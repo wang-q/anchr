@@ -3,7 +3,7 @@
 ![Publish](https://github.com/wang-q/Anchr/workflows/Publish/badge.svg)
 ![Build](https://github.com/wang-q/Anchr/workflows/Build/badge.svg)
 
-Assembler of N-free CHRomosomes
+Anchr - **A**ssembler of **N**-free **CHR**omosomes
 
 ## INSTALL
 
