@@ -73,8 +73,6 @@ Qiang Wang <wang-q@outlook.com>
 
 Copyright by Qiang Wang.
 
-Unauthorized copying of this software and its source codes, via any medium is strictly prohibited.
-
-Proprietary and confidential.
+MIT
 
 Written by Qiang Wang <wang-q@outlook.com>, 2020.
