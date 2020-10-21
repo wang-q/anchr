@@ -96,8 +96,5 @@ Cargo.lock
 **/*.rs.bk
 
 *.tmp
-*.R
-*.sh
-*.tar.gz
 *.tex
 *.pdf
