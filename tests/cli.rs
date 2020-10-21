@@ -48,15 +48,29 @@ fn file_doesnt_exist() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn command_dep() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("Anchr")?;
-    let output = cmd
-        .arg("dep")
-        .arg("check")
-        .output()
-        .unwrap();
+    let output = cmd.arg("dep").arg("check").output().unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
 
     assert_eq!(stdout.lines().count(), 151);
     assert!(stdout.contains("fastqc "));
+
+    Ok(())
+}
+#[test]
+fn command_split() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("Anchr")?;
+    let output = cmd
+        .arg("quorum")
+        .arg("tests/reads/R1.fq.gz")
+        .arg("tests/reads/R2.fq.gz")
+        .arg("-o")
+        .arg("stdout")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert!(stdout.lines().count() > 150);
+    assert!(stdout.contains("END_TIME"));
 
     Ok(())
 }
