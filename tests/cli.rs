@@ -1,7 +1,9 @@
 use assert_cmd::prelude::*; // Add methods on commands
 use itertools::Itertools;
 use predicates::prelude::*; // Used for writing assertions
-use std::process::Command; // Run programs
+use std::env;
+use std::process::Command;
+use tempfile::TempDir; // Run programs
 
 #[test]
 fn command_invalid() -> Result<(), Box<dyn std::error::Error>> {
@@ -78,6 +80,11 @@ fn command_quorum() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn command_trim() -> Result<(), Box<dyn std::error::Error>> {
+    let curdir = env::current_dir().unwrap();
+
+    let tempdir = TempDir::new().unwrap();
+    assert!(env::set_current_dir(&tempdir).is_ok());
+
     let mut cmd = Command::cargo_bin("Anchr")?;
     let output = cmd
         .arg("trim")
@@ -91,6 +98,12 @@ fn command_trim() -> Result<(), Box<dyn std::error::Error>> {
 
     assert!(stdout.lines().count() > 40);
     assert!(stdout.contains("Sickle"));
+
+    assert!(&tempdir.path().join("illumina_adapters.fa").is_file());
+    assert!(&tempdir.path().join("sequencing_artifacts.fa").is_file());
+
+    assert!(env::set_current_dir(&curdir).is_ok());
+    assert!(tempdir.close().is_ok());
 
     Ok(())
 }
