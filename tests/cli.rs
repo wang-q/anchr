@@ -74,3 +74,22 @@ fn command_split() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[test]
+fn command_trim() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("Anchr")?;
+    let output = cmd
+        .arg("trim")
+        .arg("tests/reads/R1.fq.gz")
+        .arg("tests/reads/R2.fq.gz")
+        .arg("-o")
+        .arg("stdout")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert!(stdout.lines().count() > 40);
+    assert!(stdout.contains("Sickle"));
+
+    Ok(())
+}

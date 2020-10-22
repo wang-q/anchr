@@ -3,3 +3,4 @@
 pub mod dep;
 pub mod quorum;
 pub mod template;
+pub mod trim;
