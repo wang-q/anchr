@@ -204,14 +204,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     } else {
         // write default adapter file
         let file = "illumina_adapters.fa";
-        fs::write(
-            file,
-            include_str!("../../templates/illumina_adapters.fa"),
-        )?;
-        env::current_dir()?
-            .join(file)
-            .canonicalize()
-            .unwrap()
+        fs::write(file, include_str!("../../templates/illumina_adapters.fa"))?;
+        env::current_dir()?.join(file).canonicalize().unwrap()
     };
     opt.insert("adapter", path.to_str().unwrap());
 
@@ -226,10 +220,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
             file,
             include_str!("../../templates/sequencing_artifacts.fa"),
         )?;
-        env::current_dir()?
-            .join(file)
-            .canonicalize()
-            .unwrap()
+        env::current_dir()?.join(file).canonicalize().unwrap()
     };
     opt.insert("artifact", path.to_str().unwrap());
 

@@ -19,7 +19,7 @@ rename_filter_fastq \
     <(exec expand_fastq '{{ args.0 }}' ) \
     <(exec expand_fastq '{{ args.1 }}' ) \
     > 'pe.renamed.fastq'
-{% elif args | length  == 3 -%}
+{% elif args | length == 3 -%}
 rename_filter_fastq \
     'pe' \
     <(exec expand_fastq '{{ args.0 }}' ) \

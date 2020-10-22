@@ -56,8 +56,9 @@ fn command_dep() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
 #[test]
-fn command_split() -> Result<(), Box<dyn std::error::Error>> {
+fn command_quorum() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("Anchr")?;
     let output = cmd
         .arg("quorum")

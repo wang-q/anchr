@@ -1,7 +1,7 @@
 use clap::*;
-use tera::{Tera, Context};
-use std::collections::HashMap;
 use itertools::Itertools;
+use std::collections::HashMap;
+use tera::{Context, Tera};
 
 // Create clap subcommand arguments
 pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
@@ -59,7 +59,7 @@ Fastq files can be gzipped
                 .short("o")
                 .long("outfile")
                 .takes_value(true)
-                .default_value("quorum.sh")
+                .default_value("stdout")
                 .empty_values(false)
                 .help("Output filename. [stdout] for screen"),
         )
@@ -89,7 +89,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("quorum", include_str!("../../templates/quorum.tera.sh")),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     // eprintln!("{:#?}", tera);
 
