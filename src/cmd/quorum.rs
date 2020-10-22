@@ -59,7 +59,7 @@ Fastq files can be gzipped
                 .short("o")
                 .long("outfile")
                 .takes_value(true)
-                .default_value("stdout")
+                .default_value("quorum.sh")
                 .empty_values(false)
                 .help("Output filename. [stdout] for screen"),
         )

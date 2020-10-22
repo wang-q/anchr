@@ -149,7 +149,7 @@ Fastq files can be gzipped
                 .short("o")
                 .help("Output filename. [stdout] for screen")
                 .takes_value(true)
-                .default_value("stdout")
+                .default_value("trim.sh")
                 .empty_values(false),
         )
 }
