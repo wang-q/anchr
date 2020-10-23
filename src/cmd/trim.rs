@@ -24,21 +24,21 @@ Fastq files can be gzipped
                 .index(1),
         )
         .arg(
-            Arg::with_name("len")
-                .long("len")
-                .short("l")
-                .help("Filter reads less or equal to this length")
-                .takes_value(true)
-                .default_value("60")
-                .empty_values(false),
-        )
-        .arg(
             Arg::with_name("qual")
                 .long("qual")
                 .short("q")
                 .help("Quality threshold")
                 .takes_value(true)
                 .default_value("25")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("len")
+                .long("len")
+                .short("l")
+                .help("Filter reads less or equal to this length")
+                .takes_value(true)
+                .default_value("60")
                 .empty_values(false),
         )
         .arg(
@@ -160,8 +160,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     // context from args
     let mut opt = HashMap::new();
-    opt.insert("len", args.value_of("len").unwrap());
     opt.insert("qual", args.value_of("qual").unwrap());
+    opt.insert("len", args.value_of("len").unwrap());
     opt.insert("filter", args.value_of("filter").unwrap());
     opt.insert("trimq", args.value_of("trimq").unwrap());
     opt.insert("trimk", args.value_of("trimk").unwrap());

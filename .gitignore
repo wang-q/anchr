@@ -99,3 +99,5 @@ Cargo.lock
 *.tmp
 *.tex
 *.pdf
+*.sh
+!*.tera.sh
