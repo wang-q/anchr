@@ -123,6 +123,28 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .default_value("adapter")
                 .empty_values(false),
         )
+        // Post-trimming
+        .arg(Arg::with_name("quorum").long("quorum").help("Run quorum"))
+        .arg(
+            Arg::with_name("merge")
+                .long("merge")
+                .help("Run merge reads"),
+        )
+        .arg(
+            Arg::with_name("prefilter")
+                .long("prefilter")
+                .help("Prefilter=N (1 or 2) for tadpole and bbmerge")
+                .takes_value(true)
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("ecphase")
+                .long("ecphase")
+                .help("Error-correct phases. Phase 2 can be skipped")
+                .takes_value(true)
+                .default_value("1 2 3")
+                .empty_values(false),
+        )
 }
 
 // command implementation
@@ -152,16 +174,6 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("parallel", args.value_of("parallel").unwrap());
     opt.insert("queue", args.value_of("queue").unwrap());
 
-    opt.insert("fastqc", if args.is_present("fastqc") { "1" } else { "0" });
-    opt.insert(
-        "kmergenie",
-        if args.is_present("kmergenie") {
-            "1"
-        } else {
-            "0"
-        },
-    );
-
     opt.insert("trim", args.value_of("trim").unwrap());
     opt.insert(
         "sample",
@@ -174,6 +186,16 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("qual", args.value_of("qual").unwrap());
     opt.insert("len", args.value_of("len").unwrap());
     opt.insert("filter", args.value_of("filter").unwrap());
+
+    opt.insert(
+        "prefilter",
+        if args.is_present("prefilter") {
+            args.value_of("prefilter").unwrap()
+        } else {
+            "0"
+        },
+    );
+    opt.insert("ecphase", args.value_of("ecphase").unwrap());
 
     let mut context = Context::new();
     context.insert("opt", &opt);
@@ -190,6 +212,10 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     }
 
     gen_trim(&context)?;
+
+    if !args.is_present("se") && args.is_present("merge") {
+        gen_merge(&context)?;
+    }
 
     Ok(())
 }
@@ -236,6 +262,23 @@ fn gen_trim(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_trim.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_merge.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/2_merge.tera.sh")),
     ])
     .unwrap();
 
