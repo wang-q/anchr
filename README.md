@@ -7,7 +7,7 @@ Anchr - **A**ssembler of **N**-free **CHR**omosomes
 
 ## INSTALL
 
-Current release: 0.0.1
+Current release: 0.1.0
 
 ```bash
 cargo install --force --path .

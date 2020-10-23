@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.1.0 - 2020-10-23
+
 * Add `Anchr merge`
 
 ## 0.0.1 - 2020-10-22
