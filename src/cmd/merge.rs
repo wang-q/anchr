@@ -34,9 +34,9 @@ Rs is single
         )
         .arg(
             Arg::with_name("qual")
-                .help("Quality score for 3' end")
                 .long("qual")
                 .short("q")
+                .help("Quality score for 3' end")
                 .takes_value(true)
                 .default_value("15")
                 .empty_values(false),
@@ -81,9 +81,9 @@ Rs is single
         )
         .arg(
             Arg::with_name("parallel")
-                .help("Number of threads")
                 .long("parallel")
                 .short("p")
+                .help("Number of threads")
                 .takes_value(true)
                 .default_value("8")
                 .empty_values(false),

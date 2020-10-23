@@ -34,9 +34,9 @@ Fastq files can be gzipped
         )
         .arg(
             Arg::with_name("qual")
-                .help("Quality threshold")
                 .long("qual")
                 .short("q")
+                .help("Quality threshold")
                 .takes_value(true)
                 .default_value("25")
                 .empty_values(false),
@@ -136,9 +136,9 @@ Fastq files can be gzipped
         )
         .arg(
             Arg::with_name("parallel")
-                .help("Number of threads")
                 .long("parallel")
                 .short("p")
+                .help("Number of threads")
                 .takes_value(true)
                 .default_value("8")
                 .empty_values(false),

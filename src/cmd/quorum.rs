@@ -23,45 +23,45 @@ Fastq files can be gzipped
         )
         .arg(
             Arg::with_name("jf")
-                .help("Jellyfish hash size")
                 .long("coverage")
+                .help("Jellyfish hash size")
                 .takes_value(true)
                 .default_value("500000000")
                 .empty_values(false),
         )
         .arg(
             Arg::with_name("estsize")
-                .help("Estimated genome size")
                 .long("estsize")
+                .help("Estimated genome size")
                 .takes_value(true)
                 .default_value("auto")
                 .empty_values(false),
         )
         .arg(
             Arg::with_name("prefix")
-                .help("Prefix of .cor.fa.gz")
                 .long("prefix")
+                .help("Prefix of .cor.fa.gz")
                 .takes_value(true)
                 .default_value("pe")
                 .empty_values(false),
         )
         .arg(
             Arg::with_name("parallel")
-                .help("Number of threads")
                 .long("parallel")
                 .short("p")
+                .help("Number of threads")
                 .takes_value(true)
                 .default_value("8")
                 .empty_values(false),
         )
         .arg(
             Arg::with_name("outfile")
-                .short("o")
                 .long("outfile")
+                .short("o")
+                .help("Output filename. [stdout] for screen")
                 .takes_value(true)
                 .default_value("quorum.sh")
-                .empty_values(false)
-                .help("Output filename. [stdout] for screen"),
+                .empty_values(false),
         )
 }
 
