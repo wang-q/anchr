@@ -12,9 +12,9 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 
     * --genome
     * --se
-    * --queue mpi
     * --xmx
     * --parallel 8
+    * --queue mpi
 
 * Quality check
 
@@ -93,6 +93,13 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .empty_values(false),
         )
         .arg(
+            Arg::with_name("sample")
+                .long("sample")
+                .help("Sampling coverage")
+                .takes_value(true)
+                .empty_values(false),
+        )
+        .arg(
             Arg::with_name("qual")
                 .long("qual")
                 .help("Quality threshold")
@@ -120,9 +127,19 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 
 // command implementation
 pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
+    //----------------------------
     // context from args
+    //----------------------------
     let mut opt = HashMap::new();
 
+    opt.insert(
+        "genome",
+        if args.is_present("genome") {
+            args.value_of("genome").unwrap()
+        } else {
+            "0"
+        },
+    );
     opt.insert("se", if args.is_present("se") { "1" } else { "0" });
     opt.insert(
         "xmx",
@@ -133,6 +150,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         },
     );
     opt.insert("parallel", args.value_of("parallel").unwrap());
+    opt.insert("queue", args.value_of("queue").unwrap());
 
     opt.insert("fastqc", if args.is_present("fastqc") { "1" } else { "0" });
     opt.insert(
@@ -145,6 +163,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     );
 
     opt.insert("trim", args.value_of("trim").unwrap());
+    opt.insert(
+        "sample",
+        if args.is_present("sample") {
+            args.value_of("sample").unwrap()
+        } else {
+            "0"
+        },
+    );
     opt.insert("qual", args.value_of("qual").unwrap());
     opt.insert("len", args.value_of("len").unwrap());
     opt.insert("filter", args.value_of("filter").unwrap());
@@ -152,7 +178,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     let mut context = Context::new();
     context.insert("opt", &opt);
 
+    //----------------------------
     // create scripts
+    //----------------------------
     if args.is_present("fastqc") {
         gen_fastqc(&context)?;
     }

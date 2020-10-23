@@ -23,8 +23,8 @@ for PREFIX in R S T; do
     {% if opt.filter -%}
         --filter {{ opt.filter }} \
     {% endif -%}
-    {% if opt.sample -%}
-    {% if opt.genome -%}
+    {% if opt.sample != "0" -%}
+    {% if opt.genome != "0" -%}
         --sample $(( {{ opt.genome }} * {{ opt.sample }} )) \
     {% endif -%}
     {% endif -%}
