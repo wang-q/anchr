@@ -124,6 +124,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     let mut opt = HashMap::new();
 
     opt.insert("se", if args.is_present("se") { "1" } else { "0" });
+    opt.insert(
+        "xmx",
+        if args.is_present("xmx") {
+            args.value_of("xmx").unwrap()
+        } else {
+            "0"
+        },
+    );
     opt.insert("parallel", args.value_of("parallel").unwrap());
 
     opt.insert("fastqc", if args.is_present("fastqc") { "1" } else { "0" });
@@ -153,6 +161,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         gen_kmergenie(&context)?;
     }
 
+    gen_trim(&context)?;
+
     Ok(())
 }
 
@@ -163,11 +173,11 @@ fn gen_fastqc(context: &Context) -> std::result::Result<(), std::io::Error> {
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("template", include_str!("../../templates/2_fastqc.tera.sh")),
+        ("t", include_str!("../../templates/2_fastqc.tera.sh")),
     ])
     .unwrap();
 
-    let rendered = tera.render("template", &context).unwrap();
+    let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -180,11 +190,28 @@ fn gen_kmergenie(context: &Context) -> std::result::Result<(), std::io::Error> {
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("template", include_str!("../../templates/2_kmergenie.tera.sh")),
+        ("t", include_str!("../../templates/2_kmergenie.tera.sh")),
     ])
     .unwrap();
 
-    let rendered = tera.render("template", &context).unwrap();
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_trim(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_trim.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/2_trim.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
