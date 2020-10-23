@@ -2,13 +2,15 @@
 
 ## Unreleased - ReleaseDate
 
-* Add `Anchr template`
+* Add `Anchr template` scripts
   * 2_fastqc.sh
   * 2_kmergenie.sh
   * 2_trim.sh
   * 9_statReads.sh
   * 2_quorum.sh
   * 2_merge.sh
+
+* Add `Anchr ena`
 
 ## 0.1.0 - 2020-10-23
 
@@ -22,3 +24,4 @@
 * Add `Anchr dep`
 * Add `Anchr trim`
 * Add `Anchr quorum`
+

@@ -1,5 +1,4 @@
 use assert_cmd::prelude::*; // Add methods on commands
-use itertools::Itertools;
 use predicates::prelude::*; // Used for writing assertions
 use std::env;
 use std::process::Command;
@@ -55,6 +54,18 @@ fn command_dep() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(stdout.lines().count(), 151);
     assert!(stdout.contains("fastqc "));
+
+    Ok(())
+}
+
+#[test]
+fn command_ena() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("Anchr")?;
+    let output = cmd.arg("ena").arg("info").output().unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert_eq!(stdout.lines().count(), 196);
+    assert!(stdout.contains("accession"));
 
     Ok(())
 }

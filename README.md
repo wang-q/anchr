@@ -18,6 +18,25 @@ cargo install --force --path .
 
 ```
 $ Anchr help
+anchr 0.1.1-alpha.0
+wang-q <wang-q@outlook.com>
+Anchr - Assembler of N-free CHRomosomes
+
+USAGE:
+    Anchr [SUBCOMMAND]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+SUBCOMMANDS:
+    dep         Dependencies
+    ena         ENA scripts
+    help        Prints this message or the help of the given subcommand(s)
+    merge       Merge Illumina PE reads with bbtools
+    quorum      Run quorum to discard bad reads
+    template    Creates Bash scripts
+    trim        Trim Illumina PE/SE fastq files
 
 ```
 

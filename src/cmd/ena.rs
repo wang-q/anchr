@@ -2,12 +2,12 @@ use clap::*;
 
 // Create clap subcommand arguments
 pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("dep")
-        .about("Dependencies")
+    SubCommand::with_name("ena")
+        .about("ENA scripts")
         .after_help(
             r#"
-* check   - check dependencies
-* install - install dependencies
+* info - Grab information from ENA
+* prep - Create downloading scripts
 "#,
         )
         .arg(
@@ -32,8 +32,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     let mut writer = intspan::writer(args.value_of("outfile").unwrap());
 
     let kb = match args.value_of("infile").unwrap() {
-        "check" => include_str!("../../templates/check_dep.sh"),
-        "install" => include_str!("../../templates/install_dep.sh"),
+        "info" => include_str!("../../templates/ena_info.pl"),
+        "prep" => include_str!("../../templates/ena_prep.pl"),
         _ => unreachable!(),
     };
 
