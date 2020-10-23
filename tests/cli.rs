@@ -107,3 +107,22 @@ fn command_trim() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[test]
+fn command_merge() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("Anchr")?;
+    let output = cmd
+        .arg("merge")
+        .arg("tests/reads/R1.fq.gz")
+        .arg("tests/reads/R2.fq.gz")
+        .arg("-o")
+        .arg("stdout")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert!(stdout.lines().count() > 50);
+    assert!(stdout.contains("Read merging"));
+
+    Ok(())
+}
