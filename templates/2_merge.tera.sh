@@ -37,7 +37,7 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    anchr merge \
+    Anchr merge \
         ../trim/${PREFIX}1.fq.gz ../trim/${PREFIX}2.fq.gz ../trim/${PREFIX}s.fq.gz \
 {% if opt.prefilter != "0" -%}
         --prefilter {{ opt.prefilter }} \

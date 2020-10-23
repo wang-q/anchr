@@ -215,10 +215,15 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     gen_stat_reads(&context)?;
 
+    if args.is_present("quorum") {
+        gen_quorum(&context)?;
+    } else {
+        gen_no_quorum(&context)?;
+    }
+
     if !args.is_present("se") && args.is_present("merge") {
         gen_merge(&context)?;
     }
-
 
     Ok(())
 }
@@ -274,14 +279,14 @@ fn gen_trim(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "2_merge.sh";
+fn gen_stat_reads(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "9_stat_reads.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/2_merge.tera.sh")),
+        ("t", include_str!("../../templates/9_stat_reads.tera.sh")),
     ])
     .unwrap();
 
@@ -291,14 +296,48 @@ fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_stat_reads(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "9_statReads.sh";
+fn gen_quorum(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_quorum.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/9_statReads.tera.sh")),
+        ("t", include_str!("../../templates/2_no_quorum.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_no_quorum(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_quorum.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/2_no_quorum.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_merge.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/2_merge.tera.sh")),
     ])
     .unwrap();
 

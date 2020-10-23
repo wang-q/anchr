@@ -6,8 +6,9 @@
   * 2_fastqc.sh
   * 2_kmergenie.sh
   * 2_trim.sh
-  * 2_merge.sh
   * 9_statReads.sh
+  * 2_quorum.sh
+  * 2_merge.sh
 
 ## 0.1.0 - 2020-10-23
 
