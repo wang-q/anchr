@@ -30,7 +30,7 @@ for PREFIX in R S T; do
         --sample $(( {{ opt.genome }} * {{ opt.sample }} )) \
     {% endif -%}
     {% endif -%}
-        --parallel {{ opt.parallel }}{% if opt.xmx != "0" %} --xmx{{ opt.xmx }}{% endif %} \
+        --parallel {{ opt.parallel }}{% if opt.xmx != "0" %} --xmx {{ opt.xmx }}{% endif %} \
         ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
         --prefix ${PREFIX} \
         -o trim.sh

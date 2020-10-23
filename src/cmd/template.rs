@@ -90,7 +90,8 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .help("Opts for trim")
                 .takes_value(true)
                 .default_value("--dedupe")
-                .empty_values(false),
+                .empty_values(false)
+                .allow_hyphen_values(true),
         )
         .arg(
             Arg::with_name("sample")

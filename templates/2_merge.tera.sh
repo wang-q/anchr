@@ -43,7 +43,7 @@ for PREFIX in R S T; do
         --prefilter {{ opt.prefilter }} \
 {% endif -%}
         --ecphase {{ opt.ecphase }} \
-        --parallel {{ opt.parallel }}{% if opt.xmx != "0" %} -xmx{{ opt.xmx }}{% endif %} \
+        --parallel {{ opt.parallel }}{% if opt.xmx != "0" %} --xmx {{ opt.xmx }}{% endif %} \
         --prefixm ${PREFIXM} \
         --prefixu ${PREFIXU} \
         -o merge.sh
