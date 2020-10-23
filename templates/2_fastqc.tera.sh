@@ -3,6 +3,8 @@
 #----------------------------#
 # Run
 #----------------------------#
+log_warn 2_fastqc.sh
+
 mkdir -p 2_illumina/fastqc
 cd 2_illumina/fastqc
 

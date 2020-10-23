@@ -3,6 +3,8 @@
 #----------------------------#
 # Run
 #----------------------------#
+log_warn 2_kmergenie.sh
+
 mkdir -p 2_illumina/kmergenie
 cd 2_illumina/kmergenie
 

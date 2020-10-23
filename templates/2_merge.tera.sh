@@ -1,13 +1,15 @@
 {%- include "header" -%}
 {# Keep a blank line #}
+#----------------------------#
+# run
+#----------------------------#
+log_warn 2_merge.sh
+
 if [ -e 2_illumina/merge/pe.cor.fa.gz ]; then
     log_debug "2_illumina/merge/pe.cor.fa.gz presents"
     exit;
 fi
 
-#----------------------------#
-# run
-#----------------------------#
 mkdir -p 2_illumina/merge
 cd 2_illumina/merge
 

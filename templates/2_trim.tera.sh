@@ -3,6 +3,8 @@
 #----------------------------#
 # run
 #----------------------------#
+log_warn 2_trim.sh
+
 mkdir -p 2_illumina/trim
 cd 2_illumina/trim
 
