@@ -213,9 +213,12 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     gen_trim(&context)?;
 
+    gen_stat_reads(&context)?;
+
     if !args.is_present("se") && args.is_present("merge") {
         gen_merge(&context)?;
     }
+
 
     Ok(())
 }
@@ -279,6 +282,23 @@ fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_merge.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_stat_reads(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "9_statReads.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/9_statReads.tera.sh")),
     ])
     .unwrap();
 
