@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.1.1 - 2020-10-24
+
 * Add `Anchr template` scripts
   * 2_fastqc.sh
   * 2_kmergenie.sh
