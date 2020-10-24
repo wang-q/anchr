@@ -23,7 +23,7 @@ for PREFIX in R S T; do
         --qual "{{ opt.qual }}" \
         --len "{{ opt.len }}" \
     {% if opt.filter -%}
-        --filter {{ opt.filter }} \
+        --filter "{{ opt.filter }}" \
     {% endif -%}
     {% if opt.sample != "0" -%}
     {% if opt.genome != "0" -%}

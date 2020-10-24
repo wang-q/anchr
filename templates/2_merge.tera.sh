@@ -42,7 +42,7 @@ for PREFIX in R S T; do
 {% if opt.prefilter != "0" -%}
         --prefilter {{ opt.prefilter }} \
 {% endif -%}
-        --ecphase {{ opt.ecphase }} \
+        --ecphase "{{ opt.ecphase }}" \
         --parallel {{ opt.parallel }}{% if opt.xmx != "0" %} --xmx {{ opt.xmx }}{% endif %} \
         --prefixm ${PREFIXM} \
         --prefixu ${PREFIXU} \
