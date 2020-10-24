@@ -2,6 +2,9 @@
 
 ## Unreleased - ReleaseDate
 
+* Use `tsv-sample` to replace `shuf`
+* Fix quotes
+
 ## 0.1.1 - 2020-10-24
 
 * Add `Anchr template` scripts

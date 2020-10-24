@@ -29,26 +29,12 @@ brew install miller
 brew tap brewsci/bio
 brew tap brewsci/science
 
-brew install sratoolkit    # NCBI SRAToolkit
-
-brew reinstall --build-from-source --without-webp gd # broken, can't find libwebp.so.6
-brew reinstall --build-from-source lua@5.1
-brew reinstall --build-from-source gnuplot@4
 brew install mummer        # mummer need gnuplot4
 
 brew install openblas                       # numpy
 brew install python
 brew install --HEAD quast         # assembly quality assessment. https://github.com/ablab/quast/issues/140
 quast --test                                # may recompile the bundled nucmer
-
-# canu requires gnuplot 5 while mummer requires gnuplot 4
-brew install --build-from-source canu
-
-brew unlink gnuplot@4
-brew install gnuplot
-brew unlink gnuplot
-
-brew link gnuplot@4 --force
 
 #brew install r
 brew install ntcard
@@ -304,6 +290,10 @@ rsync -avP \
     ~/data/anchr/dh5alpha/ \
     wangq@202.119.37.251:data/anchr/dh5alpha
 
+rsync -avP \
+    ~/data/anchr/dh5alpha/ \
+    wangq@10.211.55.4:data/anchr/dh5alpha
+
 # rsync -avP wangq@202.119.37.251:data/anchr/dh5alpha/ ~/data/anchr/dh5alpha
 
 ```
@@ -319,8 +309,8 @@ cd ${WORKING_DIR}/${BASE_NAME}
 rm *.sh
 Anchr template \
     --genome 4583637 \
-    --parallel 8 \
-    --xmx 10g \
+    --parallel 4 \
+    --xmx 4g \
     --queue mpi \
     \
     --fastqc \
