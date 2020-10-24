@@ -258,6 +258,10 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     gen_down_sampling(&context)?;
 
+    if !args.is_present("se") && args.is_present("merge") {
+        gen_mr_down_sampling(&context)?;
+    }
+
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
     gen_master(&context)?;
@@ -392,6 +396,23 @@ fn gen_down_sampling(context: &Context) -> std::result::Result<(), std::io::Erro
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/4_down_sampling.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_mr_down_sampling(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "6_down_sampling.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/6_down_sampling.tera.sh")),
     ])
     .unwrap();
 

@@ -7,6 +7,7 @@
   * 0_real_clean.sh
   * 0_master.sh
   * 4_down_sampling.sh
+  * 6_down_sampling.sh
 
 ## 0.1.5 - 2020-10-24
 

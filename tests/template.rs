@@ -38,7 +38,7 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 
-    assert_eq!(stderr.lines().count(), 9);
+    assert_eq!(stderr.lines().count(), 10);
     assert!(stderr.contains("2_merge.sh"));
     assert!(&tempdir.path().join("2_merge.sh").is_file());
 
