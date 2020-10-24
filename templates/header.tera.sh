@@ -35,7 +35,9 @@ log_debug () {
 set +e
 
 # set stacksize to unlimited
-ulimit -s unlimited
+if [[ "$OSTYPE" != "darwin"* ]]; then
+    ulimit -s unlimited
+fi
 
 signaled () {
     log_warn Interrupted
