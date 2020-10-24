@@ -2,14 +2,9 @@
 
 ## Unreleased - ReleaseDate
 
-## 0.1.4 - 2020-10-24
-
-## 0.1.3 - 2020-10-24
-
-## 0.1.2 - 2020-10-24
-
 * Use `tsv-sample` to replace `shuf`
 * Fix quotes
+* Tests of `Anchr template`
 
 ## 0.1.1 - 2020-10-24
 

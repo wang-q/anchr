@@ -304,7 +304,7 @@ fn gen_quorum(context: &Context) -> std::result::Result<(), std::io::Error> {
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/2_no_quorum.tera.sh")),
+        ("t", include_str!("../../templates/2_quorum.tera.sh")),
     ])
     .unwrap();
 
