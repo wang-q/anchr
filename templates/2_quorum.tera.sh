@@ -58,13 +58,13 @@ for Q in 0 {{ opt.qual }}; do
 
             printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
                 "Q${Q}L${L}.${PREFIX}" \
-                $( perl -e "printf qq{%.1f}, ${SUM_IN} / {% opt.genome %};" ) \
-                $( perl -e "printf qq{%.1f}, ${SUM_OUT} / {% opt.genome %};" ) \
-                $( perl -e "printf qq{%.2f%%}, (1 - ${SUM_OUT} / ${SUM_IN}) * 100;" ) \
+                $( perl -e "printf qq(%.1f), ${SUM_IN} / {{ opt.genome }};" ) \
+                $( perl -e "printf qq(%.1f), ${SUM_OUT} / {{ opt.genome }};" ) \
+                $( perl -e "printf qq(%.2f%%), (1 - ${SUM_OUT} / ${SUM_IN}) * 100;" ) \
                 $( cat environment.json | jq '.KMER' ) \
-                $( perl -MNumber::Format -e "print Number::Format::format_bytes({% opt.genome %}, base => 1000,);" ) \
+                $( perl -MNumber::Format -e "print Number::Format::format_bytes({{ opt.genome }}, base => 1000,);" ) \
                 $( perl -MNumber::Format -e "print Number::Format::format_bytes(${EST_G}, base => 1000,);" ) \
-                $( perl -e "printf qq{%.2f}, ${EST_G} / {% opt.genome %}" ) \
+                $( perl -e "printf qq(%.2f), ${EST_G} / {{ opt.genome }}" ) \
                 $( printf "%d:%02d'%02d''\n" $((${SECS}/3600)) $((${SECS}%3600/60)) $((${SECS}%60)) ) \
                 > statQuorum.${PREFIX}
 
@@ -100,7 +100,7 @@ for Q in 0 {{ opt.qual }}; do
         save RUNTIME
 
         # save genome size
-        ESTIMATED_GENOME_SIZE={% opt.genome %}
+        ESTIMATED_GENOME_SIZE={{ opt.genome }}
         save ESTIMATED_GENOME_SIZE
 
     done

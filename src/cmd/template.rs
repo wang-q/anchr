@@ -49,6 +49,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("genome")
                 .help("Your best guess of the haploid genome size")
                 .takes_value(true)
+                .default_value("1000000")
                 .empty_values(false),
         )
         .arg(Arg::with_name("se").long("se").help("Single end mode"))
