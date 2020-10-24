@@ -38,7 +38,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 * Downsampling
 
     * --cov "40 80"
-    * --splitp 10
+    * --splitp 20
     * --statp 2
 
 "#,
@@ -147,6 +147,31 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .default_value("1 2 3")
                 .empty_values(false),
         )
+        // Downsampling
+        .arg(
+            Arg::with_name("cov")
+                .long("cov")
+                .help("Down sampling coverages")
+                .takes_value(true)
+                .default_value("40 80")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("splitp")
+                .long("splitp")
+                .help("Parts of splitting")
+                .takes_value(true)
+                .default_value("20")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("statp")
+                .long("statp")
+                .help("Parts of stats")
+                .takes_value(true)
+                .default_value("2")
+                .empty_values(false),
+        )
 }
 
 // command implementation
@@ -199,6 +224,10 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     );
     opt.insert("ecphase", args.value_of("ecphase").unwrap());
 
+    opt.insert("cov", args.value_of("cov").unwrap());
+    opt.insert("splitp", args.value_of("splitp").unwrap());
+    opt.insert("statp", args.value_of("statp").unwrap());
+
     let mut context = Context::new();
     context.insert("opt", &opt);
 
@@ -226,6 +255,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     if !args.is_present("se") && args.is_present("merge") {
         gen_merge(&context)?;
     }
+
+    gen_down_sampling(&context)?;
 
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
@@ -344,6 +375,23 @@ fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_merge.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_down_sampling(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "4_down_sampling.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/4_down_sampling.tera.sh")),
     ])
     .unwrap();
 
