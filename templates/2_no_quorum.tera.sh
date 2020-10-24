@@ -58,7 +58,7 @@ for Q in 0 {{ opt.qual }}; do
                     getline name2; \
                     getline seq2; \
                     print $0,seq,name2,seq2}' |
-                shuf |
+                tsv-sample |
                 awk '{OFS="\n"; print $1,$2,$3,$4}' \
                 > ${PREFIX}.cor.fa
             rm ${PREFIX}.interleave.fa
@@ -75,7 +75,7 @@ for Q in 0 {{ opt.qual }}; do
                     getline name2; \
                     getline seq2; \
                     print $0,seq,name2,seq2}' |
-                shuf |
+                tsv-sample |
                 awk '{OFS="\n"; print $1,$2,$3,$4}' \
                 > pe.cor.fa
             pigz -p {{ opt.parallel }} pe.cor.fa

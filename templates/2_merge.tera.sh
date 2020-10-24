@@ -75,7 +75,7 @@ for PREFIX in R S T; do
             getline name2; \
             getline seq2; \
             print $0,seq,name2,seq2}' |
-        shuf |
+        tsv-sample |
         awk '{OFS="\n"; print $1,$2,$3,$4}' \
         > ${PREFIXM}.cor.fa
     rm ${PREFIXM}.interleave.fa
@@ -153,7 +153,7 @@ if [ -e ../S1.fq.gz ]; then
             getline name2; \
             getline seq2; \
             print $0,seq,name2,seq2}' |
-        shuf |
+        tsv-sample |
         awk '{OFS="\n"; print $1,$2,$3,$4}' \
         > pe.cor.fa
     pigz -p {{ opt.parallel }} pe.cor.fa

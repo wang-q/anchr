@@ -11,6 +11,12 @@ hash fastqc 2>/dev/null || {
     exit 1;
 }
 
+hash bbduk.sh 2>/dev/null || {
+    echo >&2 "bbtools is required but it's not installed.";
+    echo >&2 "Install with homebrew: brew install homebrew/bio/bbtools";
+    exit 1;
+}
+
 hash sickle 2>/dev/null || {
     echo >&2 "sickle is required but it's not installed.";
     echo >&2 "Install with homebrew: brew install sickle";
@@ -20,6 +26,12 @@ hash sickle 2>/dev/null || {
 hash faops 2>/dev/null || {
     echo >&2 "faops is required but it's not installed.";
     echo >&2 "Install with homebrew: brew install wang-q/tap/faops";
+    exit 1;
+}
+
+hash tsv-sample 2>/dev/null || {
+    echo >&2 "tsv-sample is required but it's not installed.";
+    echo >&2 "Install with homebrew: brew install wang-q/tap/tsv-utils";
     exit 1;
 }
 
@@ -49,12 +61,6 @@ fi
 #----------------------------#
 # anchors
 #----------------------------#
-hash bbmap.sh 2>/dev/null || {
-    echo >&2 "bbmap.sh is required but it's not installed.";
-    echo >&2 "Install with homebrew: brew install homebrew/science/bbtools";
-    exit 1;
-}
-
 hash spanr 2>/dev/null || {
     echo >&2 "spanr is required but it's not installed.";
     echo >&2 "Install with cargo: cargo install intspan";
