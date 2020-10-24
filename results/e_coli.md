@@ -310,7 +310,7 @@ rm *.sh
 Anchr template \
     --genome 4583637 \
     --parallel 4 \
-    --xmx 4g \
+    --xmx 2g \
     --queue mpi \
     \
     --fastqc \

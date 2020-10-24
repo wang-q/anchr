@@ -258,7 +258,7 @@ cat {{ opt.prefix }}.interleave.fa |
         getline name2; \
         getline seq2; \
         print $0,seq,name2,seq2}' |
-    shuf |
+    tsv-sample |
     awk '{OFS="\n"; print $1,$2,$3,$4}' \
     > {{ opt.prefix }}.cor.fa
 rm {{ opt.prefix }}.interleave.fa
