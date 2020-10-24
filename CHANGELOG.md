@@ -5,6 +5,7 @@
 * Add `Anchr template` scripts
     * 0_cleanup.sh
     * 0_real_clean.sh
+    * 0_master.sh
 
 ## 0.1.5 - 2020-10-24
 

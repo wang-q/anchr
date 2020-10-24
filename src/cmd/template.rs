@@ -229,6 +229,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
+    gen_master(&context)?;
 
     Ok(())
 }
@@ -377,6 +378,23 @@ fn gen_real_clean(context: &Context) -> std::result::Result<(), std::io::Error> 
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/0_real_clean.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_master(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "0_master.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/0_master.tera.sh")),
     ])
     .unwrap();
 
