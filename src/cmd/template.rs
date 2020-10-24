@@ -227,6 +227,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         gen_merge(&context)?;
     }
 
+    gen_cleanup(&context)?;
+    gen_real_clean(&context)?;
+
     Ok(())
 }
 
@@ -340,6 +343,40 @@ fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_merge.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_cleanup(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "0_cleanup.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/0_cleanup.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_real_clean(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "0_real_clean.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/0_real_clean.tera.sh")),
     ])
     .unwrap();
 
