@@ -27,18 +27,18 @@ find 2_illumina -type f -name "pe.cor.log"       | parallel --no-run-if-empty -j
 
 # down sampling
 rm -fr 4_downSampling/
-find . -type f -path "*4_kunitigs/*" -name "k_unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_kunitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_kunitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_tadpole/*" -name "k_unitigs_K*.fasta"   | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*4_unitigs/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*4_unitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*4_unitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*4_tadpole/*" -name "unitigs_K*.fasta"   | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*4_tadpole/*/anchor*" -name "basecov.txt"  | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*4_tadpole/*/anchor*" -name "*.sam"        | parallel --no-run-if-empty -j 1 rm
 
 rm -fr 6_downSampling
-find . -type f -path "*6_kunitigs/*" -name "k_unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_kunitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_kunitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_tadpole/*" -name "k_unitigs_K*.fasta"   | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_unitigs/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_unitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_unitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_tadpole/*" -name "unitigs_K*.fasta"   | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*6_tadpole/*/anchor*" -name "basecov.txt"  | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*6_tadpole/*/anchor*" -name "*.sam"        | parallel --no-run-if-empty -j 1 rm
 

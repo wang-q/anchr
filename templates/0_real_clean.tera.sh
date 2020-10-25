@@ -19,11 +19,11 @@ rm -fr 2_illumina/mergereads/
 
 # down sampling
 rm -fr 4_downSampling
-rm -fr 4_kunitigs*
+rm -fr 4_unitigs*
 rm -fr 4_tadpole*
 
 rm -fr 6_downSampling
-rm -fr 6_kunitigs*
+rm -fr 6_unitigs*
 rm -fr 6_tadpole*
 
 # mergeAnchors, anchorLong and anchorFill

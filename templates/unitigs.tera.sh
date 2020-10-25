@@ -39,10 +39,10 @@ save ESTIMATED_GENOME_SIZE
 log_debug "ESTIMATED_GENOME_SIZE: $ESTIMATED_GENOME_SIZE"
 
 #----------------------------#
-# Build k-unitigs
+# Build unitigs
 #----------------------------#
-if [ ! -e k_unitigs.fasta ]; then
-log_info Creating k-unitigs
+if [ ! -e unitigs.fasta ]; then
+log_info Creating unitigs
 
 {% set kmers = opt.kmer | split(pat=" ") %}
 {% for kmer in kmers -%}
@@ -50,7 +50,7 @@ log_info Creating k-unitigs
 {% if opt.tadpole -%}
     tadpole.sh \
         in=pe.cor.fa \
-        out=k_unitigs_K{{ kmer }}.fasta \
+        out=unitigs_K{{ kmer }}.fasta \
         threads={{ opt.parallel }} \
         k={{ kmer }} \
         overwrite
@@ -58,35 +58,35 @@ log_info Creating k-unitigs
     create_k_unitigs_large_k -c $(({{ kmer }}-1)) -t {{ opt.parallel }} \
         -m {{ kmer }} -n $ESTIMATED_GENOME_SIZE -l {{ kmer }} -f 0.000001 \
         pe.cor.fa \
-        > k_unitigs_K{{ kmer }}.fasta
+        > unitigs_K{{ kmer }}.fasta
 {% endif -%}
 {% endfor -%}
 
-log_info Creating non-contained k-unitigs
+log_info Creating non-contained unitigs
     dazz contained \
 {% for kmer in kmers -%}
-        k_unitigs_K{{ kmer }}.fasta \
+        unitigs_K{{ kmer }}.fasta \
 {% endfor -%}
         --len {{ opt.min }} --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
-        -o k_unitigs.non-contained.fasta
+        -o unitigs.non-contained.fasta
 
-if [ -s k_unitigs.non-contained.fasta ]; then
+if [ -s unitigs.non-contained.fasta ]; then
 {% if opt.merge == "1" -%}
-    log_info Merging k-unitigs
-    dazz orient k_unitigs.non-contained.fasta \
+    log_info Merging unitigs
+    dazz orient unitigs.non-contained.fasta \
         --len {{ opt.min }} --idt 0.99 --parallel {{ opt.parallel }} \
-        -o k_unitigs.orient.fasta
-    dazz merge k_unitigs.orient.fasta \
+        -o unitigs.orient.fasta
+    dazz merge unitigs.orient.fasta \
         --len {{ opt.min }} --idt 0.999 --parallel {{ opt.parallel }} \
-        -o k_unitigs.fasta
+        -o unitigs.fasta
 {% else -%}
-    mv k_unitigs.non-contained.fasta k_unitigs.fasta
+    mv unitigs.non-contained.fasta unitigs.fasta
 {% endif -%}
 else
-    touch k_unitigs.fasta
+    touch unitigs.fasta
 fi
 
-rm k_unitigs_K*.fasta
+rm unitigs_K*.fasta
 
 fi
 

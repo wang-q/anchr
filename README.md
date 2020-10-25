@@ -9,7 +9,7 @@ Anchr - **A**ssembler of **N**-free **CHR**omosomes
 
 Current release: 0.1.5
 
-```bash
+```shell script
 # Via cargo
 cargo install --force --path .
 
@@ -24,7 +24,7 @@ cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
 
 ```
 $ anchr help
-anchr 0.1.1-alpha.0
+anchr 0.1.6-alpha.0
 wang-q <wang-q@outlook.com>
 anchr - Assembler of N-free CHRomosomes
 
@@ -43,6 +43,7 @@ SUBCOMMANDS:
     quorum      Run quorum to discard bad reads
     template    Creates Bash scripts
     trim        Trim Illumina PE/SE fastq files
+    unitigs     Create unitigs from trimmed/merged reads
 
 ```
 
@@ -51,7 +52,7 @@ SUBCOMMANDS:
 * Command line tools managed by `Linuxbrew`
 
 ```bash
-brew install r perl
+brew install perl
 brew install parallel wget pigz
 brew install datamash mlr
 

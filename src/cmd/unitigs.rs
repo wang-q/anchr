@@ -5,8 +5,8 @@ use tera::{Context, Tera};
 
 // Create clap subcommand arguments
 pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("kunitigs")
-        .about("Create k-unitigs from corrected/merged reads")
+    SubCommand::with_name("unitigs")
+        .about("Create unitigs from trimmed/merged reads")
         .after_help(
             r#"
 <pe.cor.fa> <environment.json>
@@ -40,7 +40,7 @@ Fasta files can be gzipped
         .arg(
             Arg::with_name("min")
                 .long("min")
-                .help("Minimal length of k-unitigs")
+                .help("Minimal length of unitigs")
                 .takes_value(true)
                 .default_value("1000")
                 .empty_values(false),
@@ -48,7 +48,7 @@ Fasta files can be gzipped
         .arg(
             Arg::with_name("merge")
                 .long("merge")
-                .help("Merge k-unitigs from all k-mers")
+                .help("Merge unitigs from all k-mers")
                 .empty_values(false),
         )
         .arg(
@@ -66,7 +66,7 @@ Fasta files can be gzipped
                 .short("o")
                 .help("Output filename. [stdout] for screen")
                 .takes_value(true)
-                .default_value("kunitigs.sh")
+                .default_value("unitigs.sh")
                 .empty_values(false),
         )
 }
@@ -96,7 +96,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/kunitigs.tera.sh")),
+        ("t", include_str!("../../templates/unitigs.tera.sh")),
     ])
     .unwrap();
 

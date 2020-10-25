@@ -49,49 +49,49 @@ if [ -e 2_quorum.sh ]; then
 fi
 
 #----------------------------#
-# down sampling, k-unitigs and anchors
+# down sampling trimmed reads; build unitigs and anchors
 #----------------------------#
 if [ -e 4_downSampling.sh ]; then
     bash 4_downSampling.sh;
 fi
 
-if [ -e 4_kunitigs.sh ]; then
-    bash 4_kunitigs.sh;
+if [ -e 4_unitigs.sh ]; then
+    bash 4_unitigs.sh;
 fi
 if [ -e 4_anchors.sh ]; then
     bash 4_anchors.sh;
 fi
 if [ -e 9_statAnchors.sh ]; then
-    bash 9_statAnchors.sh 4_kunitigs statKunitigsAnchors.md
+    bash 9_statAnchors.sh 4_unitigs statUnitigsAnchors.md
 fi
 
 #----------------------------#
-# down sampling mergereads
+# down sampling merged reads
 #----------------------------#
 if [ -e 6_downSampling.sh ]; then
     bash 6_downSampling.sh
 fi
 
-if [ -e 6_kunitigs.sh ]; then
-    bash 6_kunitigs.sh;
+if [ -e 6_unitigs.sh ]; then
+    bash 6_unitigs.sh;
 fi
 if [ -e 6_anchors.sh ]; then
     bash 6_anchors.sh;
 fi
 if [ -e 9_statMRAnchors.sh ]; then
-    bash 9_statMRAnchors.sh 6_kunitigs statMRKunitigsAnchors.md
+    bash 9_statMRAnchors.sh 6_unitigs statMRUnitigsAnchors.md
 fi
 
 #----------------------------#
 # merge anchors
 #----------------------------#
 if [ -e 7_mergeAnchors.sh ]; then
-    bash 7_mergeAnchors.sh 4_kunitigs 7_mergeKunitigsAnchors;
+    bash 7_mergeAnchors.sh 4_unitigs 7_mergeUnitigsAnchors;
 fi
 
 {% if opt.merge -%}
 if [ -e 7_mergeAnchors.sh ]; then
-    bash 7_mergeAnchors.sh 6_kunitigs 7_mergeMRKunitigsAnchors
+    bash 7_mergeAnchors.sh 6_unitigs 7_mergeMRUnitigsAnchors
 fi
 {% endif -%}
 
