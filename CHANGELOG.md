@@ -4,6 +4,10 @@
 
 * Rename `environment.json` to `env.json`
 
+* Add `anchr template` scripts
+  * 4_unitigs.sh
+  * 6_unitigs.sh
+
 ## 0.2.0 - 2020-10-26
 
 * Binary name `anchr`

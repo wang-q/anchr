@@ -251,15 +251,13 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     } else {
         gen_no_quorum(&context)?;
     }
+    gen_down_sampling(&context)?;
+    gen_unitigs(&context)?;
 
     if !args.is_present("se") && args.is_present("merge") {
         gen_merge(&context)?;
-    }
-
-    gen_down_sampling(&context)?;
-
-    if !args.is_present("se") && args.is_present("merge") {
         gen_mr_down_sampling(&context)?;
+        gen_mr_unitigs(&context)?;
     }
 
     gen_cleanup(&context)?;
@@ -413,6 +411,40 @@ fn gen_mr_down_sampling(context: &Context) -> std::result::Result<(), std::io::E
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/6_down_sampling.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_unitigs(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "4_unitigs.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/4_unitigs.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_mr_unitigs(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "6_unitigs.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/6_unitigs.tera.sh")),
     ])
     .unwrap();
 
