@@ -1,4 +1,4 @@
-//! Subcommand modules for the `Anchr` binary.
+//! Subcommand modules for the `anchr` binary.
 
 pub mod dep;
 pub mod ena;

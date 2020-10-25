@@ -34,7 +34,7 @@ for Q in 0 {{ opt.qual }}; do
 
             log_info "Qual-Len: Q${Q}L${L}.${PREFIX}"
 
-            Anchr quorum \
+            anchr quorum \
                 ${PREFIX}1.fq.gz \
 {% if opt.se == "0" -%}
                 ${PREFIX}2.fq.gz \

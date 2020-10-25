@@ -7,7 +7,7 @@ fn main() -> std::io::Result<()> {
     let app = App::new("anchr")
         .version(crate_version!())
         .author(crate_authors!())
-        .about("Anchr - Assembler of N-free CHRomosomes")
+        .about("anchr - Assembler of N-free CHRomosomes")
         .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())

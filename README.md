@@ -1,7 +1,7 @@
 # Anchr
 
-![Publish](https://github.com/wang-q/Anchr/workflows/Publish/badge.svg)
-![Build](https://github.com/wang-q/Anchr/workflows/Build/badge.svg)
+![Publish](https://github.com/wang-q/anchr/workflows/Publish/badge.svg)
+![Build](https://github.com/wang-q/anchr/workflows/Build/badge.svg)
 
 Anchr - **A**ssembler of **N**-free **CHR**omosomes
 
@@ -14,22 +14,22 @@ Current release: 0.1.5
 cargo install --force --path .
 
 # Compiled binary
-curl -fsSL https://github.com/wang-q/Anchr/releases/download/v0.1.5/Anchr-x86_64-unknown-linux-musl.tar.gz |
+curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.1.5/anchr-x86_64-unknown-linux-musl.tar.gz |
   tar xvz
-cp target/x86_64-unknown-linux-musl/release/Anchr ~/bin
+cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
 
 ```
 
 ## SYNOPSIS
 
 ```
-$ Anchr help
+$ anchr help
 anchr 0.1.1-alpha.0
 wang-q <wang-q@outlook.com>
-Anchr - Assembler of N-free CHRomosomes
+anchr - Assembler of N-free CHRomosomes
 
 USAGE:
-    Anchr [SUBCOMMAND]
+    anchr [SUBCOMMAND]
 
 FLAGS:
     -h, --help       Prints help information

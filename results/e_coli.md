@@ -163,7 +163,7 @@ BASE_NAME=mg1655
 cd ${WORKING_DIR}/${BASE_NAME}
 
 rm *.sh
-Anchr template \
+anchr template \
     --genome 4641652 \
     --parallel 24 \
     --xmx 10g \
@@ -251,8 +251,8 @@ cat << EOF > source.csv
 SRP251726,dh5alpha,PE125, HiSeq 2500
 EOF
 
-Anchr ena info | perl - -v source.csv > ena_info.yml
-Anchr ena prep | perl - ena_info.yml
+anchr ena info | perl - -v source.csv > ena_info.yml
+anchr ena prep | perl - ena_info.yml
 
 mlr --icsv --omd cat ena_info.csv
 
@@ -307,10 +307,10 @@ BASE_NAME=dh5alpha
 cd ${WORKING_DIR}/${BASE_NAME}
 
 rm *.sh
-Anchr template \
+anchr template \
     --genome 4583637 \
     --parallel 4 \
-    --xmx 2g \
+    --xmx 4g \
     --queue mpi \
     \
     --fastqc \

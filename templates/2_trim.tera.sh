@@ -18,7 +18,7 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    Anchr trim \
+    anchr trim \
         {{ opt.trim }} \
         --qual "{{ opt.qual }}" \
         --len "{{ opt.len }}" \

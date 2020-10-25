@@ -10,8 +10,8 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
     let tempdir = TempDir::new().unwrap();
     assert!(env::set_current_dir(&tempdir).is_ok());
 
-    // Anchr template
-    let mut cmd = Command::cargo_bin("Anchr")?;
+    // anchr template
+    let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd.arg("template").output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 
@@ -19,8 +19,8 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
     assert!(stderr.contains("2_trim.sh"));
     assert!(&tempdir.path().join("2_trim.sh").is_file());
 
-    // Anchr template --fastqc
-    let mut cmd = Command::cargo_bin("Anchr")?;
+    // anchr template --fastqc
+    let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd.arg("template").arg("--fastqc").output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 
@@ -28,8 +28,8 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
     assert!(stderr.contains("2_fastqc.sh"));
     assert!(&tempdir.path().join("2_fastqc.sh").is_file());
 
-    // Anchr template --fastqc --merge
-    let mut cmd = Command::cargo_bin("Anchr")?;
+    // anchr template --fastqc --merge
+    let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("template")
         .arg("--fastqc")
@@ -42,8 +42,8 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
     assert!(stderr.contains("2_merge.sh"));
     assert!(&tempdir.path().join("2_merge.sh").is_file());
 
-    // Anchr template --quorum
-    let mut cmd = Command::cargo_bin("Anchr")?;
+    // anchr template --quorum
+    let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd.arg("template").arg("--quorum").output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 

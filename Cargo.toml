@@ -1,19 +1,19 @@
 [package]
-name = "Anchr"
+name = "anchr"
 version = "0.1.6-alpha.0"
 authors = ["wang-q <wang-q@outlook.com>"]
 edition = "2018"
 description = "Assembler of N-free CHRomosomes"
-documentation = "https://github.com/wang-q/Anchr"
+documentation = "https://github.com/wang-q/anchr"
 readme = "README.md"
-homepage = "https://github.com/wang-q/Anchr"
-repository = "https://github.com/wang-q/Anchr"
+homepage = "https://github.com/wang-q/anchr"
+repository = "https://github.com/wang-q/anchr"
 license = "None"
 categories = ["command-line-utilities", "bioinformatics"]
 publish = false
 
 [[bin]]
-name = "Anchr"
+name = "anchr"
 path = "src/anchr.rs"
 
 [dependencies]
