@@ -101,3 +101,6 @@ Cargo.lock
 *.pdf
 *.sh
 !*.tera.sh
+
+tests/trim
+tests/merge
