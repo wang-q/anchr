@@ -9,7 +9,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
         .about("Create unitigs from trimmed/merged reads")
         .after_help(
             r#"
-<pe.cor.fa> <environment.json>
+<pe.cor.fa> <env.json>
 
 Fasta files can be gzipped
 "#,

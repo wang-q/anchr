@@ -23,7 +23,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         mkdir -p 6_downSampling/MRXallP000
         cd 6_downSampling/MRXallP000
         gzip -d -c ../../2_illumina/merge/pe.cor.fa.gz > pe.cor.fa
-        cp ../../2_illumina/merge/environment.json .
+        cp ../../2_illumina/merge/env.json .
         exit;
     fi
 
@@ -35,7 +35,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         6_downSampling/MRX{}
 
     MAX_SERIAL=\$(
-        cat 2_illumina/merge/environment.json \
+        cat 2_illumina/merge/env.json \
             | jq '.SUM_OUT | tonumber | . / {{ opt.genome }} / {} | floor | . - 1'
     )
     MAX_SERIAL=\$(( \${MAX_SERIAL} < {{ opt.splitp }} ? \${MAX_SERIAL} : {{ opt.splitp }} ))
@@ -48,7 +48,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
         mv  \"6_downSampling/MRX{}/\${P}.fa\" \
             \"6_downSampling/MRX{}P\${P}/pe.cor.fa\"
-        cp 2_illumina/merge/environment.json \"6_downSampling/MRX{}P\${P}\"
+        cp 2_illumina/merge/env.json \"6_downSampling/MRX{}P\${P}\"
     done
 
     " ::: {{ opt.cov }}

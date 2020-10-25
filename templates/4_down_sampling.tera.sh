@@ -21,7 +21,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         mkdir -p 4_downSampling/Q{1}L{2}XallP000
         cd 4_downSampling/Q{1}L{2}XallP000
         gzip -d -c ../../2_illumina/Q{1}L{2}/pe.cor.fa.gz > pe.cor.fa
-        cp ../../2_illumina/Q{1}L{2}/environment.json .
+        cp ../../2_illumina/Q{1}L{2}/env.json .
         exit;
     fi
 
@@ -33,7 +33,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         4_downSampling/Q{1}L{2}X{3}
 
     MAX_SERIAL=\$(
-        cat 2_illumina/Q{1}L{2}/environment.json \
+        cat 2_illumina/Q{1}L{2}/env.json \
             | jq '.SUM_OUT | tonumber | . / {{ opt.genome }} / {3} | floor | . - 1'
     )
     MAX_SERIAL=\$(( \${MAX_SERIAL} < {{ opt.splitp }} ? \${MAX_SERIAL} : {{ opt.splitp }} ))
@@ -46,7 +46,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
         mv  \"4_downSampling/Q{1}L{2}X{3}/\${P}.fa\" \
             \"4_downSampling/Q{1}L{2}X{3}P\${P}/pe.cor.fa\"
-        cp 2_illumina/Q{1}L{2}/environment.json \"4_downSampling/Q{1}L{2}X{3}P\${P}\"
+        cp 2_illumina/Q{1}L{2}/env.json \"4_downSampling/Q{1}L{2}X{3}P\${P}\"
     done
 
     " ::: 0 {{ opt.qual }} ::: 0 {{ opt.len }} ::: {{ opt.cov }}

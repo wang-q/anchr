@@ -49,17 +49,17 @@ trap signaled TERM QUIT INT
 save () {
     printf ". + { %s: \"%s\"}" $1 $(eval "echo -n \"\$$1\"") > jq.filter.txt
 
-    if [ -e environment.json ]; then
-        cat environment.json |
+    if [ -e env.json ]; then
+        cat env.json |
             jq -f jq.filter.txt \
-            > environment.json.new
-        rm environment.json
+            > env.json.new
+        rm env.json
     else
         jq -f jq.filter.txt -n \
-            > environment.json.new
+            > env.json.new
     fi
 
-    mv environment.json.new environment.json
+    mv env.json.new env.json
     rm jq.filter.txt
 }
 

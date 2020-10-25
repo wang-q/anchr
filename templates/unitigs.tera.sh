@@ -19,7 +19,7 @@ log_info Symlink/copy input files
 if [ ! -e pe.cor.fa ]; then
     ln -s {{ args.0 }} pe.cor.fa
 fi
-cp {{ args.1 }} environment.json
+cp {{ args.1 }} env.json
 
 log_info Read stats of PE reads
 
@@ -31,7 +31,7 @@ save KMER
 log_debug "You set kmer size of $KMER for the graph"
 
 {% if opt.estsize == 'auto' -%}
-ESTIMATED_GENOME_SIZE=$( cat environment.json | jq '.ESTIMATED_GENOME_SIZE | tonumber' )
+ESTIMATED_GENOME_SIZE=$( cat env.json | jq '.ESTIMATED_GENOME_SIZE | tonumber' )
 {% else -%}
 ESTIMATED_GENOME_SIZE={{ opt.estsize }}
 save ESTIMATED_GENOME_SIZE

@@ -51,17 +51,17 @@ for Q in 0 {{ opt.qual }}; do
 
             log_info "statQuorum.${PREFIX}"
 
-            SUM_IN=$( cat environment.json | jq '.SUM_IN | tonumber' )
-            SUM_OUT=$( cat environment.json | jq '.SUM_OUT | tonumber' )
-            EST_G=$( cat environment.json | jq '.ESTIMATED_GENOME_SIZE | tonumber' )
-            SECS=$( cat environment.json | jq '.RUNTIME | tonumber' )
+            SUM_IN=$( cat env.json | jq '.SUM_IN | tonumber' )
+            SUM_OUT=$( cat env.json | jq '.SUM_OUT | tonumber' )
+            EST_G=$( cat env.json | jq '.ESTIMATED_GENOME_SIZE | tonumber' )
+            SECS=$( cat env.json | jq '.RUNTIME | tonumber' )
 
             printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
                 "Q${Q}L${L}.${PREFIX}" \
                 $( perl -e "printf qq(%.1f), ${SUM_IN} / {{ opt.genome }};" ) \
                 $( perl -e "printf qq(%.1f), ${SUM_OUT} / {{ opt.genome }};" ) \
                 $( perl -e "printf qq(%.2f%%), (1 - ${SUM_OUT} / ${SUM_IN}) * 100;" ) \
-                $( cat environment.json | jq '.KMER' ) \
+                $( cat env.json | jq '.KMER' ) \
                 $( perl -MNumber::Format -e "print Number::Format::format_bytes({{ opt.genome }}, base => 1000,);" ) \
                 $( perl -MNumber::Format -e "print Number::Format::format_bytes(${EST_G}, base => 1000,);" ) \
                 $( perl -e "printf qq(%.2f), ${EST_G} / {{ opt.genome }}" ) \
@@ -88,7 +88,7 @@ for Q in 0 {{ opt.qual }}; do
             mv R.cor.fa.gz pe.cor.fa.gz
         fi
 
-        rm environment.json
+        rm env.json
         log_debug "Reads stats with faops"
         SUM_OUT=$( faops n50 -H -N 0 -S pe.cor.fa.gz )
         save SUM_OUT
