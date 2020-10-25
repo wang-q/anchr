@@ -63,7 +63,7 @@ log_info Creating k-unitigs
 {% endfor -%}
 
 log_info Creating non-contained k-unitigs
-    anchr contained \
+    dazz contained \
 {% for kmer in kmers -%}
         k_unitigs_K{{ kmer }}.fasta \
 {% endfor -%}
@@ -73,10 +73,10 @@ log_info Creating non-contained k-unitigs
 if [ -s k_unitigs.non-contained.fasta ]; then
 {% if opt.merge == "1" -%}
     log_info Merging k-unitigs
-    anchr orient k_unitigs.non-contained.fasta \
+    dazz orient k_unitigs.non-contained.fasta \
         --len {{ opt.min }} --idt 0.99 --parallel {{ opt.parallel }} \
         -o k_unitigs.orient.fasta
-    anchr merge k_unitigs.orient.fasta \
+    dazz merge k_unitigs.orient.fasta \
         --len {{ opt.min }} --idt 0.999 --parallel {{ opt.parallel }} \
         -o k_unitigs.fasta
 {% else -%}
