@@ -14,9 +14,10 @@ Current release: 0.2.0
 cargo install --force --path .
 
 # Compiled binary
-curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.1.5/anchr-x86_64-unknown-linux-musl.tar.gz |
-  tar xvz
+curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.0/anchr-x86_64-unknown-linux-musl.tar.gz |
+    tar xvz
 cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
+rm -fr target
 
 ```
 
@@ -105,7 +106,7 @@ anchr trim \
     -q 25 -l 60 \
     -o stdout |
     bash
-popd 
+popd
 
 # merge
 mkdir tests/merge
@@ -121,6 +122,14 @@ popd
 
 # quorum
 pushd tests/trim
+
+anchr quorum \
+    R1.fq.gz R2.fq.gz \
+    -o stdout |
+    bash
+popd
+
+pushd tests/trim/Q25L60
 
 anchr quorum \
     R1.fq.gz R2.fq.gz \

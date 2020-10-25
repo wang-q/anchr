@@ -17,11 +17,11 @@
 
 ## 0.1.5 - 2020-10-24
 
-* Use `tsv-sample` to replace `shuf`
-* Fix quotes
-* Tests of `anchr template`
-
-## 0.1.1 - 2020-10-24
+* Add `anchr ena`
+* Add `anchr dep`
+* Add `anchr trim`
+* Add `anchr quorum`
+* Add `anchr merge`
 
 * Add `anchr template` scripts
   * 2_fastqc.sh
@@ -31,18 +31,14 @@
   * 2_quorum.sh
   * 2_merge.sh
 
-* Add `anchr ena`
+* Tests of `anchr template`
 
-## 0.1.0 - 2020-10-23
+* Use `tsv-sample` to replace `shuf`
+* Fix quotes
 
-* Add `anchr merge`
 
 ## 0.0.1 - 2020-10-22
 
 * Skeletons, need to be filled
 * Setup github actions
-
-* Add `anchr dep`
-* Add `anchr trim`
-* Add `anchr quorum`
 
