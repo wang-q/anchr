@@ -122,7 +122,6 @@ popd
 
 # quorum
 pushd tests/trim
-
 anchr quorum \
     R1.fq.gz R2.fq.gz \
     -o stdout |
@@ -130,12 +129,25 @@ anchr quorum \
 popd
 
 pushd tests/trim/Q25L60
-
 anchr quorum \
-    R1.fq.gz R2.fq.gz \
+    R1.fq.gz R2.fq.gz Rs.fq.gz \
     -o stdout |
     bash
-popd 
+popd
+
+# unitigs
+mkdir tests/Q0L0
+pushd tests/Q0L0
+
+gzip -dcf ../trim/pe.cor.fa.gz > pe.cor.fa
+
+anchr unitigs \
+    pe.cor.fa ../trim/env.json \
+    --kmer "31 41 51 61 71 81" \
+    --parallel 4 \
+    -o unitigs.sh
+bash unitigs.sh
+popd
 
 ```
 

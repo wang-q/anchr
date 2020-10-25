@@ -26,7 +26,7 @@ log_info Read stats of PE reads
 SUM_COR=$( faops n50 -H -N 0 -S pe.cor.fa )
 save SUM_COR
 
-KMER="{{ opt.kmer }}"
+KMER="{{ opt.kmer | replace(from=" ", to="," }}"
 save KMER
 log_debug "You set kmer size of $KMER for the graph"
 

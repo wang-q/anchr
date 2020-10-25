@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+* Rename `environment.json` to `env.json`
+
 ## 0.2.0 - 2020-10-26
 
 * Binary name `anchr`
