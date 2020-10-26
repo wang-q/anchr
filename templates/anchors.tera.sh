@@ -286,7 +286,7 @@ perl -MYAML::Syck -MAlignDB::IntSpan -e '
     }
 
 {% if opt.keepedge == "1" -%}
-    # repeats on the edge hurt assembling, so fill edges near big island by [% opt.fill %]
+    # repeats on the edge hurt assembling, so fill edges near big island by {{ opt.fill }}
     for my $key ( sort keys %{$yml} ) {
         my $length = AlignDB::IntSpan->new( $yml_chr->{$key} )->max;
 

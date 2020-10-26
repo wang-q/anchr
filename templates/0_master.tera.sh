@@ -89,7 +89,7 @@ if [ -e 7_merge_anchors.sh ]; then
     bash 7_merge_anchors.sh 4_unitigs 7_merge_unitigs_anchors;
 fi
 
-{% if opt.merge -%}
+{% if opt.merge == "1" -%}
 if [ -e 7_merge_anchors.sh ]; then
     bash 7_merge_anchors.sh 6_unitigs 7_merge_mr_unitigs_anchors
 fi

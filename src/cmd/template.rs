@@ -221,6 +221,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("filter", args.value_of("filter").unwrap());
 
     opt.insert(
+        "merge",
+        if args.is_present("merge") {
+            "1"
+        } else {
+            "0"
+        },
+    );
+    opt.insert(
         "prefilter",
         if args.is_present("prefilter") {
             args.value_of("prefilter").unwrap()
