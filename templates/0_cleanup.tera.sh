@@ -100,9 +100,9 @@ if [ -e statAnchors.md ]; then
     cat statAnchors.md;
     echo;
 fi
-if [ -e statKunitigsAnchors.md ]; then
+if [ -e statUnitigsAnchors.md ]; then
     echo;
-    cat statKunitigsAnchors.md;
+    cat statUnitigsAnchors.md;
     echo;
 fi
 if [ -e statTadpoleAnchors.md ]; then
@@ -110,9 +110,9 @@ if [ -e statTadpoleAnchors.md ]; then
     cat statTadpoleAnchors.md;
     echo;
 fi
-if [ -e statMRKunitigsAnchors.md ]; then
+if [ -e statMRUnitigsAnchors.md ]; then
     echo;
-    cat statMRKunitigsAnchors.md;
+    cat statMRUnitigsAnchors.md;
     echo;
 fi
 if [ -e statMRTadpoleAnchors.md ]; then
