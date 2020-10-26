@@ -15,7 +15,7 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     " ::: R1 R2 Rs ::: uniq shuffle sample bbduk clean
 
 rm -fr 2_illumina/trim/
-rm -fr 2_illumina/mergereads/
+rm -fr 2_illumina/merge/
 
 # down sampling
 rm -fr 4_downSampling

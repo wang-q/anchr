@@ -15,12 +15,12 @@ if [ -e 2_kmergenie.sh ]; then
     bash 2_kmergenie.sh;
 fi
 
-if [ -e 2_insertSize.sh ]; then
-    bash 2_insertSize.sh;
+if [ -e 2_insert_size.sh ]; then
+    bash 2_insert_size.sh;
 fi
 
-if [ -e 2_sgaPreQC.sh ]; then
-    bash 2_sgaPreQC.sh;
+if [ -e 2_sga_preqc.sh ]; then
+    bash 2_sga_preqc.sh;
 fi
 
 #----------------------------#
@@ -30,8 +30,8 @@ if [ -e 2_trim.sh ]; then
     bash 2_trim.sh;
 fi
 
-if [ -e 9_statReads.sh ]; then
-    bash 9_statReads.sh;
+if [ -e 9_stat_reads.sh ]; then
+    bash 9_stat_reads.sh;
 fi
 
 #----------------------------#
@@ -51,8 +51,8 @@ fi
 #----------------------------#
 # down sampling trimmed reads; build unitigs and anchors
 #----------------------------#
-if [ -e 4_downSampling.sh ]; then
-    bash 4_downSampling.sh;
+if [ -e 4_down_sampling.sh ]; then
+    bash 4_down_sampling.sh;
 fi
 
 if [ -e 4_unitigs.sh ]; then
@@ -61,15 +61,15 @@ fi
 if [ -e 4_anchors.sh ]; then
     bash 4_anchors.sh;
 fi
-if [ -e 9_statAnchors.sh ]; then
-    bash 9_statAnchors.sh 4_unitigs statUnitigsAnchors.md
+if [ -e 9_stat_anchors.sh ]; then
+    bash 9_stat_anchors.sh 4_unitigs statUnitigsAnchors.md
 fi
 
 #----------------------------#
 # down sampling merged reads
 #----------------------------#
-if [ -e 6_downSampling.sh ]; then
-    bash 6_downSampling.sh
+if [ -e 6_down_sampling.sh ]; then
+    bash 6_down_sampling.sh
 fi
 
 if [ -e 6_unitigs.sh ]; then
@@ -78,8 +78,8 @@ fi
 if [ -e 6_anchors.sh ]; then
     bash 6_anchors.sh;
 fi
-if [ -e 9_statMRAnchors.sh ]; then
-    bash 9_statMRAnchors.sh 6_unitigs statMRUnitigsAnchors.md
+if [ -e 9_stat_mr_anchors.sh ]; then
+    bash 9_stat_mr_anchors.sh 6_unitigs statMRUnitigsAnchors.md
 fi
 
 #----------------------------#

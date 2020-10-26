@@ -16,11 +16,11 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         exit
     fi
 
-    # shortcut if cov2 == all
+    # shortcut if cov == all
     if [[ {3} == 'all' ]]; then
         mkdir -p 4_downSampling/Q{1}L{2}XallP000
         cd 4_downSampling/Q{1}L{2}XallP000
-        gzip -d -c ../../2_illumina/Q{1}L{2}/pe.cor.fa.gz > pe.cor.fa
+        gzip -dcf ../../2_illumina/Q{1}L{2}/pe.cor.fa.gz > pe.cor.fa
         cp ../../2_illumina/Q{1}L{2}/env.json .
         exit;
     fi

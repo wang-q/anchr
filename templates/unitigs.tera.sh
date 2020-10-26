@@ -26,11 +26,11 @@ log_info Read stats of PE reads
 SUM_COR=$( faops n50 -H -N 0 -S pe.cor.fa )
 save SUM_COR
 
-KMER="{{ opt.kmer | replace(from=" ", to="," }}"
+KMER='{{ opt.kmer | replace(from=" ", to=",") }}'
 save KMER
 log_debug "You set kmer size of $KMER for the graph"
 
-{% if opt.estsize == 'auto' -%}
+{% if opt.estsize == "auto" -%}
 ESTIMATED_GENOME_SIZE=$( cat env.json | jq '.ESTIMATED_GENOME_SIZE | tonumber' )
 {% else -%}
 ESTIMATED_GENOME_SIZE={{ opt.estsize }}
