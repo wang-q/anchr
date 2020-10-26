@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.2.3 - 2020-10-27
+
 * Remove dependency on samtools
 * Fix bugs
 
