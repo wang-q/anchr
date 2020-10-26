@@ -9,7 +9,7 @@ log_warn 6_anchors.sh
 {% set parallel2 = parallel2 | round(method="floor") -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
 parallel --no-run-if-empty --linebuffer -k -j 2 "
-    if [ ! -e 6_downSampling/MRX{1}P{2}/pe.cor.fa ]; then
+    if [ ! -e 6_down_sampling/MRX{1}P{2}/pe.cor.fa ]; then
         exit;
     fi
 

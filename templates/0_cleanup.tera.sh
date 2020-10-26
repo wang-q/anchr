@@ -26,7 +26,7 @@ find 2_illumina -type f -name "pe.cor.sub.fa"    | parallel --no-run-if-empty -j
 find 2_illumina -type f -name "pe.cor.log"       | parallel --no-run-if-empty -j 1 rm
 
 # down sampling
-rm -fr 4_downSampling/
+rm -fr 4_down_sampling/
 find . -type f -path "*4_unitigs/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*4_unitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*4_unitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
@@ -34,7 +34,7 @@ find . -type f -path "*4_tadpole/*" -name "unitigs_K*.fasta"   | parallel --no-r
 find . -type f -path "*4_tadpole/*/anchor*" -name "basecov.txt"  | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*4_tadpole/*/anchor*" -name "*.sam"        | parallel --no-run-if-empty -j 1 rm
 
-rm -fr 6_downSampling
+rm -fr 6_down_sampling
 find . -type f -path "*6_unitigs/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*6_unitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*6_unitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm

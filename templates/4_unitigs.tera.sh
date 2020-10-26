@@ -6,7 +6,7 @@
 log_warn 4_unitigs.sh
 
 parallel --no-run-if-empty --linebuffer -k -j 1 "
-    if [ ! -e 4_downSampling/Q{1}L{2}X{3}P{4}/pe.cor.fa ]; then
+    if [ ! -e 4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa ]; then
         exit;
     fi
 
@@ -20,8 +20,8 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     cd 4_unitigs/Q{1}L{2}X{3}P{4}
 
     anchr unitigs \
-        ../../4_downSampling/Q{1}L{2}X{3}P{4}/pe.cor.fa \
-        ../../4_downSampling/Q{1}L{2}X{3}P{4}/env.json \
+        ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa \
+        ../../4_down_sampling/Q{1}L{2}X{3}P{4}/env.json \
         -p {{ opt.parallel }} \
         --kmer 31,41,51,61,71,81 \
         -o unitigs.sh

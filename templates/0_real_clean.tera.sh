@@ -18,11 +18,11 @@ rm -fr 2_illumina/trim/
 rm -fr 2_illumina/merge/
 
 # down sampling
-rm -fr 4_downSampling
+rm -fr 4_down_sampling
 rm -fr 4_unitigs*
 rm -fr 4_tadpole*
 
-rm -fr 6_downSampling
+rm -fr 6_down_sampling
 rm -fr 6_unitigs*
 rm -fr 6_tadpole*
 

@@ -11,26 +11,26 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
     fi
     echo '==> Q{1}L{2}X{3}'
 
-    if [ -d 4_downSampling/Q{1}L{2}X{3} ]; then
+    if [ -d 4_down_sampling/Q{1}L{2}X{3} ]; then
         echo '    Skip'
         exit
     fi
 
     # shortcut if cov == all
     if [[ {3} == 'all' ]]; then
-        mkdir -p 4_downSampling/Q{1}L{2}XallP000
-        cd 4_downSampling/Q{1}L{2}XallP000
+        mkdir -p 4_down_sampling/Q{1}L{2}XallP000
+        cd 4_down_sampling/Q{1}L{2}XallP000
         gzip -dcf ../../2_illumina/Q{1}L{2}/pe.cor.fa.gz > pe.cor.fa
         cp ../../2_illumina/Q{1}L{2}/env.json .
         exit;
     fi
 
     # actual sampling
-    mkdir -p 4_downSampling/Q{1}L{2}X{3}
+    mkdir -p 4_down_sampling/Q{1}L{2}X{3}
     faops split-about -l 0 -e \
         2_illumina/Q{1}L{2}/pe.cor.fa.gz \
         \$(( {{ opt.genome }} * {3} )) \
-        4_downSampling/Q{1}L{2}X{3}
+        4_down_sampling/Q{1}L{2}X{3}
 
     MAX_SERIAL=\$(
         cat 2_illumina/Q{1}L{2}/env.json \
@@ -42,11 +42,11 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         P=\$( printf '%03d' \${i})
         printf \"  * Part: %s\n\" \${P}
 
-        mkdir -p \"4_downSampling/Q{1}L{2}X{3}P\${P}\"
+        mkdir -p \"4_down_sampling/Q{1}L{2}X{3}P\${P}\"
 
-        mv  \"4_downSampling/Q{1}L{2}X{3}/\${P}.fa\" \
-            \"4_downSampling/Q{1}L{2}X{3}P\${P}/pe.cor.fa\"
-        cp 2_illumina/Q{1}L{2}/env.json \"4_downSampling/Q{1}L{2}X{3}P\${P}\"
+        mv  \"4_down_sampling/Q{1}L{2}X{3}/\${P}.fa\" \
+            \"4_down_sampling/Q{1}L{2}X{3}P\${P}/pe.cor.fa\"
+        cp 2_illumina/Q{1}L{2}/env.json \"4_down_sampling/Q{1}L{2}X{3}P\${P}\"
     done
 
     " ::: 0 {{ opt.qual }} ::: 0 {{ opt.len }} ::: {{ opt.cov }}
