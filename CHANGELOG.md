@@ -2,6 +2,13 @@
 
 ## Unreleased - ReleaseDate
 
+* Remove dependency on samtools
+* Fix bugs
+
+* Add `anchr template` scripts
+  * 7_merge_anchors.tera
+  * 9_stat_merge_anchors.tera
+
 ## 0.2.2 - 2020-10-27
 
 * Avoid camelCases

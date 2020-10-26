@@ -35,11 +35,12 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
     * --prefilter
     * --ecphase "1 2 3"
 
-* Downsampling
+* Down sampling, unitigs, and anchors
 
     * --cov "40 80"
     * --splitp 20
     * --statp 2
+    * --redoanchors
 
 "#,
         )
@@ -147,7 +148,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .default_value("1 2 3")
                 .empty_values(false),
         )
-        // Downsampling
+        // Down sampling, unitigs, and anchors
         .arg(
             Arg::with_name("cov")
                 .long("cov")
@@ -171,6 +172,11 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .takes_value(true)
                 .default_value("2")
                 .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("redoanchors")
+                .long("redoanchors")
+                .help("Redo anchors when merging anchors"),
         )
 }
 
@@ -227,6 +233,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("cov", args.value_of("cov").unwrap());
     opt.insert("splitp", args.value_of("splitp").unwrap());
     opt.insert("statp", args.value_of("statp").unwrap());
+    opt.insert(
+        "redoanchors",
+        if args.is_present("redoanchors") {
+            "1"
+        } else {
+            "0"
+        },
+    );
 
     let mut context = Context::new();
     context.insert("opt", &opt);
@@ -263,6 +277,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         gen_mr_anchors(&context)?;
         gen_stat_mr_anchors(&context)?;
     }
+
+    gen_merge_anchors(&context)?;
+    gen_stat_merge_anchors(&context)?;
 
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
@@ -516,7 +533,44 @@ fn gen_stat_mr_anchors(context: &Context) -> std::result::Result<(), std::io::Er
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/9_stat_mr_anchors.tera.sh")),
+        (
+            "t",
+            include_str!("../../templates/9_stat_mr_anchors.tera.sh"),
+        ),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_merge_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "7_merge_anchors.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/7_merge_anchors.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_stat_merge_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "9_stat_merge_anchors.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/9_stat_merge_anchors.tera.sh")),
     ])
     .unwrap();
 

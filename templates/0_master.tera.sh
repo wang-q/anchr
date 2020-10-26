@@ -85,22 +85,22 @@ fi
 #----------------------------#
 # merge anchors
 #----------------------------#
-if [ -e 7_mergeAnchors.sh ]; then
-    bash 7_mergeAnchors.sh 4_unitigs 7_mergeUnitigsAnchors;
+if [ -e 7_merge_anchors.sh ]; then
+    bash 7_merge_anchors.sh 4_unitigs 7_merge_unitigs_anchors;
 fi
 
 {% if opt.merge -%}
-if [ -e 7_mergeAnchors.sh ]; then
-    bash 7_mergeAnchors.sh 6_unitigs 7_mergeMRUnitigsAnchors
+if [ -e 7_merge_anchors.sh ]; then
+    bash 7_merge_anchors.sh 6_unitigs 7_merge_mr_unitigs_anchors
 fi
 {% endif -%}
 
-if [ -e 7_mergeAnchors.sh ]; then
-    bash 7_mergeAnchors.sh 7_merge 7_mergeAnchors;
+if [ -e 7_merge_anchors.sh ]; then
+    bash 7_merge_anchors.sh 7_merge 7_merge_anchors;
 fi
 
-if [ -e 7_mergeAnchors.sh ]; then
-    bash 9_statMergeAnchors.sh
+if [ -e 9_stat_merge_anchors.sh ]; then
+    bash 9_stat_merge_anchors.sh
 fi
 
 #----------------------------#
