@@ -9,6 +9,7 @@ mkdir -p 2_illumina/kmergenie
 cd 2_illumina/kmergenie
 
 {% set parallel2 = opt.parallel | int / 2 -%}
+{% set parallel2 = parallel2 | round(method="floor") -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
 for PREFIX in R S T; do
     if [ ! -e ../${PREFIX}1.fq.gz ]; then

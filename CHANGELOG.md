@@ -9,6 +9,8 @@
 * Add `anchr template` scripts
   * 4_unitigs.sh
   * 6_unitigs.sh
+  * 4_anchors.sh
+  * 6_anchors.sh
 
 ## 0.2.0 - 2020-10-26
 

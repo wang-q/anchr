@@ -25,9 +25,9 @@ rm -fr target
 
 ```
 $ anchr help
-anchr 0.1.6-alpha.0
+anchr 0.2.1-alpha.0
 wang-q <wang-q@outlook.com>
-anchr - Assembler of N-free CHRomosomes
+Anchr - Assembler of N-free CHRomosomes
 
 USAGE:
     anchr [SUBCOMMAND]
@@ -37,6 +37,7 @@ FLAGS:
     -V, --version    Prints version information
 
 SUBCOMMANDS:
+    anchors     Select anchors (proper covered regions) from contigs
     dep         Dependencies
     ena         ENA scripts
     help        Prints this message or the help of the given subcommand(s)
