@@ -33,8 +33,8 @@ bbwrap.sh \
     basecov=basecov.txt \
     1>bbmap.err 2>&1
 
-COUNT_MAPPED=$( samtools view -c mapped.sam )
-COUNT_UNMAPPED=$( samtools view -c unmapped.sam )
+COUNT_MAPPED=$( cat mapped.sam | wc -l | sed 's/ //g' )
+COUNT_UNMAPPED=$( cat unmapped.sam | wc -l | sed 's/ //g' )
 MAPPED_RATIO=$(
     echo "print ${COUNT_MAPPED}/(${COUNT_MAPPED} + ${COUNT_UNMAPPED})" | perl
 )

@@ -39,7 +39,7 @@ for X in {{ opt.cov }}; do
 
 		printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %.1f | %.1f | %.1f | %.1f | %s | %s | %s |\n" \
 			"MRX${X}P${P}" \
-			$( perl -e "printf qq(%.1f), ${SUM_COR} / [% opt.genome %];" ) \
+			$( perl -e "printf qq(%.1f), ${SUM_COR} / {{ opt.genome }};" ) \
 			$( perl -e "printf qq(%.2f%%), ${MAPPED_RATIO} * 100;" ) \
 			$( stat_format anchor/anchor.fasta ) \
 			$( stat_format anchor/pe.others.fa ) \
