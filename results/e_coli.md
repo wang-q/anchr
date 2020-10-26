@@ -6,6 +6,11 @@
 - [More tools on downloading and preprocessing data](#more-tools-on-downloading-and-preprocessing-data)
   - [Extra external executables](#extra-external-executables)
   - [Other leading assemblers](#other-leading-assemblers)
+- [*Escherichia* virus Lambda](#escherichia-virus-lambda)
+  - [lambda: reference](#lambda-reference)
+  - [lambda: download](#lambda-download)
+  - [lambda: template](#lambda-template)
+  - [lambda: run](#lambda-run)
 - [*Escherichia coli* str. K-12 substr. MG1655](#escherichia-coli-str-k-12-substr-mg1655)
   - [mg1655: reference](#mg1655-reference)
   - [mg1655: download](#mg1655-download)
@@ -52,6 +57,125 @@ brew install --ignore-dependencies picard-tools
 brew install spades
 brew install megahit
 brew install wang-q/tap/platanus
+
+```
+
+# *Escherichia* virus Lambda
+
+* Taxonomy ID: [10710](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10710)
+* Ref. Assembly: [GCF_000840245.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000840245.1/)
+
+## lambda: reference
+
+* Reference genome
+
+```shell script
+mkdir -p ~/data/anchr/ref
+cd ~/data/anchr/ref
+
+rsync -avP \
+    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/840/245/GCF_000840245.1_ViralProj14204/ \
+    lambda/
+
+```
+
+```shell script
+mkdir -p ~/data/anchr/lambda/1_genome
+cd ~/data/anchr/lambda/1_genome
+
+find ~/data/anchr/ref/lambda/ -name "*_genomic.fna.gz" |
+    grep -v "_from_" |
+    xargs gzip -dcf |
+    faops filter -N -s stdin genome.fa
+
+touch paralogs.fa
+
+```
+
+## lambda: download
+
+```shell script
+mkdir -p ~/data/anchr/lambda/ena
+cd ~/data/anchr/lambda/ena
+
+cat << EOF > source.csv
+SRX2365802,Lambda,HiSeq 2500
+EOF
+
+anchr ena info | perl - -v source.csv > ena_info.yml
+anchr ena prep | perl - ena_info.yml
+
+mlr --icsv --omd cat ena_info.csv
+
+aria2c -x 9 -s 3 -c -i ena_info.ftp.txt
+
+md5sum --check ena_info.md5.txt
+
+# sampling reads as test materials
+seqtk sample -s 23 SRR5042715_1.fastq.gz 100000 | pigz > R1.fq.gz
+seqtk sample -s 23 SRR5042715_2.fastq.gz 100000 | pigz > R2.fq.gz
+
+```
+
+| name   | srx        | platform | layout | ilength | srr        | spot     | base  |
+|:-------|:-----------|:---------|:-------|:--------|:-----------|:---------|:------|
+| Lambda | SRX2365802 | ILLUMINA | PAIRED |         | SRR5042715 | 16540237 | 3.33G |
+
+* Illumina
+
+```shell script
+cd ~/data/anchr/lambda
+
+mkdir -p 2_illumina
+cd 2_illumina
+
+seqtk sample -s 23 ../ena/SRR5042715_1.fastq.gz 100000 | pigz > R1.fq.gz
+seqtk sample -s 23 ../ena/SRR5042715_2.fastq.gz 100000 | pigz > R2.fq.gz
+
+```
+
+## lambda: template
+
+* template
+
+```shell script
+WORKING_DIR=${HOME}/data/anchr
+BASE_NAME=lambda
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+rm *.sh
+anchr template \
+    --genome 48502 \
+    --parallel 4 \
+    --xmx 4g \
+    \
+    --fastqc \
+    --kmergenie \
+    \
+    --trim "--dedupe --cutoff 5 --cutk 31" \
+    --qual "20 25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --quorum \
+    --merge \
+    --ecphase "1 2 3"
+
+```
+
+## lambda: run
+
+```shell script
+WORKING_DIR=${HOME}/data/anchr
+BASE_NAME=lambda
+
+cd ${WORKING_DIR}/${BASE_NAME}
+# rm -fr 4_*/ 6_*/ 7_*/ 8_*/
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+
+bash 0_master.sh
+#bash 0_cleanup.sh
 
 ```
 
@@ -248,7 +372,7 @@ mkdir -p ena
 cd ena
 
 cat << EOF > source.csv
-SRP251726,dh5alpha,PE125, HiSeq 2500
+SRP251726,dh5alpha,HiSeq 2500 PE125
 EOF
 
 anchr ena info | perl - -v source.csv > ena_info.yml
@@ -283,21 +407,6 @@ ln -s ../ena/SRR11245239_2.fastq.gz R2.fq.gz
 
 ## dh5alpha: template
 
-* Rsync to hpcc
-
-```shell script
-rsync -avP \
-    ~/data/anchr/dh5alpha/ \
-    wangq@202.119.37.251:data/anchr/dh5alpha
-
-rsync -avP \
-    ~/data/anchr/dh5alpha/ \
-    wangq@10.211.55.4:data/anchr/dh5alpha
-
-# rsync -avP wangq@202.119.37.251:data/anchr/dh5alpha/ ~/data/anchr/dh5alpha
-
-```
-
 * template
 
 ```shell script
@@ -311,7 +420,6 @@ anchr template \
     --genome 4583637 \
     --parallel 4 \
     --xmx 4g \
-    --queue mpi \
     \
     --fastqc \
     --kmergenie \
@@ -337,11 +445,8 @@ cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
 # rm -fr 2_illumina/trim 2_illumina/mergereads statReads.md 
 
-bash 0_bsub.sh
-#bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
-#bkill -J "${BASE_NAME}-*"
-
-#bash 0_master.sh
+bash 0_master.sh
 #bash 0_cleanup.sh
 
 ```
+

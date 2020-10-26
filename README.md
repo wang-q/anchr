@@ -14,7 +14,7 @@ Current release: 0.2.1
 cargo install --force --path .
 
 # Compiled binary
-curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.0/anchr-x86_64-unknown-linux-musl.tar.gz |
+curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.1/anchr-x86_64-unknown-linux-musl.tar.gz |
     tar xvz
 cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
 rm -fr target
@@ -165,6 +165,13 @@ bash anchors.sh
 popd
 
 ```
+
+* `anchr template`
+
+  With a conventional directory structure, `anchr template` creates all scripts from reads QC to
+  assembly evaluations.
+  
+  [*Escherichia* virus Lambda](results/e_coli.md#escherichia-virus-lambda) as an example.
 
 ## PACKAGING
 
