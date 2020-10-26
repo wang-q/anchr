@@ -33,8 +33,8 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         4_down_sampling/Q{1}L{2}X{3}
 
     MAX_SERIAL=\$(
-        cat 2_illumina/Q{1}L{2}/env.json \
-            | jq '.SUM_OUT | tonumber | . / {{ opt.genome }} / {3} | floor | . - 1'
+        cat 2_illumina/Q{1}L{2}/env.json |
+            jq '.SUM_OUT | tonumber | . / {{ opt.genome }} / {3} | floor | . - 1'
     )
     MAX_SERIAL=\$(( \${MAX_SERIAL} < {{ opt.splitp }} ? \${MAX_SERIAL} : {{ opt.splitp }} ))
 

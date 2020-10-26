@@ -22,7 +22,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
     if [[ {} == 'all' ]]; then
         mkdir -p 6_down_sampling/MRXallP000
         cd 6_down_sampling/MRXallP000
-        gzip -d -c ../../2_illumina/merge/pe.cor.fa.gz > pe.cor.fa
+        gzip -dcf ../../2_illumina/merge/pe.cor.fa.gz > pe.cor.fa
         cp ../../2_illumina/merge/env.json .
         exit;
     fi
@@ -35,8 +35,8 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         6_down_sampling/MRX{}
 
     MAX_SERIAL=\$(
-        cat 2_illumina/merge/env.json \
-            | jq '.SUM_OUT | tonumber | . / {{ opt.genome }} / {} | floor | . - 1'
+        cat 2_illumina/merge/env.json |
+            jq '.SUM_OUT | tonumber | . / {{ opt.genome }} / {} | floor | . - 1'
     )
     MAX_SERIAL=\$(( \${MAX_SERIAL} < {{ opt.splitp }} ? \${MAX_SERIAL} : {{ opt.splitp }} ))
 

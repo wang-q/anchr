@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+* Avoid camelCases
+
 ## 0.2.1 - 2020-10-26
 
 * Rename `environment.json` to `env.json`
