@@ -16,7 +16,7 @@ for package in graphviz jq parallel pigz; do
     check_install ${package}
 done
 
-for package in fastqc samtools sickle; do
+for package in fastqc sickle; do
     check_install ${package}
 done
 

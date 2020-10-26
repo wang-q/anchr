@@ -36,7 +36,7 @@ hash tsv-sample 2>/dev/null || {
 }
 
 #----------------------------#
-# superreads
+# unitigs
 #----------------------------#
 hash jellyfish 2>/dev/null || {
     echo >&2 "jellyfish is required but it's not installed.";
