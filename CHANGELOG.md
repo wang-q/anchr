@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.2.2 - 2020-10-27
+
 * Avoid camelCases
 
 * Add `anchr template` scripts
