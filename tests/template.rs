@@ -15,7 +15,7 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
     let output = cmd.arg("template").output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 
-    assert_eq!(stderr.lines().count(), 9);
+    assert_eq!(stderr.lines().count(), 10);
     assert!(stderr.contains("2_trim.sh"));
     assert!(&tempdir.path().join("2_trim.sh").is_file());
 
@@ -24,7 +24,7 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
     let output = cmd.arg("template").arg("--fastqc").output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 
-    assert_eq!(stderr.lines().count(), 10);
+    assert_eq!(stderr.lines().count(), 11);
     assert!(stderr.contains("2_fastqc.sh"));
     assert!(&tempdir.path().join("2_fastqc.sh").is_file());
 
@@ -38,7 +38,7 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 
-    assert_eq!(stderr.lines().count(), 14);
+    assert_eq!(stderr.lines().count(), 16);
     assert!(stderr.contains("2_merge.sh"));
     assert!(&tempdir.path().join("2_merge.sh").is_file());
 
@@ -47,7 +47,7 @@ fn command_template() -> Result<(), Box<dyn std::error::Error>> {
     let output = cmd.arg("template").arg("--quorum").output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 
-    assert_eq!(stderr.lines().count(), 9);
+    assert_eq!(stderr.lines().count(), 10);
     assert!(stderr.contains("2_quorum.sh"));
     assert!(&tempdir.path().join("2_quorum.sh").is_file());
 

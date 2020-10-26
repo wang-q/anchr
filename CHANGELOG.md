@@ -4,6 +4,10 @@
 
 * Avoid camelCases
 
+* Add `anchr template` scripts
+  * 9_stat_anchors.sh
+  * 9_stat_mr_anchors.sh
+
 ## 0.2.1 - 2020-10-26
 
 * Rename `environment.json` to `env.json`

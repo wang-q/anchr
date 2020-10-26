@@ -3,7 +3,7 @@
 #----------------------------#
 # Run
 #----------------------------#
-log_warn 9_statReads.sh
+log_warn 9_stat_reads.sh
 
 if [ -e statReads.md ]; then
     log_debug "statReads.md presents";
