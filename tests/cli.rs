@@ -75,8 +75,8 @@ fn command_quorum() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("quorum")
-        .arg("tests/reads/R1.fq.gz")
-        .arg("tests/reads/R2.fq.gz")
+        .arg("tests/Lambda/R1.fq.gz")
+        .arg("tests/Lambda/R2.fq.gz")
         .arg("-o")
         .arg("stdout")
         .output()
@@ -99,8 +99,8 @@ fn command_trim() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("trim")
-        .arg("tests/reads/R1.fq.gz")
-        .arg("tests/reads/R2.fq.gz")
+        .arg("tests/Lambda/R1.fq.gz")
+        .arg("tests/Lambda/R2.fq.gz")
         .arg("-o")
         .arg("stdout")
         .output()
@@ -124,8 +124,8 @@ fn command_merge() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("merge")
-        .arg("tests/reads/R1.fq.gz")
-        .arg("tests/reads/R2.fq.gz")
+        .arg("tests/Lambda/R1.fq.gz")
+        .arg("tests/Lambda/R2.fq.gz")
         .arg("-o")
         .arg("stdout")
         .output()
@@ -134,6 +134,25 @@ fn command_merge() -> Result<(), Box<dyn std::error::Error>> {
 
     assert!(stdout.lines().count() > 50);
     assert!(stdout.contains("Read merging"));
+
+    Ok(())
+}
+
+#[test]
+fn command_anchors() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("anchors")
+        .arg("tests/Lambda/unitigs.fasta")
+        .arg("tests/Lambda/R1.fq.gz")
+        .arg("-o")
+        .arg("stdout")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert!(stdout.lines().count() > 50);
+    assert!(stdout.contains("bbwrap.sh"));
 
     Ok(())
 }

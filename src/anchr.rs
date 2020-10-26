@@ -7,8 +7,9 @@ fn main() -> std::io::Result<()> {
     let app = App::new("anchr")
         .version(crate_version!())
         .author(crate_authors!())
-        .about("anchr - Assembler of N-free CHRomosomes")
+        .about("Anchr - Assembler of N-free CHRomosomes")
         .setting(AppSettings::ArgRequiredElseHelp)
+        .subcommand(cmd::anchors::make_subcommand())
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
         .subcommand(cmd::merge::make_subcommand())
@@ -19,6 +20,7 @@ fn main() -> std::io::Result<()> {
 
     // Check which subcomamnd the user ran...
     match app.get_matches().subcommand() {
+        ("anchors", Some(sub_matches)) => cmd::anchors::execute(sub_matches),
         ("dep", Some(sub_matches)) => cmd::dep::execute(sub_matches),
         ("ena", Some(sub_matches)) => cmd::ena::execute(sub_matches),
         ("merge", Some(sub_matches)) => cmd::merge::execute(sub_matches),

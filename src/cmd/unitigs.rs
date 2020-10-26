@@ -11,7 +11,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
             r#"
 <pe.cor.fa> <env.json>
 
-Fasta files can be gzipped
+Fasta files can't be gzipped
 "#,
         )
         .arg(
@@ -81,7 +81,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("kmer", args.value_of("kmer").unwrap());
     opt.insert("min", args.value_of("min").unwrap());
 
-    opt.insert("merge", if args.is_present("xmx") { "1" } else { "0" });
+    opt.insert("merge", if args.is_present("merge") { "1" } else { "0" });
     opt.insert("parallel", args.value_of("parallel").unwrap());
 
     let infiles = args.values_of("infiles").unwrap().collect_vec();

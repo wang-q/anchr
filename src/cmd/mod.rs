@@ -1,5 +1,6 @@
 //! Subcommand modules for the `anchr` binary.
 
+pub mod anchors;
 pub mod dep;
 pub mod ena;
 pub mod merge;

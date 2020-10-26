@@ -104,3 +104,4 @@ Cargo.lock
 
 tests/trim
 tests/merge
+tests/Q*

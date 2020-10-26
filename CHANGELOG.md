@@ -4,6 +4,8 @@
 
 * Rename `environment.json` to `env.json`
 
+* Add `anchr anchors`
+
 * Add `anchr template` scripts
   * 4_unitigs.sh
   * 6_unitigs.sh

@@ -64,12 +64,13 @@ brew install wang-q/tap/tsv-utils wang-q/tap/intspan
 
 ## EXAMPLES
 
+* Data soruce: *E. coli* virus Lambda
+
 ```shell script
 # ena
 mkdir -p ~/data/ena
 cd ~/data/ena
 
-# E. coli virus Lambda
 cat << EOF > source.csv
 SRX2365802,Lambda,HiSeq 2500
 EOF
@@ -93,23 +94,24 @@ seqtk sample -s 23 SRR5042715_2.fastq.gz 20000 | pigz > R2.fq.gz
 |:-------|:-----------|:---------|:-------|:--------|:-----------|:---------|:------|
 | Lambda | SRX2365802 | ILLUMINA | PAIRED |         | SRR5042715 | 16540237 | 3.33G |
 
+* Individual subcommands
 
 ```shell script
 cd ~/Scripts/rust/anchr
 
 # trim
-mkdir tests/trim
+mkdir -p tests/trim
 pushd tests/trim
 
 anchr trim \
-    ../reads/R1.fq.gz ../reads/R2.fq.gz \
+    ../Labmda/R1.fq.gz ../Labmda/R2.fq.gz \
     -q 25 -l 60 \
     -o stdout |
     bash
 popd
 
 # merge
-mkdir tests/merge
+mkdir -p tests/merge
 pushd tests/merge
 
 anchr merge \
@@ -121,14 +123,14 @@ anchr merge \
 popd
 
 # quorum
-pushd tests/trim
+pushd -p tests/trim
 anchr quorum \
     R1.fq.gz R2.fq.gz \
     -o stdout |
     bash
 popd
 
-pushd tests/trim/Q25L60
+pushd -p tests/trim/Q25L60
 anchr quorum \
     R1.fq.gz R2.fq.gz Rs.fq.gz \
     -o stdout |
@@ -136,7 +138,7 @@ anchr quorum \
 popd
 
 # unitigs
-mkdir tests/Q0L0
+mkdir -p tests/Q0L0
 pushd tests/Q0L0
 
 gzip -dcf ../trim/pe.cor.fa.gz > pe.cor.fa
@@ -149,9 +151,21 @@ anchr unitigs \
 bash unitigs.sh
 popd
 
+# anchors
+mkdir -p tests/Q0L0/anchors
+pushd tests/Q0L0/anchors
+
+anchr anchors \
+    ../unitigs.fasta \
+    ../pe.cor.fa \
+    -p 4 \
+    -o anchors.sh
+bash anchors.sh
+popd
+
 ```
 
-## PACKAGE
+## PACKAGING
 
 ```bash
 tar cvfz anchr.$(date +"%Y%m%d").tar.gz \
