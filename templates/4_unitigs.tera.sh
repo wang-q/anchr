@@ -23,7 +23,7 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
         ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa \
         ../../4_down_sampling/Q{1}L{2}X{3}P{4}/env.json \
         -p {{ opt.parallel }} \
-        --kmer 31,41,51,61,71,81 \
+        --kmer '31 41 51 61 71 81' \
         -o unitigs.sh
     bash unitigs.sh
 

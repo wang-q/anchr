@@ -148,7 +148,7 @@ rm *.sh
 anchr template \
     --genome 48502 \
     --parallel 4 \
-    --xmx 4g \
+    --xmx 6g \
     \
     --fastqc \
     --kmergenie \
