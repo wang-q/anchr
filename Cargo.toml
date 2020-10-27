@@ -18,9 +18,6 @@ path = "src/anchr.rs"
 
 [dependencies]
 clap = "2"
-regex = "1"
-lazy_static = "1.3.0"
-flate2 = "1.0"
 tera = "1"
 intspan = "0.4.14"
 itertools = "0.9.0"
