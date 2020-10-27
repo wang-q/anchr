@@ -160,7 +160,9 @@ anchr template \
     \
     --quorum \
     --merge \
-    --ecphase "1 2 3"
+    --ecphase "1 2 3" \
+    --cov "40 80" \
+    --statp 2 
 
 ```
 

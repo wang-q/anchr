@@ -2,14 +2,27 @@
 
 ## Unreleased - ReleaseDate
 
+* Save RUNTIME in `anchr anchors`
+* Add func time_format()
+
+* Add `anchr template` scripts
+  * 8_spades.sh
+  * 8_mr_spades.sh
+  * 8_megahit.sh
+  * 8_mr_megahit.sh
+  * 8_platanus.sh
+  * 9_stat_other_anchors.sh
+  * 9_quast.sh
+  * 9_stat_final.sh
+
 ## 0.2.3 - 2020-10-27
 
 * Remove dependency on samtools
 * Fix bugs
 
 * Add `anchr template` scripts
-  * 7_merge_anchors.tera
-  * 9_stat_merge_anchors.tera
+  * 7_merge_anchors.sh
+  * 9_stat_merge_anchors.sh
 
 ## 0.2.2 - 2020-10-27
 

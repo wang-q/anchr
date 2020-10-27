@@ -129,8 +129,8 @@ fi
 #----------------------------#
 # final stats
 #----------------------------#
-if [ -e 9_statFinal.sh ]; then
-    bash 9_statFinal.sh;
+if [ -e 9_stat_final.sh ]; then
+    bash 9_stat_final.sh;
 fi
 if [ -e 9_quast.sh ]; then
     bash 9_quast.sh;
