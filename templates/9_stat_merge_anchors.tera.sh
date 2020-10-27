@@ -32,7 +32,7 @@ for D in $( find . -type d -name "${DIR_PREFIX}*" | sort ); do
 	pushd ${D}/ > /dev/null
 
 	MAPPED_RATIO=$( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber' )
-	SECS_AN=$( expr $(stat -c %Y anchor/anchor.success) - $(stat -c %Y anchor/anchors.sh) )
+    SECS_AN=$( cat anchor/env.json | jq '.RUNTIME | tonumber' )
 
 	printf "| %s | %s | %s | %s | %s | %s | %s | %s | %.1f | %.1f | %.1f | %.1f | %s |\n" \
 		$(basename "${D}") \
@@ -43,7 +43,7 @@ for D in $( find . -type d -name "${DIR_PREFIX}*" | sort ); do
 		$( cat anchor/env.json | jq '.MAD | tonumber' ) \
 		$( cat anchor/env.json | jq '.lower | tonumber' ) \
 		$( cat anchor/env.json | jq '.upper | tonumber' ) \
-		$( printf "%d:%02d'%02d''\n" $((${SECS_AN}/3600)) $((${SECS_AN}%3600/60)) $((${SECS_AN}%60)) )
+        $( time_format ${SECS_AN} )
 
 	popd > /dev/null
 done \
