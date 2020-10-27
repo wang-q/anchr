@@ -20,6 +20,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 
     * --fastqc
     * --kmergenie
+    * --insertsize
 
 * Trimming
 
@@ -84,6 +85,11 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
             Arg::with_name("kmergenie")
                 .long("kmergenie")
                 .help("Run KmerGenie"),
+        )
+        .arg(
+            Arg::with_name("insertsize")
+                .long("insertsize")
+                .help("Calc insert sizes"),
         )
         // Trimming
         .arg(
@@ -252,9 +258,11 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     if args.is_present("fastqc") {
         gen_fastqc(&context)?;
     }
-
     if args.is_present("kmergenie") {
         gen_kmergenie(&context)?;
+    }
+    if args.is_present("insertsize") {
+        gen_insert_size(&context)?;
     }
 
     gen_trim(&context)?;
@@ -326,6 +334,23 @@ fn gen_kmergenie(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_kmergenie.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_insert_size(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_insert_size.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/2_insert_size.tera.sh")),
     ])
     .unwrap();
 
