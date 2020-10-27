@@ -23,7 +23,7 @@ for PREFIX in R S T; do
         in2=../${PREFIX}2.fq.gz \
         out=${PREFIX}.tadpole.contig.fasta \
         threads={{ opt.parallel }} \
-        overwrite {% if opt.prefilter == "1" %}prefilter={{ opt.prefilter }}{% endif %}
+        overwrite {% if opt.prefilter != "0" %}prefilter={{ opt.prefilter }}{% endif %}
 
     cat ${PREFIX}.tadpole.contig.fasta |
         faops dazz -l 0 -p T stdin stdout \

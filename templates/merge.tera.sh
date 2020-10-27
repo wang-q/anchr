@@ -45,7 +45,7 @@ bbmerge.sh \
     in=temp.fq.gz out=ecco.fq.gz \
     ihist={{ opt.prefixm }}.ihist.merge1.txt \
     threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %} \
-{% if opt.prefilter -%}
+{% if opt.prefilter != "0" -%}
     prefilter={{ opt.prefilter }} \
 {% endif -%}
     ecco mix vstrict overwrite
@@ -70,7 +70,7 @@ rm temp.fq.gz; ln -s eccc.fq.gz temp.fq.gz
 tadpole.sh \
     in=temp.fq.gz out=ecct.fq.gz \
     threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %} \
-{% if opt.prefilter -%}
+{% if opt.prefilter != "0" -%}
     prefilter={{ opt.prefilter }} \
 {% endif -%}
     ecc tossjunk tossdepth=2 tossuncorrectable overwrite
@@ -83,7 +83,7 @@ log_info "Read extension"
 tadpole.sh \
     in=temp.fq.gz out=extended.fq.gz \
     threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %} \
-{% if opt.prefilter -%}
+{% if opt.prefilter != "0" -%}
     prefilter={{ opt.prefilter }} \
 {% endif -%}
     mode=extend el=20 er=20 k=62 overwrite
@@ -94,7 +94,7 @@ bbmerge-auto.sh \
     in=temp.fq.gz out=merged.raw.fq.gz outu=unmerged.raw.fq.gz \
     ihist={{ opt.prefixm }}.ihist.merge.txt \
     threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %} \
-{% if opt.prefilter -%}
+{% if opt.prefilter != "0" -%}
     prefilter={{ opt.prefilter }} \
 {% endif -%}
     strict k=81 extend2=80 rem overwrite
