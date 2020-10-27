@@ -295,6 +295,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         gen_mr_spades(&context)?;
         gen_mr_megahit(&context)?;
     }
+    gen_stat_other_anchors(&context)?;
+
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
     gen_master(&context)?;
@@ -653,6 +655,23 @@ fn gen_mr_megahit(context: &Context) -> std::result::Result<(), std::io::Error> 
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/8_mr_megahit.tera.sh")),
+    ])
+        .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_stat_other_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "9_stat_other_anchors.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/9_stat_other_anchors.tera.sh")),
     ])
         .unwrap();
 
