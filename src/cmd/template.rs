@@ -163,7 +163,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
         .arg(
             Arg::with_name("prefilter")
                 .long("prefilter")
-                .help("Prefilter=N (1 or 2) for tadpole and bbmerge")
+                .help("Prefilter=N (1 or 2) for tadpole and bbmerge, 1 use less memories")
                 .takes_value(true)
                 .empty_values(false),
         )

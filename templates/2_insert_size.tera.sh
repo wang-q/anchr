@@ -36,7 +36,7 @@ for PREFIX in R S T; do
         ref=${PREFIX}.tadpole.contig.fa \
         threads={{ opt.parallel }} \
         pairedonly \
-        reads=1000000 \
+        reads={{ opt.reads }} \
         nodisk overwrite
 
     reformat.sh \
@@ -63,7 +63,7 @@ for PREFIX in R S T; do
             ref=../../1_genome/genome.fa \
             threads={{ opt.parallel }} \
             maxindel=0 strictmaxindel \
-            reads=1000000 \
+            reads={{ opt.reads }} \
             nodisk overwrite
 
         reformat.sh \
