@@ -69,3 +69,14 @@ stat_format () {
             printf qq(%d\t%s\t%d\n), $F[0], Number::Format::format_bytes($F[1], base => 1000,), $F[2];
         '
 }
+
+time_format () {
+    echo $@ |
+        perl -nl -e '
+            sub parse_duration {
+                use integer;
+                sprintf("%d:%02d:%02d", $_[0]/3600, $_[0]/60%60, $_[0]%60);
+            }
+            print parse_duration($_);
+        '
+}

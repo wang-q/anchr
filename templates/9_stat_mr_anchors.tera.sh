@@ -19,7 +19,7 @@ printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | 
     "N50Anchor" "Sum" "#" \
     "N50Others" "Sum" "#" \
     "median" "MAD" "lower" "upper" \
-    "Kmer" "RunTimeKU" "RunTimeAN" \
+    "Kmer" "RunTimeUT" "RunTimeAN" \
     >> ${FILENAME_MD}
 printf "|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|\n" \
     >> ${FILENAME_MD}
@@ -34,8 +34,8 @@ for X in {{ opt.cov }}; do
 
 		SUM_COR=$( cat env.json | jq '.SUM_COR | tonumber' )
 		MAPPED_RATIO=$( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber' )
-		SECS_KU=$( cat env.json | jq '.RUNTIME | tonumber' )
-		SECS_AN=$( expr $(stat -c %Y anchor/anchor.success) - $(stat -c %Y anchor/anchors.sh) )
+		SECS_UT=$( cat env.json | jq '.RUNTIME | tonumber' )
+        SECS_AN=$( cat anchor/env.json | jq '.RUNTIME | tonumber' )
 
 		printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %.1f | %.1f | %.1f | %.1f | %s | %s | %s |\n" \
 			"MRX${X}P${P}" \
@@ -48,8 +48,8 @@ for X in {{ opt.cov }}; do
 			$( cat anchor/env.json | jq '.lower | tonumber' ) \
 			$( cat anchor/env.json | jq '.upper | tonumber' ) \
 			$( cat env.json | jq '.KMER' ) \
-			$( printf "%d:%02d'%02d''\n" $((${SECS_KU}/3600)) $((${SECS_KU}%3600/60)) $((${SECS_KU}%60)) ) \
-			$( printf "%d:%02d'%02d''\n" $((${SECS_AN}/3600)) $((${SECS_AN}%3600/60)) $((${SECS_AN}%60)) )
+            $( time_format ${SECS_UT} ) \
+            $( time_format ${SECS_AN} )
 
 		popd > /dev/null
 	done
