@@ -220,14 +220,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("len", args.value_of("len").unwrap());
     opt.insert("filter", args.value_of("filter").unwrap());
 
-    opt.insert(
-        "merge",
-        if args.is_present("merge") {
-            "1"
-        } else {
-            "0"
-        },
-    );
+    opt.insert("merge", if args.is_present("merge") { "1" } else { "0" });
     opt.insert(
         "prefilter",
         if args.is_present("prefilter") {
@@ -297,6 +290,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         gen_mr_megahit(&context)?;
     }
     gen_stat_other_anchors(&context)?;
+
+    gen_quast(&context)?;
+    gen_stat_final(&context)?;
 
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
@@ -587,7 +583,10 @@ fn gen_stat_merge_anchors(context: &Context) -> std::result::Result<(), std::io:
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/9_stat_merge_anchors.tera.sh")),
+        (
+            "t",
+            include_str!("../../templates/9_stat_merge_anchors.tera.sh"),
+        ),
     ])
     .unwrap();
 
@@ -640,7 +639,7 @@ fn gen_megahit(context: &Context) -> std::result::Result<(), std::io::Error> {
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/8_megahit.tera.sh")),
     ])
-        .unwrap();
+    .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
@@ -657,7 +656,7 @@ fn gen_mr_megahit(context: &Context) -> std::result::Result<(), std::io::Error> 
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/8_mr_megahit.tera.sh")),
     ])
-        .unwrap();
+    .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
@@ -674,7 +673,7 @@ fn gen_platanus(context: &Context) -> std::result::Result<(), std::io::Error> {
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/8_platanus.tera.sh")),
     ])
-        .unwrap();
+    .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
@@ -689,9 +688,46 @@ fn gen_stat_other_anchors(context: &Context) -> std::result::Result<(), std::io:
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/9_stat_other_anchors.tera.sh")),
+        (
+            "t",
+            include_str!("../../templates/9_stat_other_anchors.tera.sh"),
+        ),
     ])
-        .unwrap();
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_quast(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "9_quast.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/9_quast.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_stat_final(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "9_stat_final.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/9_stat_final.tera.sh")),
+    ])
+    .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
