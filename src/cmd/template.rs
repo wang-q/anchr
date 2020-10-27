@@ -289,6 +289,12 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     gen_merge_anchors(&context)?;
     gen_stat_merge_anchors(&context)?;
 
+    gen_spades(&context)?;
+    gen_megahit(&context)?;
+    if !args.is_present("se") && args.is_present("merge") {
+        gen_mr_spades(&context)?;
+        gen_mr_megahit(&context)?;
+    }
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
     gen_master(&context)?;
@@ -581,6 +587,74 @@ fn gen_stat_merge_anchors(context: &Context) -> std::result::Result<(), std::io:
         ("t", include_str!("../../templates/9_stat_merge_anchors.tera.sh")),
     ])
     .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_spades(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "8_spades.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/8_spades.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_mr_spades(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "8_mr_spades.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/8_mr_spades.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_megahit(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "8_megahit.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/8_megahit.tera.sh")),
+    ])
+        .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_mr_megahit(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "8_mr_megahit.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/8_mr_megahit.tera.sh")),
+    ])
+        .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;

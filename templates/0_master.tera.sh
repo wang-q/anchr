@@ -109,21 +109,21 @@ fi
 if [ -e 8_spades.sh ]; then
     bash 8_spades.sh;
 fi
-if [ -e 8_spades_MR.sh ]; then
-    bash 8_spades_MR.sh;
+if [ -e 8_mr_spades.sh ]; then
+    bash 8_mr_spades.sh;
 fi
 if [ -e 8_megahit.sh ]; then
     bash 8_megahit.sh;
 fi
-if [ -e 8_megahit_MR.sh ]; then
-    bash 8_megahit_MR.sh;
+if [ -e 8_mr_megahit.sh ]; then
+    bash 8_mr_megahit.sh;
 fi
 if [ -e 8_platanus.sh ]; then
     bash 8_platanus.sh;
 fi
 
-if [ -e 9_statOtherAnchors.sh ]; then
-    bash 9_statOtherAnchors.sh;
+if [ -e 9_stat_other_anchors.sh ]; then
+    bash 9_stat_other_anchors.sh;
 fi
 
 #----------------------------#
