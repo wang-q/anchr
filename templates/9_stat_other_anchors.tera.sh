@@ -23,7 +23,7 @@ printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
 printf "|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|\n" \
     >> ${FILENAME_MD}
 
-for D in 8_spades 8_spades_MR 8_megahit 8_megahit_MR 8_platanus; do
+for D in 8_spades 8_mr_spades 8_megahit 8_mr_megahit 8_platanus; do
 	if [ ! -e ${D}/anchor/anchor.fasta ]; then
 		continue;
 	fi
