@@ -3,6 +3,8 @@
 #----------------------------#
 # Prepare SR
 #----------------------------#
+START_TIME=$(date +%s)
+
 log_info Symlink input files
 
 if [ ! -e SR.fasta ]; then
@@ -402,7 +404,15 @@ find . -type l -name "contig.fill_hole.*.yml" | parallel --no-run-if-empty -j 1 
 find . -type f -name "contig.fill_all.*.yml"  | parallel --no-run-if-empty -j 1 rm
 find . -type l -name "contig.fill_all.*.yml"  | parallel --no-run-if-empty -j 1 rm
 
-touch anchor.success
+
+save START_TIME
+
+END_TIME=$(date +%s)
+save END_TIME
+
+RUNTIME=$((END_TIME-START_TIME))
+save RUNTIME
+
 log_info "Done."
 
 exit 0
