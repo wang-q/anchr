@@ -6,6 +6,9 @@
 * Add func time_format()
 
 * Add `anchr template` scripts
+  * 2_insert_size.sh
+  * 2_kat.sh
+  * 2_sga_preqc.sh
   * 8_spades.sh
   * 8_mr_spades.sh
   * 8_megahit.sh

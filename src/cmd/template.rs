@@ -19,8 +19,9 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 * Quality check
 
     * --fastqc
-    * --kmergenie
     * --insertsize
+    * --kat
+    * --kmergenie
     * --sgapreqc
     * --sgastats
     * --reads 1000000
@@ -84,6 +85,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
         )
         // Quality check
         .arg(Arg::with_name("fastqc").long("fastqc").help("Run FastQC"))
+        .arg(Arg::with_name("kat").long("kat").help("Run KAT"))
         .arg(
             Arg::with_name("kmergenie")
                 .long("kmergenie")
@@ -289,11 +291,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     if args.is_present("fastqc") {
         gen_fastqc(&context)?;
     }
-    if args.is_present("kmergenie") {
-        gen_kmergenie(&context)?;
-    }
     if args.is_present("insertsize") {
         gen_insert_size(&context)?;
+    }
+    if args.is_present("kat") {
+        gen_kat(&context)?;
+    }
+    if args.is_present("kmergenie") {
+        gen_kmergenie(&context)?;
     }
     if args.is_present("sgapreqc") {
         gen_sga_preqc(&context)?;
@@ -360,23 +365,6 @@ fn gen_fastqc(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_kmergenie(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "2_kmergenie.sh";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    tera.add_raw_templates(vec![
-        ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/2_kmergenie.tera.sh")),
-    ])
-    .unwrap();
-
-    let rendered = tera.render("t", &context).unwrap();
-    intspan::write_lines(outname, &vec![rendered.as_str()])?;
-
-    Ok(())
-}
-
 fn gen_insert_size(context: &Context) -> std::result::Result<(), std::io::Error> {
     let outname = "2_insert_size.sh";
     eprintln!("Create {}", outname);
@@ -385,6 +373,40 @@ fn gen_insert_size(context: &Context) -> std::result::Result<(), std::io::Error>
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_insert_size.tera.sh")),
+    ])
+        .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_kat(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_kat.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/2_kat.tera.sh")),
+    ])
+        .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_kmergenie(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_kmergenie.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/2_kmergenie.tera.sh")),
     ])
     .unwrap();
 

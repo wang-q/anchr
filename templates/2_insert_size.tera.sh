@@ -5,7 +5,6 @@
 #----------------------------#
 log_warn 2_insert_size.sh
 
-
 mkdir -p 2_illumina/insert_size
 cd 2_illumina/insert_size
 

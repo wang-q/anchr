@@ -45,9 +45,13 @@ quast --test                                # may recompile the bundled nucmer
 brew install ntcard
 brew install wang-q/tap/kmergenie@1.7051
 
-brew install kmc --HEAD
-
 brew install --ignore-dependencies picard-tools
+
+brew install kat
+pip3 install tabulate
+
+#kat comp -t 4 -n -o R 2_illumina/R1.fq.gz 2_illumina/R2.fq.gz -m 51
+#kat plot spectra-mx -i -o R-spectra R-main.mx
 
 ```
 
@@ -151,7 +155,8 @@ anchr template \
     --xmx 6g \
     \
     --fastqc \
-    --kmergenie \
+    --insertsize \
+    --kat \
     \
     --trim "--dedupe --cutoff 5 --cutk 31" \
     --qual "20 25 30" \
