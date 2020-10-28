@@ -33,8 +33,10 @@ rm -fr 7_fillAnchor
 
 # spades, platanus, and megahit
 rm -fr 8_spades*
-rm -fr 8_platanus*
 rm -fr 8_megahit*
+rm -fr 8_platanus*
+rm -fr 8_mr_spades*
+rm -fr 8_mr_megahit*
 
 # quast
 rm -fr 9_quast*

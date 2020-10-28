@@ -14,7 +14,7 @@ Current release: 0.2.4
 cargo install --force --path .
 
 # Compiled binary
-curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.2/anchr-x86_64-unknown-linux-musl.tar.gz |
+curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.4/anchr-x86_64-unknown-linux-musl.tar.gz |
     tar xvz
 cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
 rm -fr target

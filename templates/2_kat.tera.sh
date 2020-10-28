@@ -47,6 +47,7 @@ done |
     mlr --ijson --otsv cat |
     perl -nla -F"\t" -e '
         /mean_gc/ and print and next;
+        $F[3] = sprintf q(%.4f), $F[3];
         $F[4] = sprintf q(%.2f), $F[4];
         print join qq(\t), @F;
     ' |
