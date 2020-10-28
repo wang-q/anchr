@@ -170,8 +170,10 @@ popd
 
   With a conventional directory structure, `anchr template` creates all scripts from reads QC to
   assembly evaluations.
-  
-  [*Escherichia* virus Lambda](results/e_coli.md#escherichia-virus-lambda) as an example.
+
+  * [*Escherichia* virus Lambda](results/e_coli.md#escherichia-virus-lambda)
+  * [*Escherichia coli* str. K-12 substr. MG1655](results/e_coli.md#escherichia-coli-str-k-12-substr-mg1655)
+  * [*Escherichia coli* str. K-12 substr. DH5α](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5α)
 
 ## PACKAGING
 

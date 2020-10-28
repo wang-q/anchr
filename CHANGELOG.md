@@ -2,6 +2,9 @@
 
 ## Unreleased - ReleaseDate
 
+* Fix bugs
+* Add `kat hist` to 2_kat.sh
+
 ## 0.2.4 - 2020-10-28
 
 * Save RUNTIME in `anchr anchors`
