@@ -173,31 +173,7 @@ popd
 
   * [*Escherichia* virus Lambda](results/e_coli.md#escherichia-virus-lambda)
   * [*Escherichia coli* str. K-12 substr. MG1655](results/e_coli.md#escherichia-coli-str-k-12-substr-mg1655)
-  * [*Escherichia coli* str. K-12 substr. DH5α](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5α)
-
-## PACKAGING
-
-```bash
-tar cvfz anchr.$(date +"%Y%m%d").tar.gz \
-    $(git ls-files | grep -v "results/")
-
-RESULT=LUAD
-pandoc results/${RESULT}.md \
-    --standalone \
-    -t latex \
-    --pdf-engine xelatex \
-    -N \
-    -V fontsize=10pt \
-    -V mainfont="Charter" \
-    -V monofont="Fira Mono" \
-    -V geometry:"top=2cm, bottom=2cm, left=1.5cm, right=1.5cm" \
-    -V geometry:a4paper \
-    --highlight-style pygments \
-    -o ${RESULT}.$(date +"%Y%m%d").pdf
-
-cloc --md $(git ls-files | grep -v "results/" | grep -v ".tsv")
-
-```
+  * [*Escherichia coli* str. K-12 substr. DH5alpha](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5alpha)
 
 ## AUTHOR
 

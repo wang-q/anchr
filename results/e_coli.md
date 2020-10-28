@@ -16,7 +16,7 @@
   - [mg1655: download](#mg1655-download)
   - [mg1655: template](#mg1655-template)
   - [mg1655: run](#mg1655-run)
-- [*Escherichia coli* str. K-12 substr. DH5α](#escherichia-coli-str-k-12-substr-dh5α)
+- [*Escherichia coli* str. K-12 substr. DH5alpha](#escherichia-coli-str-k-12-substr-dh5alpha)
   - [dh5alpha: reference](#dh5alpha-reference)
   - [dh5alpha: download](#dh5alpha-download)
   - [dh5alpha: template](#dh5alpha-template)
@@ -689,7 +689,7 @@ Table: statFinal
 | platanus.non-contained   |  176491 | 4559860 |   64 |
 
 
-# *Escherichia coli* str. K-12 substr. DH5α
+# *Escherichia coli* str. K-12 substr. DH5alpha
 
 * Taxonomy ID: [83333](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=83333)
 * Genome: [CP017100](https://www.ncbi.nlm.nih.gov/nuccore/CP017100)
