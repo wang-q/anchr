@@ -17,8 +17,13 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    for KMER in 21 31 41 51 61 71; do
+    for KMER in 21 31 41 51 61 71 81; do
         log_info "PREFIX: ${PREFIX}; KMER: ${KMER}"
+
+        kat hist \
+            -t {{ opt.parallel }} -m ${KMER} \
+            ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
+            -o ${PREFIX}-hist-${KMER}
 
         kat gcp \
             -t {{ opt.parallel }} -m ${KMER} \
