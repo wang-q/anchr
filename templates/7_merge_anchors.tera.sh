@@ -48,14 +48,14 @@ dazz contained \
     | faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.merge.fasta
 {% else -%}
 #----------------------------#
-# anchors with all reads
+# anchors with Q0L0 reads
 #----------------------------#
 log_info "anchors with Q0L0 reads"
 
 mkdir -p ${DIR_MERGE}/anchor
 cd ${DIR_MERGE}/anchor
 
-dazz anchors \
+anchr anchors \
     ../anchor.non-contained.fasta \
     ${BASH_DIR}/2_illumina/trim/pe.cor.fa.gz \
     -p {{ opt.parallel }} \

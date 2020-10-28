@@ -14,7 +14,7 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     " ::: clumpify filteredbytile sample trim filter
 
 # insertSize
-rm -f 2_illumina/insertSize/*tadpole.contig.fasta
+rm -f 2_illumina/insert_size/*tadpole.contig.fa*
 
 # quorum
 find 2_illumina -type f -name "quorum_mer_db.jf" | parallel --no-run-if-empty -j 1 rm
@@ -26,7 +26,6 @@ find 2_illumina -type f -name "pe.cor.sub.fa"    | parallel --no-run-if-empty -j
 find 2_illumina -type f -name "pe.cor.log"       | parallel --no-run-if-empty -j 1 rm
 
 # down sampling
-rm -fr 4_down_sampling/
 find . -type f -path "*4_unitigs/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*4_unitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*4_unitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
@@ -34,7 +33,6 @@ find . -type f -path "*4_tadpole/*" -name "unitigs_K*.fasta"   | parallel --no-r
 find . -type f -path "*4_tadpole/*/anchor*" -name "basecov.txt"  | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*4_tadpole/*/anchor*" -name "*.sam"        | parallel --no-run-if-empty -j 1 rm
 
-rm -fr 6_down_sampling
 find . -type f -path "*6_unitigs/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*6_unitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*6_unitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm

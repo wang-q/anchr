@@ -60,15 +60,15 @@ fi
 # mr_spades
 if [ -e 8_mr_spades/contigs.fasta ]; then
     printf "| %s | %s | %s | %s |\n" \
-        $(echo "spades_MR.contig"; faops n50 -H -S -C 8_mr_spades/contigs.fasta;) >> statFinal.md
+        $(echo "mr_spades.contig"; faops n50 -H -S -C 8_mr_spades/contigs.fasta;) >> statFinal.md
 fi
 if [ -e 8_mr_spades/scaffolds.fasta ]; then
     printf "| %s | %s | %s | %s |\n" \
-        $(echo "spades_MR.scaffold"; faops n50 -H -S -C 8_mr_spades/scaffolds.fasta;) >> statFinal.md
+        $(echo "mr_spades.scaffold"; faops n50 -H -S -C 8_mr_spades/scaffolds.fasta;) >> statFinal.md
 fi
 if [ -e 8_mr_spades/spades.non-contained.fasta ]; then
     printf "| %s | %s | %s | %s |\n" \
-        $(echo "spades_MR.non-contained"; faops n50 -H -S -C 8_mr_spades/spades.non-contained.fasta;) >> statFinal.md
+        $(echo "mr_spades.non-contained"; faops n50 -H -S -C 8_mr_spades/spades.non-contained.fasta;) >> statFinal.md
 fi
 
 # megahit
@@ -84,11 +84,11 @@ fi
 # mr_megahit
 if [ -e 8_mr_megahit/final.contigs.fa ]; then
     printf "| %s | %s | %s | %s |\n" \
-        $(echo "megahit_MR.contig"; faops n50 -H -S -C 8_mr_megahit/final.contigs.fa;) >> statFinal.md
+        $(echo "mr_megahit.contig"; faops n50 -H -S -C 8_mr_megahit/final.contigs.fa;) >> statFinal.md
 fi
 if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
     printf "| %s | %s | %s | %s |\n" \
-        $(echo "megahit_MR.non-contained"; faops n50 -H -S -C 8_mr_megahit/megahit.non-contained.fasta;) >> statFinal.md
+        $(echo "mr_megahit.non-contained"; faops n50 -H -S -C 8_mr_megahit/megahit.non-contained.fasta;) >> statFinal.md
 fi
 
 # platanus
