@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.2.6 - 2020-10-29
+
 * Add `anchr template` scripts
   * 7_glue_anchors.sh
   * 7_fill_anchors.sh
