@@ -477,7 +477,9 @@ anchr template \
     --ecphase "1 2 3" \
     --cov "40 80" \
     --statp 2 \
-    --redo
+    --redo \
+    \
+    --extend
 
 ```
 

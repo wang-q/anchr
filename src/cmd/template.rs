@@ -47,6 +47,12 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
     * --statp 2
     * --redo
 
+* Extend anchors
+
+    * --extend
+    * --gluemin 30
+    * --fillmax 2000
+
 "#,
         )
         // Info
@@ -207,6 +213,28 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("redo")
                 .help("Redo anchors when merging anchors"),
         )
+        // Extend anchors
+        .arg(
+            Arg::with_name("extend")
+                .long("extend")
+                .help("Extend anchors with other contigs"),
+        )
+        .arg(
+            Arg::with_name("gluemin")
+                .long("gluemin")
+                .help("Min length of overlaps to be glued")
+                .takes_value(true)
+                .default_value("30")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("fillmax")
+                .long("fillmax")
+                .help("Max length of gaps")
+                .takes_value(true)
+                .default_value("2000")
+                .empty_values(false),
+        )
 }
 
 // command implementation
@@ -281,11 +309,17 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
             "0"
         },
     );
+
+    opt.insert(
+        "extend",
+        if args.is_present("extend") {
             "1"
         } else {
             "0"
         },
     );
+    opt.insert("gluemin", args.value_of("gluemin").unwrap());
+    opt.insert("fillmax", args.value_of("fillmax").unwrap());
 
     let mut context = Context::new();
     context.insert("opt", &opt);
@@ -342,6 +376,11 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         gen_mr_megahit(&context)?;
     }
     gen_stat_other_anchors(&context)?;
+
+    if args.is_present("extend")  {
+        gen_glue_anchors(&context)?;
+        gen_fill_anchors(&context)?;
+    }
 
     gen_quast(&context)?;
     gen_stat_final(&context)?;
@@ -794,6 +833,46 @@ fn gen_stat_other_anchors(context: &Context) -> std::result::Result<(), std::io:
         (
             "t",
             include_str!("../../templates/9_stat_other_anchors.tera.sh"),
+        ),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_glue_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "7_glue_anchors.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        (
+            "t",
+            include_str!("../../templates/7_glue_anchors.tera.sh"),
+        ),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_fill_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "7_fill_anchors.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        (
+            "t",
+            include_str!("../../templates/7_fill_anchors.tera.sh"),
         ),
     ])
     .unwrap();

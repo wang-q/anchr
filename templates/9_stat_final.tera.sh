@@ -33,14 +33,14 @@ for D in 7_merge_anchors; do
     fi
 done
 
-# expanded anchors
-if [ -e 7_anchorLong/contig.fasta ]; then
+# extended anchors
+if [ -e 7_glue_anchors/contig.fasta ]; then
     printf "| %s | %s | %s | %s |\n" \
-        $(echo "anchorLong"; faops n50 -H -S -C 7_anchorLong/contig.fasta;) >> statFinal.md
+        $(echo "glue_anchors"; faops n50 -H -S -C 7_glue_anchors/contig.fasta;) >> statFinal.md
 fi
-if [ -e 7_anchorFill/contig.fasta ]; then
+if [ -e 7_fill_anchors/contig.fasta ]; then
     printf "| %s | %s | %s | %s |\n" \
-        $(echo "anchorFill"; faops n50 -H -S -C 7_anchorFill/contig.fasta;) >> statFinal.md
+        $(echo "fill_anchors"; faops n50 -H -S -C 7_fill_anchors/contig.fasta;) >> statFinal.md
 fi
 
 # spades

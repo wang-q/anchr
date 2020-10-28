@@ -132,6 +132,31 @@ if [ -e 9_stat_other_anchors.sh ]; then
 fi
 
 #----------------------------#
+# extend anchors
+#----------------------------#
+{% if opt.extend == "1" -%}
+rm -fr 7_extend_anchors
+mkdir -p 7_extend_anchors
+cat \
+    8_spades/spades.non-contained.fasta \
+    8_megahit/megahit.non-contained.fasta \
+    8_platanus/platanus.non-contained.fasta \
+{% if opt.merge == "1" and opt.se == "0" -%}
+    8_mr_spades/spades.non-contained.fasta \
+    8_mr_megahit/megahit.non-contained.fasta \
+{% endif -%}
+    | faops dazz -a -l 0 stdin stdout \
+    | faops filter -a 1000 -l 0 stdin 7_extend_anchors/contigs.2GS.fasta
+{% endif -%}
+{# Keep a blank line #}
+if [ -e 7_glue_anchors.sh ]; then
+    bash 7_glue_anchors.sh 7_merge_anchors/anchor.merge.fasta 7_extend_anchors/contigs.2GS.fasta 3;
+fi
+if [ -e 7_fill_anchors.sh ]; then
+    bash 7_fill_anchors.sh 7_glue_anchors/contig.fasta 7_extend_anchors/contigs.2GS.fasta 3;
+fi
+
+#----------------------------#
 # final stats
 #----------------------------#
 if [ -e 9_stat_final.sh ]; then

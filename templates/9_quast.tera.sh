@@ -27,13 +27,13 @@ if [ -e 7_merge_anchors/anchor.merge.fasta ]; then
     QUAST_LABEL+="merge_anchors,"
 fi
 
-if [ -e 7_anchorLong/contig.fasta ]; then
-    QUAST_TARGET+=" 7_anchorLong/contig.fasta "
-    QUAST_LABEL+="anchorLong,"
+if [ -e 7_glue_anchors/contig.fasta ]; then
+    QUAST_TARGET+=" 7_glue_anchors/contig.fasta "
+    QUAST_LABEL+="glue_anchors,"
 fi
-if [ -e 7_anchorFill/contig.fasta ]; then
-    QUAST_TARGET+=" 7_anchorFill/contig.fasta "
-    QUAST_LABEL+="anchorFill,"
+if [ -e 7_fill_anchors/contig.fasta ]; then
+    QUAST_TARGET+=" 7_fill_anchors/contig.fasta "
+    QUAST_LABEL+="fill_anchors,"
 fi
 
 if [ -e 8_spades/spades.non-contained.fasta ]; then
