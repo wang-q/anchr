@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.2.4 - 2020-10-28
+
 * Save RUNTIME in `anchr anchors`
 * Add func time_format()
 
