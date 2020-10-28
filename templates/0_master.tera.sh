@@ -20,14 +20,6 @@ if [ -e 2_kat.sh ]; then
     bash 2_kat.sh;
 fi
 
-if [ -e 2_kmergenie.sh ]; then
-    bash 2_kmergenie.sh;
-fi
-
-if [ -e 2_sga_preqc.sh ]; then
-    bash 2_sga_preqc.sh;
-fi
-
 #----------------------------#
 # trim reads
 #----------------------------#

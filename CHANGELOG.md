@@ -6,6 +6,10 @@
   * 7_glue_anchors.sh
   * 7_fill_anchors.sh
 
+* Remove `anchr template` scripts
+  * 2_kmergenie.sh
+  * 2_sga_preqc.sh
+
 ## 0.2.5 - 2020-10-28
 
 * Fix bugs
