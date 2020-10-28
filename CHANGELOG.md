@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.2.5 - 2020-10-28
+
 * Fix bugs
 * Add `kat hist` to 2_kat.sh
 
