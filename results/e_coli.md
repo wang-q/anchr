@@ -34,16 +34,14 @@ brew install miller
 brew tap brewsci/bio
 brew tap brewsci/science
 
-brew install mummer        # mummer need gnuplot4
-
 brew install openblas                       # numpy
 brew install python
 brew install --HEAD quast         # assembly quality assessment. https://github.com/ablab/quast/issues/140
 quast --test                                # may recompile the bundled nucmer
 
-#brew install r
-brew install ntcard
-brew install wang-q/tap/kmergenie@1.7051
+##brew install r
+#brew install ntcard
+#brew install wang-q/tap/kmergenie@1.7051
 
 brew install --ignore-dependencies picard-tools
 

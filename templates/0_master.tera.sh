@@ -11,12 +11,17 @@ log_warn 0_master.sh
 if [ -e 2_fastqc.sh ]; then
     bash 2_fastqc.sh;
 fi
-if [ -e 2_kmergenie.sh ]; then
-    bash 2_kmergenie.sh;
-fi
 
 if [ -e 2_insert_size.sh ]; then
     bash 2_insert_size.sh;
+fi
+
+if [ -e 2_kat.sh ]; then
+    bash 2_kat.sh;
+fi
+
+if [ -e 2_kmergenie.sh ]; then
+    bash 2_kmergenie.sh;
 fi
 
 if [ -e 2_sga_preqc.sh ]; then

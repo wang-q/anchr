@@ -70,6 +70,11 @@ if [ -e statInsertSize.md ]; then
     cat statInsertSize.md;
     echo;
 fi
+if [ -e statKAT.md ]; then
+    echo;
+    cat statKAT.md;
+    echo;
+fi
 if [ -e statSgaStats.md ]; then
     echo;
     cat statSgaStats.md;
