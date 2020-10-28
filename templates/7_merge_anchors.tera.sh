@@ -32,7 +32,7 @@ dazz contained \
     -o stdout |
     faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.non-contained.fasta
 
-{% if opt.redoanchors == "0" -%}
+{% if opt.redo == "0" -%}
 dazz orient \
     ${DIR_MERGE}/anchor.non-contained.fasta \
     --len 1000 --idt 0.98 --parallel {{ opt.parallel }} \
@@ -77,7 +77,7 @@ cd ${BASH_DIR}
 
 dazz contained \
     $( find . -path "*${DIR_PREFIX}*" -name "pe.others.fa" -or -path "*${DIR_PREFIX}*" -name "others.non-contained.fasta" | sort -r ) \
-{% if opt.redoanchors == "1" -%}
+{% if opt.redo == "1" -%}
     ${DIR_MERGE}/anchor/pe.others.fa \
 {% endif -%}
     --len 500 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
@@ -101,7 +101,7 @@ faops some -l 0 \
     ${DIR_MERGE}/others.txt \
     ${DIR_MERGE}/others.non-contained.fasta
 
-{% if opt.redoanchors == "1" -%}
+{% if opt.redo == "1" -%}
 find ${DIR_MERGE}/anchor -name "*.fasta" -or -name "*.fa" | parallel --no-run-if-empty -j 1 rm
 {% endif -%}
 find ${DIR_MERGE} -name "anchor.intermediate*" | parallel --no-run-if-empty -j 1 rm

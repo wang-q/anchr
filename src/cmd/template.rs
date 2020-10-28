@@ -45,7 +45,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
     * --cov "40 80"
     * --splitp 20
     * --statp 2
-    * --redoanchors
+    * --redo
 
 "#,
         )
@@ -203,8 +203,8 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .empty_values(false),
         )
         .arg(
-            Arg::with_name("redoanchors")
-                .long("redoanchors")
+            Arg::with_name("redo")
+                .long("redo")
                 .help("Redo anchors when merging anchors"),
         )
 }
@@ -274,8 +274,13 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("splitp", args.value_of("splitp").unwrap());
     opt.insert("statp", args.value_of("statp").unwrap());
     opt.insert(
-        "redoanchors",
-        if args.is_present("redoanchors") {
+        "redo",
+        if args.is_present("redo") {
+            "1"
+        } else {
+            "0"
+        },
+    );
             "1"
         } else {
             "0"
