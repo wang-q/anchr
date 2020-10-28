@@ -116,8 +116,8 @@ for PREFIX in R S T; do
     #PercentOfPairs	36.247
     for NAME in ${PREFIXM}.ihist.merge1.txt ${PREFIXM}.ihist.merge.txt; do
         printf "| %s " ${NAME} >> statMergeReads.md
-        cat ${NAME} \
-            | perl -nla -e '
+        cat ${NAME} |
+            perl -nla -e '
                 BEGIN { our $stat = { }; };
 
                 m{\#(Mean|Median|STDev|PercentOfPairs)} or next;
