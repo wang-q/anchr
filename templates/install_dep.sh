@@ -9,10 +9,10 @@ check_install () {
 }
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    check_install adoptopenjdk@11
+    check_install openjdk
 fi
 
-for package in graphviz jq parallel pigz; do
+for package in jq parallel pigz; do
     check_install ${package}
 done
 
@@ -20,7 +20,7 @@ for package in fastqc sickle; do
     check_install ${package}
 done
 
-for package in bbtools minimap miniasm sga jellyfish; do
+for package in bbtools jellyfish; do
     check_install brewsci/bio/${package};
 done
 
