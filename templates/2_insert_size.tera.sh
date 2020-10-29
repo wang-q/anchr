@@ -104,8 +104,8 @@ for PREFIX in R S T; do
         fi
 
         printf "| %s " "${PREFIX}.${G}.bbtools" >> statInsertSize.md
-        cat ${PREFIX}.ihist.${G}.txt \
-            | perl -nla -e '
+        cat ${PREFIX}.ihist.${G}.txt |
+            perl -nla -e '
                 BEGIN { our $stat = { }; };
 
                 m{\#(Mean|Median|STDev|PercentOfPairs)} or next;
@@ -132,8 +132,8 @@ for PREFIX in R S T; do
             continue;
         fi
 
-        cat ${PREFIX}.insert_size.${G}.txt \
-            | GROUP="${PREFIX}.${G}" perl -nla -F"\t" -e '
+        cat ${PREFIX}.insert_size.${G}.txt |
+            GROUP="${PREFIX}.${G}" perl -nla -F"\t" -e '
                 next if @F < 9;
                 next unless /^\d/;
                 printf qq{| %s | %.1f | %s | %.1f | %s |\n},

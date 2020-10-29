@@ -41,9 +41,6 @@ quast --test                                # may recompile the bundled nucmer
 
 brew install --ignore-dependencies picard-tools
 
-brew install kat
-pip3 install tabulate
-
 #kat comp -t 4 -n -o R 2_illumina/R1.fq.gz 2_illumina/R2.fq.gz -m 51
 #kat plot spectra-mx -i -o R-spectra R-main.mx
 

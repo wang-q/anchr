@@ -2,6 +2,7 @@
 
 ![Publish](https://github.com/wang-q/anchr/workflows/Publish/badge.svg)
 ![Build](https://github.com/wang-q/anchr/workflows/Build/badge.svg)
+[![Lines of code](https://tokei.rs/b1/github/wang-q/intspan?category=code)](https://github.com//wang-q/intspan)
 
 Anchr - **A**ssembler of **N**-free **CHR**omosomes
 
@@ -14,7 +15,7 @@ Current release: 0.2.6
 cargo install --force --path .
 
 # Compiled binary
-curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.5/anchr-x86_64-unknown-linux-musl.tar.gz |
+curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.6/anchr-x86_64-unknown-linux-musl.tar.gz |
     tar xvz
 cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
 rm -fr target
