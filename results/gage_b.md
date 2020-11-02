@@ -147,4 +147,21 @@ bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
 #bash 0_master.sh
 #bash 0_cleanup.sh
 
+rm -fr 9_quast_competitor
+quast --no-check --threads 16 \
+    -R 1_genome/genome.fa \
+    8_competitor/abyss_ctg.fasta \
+    8_competitor/cabog_ctg.fasta \
+    8_competitor/mira_ctg.fasta \
+    8_competitor/msrca_ctg.fasta \
+    8_competitor/sga_ctg.fasta \
+    8_competitor/soap_ctg.fasta \
+    8_competitor/spades_ctg.fasta \
+    8_competitor/velvet_ctg.fasta \
+    7_merge_anchors/anchor.merge.fasta \
+    7_merge_anchors/others.non-contained.fasta \
+    1_genome/paralogs.fa \
+    --label "abyss,cabog,mira,msrca,sga,soap,spades,velvet,merge,others,paralogs" \
+    -o 9_quast_competitor
+
 ```
