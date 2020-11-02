@@ -28,16 +28,14 @@
 ## Extra external executables
 
 ```shell script
-brew install aria2 curl                     # downloading tools
+brew install aria2 curl         # downloading tools
 brew install miller
 
 brew tap brewsci/bio
 brew tap brewsci/science
 
-brew install openblas                       # numpy
-brew install python
-brew install --HEAD quast         # assembly quality assessment. https://github.com/ablab/quast/issues/140
-quast --test                                # may recompile the bundled nucmer
+brew install --HEAD quast       # assembly quality assessment. https://github.com/ablab/quast/issues/140
+quast --test                    # may recompile the bundled nucmer
 
 brew install --ignore-dependencies picard-tools
 
@@ -65,23 +63,10 @@ brew install wang-q/tap/platanus
 * Reference genome
 
 ```shell script
-mkdir -p ~/data/anchr/ref
-cd ~/data/anchr/ref
-
-rsync -avP \
-    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/840/245/GCF_000840245.1_ViralProj14204/ \
-    lambda/
-
-```
-
-```shell script
 mkdir -p ~/data/anchr/lambda/1_genome
 cd ~/data/anchr/lambda/1_genome
 
-find ~/data/anchr/ref/lambda/ -name "*_genomic.fna.gz" |
-    grep -v "_from_" |
-    xargs gzip -dcf |
-    faops filter -N -s stdin genome.fa
+cp ~/data/anchr/ref/lambda/genome.fa .
 
 touch paralogs.fa
 
@@ -387,25 +372,12 @@ Table: statFinal
 * Reference genome
 
 ```shell script
-mkdir -p ~/data/anchr/ref
-cd ~/data/anchr/ref
-
-rsync -avP \
-    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2/ \
-    mg1655/
-
-```
-
-```shell script
 mkdir -p ~/data/anchr/mg1655/1_genome
 cd ~/data/anchr/mg1655/1_genome
 
-find ~/data/anchr/ref/mg1655/ -name "*_genomic.fna.gz" |
-    grep -v "_from_" |
-    xargs gzip -dcf |
-    faops filter -N -s stdin genome.fa
+cp ~/data/anchr/ref/mg1655/genome.fa .
 
-cat ~/data/anchr/paralogs/model/Results/mg1655/mg1655.multi.fas |
+cat ~/data/anchr/paralogs/e_coli/Results/mg1655/mg1655.multi.fas |
     faops filter -N -d stdin stdout \
     > paralogs.fa
 
@@ -698,23 +670,10 @@ Table: statFinal
 * Reference genome
 
 ```shell script
-mkdir -p ~/data/anchr/ref
-cd ~/data/anchr/ref
-
-rsync -avP \
-    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/001/723/505/GCF_001723505.1_ASM172350v1/ \
-    dh5alpha/
-
-```
-
-```shell script
 mkdir -p ~/data/anchr/dh5alpha/1_genome
 cd ~/data/anchr/dh5alpha/1_genome
 
-find ~/data/anchr/ref/dh5alpha/ -name "*_genomic.fna.gz" |
-    grep -v "_from_" |
-    xargs gzip -dcf |
-    faops filter -N -s stdin genome.fa
+cp ~/data/anchr/ref/dh5alpha/genome.fa .
 
 cat ~/data/anchr/paralogs/e_coli/Results/dh5alpha/dh5alpha.multi.fas |
     faops filter -N -d stdin stdout \
