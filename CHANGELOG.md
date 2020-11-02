@@ -2,6 +2,13 @@
 
 ## Unreleased - ReleaseDate
 
+* Update `anchr dep` scripts
+* Add docs
+  * se.md
+  * qlx.md
+  * gage_b.md
+* Prebuilt resources 
+
 ## 0.2.6 - 2020-10-29
 
 * Add `anchr template` scripts
