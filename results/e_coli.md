@@ -42,6 +42,14 @@ brew install --ignore-dependencies picard-tools
 #kat comp -t 4 -n -o R 2_illumina/R1.fq.gz 2_illumina/R2.fq.gz -m 51
 #kat plot spectra-mx -i -o R-spectra R-main.mx
 
+bcalm -in list_reads -kmer-size 41 -abundance-min 2 -nb-cores 6 -out 41
+
+dazz contained \
+    $( find . -name "*unitigs.fa" | sort -r ) \
+    --len 1000 --idt 0.98 --proportion 0.99999 --parallel 8 \
+    -o stdout |
+    faops filter -a 1000 -l 0 stdin unitigs.non-contained.fasta
+
 ```
 
 ## Other leading assemblers
