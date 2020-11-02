@@ -2,7 +2,7 @@
 
 ![Publish](https://github.com/wang-q/anchr/workflows/Publish/badge.svg)
 ![Build](https://github.com/wang-q/anchr/workflows/Build/badge.svg)
-[![Lines of code](https://tokei.rs/b1/github/wang-q/intspan?category=code)](https://github.com//wang-q/intspan)
+[![Lines of code](https://tokei.rs/b1/github/wang-q/anchr?category=code)](https://github.com//wang-q/anchr)
 
 Anchr - **A**ssembler of **N**-free **CHR**omosomes
 
