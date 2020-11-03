@@ -47,13 +47,17 @@ log_info Creating unitigs
 {% set kmers = opt.kmer | split(pat=" ") %}
 {% for kmer in kmers -%}
     log_debug with k={{ kmer }}
-{% if opt.tadpole -%}
+{% if opt.unitigger == "tadpole" -%}
     tadpole.sh \
         in=pe.cor.fa \
         out=unitigs_K{{ kmer }}.fasta \
         threads={{ opt.parallel }} \
         k={{ kmer }} \
         overwrite
+{% elif opt.unitigger == "bcalm" -%}
+    bcalm -in pe.cor.fa \
+        -kmer-size {{ kmer }} -abundance-min 5 -nb-cores {{ opt.parallel }} -out K{{ kmer }}
+    mv K{{ kmer }}.unitigs.fa unitigs_K{{ kmer }}.fasta
 {% else -%}
     create_k_unitigs_large_k -c $(({{ kmer }}-1)) -t {{ opt.parallel }} \
         -m {{ kmer }} -n $ESTIMATED_GENOME_SIZE -l {{ kmer }} -f 0.000001 \

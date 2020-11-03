@@ -3,11 +3,13 @@
 ## Unreleased - ReleaseDate
 
 * Update `anchr dep` scripts
+* Add `--unitigger` `anchr unitigs`
+  * superreads, tadpole, or bcalm
 * Add docs
   * se.md
   * qlx.md
   * gage_b.md
-* Prebuilt resources 
+* Prebuilt resources
 
 ## 0.2.6 - 2020-10-29
 

@@ -141,13 +141,39 @@ anchr quorum \
 popd
 
 # unitigs
-mkdir -p tests/Q0L0
-pushd tests/Q0L0
+mkdir -p tests/superreads
+pushd tests/superreads
 
-gzip -dcf ../trim/pe.cor.fa.gz > pe.cor.fa
+gzip -dcf ../trim/pe.cor.fa.gz > ../trim/pe.cor.fa
 
 anchr unitigs \
-    pe.cor.fa ../trim/env.json \
+    ../trim/pe.cor.fa ../trim/env.json \
+    --kmer "31 41 51 61 71 81" \
+    --parallel 4 \
+    -o unitigs.sh
+bash unitigs.sh
+popd
+
+# unitigs - tadpole
+mkdir -p tests/tadpole
+pushd tests/tadpole
+
+anchr unitigs \
+    ../trim/pe.cor.fa ../trim/env.json \
+    -u tadpole \
+    --kmer "31 41 51 61 71 81" \
+    --parallel 4 \
+    -o unitigs.sh
+bash unitigs.sh
+popd
+
+# unitigs - bcalm
+mkdir -p tests/bcalm
+pushd tests/bcalm
+
+anchr unitigs \
+    ../trim/pe.cor.fa ../trim/env.json \
+    -u bcalm \
     --kmer "31 41 51 61 71 81" \
     --parallel 4 \
     -o unitigs.sh
@@ -155,8 +181,8 @@ bash unitigs.sh
 popd
 
 # anchors
-mkdir -p tests/Q0L0/anchors
-pushd tests/Q0L0/anchors
+mkdir -p tests/superreads/anchors
+pushd tests/superreads/anchors
 
 anchr anchors \
     ../unitigs.fasta \

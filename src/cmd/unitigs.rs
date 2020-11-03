@@ -22,6 +22,15 @@ Fasta files can't be gzipped
                 .index(1),
         )
         .arg(
+            Arg::with_name("unitigger")
+                .long("unitigger")
+                .short("u")
+                .help("Which unitig constructor to use: superreads, tadpole, or bcalm")
+                .takes_value(true)
+                .default_value("superreads")
+                .empty_values(false),
+        )
+        .arg(
             Arg::with_name("estsize")
                 .long("estsize")
                 .help("Estimated genome size")
@@ -77,6 +86,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     // context from args
     let mut opt = HashMap::new();
+    opt.insert("unitigger", args.value_of("unitigger").unwrap());
     opt.insert("estsize", args.value_of("estsize").unwrap());
     opt.insert("kmer", args.value_of("kmer").unwrap());
     opt.insert("min", args.value_of("min").unwrap());
