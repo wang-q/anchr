@@ -101,6 +101,12 @@ perl -MNumber::Format -e "1" 2>/dev/null || {
 #----------------------------#
 # unitigs
 #----------------------------#
+hash bcalm 2>/dev/null || {
+    echo >&2 "bcalm is required but it's not installed.";
+    echo >&2 "Install with homebrew: brew install brewsci/bio/bcalm";
+    exit 1;
+}
+
 hash fasta2DB 2>/dev/null || {
     echo >&2 "DAZZ_DB is required but it's not installed.";
     echo >&2 "Install with homebrew: brew install wang-q/tap/dazz_db@20201008";

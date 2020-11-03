@@ -20,7 +20,7 @@ for package in fastqc sickle; do
     check_install ${package}
 done
 
-for package in bbtools jellyfish; do
+for package in bbtools jellyfish bcalm; do
     check_install brewsci/bio/${package};
 done
 

@@ -3,7 +3,7 @@
 ## Unreleased - ReleaseDate
 
 * Update `anchr dep` scripts
-* Add `--unitigger` `anchr unitigs`
+* Add `--unitigger` to `anchr unitigs`
   * superreads, tadpole, or bcalm
 * Add docs
   * se.md
