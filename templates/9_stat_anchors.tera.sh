@@ -10,7 +10,7 @@ log_warn 9_stat_anchors.sh
 #----------------------------#
 USAGE="Usage: $0 [DIR_PREFIX] [FILENAME_MD]"
 
-DIR_PREFIX=${1:-"4_unitigs"}
+DIR_PREFIX=${1:-"4_unitigs_superreads"}
 FILENAME_MD=${2:-"statAnchors.md"}
 
 echo -e "Table: ${FILENAME_MD}\n" > ${FILENAME_MD}

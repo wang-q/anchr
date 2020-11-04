@@ -56,7 +56,8 @@ log_info Creating unitigs
         overwrite
 {% elif opt.unitigger == "bcalm" -%}
     bcalm -in pe.cor.fa \
-        -kmer-size {{ kmer }} -abundance-min 5 -nb-cores {{ opt.parallel }} -out K{{ kmer }}
+        -kmer-size {{ kmer }} -abundance-min 5 \
+        -nb-cores {{ opt.parallel }} -out K{{ kmer }}
     mv K{{ kmer }}.unitigs.fa unitigs_K{{ kmer }}.fasta
 {% else -%}
     create_k_unitigs_large_k -c $(({{ kmer }}-1)) -t {{ opt.parallel }} \

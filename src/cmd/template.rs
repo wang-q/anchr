@@ -40,6 +40,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 * Down sampling, unitigs, and anchors
 
     * --cov "40 80"
+    * --unitigger "superreads"
     * --splitp 20
     * --statp 2
     * --redo
@@ -175,6 +176,14 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .empty_values(false),
         )
         .arg(
+            Arg::with_name("unitigger")
+                .long("unitigger")
+                .help("Unitigger used: superreads, tadpole, or bcalm")
+                .takes_value(true)
+                .default_value("superreads")
+                .empty_values(false),
+        )
+        .arg(
             Arg::with_name("splitp")
                 .long("splitp")
                 .help("Parts of splitting")
@@ -273,25 +282,12 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("ecphase", args.value_of("ecphase").unwrap());
 
     opt.insert("cov", args.value_of("cov").unwrap());
+    opt.insert("unitigger", args.value_of("unitigger").unwrap());
     opt.insert("splitp", args.value_of("splitp").unwrap());
     opt.insert("statp", args.value_of("statp").unwrap());
-    opt.insert(
-        "redo",
-        if args.is_present("redo") {
-            "1"
-        } else {
-            "0"
-        },
-    );
+    opt.insert("redo", if args.is_present("redo") { "1" } else { "0" });
 
-    opt.insert(
-        "extend",
-        if args.is_present("extend") {
-            "1"
-        } else {
-            "0"
-        },
-    );
+    opt.insert("extend", if args.is_present("extend") { "1" } else { "0" });
     opt.insert("gluemin", args.value_of("gluemin").unwrap());
     opt.insert("fillmax", args.value_of("fillmax").unwrap());
 
@@ -321,7 +317,11 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         gen_no_quorum(&context)?;
     }
     gen_down_sampling(&context)?;
-    gen_unitigs(&context)?;
+
+    let unitiggers = args.value_of("unitigger").unwrap().split_ascii_whitespace();
+    for u in unitiggers {
+        gen_unitigs(&context, u)?;
+    }
     gen_anchors(&context)?;
     gen_stat_anchors(&context)?;
 
@@ -345,7 +345,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     }
     gen_stat_other_anchors(&context)?;
 
-    if args.is_present("extend")  {
+    if args.is_present("extend") {
         gen_glue_anchors(&context)?;
         gen_fill_anchors(&context)?;
     }
@@ -386,7 +386,7 @@ fn gen_insert_size(context: &Context) -> std::result::Result<(), std::io::Error>
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_insert_size.tera.sh")),
     ])
-        .unwrap();
+    .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
@@ -403,7 +403,7 @@ fn gen_kat(context: &Context) -> std::result::Result<(), std::io::Error> {
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_kat.tera.sh")),
     ])
-        .unwrap();
+    .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
@@ -530,14 +530,53 @@ fn gen_mr_down_sampling(context: &Context) -> std::result::Result<(), std::io::E
     Ok(())
 }
 
-fn gen_unitigs(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "4_unitigs.sh";
+fn gen_unitigs(context: &Context, unitigger: &str) -> std::result::Result<(), std::io::Error> {
+    let outname = format!("4_unitigs_{}.sh", unitigger);
     eprintln!("Create {}", outname);
+
+    let mut con = Context::new();
+    con.insert("outname", outname.as_str());
+    con.insert("unitigger", unitigger);
+    con.extend(context.clone());
 
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/4_unitigs.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &con).unwrap();
+    intspan::write_lines(outname.as_str(), &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "4_anchors.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/4_anchors.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_stat_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "9_stat_anchors.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/9_stat_anchors.tera.sh")),
     ])
     .unwrap();
 
@@ -564,23 +603,6 @@ fn gen_mr_unitigs(context: &Context) -> std::result::Result<(), std::io::Error> 
     Ok(())
 }
 
-fn gen_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "4_anchors.sh";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    tera.add_raw_templates(vec![
-        ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/4_anchors.tera.sh")),
-    ])
-    .unwrap();
-
-    let rendered = tera.render("t", &context).unwrap();
-    intspan::write_lines(outname, &vec![rendered.as_str()])?;
-
-    Ok(())
-}
-
 fn gen_mr_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
     let outname = "6_anchors.sh";
     eprintln!("Create {}", outname);
@@ -589,23 +611,6 @@ fn gen_mr_anchors(context: &Context) -> std::result::Result<(), std::io::Error> 
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/6_anchors.tera.sh")),
-    ])
-    .unwrap();
-
-    let rendered = tera.render("t", &context).unwrap();
-    intspan::write_lines(outname, &vec![rendered.as_str()])?;
-
-    Ok(())
-}
-
-fn gen_stat_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "9_stat_anchors.sh";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    tera.add_raw_templates(vec![
-        ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/9_stat_anchors.tera.sh")),
     ])
     .unwrap();
 
@@ -784,10 +789,7 @@ fn gen_glue_anchors(context: &Context) -> std::result::Result<(), std::io::Error
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        (
-            "t",
-            include_str!("../../templates/7_glue_anchors.tera.sh"),
-        ),
+        ("t", include_str!("../../templates/7_glue_anchors.tera.sh")),
     ])
     .unwrap();
 
@@ -804,10 +806,7 @@ fn gen_fill_anchors(context: &Context) -> std::result::Result<(), std::io::Error
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        (
-            "t",
-            include_str!("../../templates/7_fill_anchors.tera.sh"),
-        ),
+        ("t", include_str!("../../templates/7_fill_anchors.tera.sh")),
     ])
     .unwrap();
 

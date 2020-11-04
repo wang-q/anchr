@@ -52,16 +52,20 @@ if [ -e 4_down_sampling.sh ]; then
     bash 4_down_sampling.sh;
 fi
 
-if [ -e 4_unitigs.sh ]; then
-    bash 4_unitigs.sh;
+{% set unitiggers = opt.unitigger | split(pat=" ") -%}
+{% for u in unitiggers -%}
+
+if [ -e 4_unitigs_{{ u }}.sh ]; then
+    bash 4_unitigs_{{ u }}.sh;
 fi
 if [ -e 4_anchors.sh ]; then
-    bash 4_anchors.sh;
+    bash 4_anchors.sh 4_unitigs_{{ u }};
 fi
 if [ -e 9_stat_anchors.sh ]; then
-    bash 9_stat_anchors.sh 4_unitigs statUnitigsAnchors.md
+    bash 9_stat_anchors.sh 4_unitigs_{{ u }} statUnitigs{{ u | title }}.md
 fi
-
+{% endfor -%}
+{# Keep a blank line #}
 #----------------------------#
 # down sampling merged reads
 #----------------------------#
