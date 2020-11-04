@@ -71,12 +71,12 @@ Fasta files can‘t be gzipped
         .arg(
             Arg::with_name("longest")
                 .long("longest")
-                .help("Only keep the longest proper region")
+                .help("Only keep the longest proper region"),
         )
         .arg(
             Arg::with_name("keepedge")
                 .long("keepedge")
-                .help("Keep edges of anchors")
+                .help("Keep edges of anchors"),
         )
         .arg(
             Arg::with_name("parallel")
