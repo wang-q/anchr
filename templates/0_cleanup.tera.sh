@@ -4,7 +4,8 @@
 # Run
 #----------------------------#
 log_warn 0_cleanup.sh
-
+{% set unitiggers = opt.unitigger | split(pat=" ") -%}
+{# Keep a blank line #}
 # Illumina
 parallel --no-run-if-empty --linebuffer -k -j 1 "
     if [ -e 2_illumina/{}.fq.gz ]; then
@@ -26,20 +27,16 @@ find 2_illumina -type f -name "pe.cor.sub.fa"    | parallel --no-run-if-empty -j
 find 2_illumina -type f -name "pe.cor.log"       | parallel --no-run-if-empty -j 1 rm
 
 # down sampling
-find . -type f -path "*4_unitigs/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_unitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_unitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_tadpole/*" -name "unitigs_K*.fasta"   | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_tadpole/*/anchor*" -name "basecov.txt"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_tadpole/*/anchor*" -name "*.sam"        | parallel --no-run-if-empty -j 1 rm
+{% for u in unitiggers -%}
+find . -type f -path "*4_unitigs_{{ u }}/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*4_unitigs_{{ u }}/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*4_unitigs_{{ u }}/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
 
-find . -type f -path "*6_unitigs/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_unitigs/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_unitigs/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_tadpole/*" -name "unitigs_K*.fasta"   | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_tadpole/*/anchor*" -name "basecov.txt"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_tadpole/*/anchor*" -name "*.sam"        | parallel --no-run-if-empty -j 1 rm
-
+find . -type f -path "*6_unitigs_{{ u }}/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_unitigs_{{ u }}/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_unitigs_{{ u }}/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
+{% endfor -%}
+{# Keep a blank line #}
 # tempdir
 find . -type d -name "\?" | xargs rm -fr
 

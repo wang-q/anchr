@@ -4,7 +4,8 @@
 # Run
 #----------------------------#
 log_warn 0_master.sh
-
+{% set unitiggers = opt.unitigger | split(pat=" ") -%}
+{# Keep a blank line #}
 #----------------------------#
 # Illumina QC
 #----------------------------#
@@ -52,9 +53,7 @@ if [ -e 4_down_sampling.sh ]; then
     bash 4_down_sampling.sh;
 fi
 
-{% set unitiggers = opt.unitigger | split(pat=" ") -%}
 {% for u in unitiggers -%}
-
 if [ -e 4_unitigs_{{ u }}.sh ]; then
     bash 4_unitigs_{{ u }}.sh;
 fi
@@ -86,9 +85,12 @@ fi
 #----------------------------#
 # merge anchors
 #----------------------------#
+{% for u in unitiggers -%}
 if [ -e 7_merge_anchors.sh ]; then
-    bash 7_merge_anchors.sh 4_unitigs 7_merge_unitigs_anchors;
+    bash 7_merge_anchors.sh 4_unitigs_{{ u }} 7_merge_unitigs_{{ u }};
 fi
+{% endfor -%}
+{# Keep a blank line #}
 
 {% if opt.merge == "1" -%}
 if [ -e 7_merge_anchors.sh ]; then

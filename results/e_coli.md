@@ -139,10 +139,8 @@ anchr template \
     --len "60" \
     --filter "adapter artifact" \
     \
-    --quorum \
-    --merge \
-    --ecphase "1 2 3" \
     --cov "40 80" \
+    --unitigger "bcalm" \
     --statp 2 
 
 ```
