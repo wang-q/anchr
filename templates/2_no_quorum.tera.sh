@@ -83,6 +83,22 @@ for Q in 0 {{ opt.qual }}; do
         else
             mv R.cor.fa.gz pe.cor.fa.gz
         fi
+
+        rm -f env.json
+        log_debug "Reads stats with faops"
+        SUM_OUT=$( faops n50 -H -N 0 -S pe.cor.fa.gz )
+        save SUM_OUT
+
+        save START_TIME
+        END_TIME=$(date +%s)
+        save END_TIME
+        RUNTIME=$((END_TIME-START_TIME))
+        save RUNTIME
+
+        # save genome size
+        ESTIMATED_GENOME_SIZE={{ opt.genome }}
+        save ESTIMATED_GENOME_SIZE
+
     done
 done
 
