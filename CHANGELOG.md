@@ -2,16 +2,14 @@
 
 ## Unreleased - ReleaseDate
 
-## 0.2.7 - 2020-11-05
-
 * Update `anchr dep` scripts
 * Support multiple unitiggers
   * superreads, tadpole, or bcalm
+* Prebuilt resources
 * Add docs
   * se.md
   * qlx.md
   * gage_b.md
-* Prebuilt resources
 
 ## 0.2.6 - 2020-10-29
 

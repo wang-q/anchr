@@ -55,9 +55,6 @@ brew install wang-q/tap/platanus
 
 # *Escherichia* virus Lambda
 
-* Taxonomy ID: [10710](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=10710)
-* Ref. Assembly: [GCF_000840245.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000840245.1/)
-
 ## lambda: reference
 
 * Reference genome
@@ -363,11 +360,6 @@ Table: statFinal
 
 # *Escherichia coli* str. K-12 substr. MG1655
 
-* Taxonomy ID: [511145](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=511145)
-* Genome: INSDC [U00096.3](https://www.ncbi.nlm.nih.gov/nuccore/U00096.3)
-* Assembly: [GCF_000005845.2](https://www.ncbi.nlm.nih.gov/assembly/GCF_000005845.2)
-* Proportion of paralogs (> 1000 bp): 0.0325
-
 ## mg1655: reference
 
 * Reference genome
@@ -377,10 +369,7 @@ mkdir -p ~/data/anchr/mg1655/1_genome
 cd ~/data/anchr/mg1655/1_genome
 
 cp ~/data/anchr/ref/mg1655/genome.fa .
-
-cat ~/data/anchr/paralogs/e_coli/Results/mg1655/mg1655.multi.fas |
-    faops filter -N -d stdin stdout \
-    > paralogs.fa
+cp ~/data/anchr/ref/mg1655/paralogs.fa .
 
 ```
 
@@ -663,11 +652,6 @@ Table: statFinal
 
 # *Escherichia coli* str. K-12 substr. DH5alpha
 
-* Taxonomy ID: [83333](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=83333)
-* Genome: [CP017100](https://www.ncbi.nlm.nih.gov/nuccore/CP017100)
-* Assembly: [GCF_001723515.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_001723515.1)
-* Proportion of paralogs (> 1000 bp): 0.0342
-
 ## dh5alpha: reference
 
 * Reference genome
@@ -677,10 +661,7 @@ mkdir -p ~/data/anchr/dh5alpha/1_genome
 cd ~/data/anchr/dh5alpha/1_genome
 
 cp ~/data/anchr/ref/dh5alpha/genome.fa .
-
-cat ~/data/anchr/paralogs/e_coli/Results/dh5alpha/dh5alpha.multi.fas |
-    faops filter -N -d stdin stdout \
-    > paralogs.fa
+cp ~/data/anchr/ref/dh5alpha/paralogs.fa .
 
 ```
 

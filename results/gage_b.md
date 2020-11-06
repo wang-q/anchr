@@ -8,30 +8,19 @@
   - [bcer_mi: download](#bcer_mi-download)
   - [bcer_mi: template](#bcer_mi-template)
   - [bcer_mi: run](#bcer_mi-run)
+- [*Mycobacterium abscessus* 6G-0125-R](#mycobacterium-abscessus-6g-0125-r)
+  - [Mabs_mi: reference](#mabs_mi-reference)
+- [*Rhodobacter sphaeroides* 2.4.1](#rhodobacter-sphaeroides-241)
+  - [Rsph_mi: reference](#rsph_mi-reference)
+- [*Vibrio cholerae* CP1032(5)](#vibrio-cholerae-cp10325)
+  - [Vcho_mi: reference](#vcho_mi-reference)
 
 
 # *Bacillus cereus* ATCC 10987
 
-* Taxonomy ID: [222523](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=222523)
-* Assembly: [GCF_000008005.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000008005.1)
-* Proportion of paralogs (> 1000 bp): 0.0344
-
-B_cereus_MiSeq
-
-
 ## bcer_mi: reference
 
 * Reference genome
-
-```shell script
-mkdir -p ~/data/anchr/ref
-cd ~/data/anchr/ref
-
-rsync -avP \
-    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/008/005/GCF_000008005.1_ASM800v1/ \
-    Bcer/
-
-```
 
 ```shell script
 mkdir -p ~/data/anchr/bcer_mi/1_genome
@@ -165,3 +154,58 @@ quast --no-check --threads 16 \
     -o 9_quast_competitor
 
 ```
+
+
+# *Mycobacterium abscessus* 6G-0125-R
+
+## Mabs_mi: reference
+
+* Reference genome
+
+```shell script
+mkdir -p ~/data/anchr/Mabs_mi/1_genome
+cd ~/data/anchr/Mabs_mi/1_genome
+
+cp ~/data/anchr/ref/Mabs/genome.fa .
+cp ~/data/anchr/ref/Mabs/paralogs.fa .
+
+```
+
+# *Rhodobacter sphaeroides* 2.4.1
+
+## Rsph_mi: reference
+
+* Reference genome
+
+```shell script
+mkdir -p ~/data/anchr/Rsph_mi/1_genome
+cd ~/data/anchr/Rsph_mi/1_genome
+
+cp ~/data/anchr/ref/Rsph/genome.fa .
+cp ~/data/anchr/ref/Rsph/paralogs.fa .
+
+```
+
+
+# *Vibrio cholerae* CP1032(5)
+
+* *Vibrio cholerae* O1 biovar El Tor str. N16961
+  * Taxid: [243277](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=243277)
+  * Assembly: [GCF_000006745.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000006745.1)
+  * Proportion of paralogs (> 1000 bp): 0.0216
+* *Vibrio cholerae* CP1032(5)
+  * Assembly: [GCF_000279305.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000279305.1)
+
+## Vcho_mi: reference
+
+* Reference genome
+
+```shell script
+mkdir -p ~/data/anchr/Vcho_mi/1_genome
+cd ~/data/anchr/Vcho_mi/1_genome
+
+cp ~/data/anchr/ref/Vcho/genome.fa .
+cp ~/data/anchr/ref/Vcho/paralogs.fa .
+
+```
+
