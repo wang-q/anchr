@@ -139,6 +139,9 @@ anchr template \
     --len "60" \
     --filter "adapter artifact" \
     \
+    --merge \
+    --ecphase "1 2 3" \
+    \
     --cov "40 80" \
     --unitigger "bcalm" \
     --statp 2 
@@ -438,7 +441,9 @@ anchr template \
     --quorum \
     --merge \
     --ecphase "1 2 3" \
+    \
     --cov "40 80" \
+    --unitigger "superreads tadpole bcalm" \
     --statp 2 \
     --redo \
     \
