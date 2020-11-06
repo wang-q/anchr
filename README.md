@@ -18,7 +18,7 @@ cargo install --git https://github.com/wang-q/anchr --branch main
 
 # Compiled binary
 mkdir -p "~/bin"
-curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.7/anchr-x86_64-unknown-linux-musl.tar.gz |
+curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.2.8/anchr-x86_64-unknown-linux-musl.tar.gz |
     tar xvz
 cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
 rm -fr target
@@ -29,7 +29,7 @@ rm -fr target
 
 ```
 $ anchr help
-anchr 0.2.8-alpha.0
+anchr 0.2.8
 wang-q <wang-q@outlook.com>
 Anchr - Assembler of N-free CHRomosomes
 
