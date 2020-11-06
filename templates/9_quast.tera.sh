@@ -20,11 +20,13 @@ if [ -e 7_merge_unitigs_{{ u }}/anchor.merge.fasta ]; then
 fi
 {% endfor -%}
 {# Keep a blank line #}
-if [ -e 7_merge_mr_unitigs_anchors/anchor.merge.fasta ]; then
-    QUAST_TARGET+=" 7_merge_mr_unitigs_anchors/anchor.merge.fasta "
-    QUAST_LABEL+="merge_mr_unitigs,"
+{% for u in unitiggers -%}
+if [ -e 7_merge_mr_unitigs_{{ u }}/anchor.merge.fasta ]; then
+    QUAST_TARGET+=" 7_merge_mr_unitigs_{{ u }}/anchor.merge.fasta "
+    QUAST_LABEL+="merge_mr_unitigs_{{ u }},"
 fi
-
+{% endfor -%}
+{# Keep a blank line #}
 if [ -e 7_merge_anchors/anchor.merge.fasta ]; then
     QUAST_TARGET+=" 7_merge_anchors/anchor.merge.fasta "
     QUAST_LABEL+="merge_anchors,"
