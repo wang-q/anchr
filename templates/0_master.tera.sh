@@ -65,6 +65,7 @@ if [ -e 9_stat_anchors.sh ]; then
 fi
 {% endfor -%}
 {# Keep a blank line #}
+{% if opt.merge == "1" -%}
 #----------------------------#
 # down sampling merged reads
 #----------------------------#
@@ -72,16 +73,19 @@ if [ -e 6_down_sampling.sh ]; then
     bash 6_down_sampling.sh
 fi
 
-if [ -e 6_unitigs.sh ]; then
-    bash 6_unitigs.sh;
+{% for u in unitiggers -%}
+if [ -e 6_unitigs_{{ u }}.sh ]; then
+    bash 6_unitigs_{{ u }}.sh;
 fi
 if [ -e 6_anchors.sh ]; then
-    bash 6_anchors.sh;
+    bash 6_anchors.sh 6_unitigs_{{ u }};
 fi
-if [ -e 9_stat_mr_anchors.sh ]; then
-    bash 9_stat_mr_anchors.sh 6_unitigs statMRUnitigsAnchors.md
+if [ -e 9_stat_anchors.sh ]; then
+    bash 9_stat_mr_anchors.sh 6_unitigs_{{ u }} statMRUnitigs{{ u | title }}.md
 fi
-
+{% endfor -%}
+{% endif -%}
+{# Keep a blank line #}
 #----------------------------#
 # merge anchors
 #----------------------------#
@@ -91,13 +95,14 @@ if [ -e 7_merge_anchors.sh ]; then
 fi
 {% endfor -%}
 {# Keep a blank line #}
-
 {% if opt.merge == "1" -%}
+{% for u in unitiggers -%}
 if [ -e 7_merge_anchors.sh ]; then
-    bash 7_merge_anchors.sh 6_unitigs 7_merge_mr_unitigs_anchors
+    bash 7_merge_anchors.sh 6_unitigs_{{ u }} 7_merge_mr_unitigs_{{ u }}
 fi
+{% endfor -%}
 {% endif -%}
-
+{# Keep a blank line #}
 if [ -e 7_merge_anchors.sh ]; then
     bash 7_merge_anchors.sh 7_merge 7_merge_anchors;
 fi

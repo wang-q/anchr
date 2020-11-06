@@ -1,4 +1,5 @@
 use clap::*;
+use itertools::Itertools;
 use std::collections::HashMap;
 use tera::{Context, Tera};
 
@@ -319,8 +320,13 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     }
     gen_down_sampling(&context)?;
 
-    let unitiggers = args.value_of("unitigger").unwrap().split_ascii_whitespace();
-    for u in unitiggers {
+    let unitiggers = args
+        .value_of("unitigger")
+        .unwrap()
+        .split_ascii_whitespace()
+        .collect_vec();
+
+    for u in unitiggers.clone() {
         gen_unitigs(&context, u)?;
     }
     gen_anchors(&context)?;
@@ -329,7 +335,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     if !args.is_present("se") && args.is_present("merge") {
         gen_merge(&context)?;
         gen_mr_down_sampling(&context)?;
-        gen_mr_unitigs(&context)?;
+        for u in unitiggers.clone() {
+            gen_mr_unitigs(&context, u)?;
+        }
         gen_mr_anchors(&context)?;
         gen_stat_mr_anchors(&context)?;
     }
@@ -553,9 +561,14 @@ fn gen_unitigs(context: &Context, unitigger: &str) -> std::result::Result<(), st
     Ok(())
 }
 
-fn gen_mr_unitigs(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "6_unitigs.sh";
+fn gen_mr_unitigs(context: &Context, unitigger: &str) -> std::result::Result<(), std::io::Error> {
+    let outname = format!("6_unitigs_{}.sh", unitigger);
     eprintln!("Create {}", outname);
+
+    let mut con = Context::new();
+    con.insert("outname", outname.as_str());
+    con.insert("unitigger", unitigger);
+    con.extend(context.clone());
 
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
@@ -564,8 +577,8 @@ fn gen_mr_unitigs(context: &Context) -> std::result::Result<(), std::io::Error> 
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
-    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+    let rendered = tera.render("t", &con).unwrap();
+    intspan::write_lines(outname.as_str(), &vec![rendered.as_str()])?;
 
     Ok(())
 }

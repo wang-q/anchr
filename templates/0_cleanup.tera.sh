@@ -100,26 +100,18 @@ if [ -e statAnchors.md ]; then
     cat statAnchors.md;
     echo;
 fi
-if [ -e statUnitigsAnchors.md ]; then
+{% for u in unitiggers -%}
+if [ -e statUnitigs{{ u | title }}.md ]; then
     echo;
-    cat statUnitigsAnchors.md;
-    echo;
-fi
-if [ -e statTadpoleAnchors.md ]; then
-    echo;
-    cat statTadpoleAnchors.md;
+    cat statUnitigs{{ u | title }}.md
     echo;
 fi
-if [ -e statMRUnitigsAnchors.md ]; then
+if [ -e statMRUnitigs{{ u | title }}.md ]; then
     echo;
-    cat statMRUnitigsAnchors.md;
-    echo;
-fi
-if [ -e statMRTadpoleAnchors.md ]; then
-    echo;
-    cat statMRTadpoleAnchors.md;
+    cat statMRUnitigs{{ u | title }}.md;
     echo;
 fi
+{% endfor -%}
 if [ -e statMergeAnchors.md ]; then
     echo;
     cat statMergeAnchors.md;
