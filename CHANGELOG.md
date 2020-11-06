@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.2.8 - 2020-11-07
+
 * Update `anchr dep` scripts
 * Support multiple unitiggers
   * superreads, tadpole, or bcalm
