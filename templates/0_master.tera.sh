@@ -65,7 +65,7 @@ if [ -e 9_stat_anchors.sh ]; then
 fi
 {% endfor -%}
 {# Keep a blank line #}
-{% if opt.merge == "1" -%}
+{% if opt.merge == "1" and opt.se == "0" -%}
 #----------------------------#
 # down sampling merged reads
 #----------------------------#
@@ -95,7 +95,7 @@ if [ -e 7_merge_anchors.sh ]; then
 fi
 {% endfor -%}
 {# Keep a blank line #}
-{% if opt.merge == "1" -%}
+{% if opt.merge == "1" and opt.se == "0" -%}
 {% for u in unitiggers -%}
 if [ -e 7_merge_anchors.sh ]; then
     bash 7_merge_anchors.sh 6_unitigs_{{ u }} 7_merge_mr_unitigs_{{ u }}
@@ -150,15 +150,15 @@ cat \
 {% endif -%}
     | faops dazz -a -l 0 stdin stdout \
     | faops filter -a 1000 -l 0 stdin 7_extend_anchors/contigs.2GS.fasta
-{% endif -%}
-{# Keep a blank line #}
+
 if [ -e 7_glue_anchors.sh ]; then
     bash 7_glue_anchors.sh 7_merge_anchors/anchor.merge.fasta 7_extend_anchors/contigs.2GS.fasta 3;
 fi
 if [ -e 7_fill_anchors.sh ]; then
     bash 7_fill_anchors.sh 7_glue_anchors/contig.fasta 7_extend_anchors/contigs.2GS.fasta 3;
 fi
-
+{% endif -%}
+{# Keep a blank line #}
 #----------------------------#
 # final stats
 #----------------------------#

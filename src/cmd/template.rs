@@ -85,7 +85,6 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("queue")
                 .help("Queue name of the LSF cluster")
                 .takes_value(true)
-                .default_value("mpi")
                 .empty_values(false),
         )
         // Quality check
@@ -255,7 +254,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         },
     );
     opt.insert("parallel", args.value_of("parallel").unwrap());
-    opt.insert("queue", args.value_of("queue").unwrap());
+    opt.insert(
+        "queue",
+        if args.is_present("queue") {
+            args.value_of("queue").unwrap()
+        } else {
+            "0"
+        },
+    );
 
     opt.insert("reads", args.value_of("reads").unwrap());
 
@@ -365,6 +371,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
     gen_master(&context)?;
+    if args.is_present("queue") {
+        gen_bsub(&context)?;
+    }
 
     Ok(())
 }
@@ -908,6 +917,23 @@ fn gen_master(context: &Context) -> std::result::Result<(), std::io::Error> {
         ("t", include_str!("../../templates/0_master.tera.sh")),
     ])
     .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_bsub(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "0_bsub.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/0_bsub.tera.sh")),
+    ])
+        .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
