@@ -2,6 +2,10 @@
 
 ## Unreleased - ReleaseDate
 
+* Add `anchr template` scripts
+  * 0_bsub.sh
+* Features completed
+
 ## 0.2.8 - 2020-11-07
 
 * Update `anchr dep` scripts
