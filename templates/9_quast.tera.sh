@@ -16,14 +16,14 @@ fi
 {% for u in unitiggers -%}
 if [ -e 7_merge_unitigs_{{ u }}/anchor.merge.fasta ]; then
     QUAST_TARGET+=" 7_merge_unitigs_{{ u }}/anchor.merge.fasta "
-    QUAST_LABEL+="merge_unitigs_{{ u }},"
+    QUAST_LABEL+="merge_{{ u }},"
 fi
 {% endfor -%}
 {# Keep a blank line #}
 {% for u in unitiggers -%}
 if [ -e 7_merge_mr_unitigs_{{ u }}/anchor.merge.fasta ]; then
     QUAST_TARGET+=" 7_merge_mr_unitigs_{{ u }}/anchor.merge.fasta "
-    QUAST_LABEL+="merge_mr_unitigs_{{ u }},"
+    QUAST_LABEL+="merge_mr_{{ u }},"
 fi
 {% endfor -%}
 {# Keep a blank line #}
