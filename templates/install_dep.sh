@@ -20,7 +20,7 @@ for package in fastqc sickle; do
     check_install ${package}
 done
 
-for package in bbtools jellyfish bcalm; do
+for package in jellyfish bcalm; do
     check_install brewsci/bio/${package};
 done
 
@@ -29,7 +29,7 @@ for package in poa; do
     check_install brewsci/science/${package};
 done
 
-for package in tsv-utils faops sparsemem dazz_db@20201008 daligner@20201008 intspan; do
+for package in tsv-utils faops sparsemem dazz_db@20201008 daligner@20201008 bbtools@38.59 intspan; do
     check_install wang-q/tap/${package};
 done
 
