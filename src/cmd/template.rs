@@ -27,6 +27,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 * Trimming
 
     * --trim "--dedupe"
+    * --sample "300"
     * --qual "25 30"
     * --len "60"
     * --filter "adapter"

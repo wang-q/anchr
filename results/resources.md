@@ -7,7 +7,9 @@ These steps require another project: [App::Egaz](https://github.com/wang-q/App-E
 
 Paralogs detected here **may** overlap with transposons/retrotransposons.
 
-## Info
+## Download
+
+### E. coli
 
 * *Escherichia* virus Lambda
 
@@ -26,40 +28,6 @@ Paralogs detected here **may** overlap with transposons/retrotransposons.
   * Assembly: [GCF_001723515.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_001723515.1)
   * Proportion of paralogs (> 1000 bp): 0.0342
 
-* *Bacillus cereus* ATCC 10987
-
-  * Taxonomy ID: [222523](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=222523)
-  * Assembly: [GCF_000008005.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000008005.1)
-  * Proportion of paralogs (> 1000 bp): 0.0344
-
-* *Mycobacterium abscessus* 6G-0125-R
-
-  * *Mycobacterium abscessus* ATCC 19977
-    * Taxonomy ID: [561007](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=561007)
-    * Assembly: [GCF_000069185.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000069185.1)
-    * Proportion of paralogs (> 1000 bp): 0.0344
-
-  * *Mycobacterium abscessus* 6G-0125-R
-    * Assembly: [GCF_000270985.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000270985.1)
-    * Illumina and 454, 40x
-
-* *Rhodobacter sphaeroides* 2.4.1
-
-  * Taxonomy ID: [272943](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=272943)
-  * Assembly: [GCF_000012905.2](https://www.ncbi.nlm.nih.gov/assembly/GCF_000012905.2)
-  * Proportion of paralogs (> 1000 bp): 0.0293
-
-* *Vibrio cholerae* CP1032(5)
-
-  * *Vibrio cholerae* O1 biovar El Tor str. N16961
-    * Taxid: [243277](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=243277)
-    * Assembly: [GCF_000006745.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000006745.1)
-    * Proportion of paralogs (> 1000 bp): 0.0216
-  * *Vibrio cholerae* CP1032(5)
-    * Assembly: [GCF_000279305.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000279305.1)
-
-## Download
-
 ```shell script
 mkdir -p ~/data/anchr/assembly
 cd ~/data/anchr/assembly
@@ -75,6 +43,45 @@ rsync -avP \
 rsync -avP \
     ftp.ncbi.nlm.nih.gov::genomes/all/GCF/001/723/505/GCF_001723505.1_ASM172350v1/ \
     dh5alpha/
+
+```
+
+### GAGE-B
+
+* *Bacillus cereus* ATCC 10987, 蜡样芽胞杆菌
+
+  * Taxonomy ID: [222523](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=222523)
+  * Assembly: [GCF_000008005.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000008005.1)
+  * Proportion of paralogs (> 1000 bp): 0.0344
+
+* *Mycobacterium abscessus* 6G-0125-R, 脓肿分枝杆菌
+
+  * *Mycobacterium abscessus* ATCC 19977
+    * Taxonomy ID: [561007](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=561007)
+    * Assembly: [GCF_000069185.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000069185.1)
+    * Proportion of paralogs (> 1000 bp): 0.0344
+
+  * *Mycobacterium abscessus* 6G-0125-R
+    * Assembly: [GCF_000270985.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000270985.1)
+    * Illumina and 454, 40x
+
+* *Rhodobacter sphaeroides* 2.4.1, 类球红细菌
+
+  * Taxonomy ID: [272943](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=272943)
+  * Assembly: [GCF_000012905.2](https://www.ncbi.nlm.nih.gov/assembly/GCF_000012905.2)
+  * Proportion of paralogs (> 1000 bp): 0.0293
+
+* *Vibrio cholerae* CP1032(5), 霍乱弧菌
+
+  * *Vibrio cholerae* O1 biovar El Tor str. N16961
+    * Taxonomy ID: [243277](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=243277)
+    * Assembly: [GCF_000006745.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000006745.1)
+    * Proportion of paralogs (> 1000 bp): 0.0216
+  * *Vibrio cholerae* CP1032(5)
+    * Assembly: [GCF_000279305.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000279305.1)
+
+```shell script
+cd ~/data/anchr/assembly
 
 rsync -avP \
     ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/008/005/GCF_000008005.1_ASM800v1/ \
@@ -94,6 +101,40 @@ rsync -avP \
 
 ```
 
+### FDA-ARGOS
+
+* *Francisella tularensis* subsp. tularensis SCHU S4, 土拉热弗朗西斯氏菌
+    * Taxonomy ID: [177416](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=177416)
+    * Assembly: [GCF_000008985.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000008985.1)
+    * Proportion of paralogs (> 1000 bp): 0.0438
+
+* *Haemophilus influenzae* Rd KW20, 流感嗜血杆菌
+    * Taxonomy ID: [71421](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=71421)
+    * Assembly: [GCF_000027305.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000027305.1)
+    * Proportion of paralogs (> 1000 bp): 0.0324
+
+* *Campylobacter jejuni* subsp. jejuni NCTC 11168, = ATCC 700819, 空肠弯曲杆菌
+    * Taxonomy ID: [192222](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=192222)
+    * Assembly: [GCF_000009085.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000009085.1)
+    * Proportion of paralogs (> 1000 bp): 0.0196
+
+```shell script
+cd ~/data/anchr/assembly
+
+rsync -avP \
+    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/008/985/GCF_000008985.1_ASM898v1 \
+    Ftul/
+
+rsync -avP \
+    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/027/305/GCF_000027305.1_ASM2730v1 \
+    Hinf/
+
+rsync -avP \
+    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/009/085/GCF_000009085.1_ASM908v1 \
+    Cjej/
+
+```
+
 ```shell script
 mkdir -p ~/data/anchr/ref
 cd ~/data/anchr/ref
@@ -101,6 +142,7 @@ cd ~/data/anchr/ref
 for STRAIN in \
     lambda mg1655 dh5alpha \
     Bcer Mabs Rsph Vcho \
+    Ftul Hinf Cjej \
     ; do
     echo >&2 ${STRAIN};
     mkdir -p ${STRAIN}
@@ -128,6 +170,7 @@ cd ~/data/anchr/paralogs/genomes
 for STRAIN in \
     lambda mg1655 dh5alpha \
     Bcer Mabs Rsph Vcho \
+    Ftul Hinf Cjej \
     ; do
     if [ -d ${STRAIN} ]; then
         echo >&2 "==> ${STRAIN} already be processed";
@@ -143,14 +186,6 @@ for STRAIN in \
         ../../ref/${STRAIN}/genome.fa -o ${STRAIN} \
         --repeatmasker '--parallel 4' -v
 done
-
-#for STRAIN in Bper Cdif Cdip Cjej Ftul Hinf Lmon Lpne Ngon Nmen Sfle Vpar; do
-#    if [ -d ${STRAIN} ]; then
-#        echo >&2 Skip ${STRAIN};
-#        continue;
-#    fi
-#
-#done
 
 ```
 
@@ -197,6 +232,29 @@ for STRAIN in \
     Bcer Mabs Rsph Vcho \
     ; do
     cat gage_b/Results/${STRAIN}/${STRAIN}.multi.fas |
+        faops filter -N -d stdin stdout \
+        > ../ref/${STRAIN}/paralogs.fa
+done
+
+```
+
+```shell script
+cd ~/data/anchr/paralogs
+
+egaz template \
+    genomes/Ftul genomes/Hinf genomes/Cjej \
+    --self -o fda_argos/ \
+    --circos \
+    --length 1000 --parallel 4 -v
+
+bash fda_argos/1_self.sh
+bash fda_argos/3_proc.sh
+bash fda_argos/4_circos.sh
+
+for STRAIN in \
+    Ftul Hinf Cjej \
+    ; do
+    cat fda_argos/Results/${STRAIN}/${STRAIN}.multi.fas |
         faops filter -N -d stdin stdout \
         > ../ref/${STRAIN}/paralogs.fa
 done

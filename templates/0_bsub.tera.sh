@@ -115,7 +115,7 @@ bsub -w "ended(${BASE_NAME}-6_anchors_{{ u }})" \
 {# Keep a blank line #}
 bsub -w "ended(${BASE_NAME}-2_quorum) {% for u in unitiggers %}&& ended(${BASE_NAME}-7_merge_anchors_4_unitigs_{{ u }}){% endfor %} {% if opt.merge == "1" and opt.se == "0" %}{% for u in unitiggers %}&& ended(${BASE_NAME}-7_merge_anchors_4_unitigs_{{ u }}){% endfor %}{% endif %}" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-7_merge_anchors" \
-    "bash 7_mergeAnchors.sh 7_merge 7_merge_anchors"
+    "bash 7_merge_anchors.sh 7_merge 7_merge_anchors"
 bsub -w "ended(${BASE_NAME}-7_merge_anchors)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_stat_merge_anchors" \
     "bash 9_stat_merge_anchors.sh"
