@@ -201,9 +201,21 @@ popd
   With a conventional directory structure, `anchr template` creates all scripts from reads QC to
   assembly evaluations.
 
-  * [*Escherichia* virus Lambda](results/e_coli.md#escherichia-virus-lambda)
-  * [*Escherichia coli* str. K-12 substr. MG1655](results/e_coli.md#escherichia-coli-str-k-12-substr-mg1655)
-  * [*Escherichia coli* str. K-12 substr. DH5alpha](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5alpha)
+  * E. coli
+    * [*Escherichia* virus Lambda](results/e_coli.md#escherichia-virus-lambda)
+    * [*Escherichia coli* str. K-12 substr. MG1655](results/e_coli.md#escherichia-coli-str-k-12-substr-mg1655)
+    * [*Escherichia coli* str. K-12 substr. DH5alpha](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5alpha)
+
+  * FDA-ARGOS bacteria
+    * [Francisella tularensis FDAARGOS_247](results/fda_argos.md#francisella-tularensis-fdaargos_247)
+    * [Haemophilus influenzae FDAARGOS_199](results/fda_argos.md#haemophilus-influenzae-fdaargos_199)
+    * [Campylobacter jejuni subsp. jejuni ATCC 700819](results/fda_argos.md#campylobacter-jejuni-subsp-jejuni-atcc-700819)
+    * [Legionella pneumophila subsp. pneumophila ATCC 33152D-5](results/fda_argos.md#legionella-pneumophila-subsp-pneumophila-atcc-33152d-5)
+    * [Corynebacterium diphtheriae FDAARGOS_197](results/fda_argos.md#corynebacterium-diphtheriae-fdaargos_197)
+    * [Clostridioides difficile 630](results/fda_argos.md#clostridioides-difficile-630)
+
+  * Yeast
+    * [*Saccharomyces cerevisiae* S288c](results/yeast.md#saccharomyces-cerevisiae-s288c)
 
 ## AUTHOR
 

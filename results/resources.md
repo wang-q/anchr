@@ -133,6 +133,7 @@ rsync -avP \
     * Assembly: [GCF_000009205.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000009205.1)
     * Proportion of paralogs (> 1000 bp): 0.0661
 
+
 ```shell script
 cd ~/data/anchr/assembly
 
@@ -162,6 +163,23 @@ rsync -avP \
 
 ```
 
+### Yeast
+
+* *Saccharomyces cerevisiae* S288c
+    * Taxonomy ID: [559292](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=559292)
+    * Assembly: [GCF_000146045.2](https://www.ncbi.nlm.nih.gov/assembly/GCF_000146045.2)
+    * Proportion of paralogs (> 1000 bp): 0.058
+
+
+```shell script
+cd ~/data/anchr/assembly
+
+rsync -avP \
+    ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/146/045/GCF_000146045.2_R64 \
+    s288c/
+
+```
+
 ```shell script
 mkdir -p ~/data/anchr/ref
 cd ~/data/anchr/ref
@@ -170,6 +188,7 @@ for STRAIN in \
     lambda mg1655 dh5alpha \
     Bcer Mabs Rsph Vcho \
     Ftul Hinf Cjej Lpne Cdip Cdif \
+    s288c \
     ; do
     echo >&2 ${STRAIN};
     mkdir -p ${STRAIN}
@@ -198,6 +217,7 @@ for STRAIN in \
     lambda mg1655 dh5alpha \
     Bcer Mabs Rsph Vcho \
     Ftul Hinf Cjej Lpne Cdip Cdif \
+    s288c \
     ; do
     if [ -d ${STRAIN} ]; then
         echo >&2 "==> ${STRAIN} already be processed";
@@ -282,6 +302,29 @@ for STRAIN in \
     Ftul Hinf Cjej Lpne Cdip Cdif \
     ; do
     cat fda_argos/Results/${STRAIN}/${STRAIN}.multi.fas |
+        faops filter -N -d stdin stdout \
+        > ../ref/${STRAIN}/paralogs.fa
+done
+
+```
+
+```shell script
+cd ~/data/anchr/paralogs
+
+egaz template \
+    genomes/s288c \
+    --self -o yeast/ \
+    --circos \
+    --length 1000 --parallel 4 -v
+
+bash yeast/1_self.sh
+bash yeast/3_proc.sh
+bash yeast/4_circos.sh
+
+for STRAIN in \
+    s288c \
+    ; do
+    cat yeast/Results/${STRAIN}/${STRAIN}.multi.fas |
         faops filter -N -d stdin stdout \
         > ../ref/${STRAIN}/paralogs.fa
 done

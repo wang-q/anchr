@@ -450,7 +450,7 @@ cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
 # rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
 
-#bash 0_bsub.sh
+# BASE_NAME=mg1655 bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
 #bkill -J "${BASE_NAME}-*"
 
@@ -832,7 +832,7 @@ cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
 # rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
 
-#bash 0_bsub.sh
+# BASE_NAME=dh5alpha bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
 #bkill -J "${BASE_NAME}-*"
 
