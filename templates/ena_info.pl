@@ -27,11 +27,11 @@ use Text::CSV_XS;
     <<'MARKDOWN',
 Grab information from ENA.
 
-Usage: perl %c [options] <infile.csv> > <outfile.json>
+Usage: perl %c [options] <infile.csv> > <outfile.yml>
 
 * <infile> == stdin means read from STDIN
 * <infile> format
-    * first column is one SRA object ID, /[DES]R\w\d+/, SRP or SRX
+    * first column is one SRA object ID, /(?:[DES]R\w|SAMN|PRJNA)\d+/, SRP or SRX
     * second column is the name of one group
     * other columns are optional
 MARKDOWN
@@ -75,7 +75,7 @@ my $csv = Text::CSV_XS->new( { binary => 1 } )
     or die "Cannot use CSV: " . Text::CSV_XS->error_diag;
 while ( my $row = $csv->getline($csv_fh) ) {
     next if $row->[0]     =~ /^#/;
-    next unless $row->[0] =~ /[DES]R\w\d+/;
+    next unless $row->[0] =~ /(?:[DES]R\w|SAMN|PRJNA)\d+/;
 
     my ( $key, $name ) = ( $row->[0], $row->[1] );
     if ( !defined $name ) {

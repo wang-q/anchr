@@ -61,8 +61,6 @@ for (@ARGV) {
 #----------------------------------------------------------#
 my $yml = YAML::Syck::LoadFile( $ARGV[0] );
 my $basename = Path::Tiny::path( $ARGV[0] )->basename( ".yml", ".yaml" );
-$basename .= "." . $opt->{platform} if $opt->{platform};
-$basename .= "." . $opt->{layout}   if $opt->{layout};
 
 my $csv = Text::CSV_XS->new( { binary => 1 } )
     or die "Cannot use CSV: " . Text::CSV_XS->error_diag;
