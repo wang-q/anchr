@@ -3,6 +3,7 @@
 [TOC levels=1-3]: # ""
 
 - [Assemble genomes from FDA-ARGOS data sets](#assemble-genomes-from-fda-argos-data-sets)
+- [Good assemblies before 2010](#good-assemblies-before-2010)
 - [Francisella tularensis FDAARGOS_247](#francisella-tularensis-fdaargos_247)
   - [Ftul: reference](#ftul-reference)
   - [Ftul: download](#ftul-download)
@@ -46,6 +47,144 @@ done
 
 ```
 
+# Good assemblies before 2010
+
+* Get BioSample from [PRJNA231221](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA231221)
+* Save `Full (text)` to `fda_argos.samples.txt` with a web browser
+
+* Dump `gr_prok_overview.tsv` from database `gr_prok`
+
+```shell script
+mkdir -p ~/data/anchr/fda_argos/
+cd ~/data/anchr/fda_argos/
+
+cat fda_argos.samples.txt |
+    grep "^Organism: " |
+    sed 's/Organism: //' |
+    sort -u \
+    > organism.lst
+
+cat gr_prok_overview.tsv |
+    perl -nla -F"\t" -e '
+        $. == 1 and print and next;
+        ($year) = split q(-), $F[10];
+        print if $year <= 2010;
+    ' |
+    tsv-filter -H --istr-in-fld status:complete --or --istr-in-fld status:genome \
+    > good_assembly.tsv
+
+cat good_assembly.tsv |
+    keep-header -- grep -Fw -f organism.lst |
+    keep-header -- tsv-sort -k2,2 \
+    > cross.tsv
+
+```
+
+* Cross match strain names between `fda_argos.samples.txt` and `cross.tsv` manually
+
+* Download Illumina Reads
+
+```shell script
+mkdir -p ~/data/anchr/fda_argos/
+cd ~/data/anchr/fda_argos/
+
+cat << EOF > source.csv
+#SAMN16357368,Bac_thetaiotaomicron_VPI_5482,Bacteroides thetaiotaomicron VPI-5482,No SRA
+SAMN03996253,Bar_bacilliformis_KC583,Bartonella bacilliformis KC583
+SAMN03996256,Bar_henselae_Houston_1,Bartonella henselae str. Houston-1
+SAMN03996258,Bord_bronchiseptica_RB50,Bordetella bronchiseptica RB50
+SAMN04875532,Bord_pertussis_Tohama_I,Bordetella pertussis Tohama I
+SAMN04875533,Borr_burgdorferi_B31,Borreliella burgdorferi B31
+SAMN10228570,Bu_mallei_ATCC_23344,Burkholderia mallei ATCC 23344
+SAMN05004753,Bu_thailandensis_E264,Burkholderia thailandensis E264
+SAMN04875589,Ca_jejuni_jejuni_ATCC_700819,Campylobacter jejuni subsp. jejuni NCTC 11168 = ATCC 700819
+SAMN16357198,Ci_koseri_ATCC_BAA_895,Citrobacter koseri ATCC BAA-895
+SAMN04875594,Cl_difficile_630,Clostridioides difficile 630
+#SAMN16357334,Co_kroppenstedtii_DSM_44385,Corynebacterium kroppenstedtii DSM 44385,No SRA
+SAMN16357163,Co_urealyticum_DSM_7109,Corynebacterium urealyticum DSM 7109
+SAMN11056390,Cup_metallidurans_CH34,Cupriavidus metallidurans CH34
+SAMN10228557,Cut_acnes_SK137,Cutibacterium acnes SK137
+SAMN16357201,E_fergusonii_ATCC_35469,Escherichia fergusonii ATCC 35469
+SAMN04875536,H_influenzae_Rd_KW20,Haemophilus influenzae Rd KW20
+#SAMN16357582,J_denitrificans_DSM_20603,Jonesia denitrificans DSM 20603
+SAMN16357230,K_sedentarius_DSM_20547,Kytococcus sedentarius DSM 20547
+SAMN04875539,Leg_pneumophila_Philadelphia_1,Legionella pneumophila subsp. pneumophila str. Philadelphia 1
+SAMN04875540,Lep_interrogans_Fiocruz_L1_130,Leptospira interrogans serovar Copenhageni str. Fiocruz L1-130
+SAMN16357202,Leu_mesenteroides_ATCC_8293,Leuconostoc mesenteroides subsp. mesenteroides ATCC 8293
+SAMN06173318,M_avium_K_10,Mycobacterium avium subsp. paratuberculosis K-10
+SAMN11056472,M_tuberculosis_H37Rv,Mycobacterium tuberculosis H37Rv
+SAMN04875545,N_meningitidis_FAM18,Neisseria meningitidis FAM18
+SAMN04875546,N_meningitidis_MC58,Neisseria meningitidis MC58 
+SAMN16357208,O_anthropi_ATCC_49188,Ochrobactrum anthropi ATCC 49188
+SAMN16357376,Pa_distasonis_ATCC_8503,Parabacteroides distasonis ATCC 8503
+SAMN06173320,Pse_protegens_Pf_5,Pseudomonas protegens Pf-5
+SAMN06173321,Psy_cryohalolentis_K5,Psychrobacter cryohalolentis K5
+SAMN06173322,R_denitrificans_OCh_114,Roseobacter denitrificans OCh 114
+SAMN11056396,Sh_putrefaciens_CN_32,Shewanella putrefaciens CN-32
+SAMN03255464,Sta_aureus_Mu50,Staphylococcus aureus subsp. aureus Mu50
+SAMN03255470,Sta_aureus_NCTC_8325,Staphylococcus aureus subsp. aureus NCTC 8325
+#SAMN03255450,Sta_aureus_NCTC_8325,Staphylococcus aureus subsp. aureus NCTC 8325
+SAMN03255448,Sta_aureus_N315,Staphylococcus aureus subsp. aureus N315
+SAMN13450443,Sta_epidermidis_ATCC_12228,Staphylococcus epidermidis ATCC 12228
+SAMN06173368,Sta_saprophyticus_ATCC_15305,Staphylococcus saprophyticus subsp. saprophyticus ATCC 15305 = NCTC 7292
+SAMN06173323,Str_moniliformis_DSM_12112,Streptobacillus moniliformis DSM 12112
+SAMN10228564,Y_pseudotuberculosis_YPIII,Yersinia pseudotuberculosis YPIII
+EOF
+
+anchr ena info | perl - -v source.csv > ena_info.yml
+anchr ena prep | perl - -p illumina ena_info.yml
+
+mlr --icsv --omd cat ena_info.csv
+
+aria2c -x 6 -s 2 -c -i ena_info.ftp.txt
+
+md5sum --check ena_info.md5.txt
+
+```
+
+| name                           | srx        | platform | layout | ilength | srr         | spot     | base      |
+|:-------------------------------|:-----------|:---------|:-------|:--------|:------------|:---------|:----------|
+| Bar_bacilliformis_KC583        | SRX1385802 | ILLUMINA | PAIRED | 443     | SRR2823707  | 7131080  | 1.34G     |
+| Bar_henselae_Houston_1         | SRX1385804 | ILLUMINA | PAIRED | 391     | SRR2823712  | 6669509  | 1.25G     |
+| Bord_bronchiseptica_RB50       | SRX1385806 | ILLUMINA | PAIRED | 397     | SRR2823715  | 2960592  | 570.33M   |
+| Bord_bronchiseptica_RB50       | SRX1385807 | ILLUMINA | PAIRED | 397     | SRR2823716  | 3059385  | 589.37M   |
+| Bord_pertussis_Tohama_I        | SRX2179101 | ILLUMINA | PAIRED | 528     | SRR4271511  | 4333095  | 834.74M   |
+| Bord_pertussis_Tohama_I        | SRX2179104 | ILLUMINA | PAIRED | 528     | SRR4271510  | 3949224  | 760.79M   |
+| Borr_burgdorferi_B31           | SRX2179106 | ILLUMINA | PAIRED | 577     | SRR4271513  | 7284107  | 1.37G     |
+| Bu_mallei_ATCC_23344           | SRX4900909 | ILLUMINA | PAIRED | 529     | SRR8072938  | 4949942  | 1.39G     |
+| Bu_thailandensis_E264          | SRX2110113 | ILLUMINA | PAIRED | 501     | SRR4125425  | 7184151  | 1.35G     |
+| Ca_jejuni_jejuni_ATCC_700819   | SRX2107012 | ILLUMINA | PAIRED | 562     | SRR4125016  | 7696800  | 1.45G     |
+| Ci_koseri_ATCC_BAA_895         | SRX9293511 | ILLUMINA | PAIRED | 534     | SRR12825872 | 15181966 | 4.27G     |
+| Cl_difficile_630               | SRX2107163 | ILLUMINA | PAIRED | 523     | SRR4125185  | 6595393  | 1.24G     |
+| Co_urealyticum_DSM_7109        | SRX9295022 | ILLUMINA | PAIRED | 592     | SRR12827384 | 7515280  | 2.11G     |
+| Cup_metallidurans_CH34         | SRX5934689 | ILLUMINA | PAIRED | 449     | SRR9161655  | 8291696  | 2.33G     |
+| Cut_acnes_SK137                | SRX4900879 | ILLUMINA | PAIRED | 622     | SRR8072906  | 6793960  | 1.91G     |
+| E_fergusonii_ATCC_35469        | SRX9293517 | ILLUMINA | PAIRED | 537     | SRR12825878 | 7254756  | 2.04G     |
+| H_influenzae_Rd_KW20           | SRX2104758 | ILLUMINA | PAIRED | 516     | SRR4123928  | 6115624  | 1.15G     |
+| K_sedentarius_DSM_20547        | SRX9293604 | ILLUMINA | PAIRED | 414     | SRR12825966 | 3483084  | 1,003.16M |
+| Leg_pneumophila_Philadelphia_1 | SRX2179279 | ILLUMINA | PAIRED | 570     | SRR4272054  | 5249241  | 1,011.23M |
+| Lep_interrogans_Fiocruz_L1_130 | SRX2179272 | ILLUMINA | PAIRED | 466     | SRR4272049  | 6556612  | 1.23G     |
+| Leu_mesenteroides_ATCC_8293    | SRX9293521 | ILLUMINA | PAIRED | 531     | SRR12825883 | 13118133 | 3.69G     |
+| M_avium_K_10                   | SRX2705222 | ILLUMINA | PAIRED | 505     | SRR5413272  | 5359484  | 1.01G     |
+| M_tuberculosis_H37Rv           | SRX6389030 | ILLUMINA | PAIRED | 604     | SRR9626912  | 7874573  | 2.21G     |
+| N_meningitidis_FAM18           | SRX2179296 | ILLUMINA | PAIRED | 519     | SRR4272074  | 12948421 | 2.44G     |
+| N_meningitidis_MC58            | SRX2179304 | ILLUMINA | PAIRED | 536     | SRR4272082  | 6907195  | 1.3G      |
+| O_anthropi_ATCC_49188          | SRX9292947 | ILLUMINA | PAIRED | 468     | SRR12825308 | 8125004  | 2.29G     |
+| Pse_protegens_Pf_5             | SRX2705227 | ILLUMINA | PAIRED | 527     | SRR5413277  | 4966775  | 956.81M   |
+| Pse_protegens_Pf_5             | SRX2705228 | ILLUMINA | PAIRED | 527     | SRR5413278  | 1288497  | 248.22M   |
+| Psy_cryohalolentis_K5          | SRX2705242 | ILLUMINA | PAIRED | 537     | SRR5413293  | 5721091  | 1.08G     |
+| R_denitrificans_OCh_114        | SRX2737869 | ILLUMINA | PAIRED | 512     | SRR5449080  | 1739986  | 335.19M   |
+| R_denitrificans_OCh_114        | SRX2737871 | ILLUMINA | PAIRED | 512     | SRR5449079  | 4276643  | 823.86M   |
+| Sh_putrefaciens_CN_32          | SRX5936044 | ILLUMINA | PAIRED | 536     | SRR9163108  | 9195551  | 2.59G     |
+| Sta_aureus_Mu50                | SRX981321  | ILLUMINA | PAIRED | 563     | SRR1955819  | 5759114  | 1.08G     |
+| Sta_aureus_Mu50                | SRX981322  | ILLUMINA | PAIRED | 563     | SRR1955820  | 5484223  | 1.03G     |
+| Sta_aureus_N315                | SRX981099  | ILLUMINA | PAIRED | 547     | SRR1955595  | 6533728  | 1.23G     |
+| Sta_aureus_NCTC_8325           | SRX981348  | ILLUMINA | PAIRED | 536     | SRR1955845  | 6994744  | 1.32G     |
+| Sta_epidermidis_ATCC_12228     | SRX8576561 | ILLUMINA | PAIRED | 573     | SRR12047979 | 7608242  | 2.14G     |
+| Sta_saprophyticus_ATCC_15305   | SRX2730648 | ILLUMINA | PAIRED | 424     | SRR5440743  | 17328248 | 4.87G     |
+| Str_moniliformis_DSM_12112     | SRX2705245 | ILLUMINA | PAIRED | 524     | SRR5413295  | 5272442  | 1,015.69M |
+| Y_pseudotuberculosis_YPIII     | SRX4900894 | ILLUMINA | PAIRED | 594     | SRR8072924  | 4239591  | 1.19G     |
+| Y_pseudotuberculosis_YPIII     | SRX4900896 | ILLUMINA | PAIRED | 594     | SRR8072925  | 4106622  | 1.16G     |
 
 # Francisella tularensis FDAARGOS_247
 
@@ -75,7 +214,7 @@ SRX2105481,Ftul,HiSeq 2500 PE100
 EOF
 
 anchr ena info | perl - -v source.csv > ena_info.yml
-anchr ena prep | perl - ena_info.yml
+anchr ena prep | perl - -p illumina ena_info.yml
 
 mlr --icsv --omd cat ena_info.csv
 
