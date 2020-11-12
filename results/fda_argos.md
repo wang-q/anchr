@@ -5,38 +5,21 @@
 - [Assemble genomes from FDA-ARGOS data sets](#assemble-genomes-from-fda-argos-data-sets)
 - [Download](#download)
   - [Good assemblies before 2010](#good-assemblies-before-2010)
-  - [Assemblies](#assemblies)
+  - [Reference Assemblies](#reference-assemblies)
   - [Illumina Reads](#illumina-reads)
-- [Francisella tularensis FDAARGOS_247](#francisella-tularensis-fdaargos_247)
-  - [Ftul: reference](#ftul-reference)
-  - [Ftul: download](#ftul-download)
-  - [Ftul: template](#ftul-template)
-  - [Ftul: run](#ftul-run)
-- [Haemophilus influenzae FDAARGOS_199](#haemophilus-influenzae-fdaargos_199)
-  - [Hinf: reference](#hinf-reference)
-  - [Hinf: download](#hinf-download)
-  - [Hinf: template](#hinf-template)
-  - [Hinf: run](#hinf-run)
-- [Campylobacter jejuni subsp. jejuni ATCC 700819](#campylobacter-jejuni-subsp-jejuni-atcc-700819)
-  - [Cjej: reference](#cjej-reference)
-  - [Cjej: download](#cjej-download)
-  - [Cjej: template](#cjej-template)
-  - [Cjej: run](#cjej-run)
+  - [Reference Genomes](#reference-genomes)
+  - [Paralogs](#paralogs)
+  - [Copy/link files](#copylink-files)
+- [Ca_jej_jejuni_NCTC_11168_ATCC_700819](#ca_jej_jejuni_nctc_11168_atcc_700819)
+- [Clostridio_dif_630](#clostridio_dif_630)
+- [Co_dip_NCTC_13129](#co_dip_nctc_13129)
+- [Fr_tul_tularensis_SCHU_S4](#fr_tul_tularensis_schu_s4)
+- [Ha_inf_Rd_KW20](#ha_inf_rd_kw20)
 - [Legionella pneumophila subsp. pneumophila ATCC 33152D-5](#legionella-pneumophila-subsp-pneumophila-atcc-33152d-5)
   - [Lpne: reference](#lpne-reference)
   - [Lpne: download](#lpne-download)
   - [Lpne: template](#lpne-template)
   - [Lpne: run](#lpne-run)
-- [Corynebacterium diphtheriae FDAARGOS_197](#corynebacterium-diphtheriae-fdaargos_197)
-  - [Cdip: reference](#cdip-reference)
-  - [Cdip: download](#cdip-download)
-  - [Cdip: template](#cdip-template)
-  - [Cdip: run](#cdip-run)
-- [Clostridioides difficile 630](#clostridioides-difficile-630)
-  - [Cdif: reference](#cdif-reference)
-  - [Cdif: download](#cdif-download)
-  - [Cdif: template](#cdif-template)
-  - [Cdif: run](#cdif-run)
 
 
 * Rsync to hpcc
@@ -158,7 +141,7 @@ cat fda_argos.samples.txt |
 
 ```
 
-## Assemblies
+## Reference Assemblies
 
 ```shell script
 cd ~/data/anchr/fda_argos/
@@ -302,84 +285,257 @@ md5sum --check ena_info.md5.txt
 | Y_pseudot_YPIII                            | SRX4900896 | ILLUMINA | PAIRED | 594     | SRR8072925  | 4106622  | 1.16G     |
 
 
-# Francisella tularensis FDAARGOS_247
-
-## Ftul: reference
-
-* Reference genome
+## Reference Genomes
 
 ```shell script
-mkdir -p ~/data/anchr/Ftul/1_genome
-cd ~/data/anchr/Ftul/1_genome
+mkdir -p ~/data/anchr/fda_argos/ref
+cd ~/data/anchr/fda_argos/ref
 
-cp ~/data/anchr/ref/Ftul/genome.fa .
-cp ~/data/anchr/ref/Ftul/paralogs.fa .
+for STRAIN in \
+    $(
+        cat ../ena/source.csv |
+            grep -v "^#" |
+            cut -d, -f 2 |
+            sort -u
+            
+    ) \
+    ; do
+    echo >&2 ${STRAIN};
+    mkdir -p ${STRAIN}
+
+    if [ ! -d ../ASSEMBLY/${STRAIN} ]; then
+        echo >&2 Skip ${STRAIN};
+        continue;
+    fi
+
+    find ../ASSEMBLY/${STRAIN}/ -name "*_genomic.fna.gz" |
+        grep -v "_from_" |
+        xargs gzip -dcf |
+        faops filter -N -s stdin ${STRAIN}/genome.fa
+
+done
 
 ```
 
-## Ftul: download
+## Paralogs
+
+* RepeatMasker
 
 ```shell script
-cd ~/data/anchr/Ftul
+mkdir -p ~/data/anchr/fda_argos/paralogs/genomes
+cd ~/data/anchr/fda_argos/paralogs/genomes
 
-mkdir -p ena
-cd ena
+for STRAIN in \
+    $(
+        cat ../../ena/source.csv |
+            grep -v "^#" |
+            cut -d, -f 2 |
+            sort -u
+            
+    ) \
+    ; do
+    if [ -d ${STRAIN} ]; then
+        echo >&2 "==> ${STRAIN} already be processed";
+        continue;
+    fi
 
-cat << EOF > source.csv
-SRX2105481,Ftul,HiSeq 2500 PE100
-EOF
+    if [ ! -e ../../ref/${STRAIN}/genome.fa ]; then
+        echo >&2 Skip ${STRAIN};
+        continue;
+    fi
 
-anchr ena info | perl - -v source.csv > ena_info.yml
-anchr ena prep | perl - -p illumina ena_info.yml
-
-mlr --icsv --omd cat ena_info.csv
-
-aria2c -x 9 -s 3 -c -i ena_info.ftp.txt
-
-md5sum --check ena_info.md5.txt
+    egaz prepseq \
+        ../../ref/${STRAIN}/genome.fa -o ${STRAIN} \
+        --repeatmasker '--parallel 4' -v
+done
 
 ```
 
-| name | srx        | platform | layout | ilength | srr        | spot     | base |
-|:-----|:-----------|:---------|:-------|:--------|:-----------|:---------|:-----|
-| Ftul | SRX2105481 | ILLUMINA | PAIRED | 560     | SRR4124773 | 10615135 | 2G   |
-
-
-* Illumina
+* Self-alignments
 
 ```shell script
-cd ~/data/anchr/Ftul
+cd ~/data/anchr/fda_argos/paralogs
 
-mkdir -p 2_illumina
-cd 2_illumina
+egaz template \
+    $(
+        cat ../ena/source.csv |
+            grep -v "^#" |
+            cut -d, -f 2 |
+            sort -u |
+            xargs -I{} echo "genomes/{}"
+    ) \
+    --self -o ./ \
+    --circos \
+    --length 1000 --parallel 4 -v
 
-ln -s ../ena/SRR4124773_1.fastq.gz R1.fq.gz
-ln -s ../ena/SRR4124773_2.fastq.gz R2.fq.gz
+bash ./1_self.sh
+bash ./3_proc.sh
+bash ./4_circos.sh
+
+# paralogs.fa
+for STRAIN in \
+    $(
+        cat ../ena/source.csv |
+            grep -v "^#" |
+            cut -d, -f 2 |
+            sort -u
+            
+    ) \
+    ; do
+    cat ./Results/${STRAIN}/${STRAIN}.multi.fas |
+        faops filter -N -d stdin stdout \
+        > ../ref/${STRAIN}/paralogs.fa
+done
+
+# stats
+for STRAIN in \
+    $(
+        cat ../ena/source.csv |
+            grep -v "^#" |
+            cut -d, -f 2 |
+            sort -u
+            
+    ) \
+    ; do
+    cat ./Results/${STRAIN}/${STRAIN}.cover.csv |
+        grep "^all" |
+        sed "s/^all/${STRAIN}/"
+done |
+    (echo -e '#name,chrLength,size,coverage' && cat ) \
+    > cover.csv
+
+mlr --icsv --omd cat cover.csv
 
 ```
 
-## Ftul: template
+| #name                                      | chrLength | size   | coverage |
+|:-------------------------------------------|:----------|:-------|:---------|
+| Bact_the_VPI_5482                          | 6260361   | 286736 | 0.0458   |
+| Bar_bac_KC583                              | 1445021   | 98593  | 0.0682   |
+| Bar_hen_Houston_1                          | 1931047   | 146599 | 0.0759   |
+| Bord_bronchis_RB50                         | 5339179   | 166533 | 0.0312   |
+| Bord_pert_Tohama_I                         | 4086189   | 81815  | 0.0200   |
+| Borr_bur_B31                               | 1467551   | 305695 | 0.2083   |
+| Bu_mall_ATCC_23344                         | 5835527   | 223898 | 0.0384   |
+| Bu_tha_E264                                | 6723972   | 274890 | 0.0409   |
+| Ca_jej_jejuni_NCTC_11168_ATCC_700819       | 1641481   | 32217  | 0.0196   |
+| Ci_kos_ATCC_BAA_895                        | 4720462   | 147120 | 0.0312   |
+| Clostridio_dif_630                         | 4274782   | 278659 | 0.0652   |
+| Co_dip_NCTC_13129                          | 2488635   | 44783  | 0.0180   |
+| Co_kro_DSM_44385                           | 2446804   | 17352  | 0.0071   |
+| Co_ure_DSM_7109                            | 2369219   | 83469  | 0.0352   |
+| Cup_met_CH34                               | 6913352   | 362651 | 0.0525   |
+| Cut_acn_SK137                              | 2495334   | 27313  | 0.0109   |
+| Es_fer_ATCC_35469                          | 4643861   | 129186 | 0.0278   |
+| Fr_tul_tularensis_SCHU_S4                  | 1892775   | 82812  | 0.0438   |
+| Ha_inf_Rd_KW20                             | 1830138   | 59315  | 0.0324   |
+| He_pyl_26695                               | 1667867   | 72577  | 0.0435   |
+| He_pyl_J99                                 | 1643831   | 45987  | 0.0280   |
+| J_deni_DSM_20603                           | 2749646   | 52925  | 0.0192   |
+| Ko_rhi_DC2201                              | 2697540   | 29304  | 0.0109   |
+| Ky_sed_DSM_20547                           | 2785024   | 95421  | 0.0343   |
+| Leg_pneumop_pneumophila_Philadelphia_1     | 3397754   | 89782  | 0.0264   |
+| Lep_int_Copenhageni_Fiocruz_L1_130         | 4627366   | 105815 | 0.0229   |
+| Leu_mes_mesenteroides_ATCC_8293            | 2075763   | 56816  | 0.0274   |
+| Mycobacteri_avi_paratuberculosis_K_10      | 4829781   | 239309 | 0.0495   |
+| Mycobacteri_tub_H37Ra                      | 4419977   | 187555 | 0.0424   |
+| Mycobacteri_tub_H37Rv                      | 4411532   | 176345 | 0.0400   |
+| Mycol_sme_MC2_155                          | 6988209   | 350227 | 0.0501   |
+| N_gon_FA_1090                              | 2153922   | 110972 | 0.0515   |
+| N_men_FAM18                                | 2194961   | 123508 | 0.0563   |
+| N_men_MC58                                 | 2272360   | 183408 | 0.0807   |
+| O_anthro_ATCC_49188                        | 5205777   | 142165 | 0.0273   |
+| Par_dis_ATCC_8503                          | 4811379   | 167145 | 0.0347   |
+| Pre_mel_ATCC_25845                         | 3168282   | 72306  | 0.0228   |
+| Pse_pro_Pf_5                               | 7074893   | 175507 | 0.0248   |
+| Psy_cry_K5                                 | 3101097   | 81488  | 0.0263   |
+| Ros_deni_OCh_114                           | 4133097   | 39434  | 0.0095   |
+| She_putr_CN_32                             | 4659220   | 148175 | 0.0318   |
+| Sta_aure_aureus_Mu50                       | 2903636   | 86252  | 0.0297   |
+| Sta_aure_aureus_N315                       | 2814816   | 96559  | 0.0343   |
+| Sta_aure_aureus_NCTC_8325                  | 2821361   | 57079  | 0.0202   |
+| Sta_epi_ATCC_12228                         | 2532762   | 85141  | 0.0336   |
+| Sta_sap_saprophyticus_ATCC_15305_NCTC_7292 | 2577899   | 44095  | 0.0171   |
+| Streptob_moni_DSM_12112                    | 1673280   | 241650 | 0.1444   |
+| Y_pseudot_YPIII                            | 4689441   | 114669 | 0.0245   |
 
-* template
+
+## Copy/link files
 
 ```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Ftul
+cd ~/data/anchr/fda_argos
+
+for STRAIN in \
+    $(
+        cat ena/source.csv |
+            grep -v "^#" |
+            cut -d, -f 2 |
+            sort -u
+            
+    ) \
+    ; do
+    mkdir -p ${STRAIN}/1_genome
+    
+    cp ref/${STRAIN}/genome.fa ${STRAIN}/1_genome
+    cp ref/${STRAIN}/paralogs.fa ${STRAIN}/1_genome
+
+done
+
+# Clean symlinks
+find . -name "R1.fq.gz" -or \
+       -name "R2.fq.gz" -or \
+       -name "S1.fq.gz" -or \
+       -name "S2.fq.gz" -or \
+       -name "T1.fq.gz" -or \
+       -name "T2.fq.gz" |
+    xargs rm
+cat ena/ena_info.csv |
+    grep -v "^#" |
+    grep -v "^name" |
+    parallel -j 1 -k --colsep "," '
+        mkdir -p {1}/2_illumina
+        cd {1}/2_illumina
+        
+        if [[ -L R1.fq.gz ]]; then
+            if [[ -L S1.fq.gz ]]; then
+                if [[ -L T1.fq.gz ]]; then
+                    echo "Symlinks exist"
+                else
+                    ln -s ../../ena/{6}_1.fastq.gz T1.fq.gz
+                    ln -s ../../ena/{6}_2.fastq.gz T2.fq.gz
+                fi
+            else
+                ln -s ../../ena/{6}_1.fastq.gz S1.fq.gz
+                ln -s ../../ena/{6}_2.fastq.gz S2.fq.gz
+            fi
+        else
+            ln -s ../../ena/{6}_1.fastq.gz R1.fq.gz
+            ln -s ../../ena/{6}_2.fastq.gz R2.fq.gz
+        fi
+    '
+
+```
+
+
+# Ca_jej_jejuni_NCTC_11168_ATCC_700819
+
+```shell script
+WORKING_DIR=${HOME}/data/anchr/fda_argos
+BASE_NAME=Ca_jej_jejuni_NCTC_11168_ATCC_700819
 
 cd ${WORKING_DIR}/${BASE_NAME}
 
 rm *.sh
 anchr template \
-    --genome 1892775 \
+    --genome 1641481 \
     --parallel 24 \
     --xmx 80g \
-    --queue mpi \
     \
     --fastqc \
     --insertsize \
     --kat \
     \
-    --trim "--dedupe --cutoff 50 --cutk 31" \
+    --trim "--dedupe --cutoff 30 --cutk 31" \
     --sample 300 \
     --qual "25 30" \
     --len "60" \
@@ -396,25 +552,426 @@ anchr template \
     \
     --extend
 
+# rm -fr 4_*/ 6_*/ 7_*/ 8_*/
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
+
+# rm -fr 4_down_sampling 6_down_sampling
+
+bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
+
+# bash 0_master.sh
+# bash 0_cleanup.sh
+
 ```
 
-## Ftul: run
+Table: statInsertSize
+
+| Group             |  Mean | Median |  STDev | PercentOfPairs/PairOrientation |
+|:------------------|------:|-------:|-------:|-------------------------------:|
+| R.genome.bbtools  | 431.2 |    300 | 2174.5 |                         98.84% |
+| R.tadpole.bbtools | 310.1 |    299 |  103.7 |                         96.43% |
+| R.genome.picard   | 310.8 |    300 |   86.6 |                             FR |
+| R.tadpole.picard  | 309.9 |    299 |   86.5 |                             FR |
+
+
+Table: statKAT
+
+| k    | mean_freq | est_genome_size | est_het_rate | mean_gc |
+|:-----|:----------|:----------------|:-------------|:--------|
+| R.21 | 0         | 0               | 0.0000       | 33.93   |
+| R.31 | 0         | 0               | 0.0000       | 33.22   |
+| R.41 | 0         | 0               | 0.0000       | 32.85   |
+| R.51 | 451       | 1268552         | 0.0000       | 32.60   |
+| R.61 | 360       | 1589497         | 0.0000       | 32.41   |
+| R.71 | 268       | 1589092         | 0.0000       | 32.24   |
+| R.81 | 183       | 1622277         | 0.0000       | 32.07   |
+
+
+Table: statReads
+
+| Name       |     N50 |     Sum |        # |
+|:-----------|--------:|--------:|---------:|
+| Genome     | 1641481 | 1641481 |        1 |
+| Paralogs   |    6079 |   33258 |       13 |
+| Illumina.R |     101 |   1.55G | 15393600 |
+| trim.R     |     100 | 530.04M |  5325364 |
+| Q25L60     |     100 |  516.1M |  5196839 |
+| Q30L60     |     100 | 489.69M |  4979409 |
+
+
+Table: statTrimReads
+
+| Name     | N50 |     Sum |        # |
+|:---------|----:|--------:|---------:|
+| clumpify | 101 |   1.54G | 15283902 |
+| highpass | 101 |   1.54G | 15224722 |
+| sample   | 101 | 549.04M |  5436054 |
+| trim     | 100 | 530.08M |  5325832 |
+| filter   | 100 | 530.04M |  5325364 |
+| R1       | 100 | 265.32M |  2662682 |
+| R2       | 100 | 264.72M |  2662682 |
+| Rs       |   0 |       0 |        0 |
+
+
+```text
+#R.trim
+#Matched	4095	0.07533%
+#Name	Reads	ReadsPct
+```
+
+```text
+#R.filter
+#Matched	468	0.00879%
+#Name	Reads	ReadsPct
+```
+
+```text
+#R.peaks
+#k	31
+#unique_kmers	8176693
+#error_kmers	6560383
+#genomic_kmers	1616310
+#main_peak	221
+#genome_size_in_peaks	1640136
+#genome_size	1641667
+#haploid_genome_size	1641667
+#fold_coverage	221
+#haploid_fold_coverage	221
+#ploidy	1
+#percent_repeat_in_peaks	1.463
+#percent_repeat	1.525
+#start	center	stop	max	volume
+```
+
+
+Table: statMergeReads
+
+| Name          | N50 |     Sum |       # |
+|:--------------|----:|--------:|--------:|
+| clumped       | 100 | 530.03M | 5325284 |
+| ecco          | 100 | 530.03M | 5325284 |
+| eccc          | 100 | 530.03M | 5325284 |
+| ecct          | 100 | 527.04M | 5294872 |
+| extended      | 140 |  738.4M | 5294872 |
+| merged.raw    | 333 | 688.75M | 2151939 |
+| unmerged.raw  | 140 | 137.52M |  990994 |
+| unmerged.trim | 140 | 137.52M |  990988 |
+| M1            | 333 |  688.1M | 2149922 |
+| U1            | 140 |  68.99M |  495494 |
+| U2            | 140 |  68.53M |  495494 |
+| Us            |   0 |       0 |       0 |
+| M.cor         | 317 | 827.77M | 5290832 |
+
+| Group              |  Mean | Median | STDev | PercentOfPairs |
+|:-------------------|------:|-------:|------:|---------------:|
+| M.ihist.merge1.txt | 159.6 |    165 |  20.8 |          4.65% |
+| M.ihist.merge.txt  | 320.1 |    321 |  58.6 |         81.28% |
+
+
+Table: statQuorum
+
+| Name     | CovIn | CovOut | Discard% | Kmer | RealG |  EstG | Est/Real |   RunTime |
+|:---------|------:|-------:|---------:|-----:|------:|------:|---------:|----------:|
+| Q0L0.R   | 289.6 |  273.0 |    5.75% | "71" | 1.83M | 1.62M |     0.89 | 0:01'07'' |
+| Q25L60.R | 282.0 |  268.9 |    4.68% | "71" | 1.83M | 1.62M |     0.89 | 0:01'05'' |
+| Q30L60.R | 267.7 |  257.5 |    3.81% | "71" | 1.83M | 1.62M |     0.88 | 0:01'04'' |
+
+
+Table: statUnitigsSuperreads.md
+
+| Name          | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:--------------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| Q0L0X40P000   |   40.0 |  98.68% |     66811 | 1.59M | 50 |      2340 | 13.67K | 202 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:20 |   0:00:25 |
+| Q0L0X40P001   |   40.0 |  98.79% |     57909 | 1.59M | 51 |      2340 | 14.81K | 230 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:24 |
+| Q0L0X40P002   |   40.0 |  98.74% |     66531 |  1.6M | 56 |      2340 | 15.47K | 228 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:23 |
+| Q0L0X80P000   |   80.0 |  98.08% |     40407 | 1.59M | 69 |      2340 | 11.62K | 148 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:23 |
+| Q0L0X80P001   |   80.0 |  98.29% |     43899 | 1.59M | 67 |      2340 | 12.16K | 142 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
+| Q0L0X80P002   |   80.0 |  98.22% |     46359 | 1.59M | 64 |      2340 | 12.17K | 136 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:26 |   0:00:23 |
+| Q25L60X40P000 |   40.0 |  98.73% |     56877 |  1.6M | 54 |      2340 |  14.3K | 221 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:24 |
+| Q25L60X40P001 |   40.0 |  98.78% |     70625 | 1.59M | 46 |      2340 | 15.27K | 208 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:24 |
+| Q25L60X40P002 |   40.0 |  98.66% |     79970 | 1.59M | 45 |      2340 | 13.26K | 180 |   45.0 | 3.0 |  12.0 |  81.0 | "31,41,51,61,71,81" |   0:00:17 |   0:00:22 |
+| Q25L60X80P000 |   80.0 |  98.30% |     57893 | 1.59M | 54 |      6071 | 11.65K | 118 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
+| Q25L60X80P001 |   80.0 |  98.27% |     66536 | 1.59M | 57 |      6071 | 11.83K | 121 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:23 |
+| Q25L60X80P002 |   80.0 |  98.23% |     48276 | 1.59M | 54 |      6071 | 11.44K | 118 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
+| Q30L60X40P000 |   40.0 |  98.72% |     70556 | 1.59M | 43 |      2340 | 13.37K | 194 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:23 |
+| Q30L60X40P001 |   40.0 |  98.86% |     74607 |  1.6M | 45 |      2340 | 15.11K | 223 |   45.0 | 3.0 |  12.0 |  81.0 | "31,41,51,61,71,81" |   0:00:17 |   0:00:24 |
+| Q30L60X40P002 |   40.0 |  98.90% |     60535 |  1.6M | 48 |      2340 | 14.41K | 201 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:18 |   0:00:23 |
+| Q30L60X80P000 |   80.0 |  98.42% |     69808 | 1.59M | 53 |      6071 | 12.02K | 138 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:26 |   0:00:23 |
+| Q30L60X80P001 |   80.0 |  98.37% |     70552 | 1.59M | 51 |      2340 |  12.6K | 124 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
+| Q30L60X80P002 |   80.0 |  98.32% |     66680 | 1.59M | 50 |      2340 | 12.66K | 128 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
+
+
+Table: statMRUnitigsSuperreads.md
+
+| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| MRX40P000 |   40.0 |  97.67% |     50164 | 1.59M | 55 |      2340 | 14.43K | 115 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:23 |   0:00:23 |
+| MRX40P001 |   40.0 |  97.79% |     75073 | 1.59M | 47 |      2340 | 13.79K |  99 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:23 |   0:00:21 |
+| MRX40P002 |   40.0 |  97.83% |     79910 | 1.59M | 43 |      2340 | 13.28K |  93 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:23 |   0:00:22 |
+| MRX80P000 |   80.0 |  97.58% |     57869 | 1.59M | 62 |      2340 | 14.97K | 130 |   88.0 | 6.0 |  23.3 | 159.0 | "31,41,51,61,71,81" |   0:00:38 |   0:00:23 |
+| MRX80P001 |   80.0 |  97.60% |     64662 | 1.59M | 57 |      2340 | 14.09K | 120 |   88.0 | 6.0 |  23.3 | 159.0 | "31,41,51,61,71,81" |   0:00:38 |   0:00:23 |
+| MRX80P002 |   80.0 |  97.49% |     50162 | 1.59M | 60 |      2340 |  14.7K | 124 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:38 |   0:00:22 |
+
+
+Table: statUnitigsBcalm.md
+
+| Name          | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:--------------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| Q0L0X40P000   |   40.0 |  98.88% |     79903 | 1.59M | 40 |      2490 | 14.92K | 234 |   45.0 | 2.0 |  13.0 |  76.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:25 |
+| Q0L0X40P001   |   40.0 |  98.69% |     79871 | 1.59M | 45 |      2340 |  16.2K | 224 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:24 |
+| Q0L0X40P002   |   40.0 |  98.94% |     68219 |  1.6M | 44 |      2340 | 16.04K | 234 |   44.0 | 2.0 |  12.7 |  75.0 | "31,41,51,61,71,81" |   0:00:45 |   0:00:24 |
+| Q0L0X80P000   |   80.0 |  98.75% |     79989 |  1.6M | 43 |      2340 | 13.94K | 200 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:49 |   0:00:26 |
+| Q0L0X80P001   |   80.0 |  98.61% |     79949 | 1.59M | 43 |      2340 |    13K | 172 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:49 |   0:00:23 |
+| Q0L0X80P002   |   80.0 |  98.79% |     80735 |  1.6M | 43 |      2340 | 14.01K | 202 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:49 |   0:00:25 |
+| Q25L60X40P000 |   40.0 |  98.95% |     55758 | 1.59M | 50 |      1024 | 21.82K | 255 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:25 |
+| Q25L60X40P001 |   40.0 |  98.79% |     70854 | 1.59M | 47 |      1053 | 18.11K | 255 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:24 |
+| Q25L60X40P002 |   40.0 |  98.99% |     71573 | 1.59M | 42 |      1069 | 17.64K | 207 |   44.0 | 2.0 |  12.7 |  75.0 | "31,41,51,61,71,81" |   0:00:45 |   0:00:24 |
+| Q25L60X80P000 |   80.0 |  98.82% |     71558 |  1.6M | 42 |      2340 | 14.87K | 213 |   90.0 | 6.5 |  23.5 | 164.2 | "31,41,51,61,71,81" |   0:00:49 |   0:00:25 |
+| Q25L60X80P001 |   80.0 |  98.80% |     83938 | 1.59M | 39 |      2340 | 14.24K | 181 |   90.0 | 6.0 |  24.0 | 162.0 | "31,41,51,61,71,81" |   0:00:50 |   0:00:25 |
+| Q25L60X80P002 |   80.0 |  98.84% |     79976 | 1.59M | 36 |      2340 | 14.76K | 203 |   90.0 | 6.0 |  24.0 | 162.0 | "31,41,51,61,71,81" |   0:00:50 |   0:00:24 |
+| Q30L60X40P000 |   40.0 |  98.71% |     78883 | 1.59M | 48 |      2340 | 14.83K | 212 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:23 |
+| Q30L60X40P001 |   40.0 |  98.85% |     70822 |  1.6M | 47 |      2609 |    16K | 258 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:23 |
+| Q30L60X40P002 |   40.0 |  98.86% |     71545 | 1.59M | 45 |      2340 | 16.76K | 246 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:46 |   0:00:26 |
+| Q30L60X80P000 |   80.0 |  98.81% |     71579 | 1.59M | 42 |      2340 | 15.26K | 201 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:50 |   0:00:25 |
+| Q30L60X80P001 |   80.0 |  98.88% |     71570 | 1.59M | 43 |      2340 | 15.39K | 205 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:49 |   0:00:26 |
+| Q30L60X80P002 |   80.0 |  98.91% |     79941 | 1.59M | 43 |      2340 | 15.61K | 209 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:49 |   0:00:26 |
+
+
+Table: statMRUnitigsBcalm.md
+
+| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |  # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|---:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| MRX40P000 |   40.0 |  98.33% |    104120 |  1.6M | 34 |      2340 | 12.94K | 92 |   45.0 | 4.0 |  11.0 |  85.5 | "31,41,51,61,71,81" |   0:00:47 |   0:00:24 |
+| MRX40P001 |   40.0 |  98.19% |    104091 | 1.59M | 37 |      2340 | 13.55K | 95 |   45.0 | 3.0 |  12.0 |  81.0 | "31,41,51,61,71,81" |   0:00:47 |   0:00:22 |
+| MRX40P002 |   40.0 |  98.19% |     90197 | 1.59M | 40 |      2340 | 13.36K | 93 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:46 |   0:00:22 |
+| MRX80P000 |   80.0 |  97.84% |     80643 | 1.59M | 41 |      2340 | 13.22K | 89 |   88.0 | 6.0 |  23.3 | 159.0 | "31,41,51,61,71,81" |   0:00:54 |   0:00:23 |
+| MRX80P001 |   80.0 |  97.82% |     80629 | 1.59M | 42 |      2340 | 13.05K | 92 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:54 |   0:00:23 |
+| MRX80P002 |   80.0 |  97.96% |     83989 | 1.59M | 40 |      2340 | 13.26K | 90 |   89.0 | 5.5 |  24.2 | 158.2 | "31,41,51,61,71,81" |   0:00:53 |   0:00:23 |
+
+
+Table: statUnitigsTadpole.md
+
+| Name          | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:--------------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| Q0L0X40P000   |   40.0 |  98.87% |     79983 | 1.59M | 42 |      2340 | 13.98K | 199 |   45.0 | 2.0 |  13.0 |  76.5 | "31,41,51,61,71,81" |   0:00:27 |   0:00:24 |
+| Q0L0X40P001   |   40.0 |  98.86% |     79885 |  1.6M | 43 |      2340 | 14.57K | 193 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:24 |   0:00:25 |
+| Q0L0X40P002   |   40.0 |  98.99% |     71561 |  1.6M | 45 |      2340 | 15.38K | 188 |   45.0 | 3.0 |  12.0 |  81.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:24 |
+| Q0L0X80P000   |   80.0 |  98.62% |     75183 | 1.59M | 43 |      6071 | 11.23K | 106 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:24 |
+| Q0L0X80P001   |   80.0 |  98.61% |     80762 | 1.59M | 42 |      6071 | 11.69K | 110 |   88.0 | 4.0 |  25.3 | 150.0 | "31,41,51,61,71,81" |   0:00:29 |   0:00:24 |
+| Q0L0X80P002   |   80.0 |  98.58% |     80745 | 1.59M | 44 |      6071 |  11.7K | 112 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:28 |   0:00:23 |
+| Q25L60X40P000 |   40.0 |  98.70% |     55840 | 1.59M | 47 |      2340 | 14.94K | 190 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:23 |
+| Q25L60X40P001 |   40.0 |  98.83% |     71559 |  1.6M | 45 |      2340 | 14.79K | 198 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:24 |
+| Q25L60X40P002 |   40.0 |  98.96% |     80733 |  1.6M | 42 |      2340 | 15.91K | 185 |   44.0 | 2.0 |  12.7 |  75.0 | "31,41,51,61,71,81" |   0:00:26 |   0:00:24 |
+| Q25L60X80P000 |   80.0 |  98.71% |     75174 | 1.59M | 43 |      6071 | 12.05K | 126 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:23 |
+| Q25L60X80P001 |   80.0 |  98.68% |     79976 | 1.59M | 41 |      6071 | 12.01K | 116 |   88.0 | 4.0 |  25.3 | 150.0 | "31,41,51,61,71,81" |   0:00:30 |   0:00:24 |
+| Q25L60X80P002 |   80.0 |  98.54% |     75182 | 1.59M | 42 |      6071 | 11.67K | 116 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:24 |
+| Q30L60X40P000 |   40.0 |  98.72% |     70818 | 1.59M | 44 |      2340 | 14.35K | 191 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:24 |   0:00:22 |
+| Q30L60X40P001 |   40.0 |  98.95% |     51994 |  1.6M | 56 |      1037 | 18.46K | 235 |   44.0 | 2.0 |  12.7 |  75.0 | "31,41,51,61,71,81" |   0:00:23 |   0:00:24 |
+| Q30L60X40P002 |   40.0 |  98.93% |     79927 |  1.6M | 45 |      2340 | 16.78K | 219 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:23 |   0:00:25 |
+| Q30L60X80P000 |   80.0 |  98.82% |     75185 | 1.59M | 40 |      2340 | 12.91K | 142 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:28 |   0:00:26 |
+| Q30L60X80P001 |   80.0 |  98.66% |     75180 | 1.59M | 41 |      2340 | 12.69K | 130 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:24 |
+| Q30L60X80P002 |   80.0 |  98.69% |     79977 | 1.59M | 40 |      6071 |  11.7K | 124 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:26 |   0:00:24 |
+
+
+Table: statMRUnitigsTadpole.md
+
+| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| MRX40P000 |   40.0 |  97.90% |     80640 | 1.59M | 40 |      2340 | 12.86K |  87 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:22 |
+| MRX40P001 |   40.0 |  97.97% |    104091 | 1.59M | 39 |      2340 | 13.03K |  85 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:22 |
+| MRX40P002 |   40.0 |  97.84% |     90197 | 1.59M | 41 |      2340 | 12.87K |  85 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:22 |
+| MRX80P000 |   80.0 |  97.76% |     79879 | 1.59M | 44 |      2340 | 12.81K |  90 |   89.0 | 7.0 |  22.7 | 165.0 | "31,41,51,61,71,81" |   0:00:31 |   0:00:22 |
+| MRX80P001 |   80.0 |  97.80% |     79887 | 1.59M | 45 |      2340 | 12.86K |  92 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:31 |   0:00:23 |
+| MRX80P002 |   80.0 |  97.97% |     79884 | 1.59M | 46 |      2340 | 13.73K | 102 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:33 |   0:00:23 |
+
+
+Table: statMergeAnchors.md
+
+| Name                          | Mapped% | N50Anchor |   Sum |  # | N50Others |     Sum |  # | median |  MAD | lower | upper | RunTimeAN |
+|:------------------------------|--------:|----------:|------:|---:|----------:|--------:|---:|-------:|-----:|------:|------:|----------:|
+| 7_merge_anchors               |  97.94% |    112408 | 1.59M | 23 |    177862 | 271.07K | 41 |  301.0 | 17.0 |  83.3 | 528.0 |   0:00:34 |
+| 7_merge_mr_unitigs_bcalm      |  98.91% |    104621 | 1.59M | 25 |      6071 |  20.27K |  7 |  301.0 | 16.0 |  84.3 | 523.5 |   0:00:48 |
+| 7_merge_mr_unitigs_superreads |  98.85% |     90146 | 1.59M | 33 |      6071 |   8.41K |  2 |  303.0 | 15.0 |  86.0 | 522.0 |   0:00:45 |
+| 7_merge_mr_unitigs_tadpole    |  98.85% |    104100 | 1.59M | 28 |      6071 |   8.96K |  3 |  300.0 | 15.0 |  85.0 | 517.5 |   0:00:46 |
+| 7_merge_unitigs_bcalm         |  98.91% |    104137 |  1.6M | 28 |    177862 | 227.26K | 26 |  302.0 | 18.0 |  82.7 | 534.0 |   0:00:47 |
+| 7_merge_unitigs_superreads    |  99.08% |    104147 | 1.59M | 28 |      2340 |  12.47K |  5 |  303.0 | 16.0 |  85.0 | 526.5 |   0:00:54 |
+| 7_merge_unitigs_tadpole       |  99.05% |    104147 |  1.6M | 29 |      6079 |   47.4K | 20 |  301.0 | 17.0 |  83.3 | 528.0 |   0:00:52 |
+
+
+Table: statOtherAnchors.md
+
+| Name         | Mapped% | N50Anchor |   Sum |  # | N50Others |   Sum |  # | median |  MAD | lower | upper | RunTimeAN |
+|:-------------|--------:|----------:|------:|---:|----------:|------:|---:|-------:|-----:|------:|------:|----------:|
+| 8_spades     |  99.35% |    104593 | 1.23M | 19 |      2420 | 15.9K | 35 |  303.0 | 19.0 |  82.0 | 540.0 |   0:00:29 |
+| 8_mr_spades  |  99.42% |    153954 | 1.61M | 16 |      2340 |   13K | 34 |  501.0 | 45.5 | 121.5 | 956.2 |   0:00:31 |
+| 8_megahit    |  98.68% |    112616 |  1.6M | 24 |      6015 | 10.8K | 48 |  303.0 | 17.5 |  83.5 | 533.2 |   0:00:29 |
+| 8_mr_megahit |  99.30% |    153889 | 1.61M | 22 |      2340 | 12.8K | 44 |  501.0 | 35.0 | 132.0 | 909.0 |   0:00:30 |
+| 8_platanus   |  98.87% |    104629 | 1.11M | 18 |      5981 | 9.77K | 37 |  303.0 | 17.0 |  84.0 | 531.0 |   0:00:27 |
+
+
+Table: statFinal
+
+| Name                     |     N50 |     Sum |   # |
+|:-------------------------|--------:|--------:|----:|
+| Genome                   | 1641481 | 1641481 |   1 |
+| Paralogs                 |    6079 |   33258 |  13 |
+| 7_merge_anchors.anchors  |  112408 | 1594034 |  23 |
+| 7_merge_anchors.others   |  177862 |  271070 |  41 |
+| glue_anchors             |  112408 | 1594034 |  23 |
+| fill_anchors             |  128683 | 1603036 |  19 |
+| spades.contig            |  153957 | 1622964 |  34 |
+| spades.scaffold          |  189387 | 1623102 |  32 |
+| spades.non-contained     |  153957 | 1616696 |  17 |
+| mr_spades.contig         |  189482 | 1624572 |  25 |
+| mr_spades.scaffold       |  189482 | 1624572 |  25 |
+| mr_spades.non-contained  |  189482 | 1621940 |  18 |
+| megahit.contig           |  112661 | 1622829 |  60 |
+| megahit.non-contained    |  112661 | 1607338 |  24 |
+| mr_megahit.contig        |  174584 | 1631643 |  41 |
+| mr_megahit.non-contained |  174584 | 1621872 |  22 |
+| platanus.contig          |  112554 | 1628911 | 108 |
+| platanus.scaffold        |  153895 | 1622467 |  63 |
+| platanus.non-contained   |  153895 | 1612680 |  21 |
+
+
+# Clostridio_dif_630
 
 ```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Ftul
+WORKING_DIR=${HOME}/data/anchr/fda_argos
+BASE_NAME=Clostridio_dif_630
 
 cd ${WORKING_DIR}/${BASE_NAME}
+
+rm *.sh
+anchr template \
+    --genome 4274782 \
+    --parallel 24 \
+    --xmx 80g \
+    \
+    --fastqc \
+    --insertsize \
+    --kat \
+    \
+    --trim "--dedupe --cutoff 30 --cutk 31" \
+    --sample 300 \
+    --qual "25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --quorum \
+    --merge \
+    --ecphase "1 2 3" \
+    \
+    --cov "40 80" \
+    --unitigger "superreads bcalm tadpole" \
+    --statp 2 \
+    --redo \
+    \
+    --extend
+
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
-# BASE_NAME=Ftul bash 0_bsub.sh
+# rm -fr 4_down_sampling 6_down_sampling
+
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
-#bkill -J "${BASE_NAME}-*"
 
-#bash 0_master.sh
-#bash 0_cleanup.sh
-#rm -fr 4_down_sampling 6_down_sampling
+# bash 0_master.sh
+# bash 0_cleanup.sh
+
+```
+
+# Co_dip_NCTC_13129
+
+```shell script
+WORKING_DIR=${HOME}/data/anchr/fda_argos
+BASE_NAME=Co_dip_NCTC_13129
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+rm *.sh
+anchr template \
+    --genome 2488635 \
+    --parallel 24 \
+    --xmx 80g \
+    \
+    --fastqc \
+    --insertsize \
+    --kat \
+    \
+    --trim "--dedupe --cutoff 30 --cutk 31" \
+    --sample 300 \
+    --qual "25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --quorum \
+    --merge \
+    --ecphase "1 2 3" \
+    \
+    --cov "40 80" \
+    --unitigger "superreads bcalm tadpole" \
+    --statp 2 \
+    --redo \
+    \
+    --extend
+
+# rm -fr 4_*/ 6_*/ 7_*/ 8_*/
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
+
+# rm -fr 4_down_sampling 6_down_sampling
+
+bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
+
+# bash 0_master.sh
+# bash 0_cleanup.sh
+
+```
+
+# Fr_tul_tularensis_SCHU_S4
+
+```shell script
+WORKING_DIR=${HOME}/data/anchr/fda_argos
+BASE_NAME=Fr_tul_tularensis_SCHU_S4
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+rm *.sh
+anchr template \
+    --genome 1892775 \
+    --parallel 24 \
+    --xmx 80g \
+    \
+    --fastqc \
+    --insertsize \
+    --kat \
+    \
+    --trim "--dedupe --cutoff 30 --cutk 31" \
+    --sample 300 \
+    --qual "25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --quorum \
+    --merge \
+    --ecphase "1 2 3" \
+    \
+    --cov "40 80" \
+    --unitigger "superreads bcalm tadpole" \
+    --statp 2 \
+    --redo \
+    \
+    --extend
+
+# rm -fr 4_*/ 6_*/ 7_*/ 8_*/
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
+
+# rm -fr 4_down_sampling 6_down_sampling
+
+bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
+
+# bash 0_master.sh
+# bash 0_cleanup.sh
 
 ```
 
@@ -688,69 +1245,11 @@ Table: statFinal
 | platanus.non-contained   |   37808 | 1798706 |  65 |
 
 
-# Haemophilus influenzae FDAARGOS_199
-
-## Hinf: reference
-
-* Reference genome
+# Ha_inf_Rd_KW20
 
 ```shell script
-mkdir -p ~/data/anchr/Hinf/1_genome
-cd ~/data/anchr/Hinf/1_genome
-
-cp ~/data/anchr/ref/Hinf/genome.fa .
-cp ~/data/anchr/ref/Hinf/paralogs.fa .
-
-```
-
-## Hinf: download
-
-```shell script
-cd ~/data/anchr/Hinf
-
-mkdir -p ena
-cd ena
-
-cat << EOF > source.csv
-SRX2104758,Hinf,HiSeq 2500 PE100
-EOF
-
-anchr ena info | perl - -v source.csv > ena_info.yml
-anchr ena prep | perl - ena_info.yml
-
-mlr --icsv --omd cat ena_info.csv
-
-aria2c -x 9 -s 3 -c -i ena_info.ftp.txt
-
-md5sum --check ena_info.md5.txt
-
-```
-
-| name | srx        | platform | layout | ilength | srr        | spot    | base  |
-|:-----|:-----------|:---------|:-------|:--------|:-----------|:--------|:------|
-| Hinf | SRX2104758 | ILLUMINA | PAIRED | 516     | SRR4123928 | 6115624 | 1.15G |
-
-
-* Illumina
-
-```shell script
-cd ~/data/anchr/Hinf
-
-mkdir -p 2_illumina
-cd 2_illumina
-
-ln -s ../ena/SRR4123928_1.fastq.gz R1.fq.gz
-ln -s ../ena/SRR4123928_2.fastq.gz R2.fq.gz
-
-```
-
-## Hinf: template
-
-* template
-
-```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Hinf
+WORKING_DIR=${HOME}/data/anchr/fda_argos
+BASE_NAME=Ha_inf_Rd_KW20
 
 cd ${WORKING_DIR}/${BASE_NAME}
 
@@ -759,7 +1258,6 @@ anchr template \
     --genome 1830138 \
     --parallel 24 \
     --xmx 80g \
-    --queue mpi \
     \
     --fastqc \
     --insertsize \
@@ -782,25 +1280,15 @@ anchr template \
     \
     --extend
 
-```
-
-## Hinf: run
-
-```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Hinf
-
-cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
-# BASE_NAME=Hinf bash 0_bsub.sh
+# rm -fr 4_down_sampling 6_down_sampling
+
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
-#bkill -J "${BASE_NAME}-*"
 
-#bash 0_master.sh
-#bash 0_cleanup.sh
-#rm -fr 4_down_sampling 6_down_sampling
+# bash 0_master.sh
+# bash 0_cleanup.sh
 
 ```
 
@@ -1072,392 +1560,6 @@ Table: statFinal
 | platanus.contig          |  107526 | 1806417 | 132 |
 | platanus.scaffold        |  131416 | 1800142 |  79 |
 | platanus.non-contained   |  131416 | 1791177 |  19 |
-
-
-# Campylobacter jejuni subsp. jejuni ATCC 700819
-
-## Cjej: reference
-
-* Reference genome
-
-```shell script
-mkdir -p ~/data/anchr/Cjej/1_genome
-cd ~/data/anchr/Cjej/1_genome
-
-cp ~/data/anchr/ref/Cjej/genome.fa .
-cp ~/data/anchr/ref/Cjej/paralogs.fa .
-
-```
-
-## Cjej: download
-
-```shell script
-cd ~/data/anchr/Cjej
-
-mkdir -p ena
-cd ena
-
-cat << EOF > source.csv
-SRX2107012,Cjej,HiSeq 2500 PE100
-EOF
-
-anchr ena info | perl - -v source.csv > ena_info.yml
-anchr ena prep | perl - ena_info.yml
-
-mlr --icsv --omd cat ena_info.csv
-
-aria2c -x 9 -s 3 -c -i ena_info.ftp.txt
-
-md5sum --check ena_info.md5.txt
-
-```
-
-| name | srx        | platform | layout | ilength | srr        | spot    | base  |
-|:-----|:-----------|:---------|:-------|:--------|:-----------|:--------|:------|
-| Cjej | SRX2107012 | ILLUMINA | PAIRED | 562     | SRR4125016 | 7696800 | 1.45G |
-
-
-* Illumina
-
-```shell script
-cd ~/data/anchr/Cjej
-
-mkdir -p 2_illumina
-cd 2_illumina
-
-ln -s ../ena/SRR4125016_1.fastq.gz R1.fq.gz
-ln -s ../ena/SRR4125016_2.fastq.gz R2.fq.gz
-
-```
-
-## Cjej: template
-
-* template
-
-```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Cjej
-
-cd ${WORKING_DIR}/${BASE_NAME}
-
-rm *.sh
-anchr template \
-    --genome 1830138 \
-    --parallel 24 \
-    --xmx 80g \
-    --queue mpi \
-    \
-    --fastqc \
-    --insertsize \
-    --kat \
-    \
-    --trim "--dedupe --cutoff 50 --cutk 31" \
-    --sample 300 \
-    --qual "25 30" \
-    --len "60" \
-    --filter "adapter artifact" \
-    \
-    --quorum \
-    --merge \
-    --ecphase "1 2 3" \
-    \
-    --cov "40 80" \
-    --unitigger "superreads bcalm tadpole" \
-    --statp 2 \
-    --redo \
-    \
-    --extend
-
-```
-
-## Cjej: run
-
-```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Cjej
-
-cd ${WORKING_DIR}/${BASE_NAME}
-# rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
-
-# BASE_NAME=Cjej bash 0_bsub.sh
-bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
-#bkill -J "${BASE_NAME}-*"
-
-#bash 0_master.sh
-#bash 0_cleanup.sh
-#rm -fr 4_down_sampling 6_down_sampling
-
-```
-
-Table: statInsertSize
-
-| Group             |  Mean | Median |  STDev | PercentOfPairs/PairOrientation |
-|:------------------|------:|-------:|-------:|-------------------------------:|
-| R.genome.bbtools  | 431.2 |    300 | 2174.5 |                         98.84% |
-| R.tadpole.bbtools | 310.1 |    299 |  103.7 |                         96.43% |
-| R.genome.picard   | 310.8 |    300 |   86.6 |                             FR |
-| R.tadpole.picard  | 309.9 |    299 |   86.5 |                             FR |
-
-
-Table: statKAT
-
-| k    | mean_freq | est_genome_size | est_het_rate | mean_gc |
-|:-----|:----------|:----------------|:-------------|:--------|
-| R.21 | 0         | 0               | 0.0000       | 33.93   |
-| R.31 | 0         | 0               | 0.0000       | 33.22   |
-| R.41 | 0         | 0               | 0.0000       | 32.85   |
-| R.51 | 451       | 1268552         | 0.0000       | 32.60   |
-| R.61 | 360       | 1589497         | 0.0000       | 32.41   |
-| R.71 | 268       | 1589092         | 0.0000       | 32.24   |
-| R.81 | 183       | 1622277         | 0.0000       | 32.07   |
-
-
-Table: statReads
-
-| Name       |     N50 |     Sum |        # |
-|:-----------|--------:|--------:|---------:|
-| Genome     | 1641481 | 1641481 |        1 |
-| Paralogs   |    6079 |   33258 |       13 |
-| Illumina.R |     101 |   1.55G | 15393600 |
-| trim.R     |     100 | 530.04M |  5325364 |
-| Q25L60     |     100 |  516.1M |  5196839 |
-| Q30L60     |     100 | 489.69M |  4979409 |
-
-
-Table: statTrimReads
-
-| Name     | N50 |     Sum |        # |
-|:---------|----:|--------:|---------:|
-| clumpify | 101 |   1.54G | 15283902 |
-| highpass | 101 |   1.54G | 15224722 |
-| sample   | 101 | 549.04M |  5436054 |
-| trim     | 100 | 530.08M |  5325832 |
-| filter   | 100 | 530.04M |  5325364 |
-| R1       | 100 | 265.32M |  2662682 |
-| R2       | 100 | 264.72M |  2662682 |
-| Rs       |   0 |       0 |        0 |
-
-
-```text
-#R.trim
-#Matched	4095	0.07533%
-#Name	Reads	ReadsPct
-```
-
-```text
-#R.filter
-#Matched	468	0.00879%
-#Name	Reads	ReadsPct
-```
-
-```text
-#R.peaks
-#k	31
-#unique_kmers	8176693
-#error_kmers	6560383
-#genomic_kmers	1616310
-#main_peak	221
-#genome_size_in_peaks	1640136
-#genome_size	1641667
-#haploid_genome_size	1641667
-#fold_coverage	221
-#haploid_fold_coverage	221
-#ploidy	1
-#percent_repeat_in_peaks	1.463
-#percent_repeat	1.525
-#start	center	stop	max	volume
-```
-
-
-Table: statMergeReads
-
-| Name          | N50 |     Sum |       # |
-|:--------------|----:|--------:|--------:|
-| clumped       | 100 | 530.03M | 5325284 |
-| ecco          | 100 | 530.03M | 5325284 |
-| eccc          | 100 | 530.03M | 5325284 |
-| ecct          | 100 | 527.04M | 5294872 |
-| extended      | 140 |  738.4M | 5294872 |
-| merged.raw    | 333 | 688.75M | 2151939 |
-| unmerged.raw  | 140 | 137.52M |  990994 |
-| unmerged.trim | 140 | 137.52M |  990988 |
-| M1            | 333 |  688.1M | 2149922 |
-| U1            | 140 |  68.99M |  495494 |
-| U2            | 140 |  68.53M |  495494 |
-| Us            |   0 |       0 |       0 |
-| M.cor         | 317 | 827.77M | 5290832 |
-
-| Group              |  Mean | Median | STDev | PercentOfPairs |
-|:-------------------|------:|-------:|------:|---------------:|
-| M.ihist.merge1.txt | 159.6 |    165 |  20.8 |          4.65% |
-| M.ihist.merge.txt  | 320.1 |    321 |  58.6 |         81.28% |
-
-
-Table: statQuorum
-
-| Name     | CovIn | CovOut | Discard% | Kmer | RealG |  EstG | Est/Real |   RunTime |
-|:---------|------:|-------:|---------:|-----:|------:|------:|---------:|----------:|
-| Q0L0.R   | 289.6 |  273.0 |    5.75% | "71" | 1.83M | 1.62M |     0.89 | 0:01'07'' |
-| Q25L60.R | 282.0 |  268.9 |    4.68% | "71" | 1.83M | 1.62M |     0.89 | 0:01'05'' |
-| Q30L60.R | 267.7 |  257.5 |    3.81% | "71" | 1.83M | 1.62M |     0.88 | 0:01'04'' |
-
-
-Table: statUnitigsSuperreads.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  98.68% |     66811 | 1.59M | 50 |      2340 | 13.67K | 202 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:20 |   0:00:25 |
-| Q0L0X40P001   |   40.0 |  98.79% |     57909 | 1.59M | 51 |      2340 | 14.81K | 230 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:24 |
-| Q0L0X40P002   |   40.0 |  98.74% |     66531 |  1.6M | 56 |      2340 | 15.47K | 228 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:23 |
-| Q0L0X80P000   |   80.0 |  98.08% |     40407 | 1.59M | 69 |      2340 | 11.62K | 148 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:23 |
-| Q0L0X80P001   |   80.0 |  98.29% |     43899 | 1.59M | 67 |      2340 | 12.16K | 142 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
-| Q0L0X80P002   |   80.0 |  98.22% |     46359 | 1.59M | 64 |      2340 | 12.17K | 136 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:26 |   0:00:23 |
-| Q25L60X40P000 |   40.0 |  98.73% |     56877 |  1.6M | 54 |      2340 |  14.3K | 221 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:24 |
-| Q25L60X40P001 |   40.0 |  98.78% |     70625 | 1.59M | 46 |      2340 | 15.27K | 208 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:24 |
-| Q25L60X40P002 |   40.0 |  98.66% |     79970 | 1.59M | 45 |      2340 | 13.26K | 180 |   45.0 | 3.0 |  12.0 |  81.0 | "31,41,51,61,71,81" |   0:00:17 |   0:00:22 |
-| Q25L60X80P000 |   80.0 |  98.30% |     57893 | 1.59M | 54 |      6071 | 11.65K | 118 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
-| Q25L60X80P001 |   80.0 |  98.27% |     66536 | 1.59M | 57 |      6071 | 11.83K | 121 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:23 |
-| Q25L60X80P002 |   80.0 |  98.23% |     48276 | 1.59M | 54 |      6071 | 11.44K | 118 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
-| Q30L60X40P000 |   40.0 |  98.72% |     70556 | 1.59M | 43 |      2340 | 13.37K | 194 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:17 |   0:00:23 |
-| Q30L60X40P001 |   40.0 |  98.86% |     74607 |  1.6M | 45 |      2340 | 15.11K | 223 |   45.0 | 3.0 |  12.0 |  81.0 | "31,41,51,61,71,81" |   0:00:17 |   0:00:24 |
-| Q30L60X40P002 |   40.0 |  98.90% |     60535 |  1.6M | 48 |      2340 | 14.41K | 201 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:18 |   0:00:23 |
-| Q30L60X80P000 |   80.0 |  98.42% |     69808 | 1.59M | 53 |      6071 | 12.02K | 138 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:26 |   0:00:23 |
-| Q30L60X80P001 |   80.0 |  98.37% |     70552 | 1.59M | 51 |      2340 |  12.6K | 124 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
-| Q30L60X80P002 |   80.0 |  98.32% |     66680 | 1.59M | 50 |      2340 | 12.66K | 128 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:22 |
-
-
-Table: statMRUnitigsSuperreads.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  97.67% |     50164 | 1.59M | 55 |      2340 | 14.43K | 115 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:23 |   0:00:23 |
-| MRX40P001 |   40.0 |  97.79% |     75073 | 1.59M | 47 |      2340 | 13.79K |  99 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:23 |   0:00:21 |
-| MRX40P002 |   40.0 |  97.83% |     79910 | 1.59M | 43 |      2340 | 13.28K |  93 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:23 |   0:00:22 |
-| MRX80P000 |   80.0 |  97.58% |     57869 | 1.59M | 62 |      2340 | 14.97K | 130 |   88.0 | 6.0 |  23.3 | 159.0 | "31,41,51,61,71,81" |   0:00:38 |   0:00:23 |
-| MRX80P001 |   80.0 |  97.60% |     64662 | 1.59M | 57 |      2340 | 14.09K | 120 |   88.0 | 6.0 |  23.3 | 159.0 | "31,41,51,61,71,81" |   0:00:38 |   0:00:23 |
-| MRX80P002 |   80.0 |  97.49% |     50162 | 1.59M | 60 |      2340 |  14.7K | 124 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:38 |   0:00:22 |
-
-
-Table: statUnitigsBcalm.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  98.88% |     79903 | 1.59M | 40 |      2490 | 14.92K | 234 |   45.0 | 2.0 |  13.0 |  76.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:25 |
-| Q0L0X40P001   |   40.0 |  98.69% |     79871 | 1.59M | 45 |      2340 |  16.2K | 224 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:24 |
-| Q0L0X40P002   |   40.0 |  98.94% |     68219 |  1.6M | 44 |      2340 | 16.04K | 234 |   44.0 | 2.0 |  12.7 |  75.0 | "31,41,51,61,71,81" |   0:00:45 |   0:00:24 |
-| Q0L0X80P000   |   80.0 |  98.75% |     79989 |  1.6M | 43 |      2340 | 13.94K | 200 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:49 |   0:00:26 |
-| Q0L0X80P001   |   80.0 |  98.61% |     79949 | 1.59M | 43 |      2340 |    13K | 172 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:49 |   0:00:23 |
-| Q0L0X80P002   |   80.0 |  98.79% |     80735 |  1.6M | 43 |      2340 | 14.01K | 202 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:49 |   0:00:25 |
-| Q25L60X40P000 |   40.0 |  98.95% |     55758 | 1.59M | 50 |      1024 | 21.82K | 255 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:25 |
-| Q25L60X40P001 |   40.0 |  98.79% |     70854 | 1.59M | 47 |      1053 | 18.11K | 255 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:24 |
-| Q25L60X40P002 |   40.0 |  98.99% |     71573 | 1.59M | 42 |      1069 | 17.64K | 207 |   44.0 | 2.0 |  12.7 |  75.0 | "31,41,51,61,71,81" |   0:00:45 |   0:00:24 |
-| Q25L60X80P000 |   80.0 |  98.82% |     71558 |  1.6M | 42 |      2340 | 14.87K | 213 |   90.0 | 6.5 |  23.5 | 164.2 | "31,41,51,61,71,81" |   0:00:49 |   0:00:25 |
-| Q25L60X80P001 |   80.0 |  98.80% |     83938 | 1.59M | 39 |      2340 | 14.24K | 181 |   90.0 | 6.0 |  24.0 | 162.0 | "31,41,51,61,71,81" |   0:00:50 |   0:00:25 |
-| Q25L60X80P002 |   80.0 |  98.84% |     79976 | 1.59M | 36 |      2340 | 14.76K | 203 |   90.0 | 6.0 |  24.0 | 162.0 | "31,41,51,61,71,81" |   0:00:50 |   0:00:24 |
-| Q30L60X40P000 |   40.0 |  98.71% |     78883 | 1.59M | 48 |      2340 | 14.83K | 212 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:23 |
-| Q30L60X40P001 |   40.0 |  98.85% |     70822 |  1.6M | 47 |      2609 |    16K | 258 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:23 |
-| Q30L60X40P002 |   40.0 |  98.86% |     71545 | 1.59M | 45 |      2340 | 16.76K | 246 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:46 |   0:00:26 |
-| Q30L60X80P000 |   80.0 |  98.81% |     71579 | 1.59M | 42 |      2340 | 15.26K | 201 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:50 |   0:00:25 |
-| Q30L60X80P001 |   80.0 |  98.88% |     71570 | 1.59M | 43 |      2340 | 15.39K | 205 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:49 |   0:00:26 |
-| Q30L60X80P002 |   80.0 |  98.91% |     79941 | 1.59M | 43 |      2340 | 15.61K | 209 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:49 |   0:00:26 |
-
-
-Table: statMRUnitigsBcalm.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |  # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|---:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  98.33% |    104120 |  1.6M | 34 |      2340 | 12.94K | 92 |   45.0 | 4.0 |  11.0 |  85.5 | "31,41,51,61,71,81" |   0:00:47 |   0:00:24 |
-| MRX40P001 |   40.0 |  98.19% |    104091 | 1.59M | 37 |      2340 | 13.55K | 95 |   45.0 | 3.0 |  12.0 |  81.0 | "31,41,51,61,71,81" |   0:00:47 |   0:00:22 |
-| MRX40P002 |   40.0 |  98.19% |     90197 | 1.59M | 40 |      2340 | 13.36K | 93 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:46 |   0:00:22 |
-| MRX80P000 |   80.0 |  97.84% |     80643 | 1.59M | 41 |      2340 | 13.22K | 89 |   88.0 | 6.0 |  23.3 | 159.0 | "31,41,51,61,71,81" |   0:00:54 |   0:00:23 |
-| MRX80P001 |   80.0 |  97.82% |     80629 | 1.59M | 42 |      2340 | 13.05K | 92 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:54 |   0:00:23 |
-| MRX80P002 |   80.0 |  97.96% |     83989 | 1.59M | 40 |      2340 | 13.26K | 90 |   89.0 | 5.5 |  24.2 | 158.2 | "31,41,51,61,71,81" |   0:00:53 |   0:00:23 |
-
-
-Table: statUnitigsTadpole.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  98.87% |     79983 | 1.59M | 42 |      2340 | 13.98K | 199 |   45.0 | 2.0 |  13.0 |  76.5 | "31,41,51,61,71,81" |   0:00:27 |   0:00:24 |
-| Q0L0X40P001   |   40.0 |  98.86% |     79885 |  1.6M | 43 |      2340 | 14.57K | 193 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:24 |   0:00:25 |
-| Q0L0X40P002   |   40.0 |  98.99% |     71561 |  1.6M | 45 |      2340 | 15.38K | 188 |   45.0 | 3.0 |  12.0 |  81.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:24 |
-| Q0L0X80P000   |   80.0 |  98.62% |     75183 | 1.59M | 43 |      6071 | 11.23K | 106 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:24 |
-| Q0L0X80P001   |   80.0 |  98.61% |     80762 | 1.59M | 42 |      6071 | 11.69K | 110 |   88.0 | 4.0 |  25.3 | 150.0 | "31,41,51,61,71,81" |   0:00:29 |   0:00:24 |
-| Q0L0X80P002   |   80.0 |  98.58% |     80745 | 1.59M | 44 |      6071 |  11.7K | 112 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:28 |   0:00:23 |
-| Q25L60X40P000 |   40.0 |  98.70% |     55840 | 1.59M | 47 |      2340 | 14.94K | 190 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:23 |
-| Q25L60X40P001 |   40.0 |  98.83% |     71559 |  1.6M | 45 |      2340 | 14.79K | 198 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:25 |   0:00:24 |
-| Q25L60X40P002 |   40.0 |  98.96% |     80733 |  1.6M | 42 |      2340 | 15.91K | 185 |   44.0 | 2.0 |  12.7 |  75.0 | "31,41,51,61,71,81" |   0:00:26 |   0:00:24 |
-| Q25L60X80P000 |   80.0 |  98.71% |     75174 | 1.59M | 43 |      6071 | 12.05K | 126 |   88.0 | 5.0 |  24.3 | 154.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:23 |
-| Q25L60X80P001 |   80.0 |  98.68% |     79976 | 1.59M | 41 |      6071 | 12.01K | 116 |   88.0 | 4.0 |  25.3 | 150.0 | "31,41,51,61,71,81" |   0:00:30 |   0:00:24 |
-| Q25L60X80P002 |   80.0 |  98.54% |     75182 | 1.59M | 42 |      6071 | 11.67K | 116 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:24 |
-| Q30L60X40P000 |   40.0 |  98.72% |     70818 | 1.59M | 44 |      2340 | 14.35K | 191 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:24 |   0:00:22 |
-| Q30L60X40P001 |   40.0 |  98.95% |     51994 |  1.6M | 56 |      1037 | 18.46K | 235 |   44.0 | 2.0 |  12.7 |  75.0 | "31,41,51,61,71,81" |   0:00:23 |   0:00:24 |
-| Q30L60X40P002 |   40.0 |  98.93% |     79927 |  1.6M | 45 |      2340 | 16.78K | 219 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:23 |   0:00:25 |
-| Q30L60X80P000 |   80.0 |  98.82% |     75185 | 1.59M | 40 |      2340 | 12.91K | 142 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:28 |   0:00:26 |
-| Q30L60X80P001 |   80.0 |  98.66% |     75180 | 1.59M | 41 |      2340 | 12.69K | 130 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:24 |
-| Q30L60X80P002 |   80.0 |  98.69% |     79977 | 1.59M | 40 |      6071 |  11.7K | 124 |   89.0 | 5.0 |  24.7 | 156.0 | "31,41,51,61,71,81" |   0:00:26 |   0:00:24 |
-
-
-Table: statMRUnitigsTadpole.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  97.90% |     80640 | 1.59M | 40 |      2340 | 12.86K |  87 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:22 |
-| MRX40P001 |   40.0 |  97.97% |    104091 | 1.59M | 39 |      2340 | 13.03K |  85 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:22 |
-| MRX40P002 |   40.0 |  97.84% |     90197 | 1.59M | 41 |      2340 | 12.87K |  85 |   44.0 | 3.0 |  11.7 |  79.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:22 |
-| MRX80P000 |   80.0 |  97.76% |     79879 | 1.59M | 44 |      2340 | 12.81K |  90 |   89.0 | 7.0 |  22.7 | 165.0 | "31,41,51,61,71,81" |   0:00:31 |   0:00:22 |
-| MRX80P001 |   80.0 |  97.80% |     79887 | 1.59M | 45 |      2340 | 12.86K |  92 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:31 |   0:00:23 |
-| MRX80P002 |   80.0 |  97.97% |     79884 | 1.59M | 46 |      2340 | 13.73K | 102 |   89.0 | 6.0 |  23.7 | 160.5 | "31,41,51,61,71,81" |   0:00:33 |   0:00:23 |
-
-
-Table: statMergeAnchors.md
-
-| Name                          | Mapped% | N50Anchor |   Sum |  # | N50Others |     Sum |  # | median |  MAD | lower | upper | RunTimeAN |
-|:------------------------------|--------:|----------:|------:|---:|----------:|--------:|---:|-------:|-----:|------:|------:|----------:|
-| 7_merge_anchors               |  97.94% |    112408 | 1.59M | 23 |    177862 | 271.07K | 41 |  301.0 | 17.0 |  83.3 | 528.0 |   0:00:34 |
-| 7_merge_mr_unitigs_bcalm      |  98.91% |    104621 | 1.59M | 25 |      6071 |  20.27K |  7 |  301.0 | 16.0 |  84.3 | 523.5 |   0:00:48 |
-| 7_merge_mr_unitigs_superreads |  98.85% |     90146 | 1.59M | 33 |      6071 |   8.41K |  2 |  303.0 | 15.0 |  86.0 | 522.0 |   0:00:45 |
-| 7_merge_mr_unitigs_tadpole    |  98.85% |    104100 | 1.59M | 28 |      6071 |   8.96K |  3 |  300.0 | 15.0 |  85.0 | 517.5 |   0:00:46 |
-| 7_merge_unitigs_bcalm         |  98.91% |    104137 |  1.6M | 28 |    177862 | 227.26K | 26 |  302.0 | 18.0 |  82.7 | 534.0 |   0:00:47 |
-| 7_merge_unitigs_superreads    |  99.08% |    104147 | 1.59M | 28 |      2340 |  12.47K |  5 |  303.0 | 16.0 |  85.0 | 526.5 |   0:00:54 |
-| 7_merge_unitigs_tadpole       |  99.05% |    104147 |  1.6M | 29 |      6079 |   47.4K | 20 |  301.0 | 17.0 |  83.3 | 528.0 |   0:00:52 |
-
-
-Table: statOtherAnchors.md
-
-| Name         | Mapped% | N50Anchor |   Sum |  # | N50Others |   Sum |  # | median |  MAD | lower | upper | RunTimeAN |
-|:-------------|--------:|----------:|------:|---:|----------:|------:|---:|-------:|-----:|------:|------:|----------:|
-| 8_spades     |  99.35% |    104593 | 1.23M | 19 |      2420 | 15.9K | 35 |  303.0 | 19.0 |  82.0 | 540.0 |   0:00:29 |
-| 8_mr_spades  |  99.42% |    153954 | 1.61M | 16 |      2340 |   13K | 34 |  501.0 | 45.5 | 121.5 | 956.2 |   0:00:31 |
-| 8_megahit    |  98.68% |    112616 |  1.6M | 24 |      6015 | 10.8K | 48 |  303.0 | 17.5 |  83.5 | 533.2 |   0:00:29 |
-| 8_mr_megahit |  99.30% |    153889 | 1.61M | 22 |      2340 | 12.8K | 44 |  501.0 | 35.0 | 132.0 | 909.0 |   0:00:30 |
-| 8_platanus   |  98.87% |    104629 | 1.11M | 18 |      5981 | 9.77K | 37 |  303.0 | 17.0 |  84.0 | 531.0 |   0:00:27 |
-
-
-Table: statFinal
-
-| Name                     |     N50 |     Sum |   # |
-|:-------------------------|--------:|--------:|----:|
-| Genome                   | 1641481 | 1641481 |   1 |
-| Paralogs                 |    6079 |   33258 |  13 |
-| 7_merge_anchors.anchors  |  112408 | 1594034 |  23 |
-| 7_merge_anchors.others   |  177862 |  271070 |  41 |
-| glue_anchors             |  112408 | 1594034 |  23 |
-| fill_anchors             |  128683 | 1603036 |  19 |
-| spades.contig            |  153957 | 1622964 |  34 |
-| spades.scaffold          |  189387 | 1623102 |  32 |
-| spades.non-contained     |  153957 | 1616696 |  17 |
-| mr_spades.contig         |  189482 | 1624572 |  25 |
-| mr_spades.scaffold       |  189482 | 1624572 |  25 |
-| mr_spades.non-contained  |  189482 | 1621940 |  18 |
-| megahit.contig           |  112661 | 1622829 |  60 |
-| megahit.non-contained    |  112661 | 1607338 |  24 |
-| mr_megahit.contig        |  174584 | 1631643 |  41 |
-| mr_megahit.non-contained |  174584 | 1621872 |  22 |
-| platanus.contig          |  112554 | 1628911 | 108 |
-| platanus.scaffold        |  153895 | 1622467 |  63 |
-| platanus.non-contained   |  153895 | 1612680 |  21 |
 
 
 # Legionella pneumophila subsp. pneumophila ATCC 33152D-5
@@ -1841,766 +1943,4 @@ Table: statFinal
 | platanus.contig          |  198751 | 3392430 | 197 |
 | platanus.scaffold        |  363088 | 3385815 | 148 |
 | platanus.non-contained   |  363088 | 3364323 |  24 |
-
-
-# Corynebacterium diphtheriae FDAARGOS_197
-
-## Cdip: reference
-
-* Reference genome
-
-```shell script
-mkdir -p ~/data/anchr/Cdip/1_genome
-cd ~/data/anchr/Cdip/1_genome
-
-cp ~/data/anchr/ref/Cdip/genome.fa .
-cp ~/data/anchr/ref/Cdip/paralogs.fa .
-
-```
-
-## Cdip: download
-
-```shell script
-cd ~/data/anchr/Cdip
-
-mkdir -p ena
-cd ena
-
-cat << EOF > source.csv
-SRX2179108,Cdip,HiSeq 2500 PE100
-EOF
-
-anchr ena info | perl - -v source.csv > ena_info.yml
-anchr ena prep | perl - ena_info.yml
-
-mlr --icsv --omd cat ena_info.csv
-
-aria2c -x 9 -s 3 -c -i ena_info.ftp.txt
-
-md5sum --check ena_info.md5.txt
-
-```
-
-| name | srx        | platform | layout | ilength | srr        | spot    | base  |
-|:-----|:-----------|:---------|:-------|:--------|:-----------|:--------|:------|
-| Cdip | SRX2179108 | ILLUMINA | PAIRED | 593     | SRR4271515 | 5564406 | 1.05G |
-
-
-* Illumina
-
-```shell script
-cd ~/data/anchr/Cdip
-
-mkdir -p 2_illumina
-cd 2_illumina
-
-ln -s ../ena/SRR4271515_1.fastq.gz R1.fq.gz
-ln -s ../ena/SRR4271515_2.fastq.gz R2.fq.gz
-
-```
-
-## Cdip: template
-
-* template
-
-```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Cdip
-
-cd ${WORKING_DIR}/${BASE_NAME}
-
-rm *.sh
-anchr template \
-    --genome 2488635 \
-    --parallel 24 \
-    --xmx 80g \
-    --queue mpi \
-    \
-    --fastqc \
-    --insertsize \
-    --kat \
-    \
-    --trim "--dedupe --cutoff 50 --cutk 31" \
-    --sample 300 \
-    --qual "25 30" \
-    --len "60" \
-    --filter "adapter artifact" \
-    \
-    --quorum \
-    --merge \
-    --ecphase "1 2 3" \
-    \
-    --cov "40 80" \
-    --unitigger "superreads bcalm tadpole" \
-    --statp 2 \
-    --redo \
-    \
-    --extend
-
-```
-
-## Cdip: run
-
-```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Cdip
-
-cd ${WORKING_DIR}/${BASE_NAME}
-# rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
-
-# BASE_NAME=Cdip bash 0_bsub.sh
-bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
-#bkill -J "${BASE_NAME}-*"
-
-#bash 0_master.sh
-#bash 0_cleanup.sh
-#rm -fr 4_down_sampling 6_down_sampling
-
-```
-
-Table: statInsertSize
-
-| Group             |  Mean | Median |  STDev | PercentOfPairs/PairOrientation |
-|:------------------|------:|-------:|-------:|-------------------------------:|
-| R.genome.bbtools  | 515.8 |    371 | 2333.5 |                         98.59% |
-| R.tadpole.bbtools | 372.0 |    366 |  105.1 |                         86.75% |
-| R.genome.picard   | 377.4 |    371 |  105.0 |                             FR |
-| R.tadpole.picard  | 372.0 |    366 |  104.5 |                             FR |
-
-
-Table: statKAT
-
-| k    | mean_freq | est_genome_size | est_het_rate | mean_gc |
-|:-----|:----------|:----------------|:-------------|:--------|
-| R.21 | 334       | 2415175         | 0.0000       | 54.27   |
-| R.31 | 282       | 2415575         | 0.0000       | 54.29   |
-| R.41 | 236       | 2415448         | 0.0000       | 54.28   |
-| R.51 | 193       | 2412947         | 0.0000       | 54.25   |
-| R.61 | 153       | 2419302         | 0.0000       | 54.21   |
-| R.71 | 114       | 2423650         | 0.0000       | 54.16   |
-| R.81 | 77        | 2450423         | 0.0000       | 54.11   |
-
-
-Table: statReads
-
-| Name       |     N50 |     Sum |        # |
-|:-----------|--------:|--------:|---------:|
-| Genome     | 2488635 | 2488635 |        1 |
-| Paralogs   |    5627 |   56034 |       18 |
-| Illumina.R |     101 |   1.12G | 11128812 |
-| trim.R     |     100 | 655.71M |  6698392 |
-| Q25L60     |     100 | 576.57M |  5976543 |
-| Q30L60     |     100 |  445.6M |  4824992 |
-
-
-Table: statTrimReads
-
-| Name     | N50 |     Sum |        # |
-|:---------|----:|--------:|---------:|
-| clumpify | 101 |   1.12G | 11094542 |
-| highpass | 101 |    1.1G | 10890114 |
-| sample   | 101 | 746.59M |  7391984 |
-| trim     | 100 | 655.71M |  6698392 |
-| filter   | 100 | 655.71M |  6698392 |
-| R1       | 100 | 328.89M |  3349196 |
-| R2       | 100 | 326.83M |  3349196 |
-| Rs       |   0 |       0 |        0 |
-
-
-```text
-#R.trim
-#Matched	5876	0.07949%
-#Name	Reads	ReadsPct
-```
-
-```text
-#R.filter
-#Matched	0	0.00000%
-#Name	Reads	ReadsPct
-```
-
-```text
-#R.peaks
-#k	31
-#unique_kmers	18215656
-#error_kmers	15768780
-#genomic_kmers	2446876
-#main_peak	179
-#genome_size_in_peaks	2481266
-#genome_size	2488922
-#haploid_genome_size	2488922
-#fold_coverage	179
-#haploid_fold_coverage	179
-#ploidy	1
-#percent_repeat_in_peaks	1.393
-#percent_repeat	1.495
-#start	center	stop	max	volume
-```
-
-
-Table: statMergeReads
-
-| Name          | N50 |     Sum |       # |
-|:--------------|----:|--------:|--------:|
-| clumped       | 100 |  655.7M | 6698278 |
-| ecco          | 100 |  655.7M | 6698278 |
-| eccc          | 100 |  655.7M | 6698278 |
-| ecct          | 100 | 653.05M | 6670458 |
-| extended      | 140 | 918.54M | 6670458 |
-| merged.raw    | 365 | 648.14M | 1886058 |
-| unmerged.raw  | 140 | 395.33M | 2898342 |
-| unmerged.trim | 140 | 395.31M | 2898216 |
-| M1            | 365 | 647.11M | 1883107 |
-| U1            | 140 | 198.62M | 1449108 |
-| U2            | 140 |  196.7M | 1449108 |
-| Us            |   0 |       0 |       0 |
-| M.cor         | 310 |   1.04G | 6664430 |
-
-| Group              |  Mean | Median | STDev | PercentOfPairs |
-|:-------------------|------:|-------:|------:|---------------:|
-| M.ihist.merge1.txt | 154.4 |    158 |  23.3 |          2.80% |
-| M.ihist.merge.txt  | 343.6 |    355 |  60.4 |         56.55% |
-
-
-Table: statQuorum
-
-| Name     | CovIn | CovOut | Discard% | Kmer | RealG |  EstG | Est/Real |   RunTime |
-|:---------|------:|-------:|---------:|-----:|------:|------:|---------:|----------:|
-| Q0L0.R   | 263.5 |  234.7 |   10.91% | "51" | 2.49M |  2.7M |     1.08 | 0:01'21'' |
-| Q25L60.R | 231.9 |  213.6 |    7.87% | "51" | 2.49M | 2.47M |     0.99 | 0:01'15'' |
-| Q30L60.R | 179.4 |  169.1 |    5.69% | "47" | 2.49M | 2.45M |     0.98 | 0:01'02'' |
-
-
-Table: statUnitigsSuperreads.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |    # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|----:|----------:|-------:|-----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  98.27% |     20179 | 2.47M | 204 |        35 | 35.26K | 1005 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:20 |   0:00:27 |
-| Q0L0X40P001   |   40.0 |  98.24% |     20944 | 2.47M | 201 |        39 | 38.93K |  965 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:20 |   0:00:27 |
-| Q0L0X40P002   |   40.0 |  98.30% |     15996 | 2.47M | 220 |        37 | 38.26K | 1003 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:20 |   0:00:28 |
-| Q0L0X80P000   |   80.0 |  96.98% |     14620 | 2.43M | 254 |        38 | 26.37K |  621 |   78.0 | 5.0 |  21.0 | 139.5 | "31,41,51,61,71,81" |   0:00:30 |   0:00:27 |
-| Q0L0X80P001   |   80.0 |  97.15% |     14910 | 2.43M | 241 |        34 | 20.79K |  561 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:00:30 |   0:00:26 |
-| Q25L60X40P000 |   40.0 |  99.07% |     30829 |  2.3M | 121 |       550 | 32.94K |  582 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:20 |   0:00:29 |
-| Q25L60X40P001 |   40.0 |  99.08% |     41403 | 2.45M | 105 |        48 | 24.64K |  554 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:20 |   0:00:31 |
-| Q25L60X40P002 |   40.0 |  99.22% |     36770 | 2.44M | 130 |       424 | 35.46K |  628 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:20 |   0:00:28 |
-| Q25L60X80P000 |   80.0 |  98.51% |     32295 | 2.44M | 110 |        39 | 14.82K |  384 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:00:31 |   0:00:30 |
-| Q25L60X80P001 |   80.0 |  98.82% |     43629 | 2.44M | 109 |        44 | 16.14K |  387 |   78.0 | 6.0 |  20.0 | 144.0 | "31,41,51,61,71,81" |   0:00:31 |   0:00:30 |
-| Q30L60X40P000 |   40.0 |  99.34% |     24639 | 2.37M | 163 |       562 | 48.74K |  649 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:20 |   0:00:31 |
-| Q30L60X40P001 |   40.0 |  99.32% |     21588 |  2.1M | 163 |       812 | 48.69K |  556 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:20 |   0:00:30 |
-| Q30L60X40P002 |   40.0 |  99.34% |     32243 | 2.39M | 134 |       468 | 37.34K |  620 |   40.0 | 5.0 |   8.3 |  80.0 | "31,41,51,61,71,81" |   0:00:20 |   0:00:33 |
-| Q30L60X80P000 |   80.0 |  99.33% |     47360 | 2.44M |  90 |       766 | 29.04K |  481 |   78.0 | 9.0 |  17.0 | 156.0 | "31,41,51,61,71,81" |   0:00:31 |   0:00:33 |
-| Q30L60X80P001 |   80.0 |  99.35% |     45782 | 2.43M | 103 |       222 | 25.91K |  473 |   79.0 | 8.0 |  18.3 | 154.5 | "31,41,51,61,71,81" |   0:00:30 |   0:00:34 |
-
-
-Table: statMRUnitigsSuperreads.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  98.71% |     56645 | 2.43M |  69 |        98 | 15.47K | 171 |   40.0 | 3.0 |  10.3 |  73.5 | "31,41,51,61,71,81" |   0:00:28 |   0:00:28 |
-| MRX40P001 |   40.0 |  98.60% |     43319 | 2.27M |  80 |       113 | 17.75K | 180 |   40.0 | 2.0 |  11.3 |  69.0 | "31,41,51,61,71,81" |   0:00:28 |   0:00:26 |
-| MRX40P002 |   40.0 |  98.65% |     59208 | 2.43M |  71 |        92 | 16.86K | 183 |   40.0 | 3.0 |  10.3 |  73.5 | "31,41,51,61,71,81" |   0:00:27 |   0:00:27 |
-| MRX80P000 |   80.0 |  98.30% |     43305 | 2.43M |  91 |        88 | 18.39K | 211 |   79.0 | 4.0 |  22.3 | 136.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:28 |
-| MRX80P001 |   80.0 |  98.40% |     46395 | 2.43M |  99 |        81 | 17.44K | 234 |   79.0 | 5.0 |  21.3 | 141.0 | "31,41,51,61,71,81" |   0:00:45 |   0:00:28 |
-| MRX80P002 |   80.0 |  98.25% |     34391 | 2.43M | 108 |        82 | 19.21K | 248 |   79.0 | 5.0 |  21.3 | 141.0 | "31,41,51,61,71,81" |   0:00:45 |   0:00:27 |
-
-
-Table: statUnitigsBcalm.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  98.80% |     47689 | 2.43M |  93 |        70 | 29.89K | 622 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:52 |   0:00:30 |
-| Q0L0X40P001   |   40.0 |  98.70% |     46129 | 2.44M | 100 |       140 | 30.44K | 622 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:52 |   0:00:30 |
-| Q0L0X40P002   |   40.0 |  98.85% |     46294 | 2.39M |  98 |       557 |  32.5K | 635 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:52 |   0:00:31 |
-| Q0L0X80P000   |   80.0 |  98.76% |     61765 | 2.44M |  67 |        59 | 23.32K | 426 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:00:58 |   0:00:33 |
-| Q0L0X80P001   |   80.0 |  98.81% |     61688 | 2.44M |  71 |        54 | 24.35K | 464 |   79.0 | 5.0 |  21.3 | 141.0 | "31,41,51,61,71,81" |   0:00:59 |   0:00:33 |
-| Q25L60X40P000 |   40.0 |  99.05% |     36141 | 2.44M | 124 |        59 | 30.17K | 652 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:52 |   0:00:30 |
-| Q25L60X40P001 |   40.0 |  99.02% |     41395 | 2.44M | 109 |        52 | 29.35K | 649 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:53 |   0:00:29 |
-| Q25L60X40P002 |   40.0 |  99.02% |     42798 | 2.43M | 112 |        48 | 29.14K | 638 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:52 |   0:00:30 |
-| Q25L60X80P000 |   80.0 |  99.29% |     61656 | 2.44M |  75 |        50 | 24.25K | 522 |   80.0 | 7.0 |  19.7 | 151.5 | "31,41,51,61,71,81" |   0:00:58 |   0:00:35 |
-| Q25L60X80P001 |   80.0 |  99.20% |     57375 | 2.44M |  71 |        59 | 25.21K | 489 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:00:59 |   0:00:33 |
-| Q30L60X40P000 |   40.0 |  98.72% |     19144 | 2.42M | 231 |       448 | 41.41K | 837 |   40.0 | 5.0 |   8.3 |  80.0 | "31,41,51,61,71,81" |   0:00:53 |   0:00:29 |
-| Q30L60X40P001 |   40.0 |  98.54% |     19253 | 2.41M | 236 |       907 | 43.12K | 808 |   40.0 | 6.0 |   7.3 |  80.0 | "31,41,51,61,71,81" |   0:00:53 |   0:00:27 |
-| Q30L60X40P002 |   40.0 |  98.56% |     19472 | 2.41M | 238 |       894 | 46.54K | 835 |   40.0 | 6.0 |   7.3 |  80.0 | "31,41,51,61,71,81" |   0:00:53 |   0:00:27 |
-| Q30L60X80P000 |   80.0 |  99.31% |     44425 | 2.43M |  98 |      1011 | 40.14K | 645 |   80.0 | 9.0 |  17.7 | 160.0 | "31,41,51,61,71,81" |   0:00:59 |   0:00:35 |
-| Q30L60X80P001 |   80.0 |  99.30% |     44453 | 2.44M | 115 |       277 | 34.74K | 663 |   79.0 | 9.0 |  17.3 | 158.0 | "31,41,51,61,71,81" |   0:00:59 |   0:00:34 |
-
-
-Table: statMRUnitigsBcalm.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  98.80% |     49152 | 2.15M | 76 |       131 | 12.89K | 126 |   39.0 | 2.0 |  11.0 |  67.5 | "31,41,51,61,71,81" |   0:00:55 |   0:00:27 |
-| MRX40P001 |   40.0 |  98.68% |     84538 | 2.44M | 56 |       157 | 12.81K | 125 |   40.0 | 3.0 |  10.3 |  73.5 | "31,41,51,61,71,81" |   0:00:55 |   0:00:27 |
-| MRX40P002 |   40.0 |  98.87% |     66747 | 2.32M | 66 |       629 | 21.44K | 165 |   39.0 | 2.0 |  11.0 |  67.5 | "31,41,51,61,71,81" |   0:00:54 |   0:00:28 |
-| MRX80P000 |   80.0 |  98.44% |     82981 | 2.43M | 51 |       172 |  11.3K | 101 |   79.0 | 4.0 |  22.3 | 136.5 | "31,41,51,61,71,81" |   0:01:02 |   0:00:27 |
-| MRX80P001 |   80.0 |  98.39% |     89474 | 2.43M | 51 |       112 | 10.75K | 102 |   79.0 | 4.0 |  22.3 | 136.5 | "31,41,51,61,71,81" |   0:01:03 |   0:00:26 |
-| MRX80P002 |   80.0 |  98.40% |     97848 | 2.44M | 53 |       109 | 10.39K | 106 |   79.0 | 5.0 |  21.3 | 141.0 | "31,41,51,61,71,81" |   0:01:03 |   0:00:26 |
-
-
-Table: statUnitigsTadpole.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  98.87% |     54429 | 2.44M |  85 |       268 |  25.8K | 471 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:30 |
-| Q0L0X40P001   |   40.0 |  98.83% |     61686 | 2.44M |  83 |        84 |  24.7K | 490 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:28 |   0:00:29 |
-| Q0L0X40P002   |   40.0 |  98.91% |     53436 | 2.39M |  83 |       169 | 26.24K | 489 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:30 |
-| Q0L0X80P000   |   80.0 |  98.74% |     64068 | 2.44M |  59 |       108 | 20.67K | 359 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:00:30 |   0:00:30 |
-| Q0L0X80P001   |   80.0 |  98.77% |     63739 | 2.44M |  60 |        57 | 19.25K | 356 |   79.0 | 5.0 |  21.3 | 141.0 | "31,41,51,61,71,81" |   0:00:31 |   0:00:31 |
-| Q25L60X40P000 |   40.0 |  99.30% |     55131 | 2.44M |  88 |        64 | 25.19K | 500 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:33 |
-| Q25L60X40P001 |   40.0 |  99.26% |     60445 | 2.44M |  80 |       181 |    25K | 499 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:26 |   0:00:33 |
-| Q25L60X40P002 |   40.0 |  99.27% |     44453 | 2.29M | 114 |       501 | 36.23K | 550 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:26 |   0:00:31 |
-| Q25L60X80P000 |   80.0 |  99.23% |     55158 | 2.44M |  75 |        59 | 18.14K | 353 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:00:32 |   0:00:32 |
-| Q25L60X80P001 |   80.0 |  99.15% |     61654 | 2.44M |  71 |        58 |  17.4K | 330 |   80.0 | 6.0 |  20.7 | 147.0 | "31,41,51,61,71,81" |   0:00:30 |   0:00:31 |
-| Q30L60X40P000 |   40.0 |  99.25% |     39321 | 2.43M | 125 |       637 | 41.46K | 622 |   40.0 | 5.0 |   8.3 |  80.0 | "31,41,51,61,71,81" |   0:00:27 |   0:00:31 |
-| Q30L60X40P001 |   40.0 |  99.25% |     28199 | 2.42M | 149 |       948 | 55.01K | 670 |   40.0 | 5.0 |   8.3 |  80.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:30 |
-| Q30L60X40P002 |   40.0 |  99.23% |     32032 | 2.32M | 136 |       608 | 43.14K | 650 |   39.0 | 5.0 |   8.0 |  78.0 | "31,41,51,61,71,81" |   0:00:25 |   0:00:29 |
-| Q30L60X80P000 |   80.0 |  99.37% |     39335 |  2.3M | 103 |       641 | 35.52K | 526 |   79.0 | 8.0 |  18.3 | 154.5 | "31,41,51,61,71,81" |   0:00:29 |   0:00:35 |
-| Q30L60X80P001 |   80.0 |  99.32% |     48897 | 2.44M | 101 |        82 | 23.69K | 489 |   78.0 | 9.0 |  17.0 | 156.0 | "31,41,51,61,71,81" |   0:00:30 |   0:00:33 |
-
-
-Table: statMRUnitigsTadpole.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  98.60% |     63723 | 2.43M | 57 |       102 | 10.95K | 111 |   40.0 | 3.0 |  10.3 |  73.5 | "31,41,51,61,71,81" |   0:00:32 |   0:00:27 |
-| MRX40P001 |   40.0 |  98.45% |     44670 |  1.9M | 75 |       538 | 12.87K |  98 |   39.0 | 2.0 |  11.0 |  67.5 | "31,41,51,61,71,81" |   0:00:32 |   0:00:24 |
-| MRX40P002 |   40.0 |  98.38% |     89456 | 2.43M | 51 |       841 | 11.46K | 101 |   40.0 | 3.0 |  10.3 |  73.5 | "31,41,51,61,71,81" |   0:00:31 |   0:00:26 |
-| MRX80P000 |   80.0 |  98.43% |     97844 | 2.44M | 53 |       116 | 11.18K | 110 |   79.0 | 5.0 |  21.3 | 141.0 | "31,41,51,61,71,81" |   0:00:37 |   0:00:26 |
-| MRX80P001 |   80.0 |  98.33% |     63984 | 2.43M | 59 |       104 | 11.53K | 120 |   79.0 | 5.0 |  21.3 | 141.0 | "31,41,51,61,71,81" |   0:00:35 |   0:00:26 |
-| MRX80P002 |   80.0 |  98.38% |     63958 | 2.43M | 61 |       155 | 12.56K | 123 |   79.0 | 4.5 |  21.8 | 138.8 | "31,41,51,61,71,81" |   0:00:38 |   0:00:26 |
-
-
-Table: statMergeAnchors.md
-
-| Name                          | Mapped% | N50Anchor |   Sum |  # | N50Others |     Sum |  # | median |  MAD | lower | upper | RunTimeAN |
-|:------------------------------|--------:|----------:|------:|---:|----------:|--------:|---:|-------:|-----:|------:|------:|----------:|
-| 7_merge_anchors               |  97.67% |    115865 | 2.44M | 46 |      1657 | 154.75K | 81 |  234.0 | 15.0 |  63.0 | 418.5 |   0:00:35 |
-| 7_merge_mr_unitigs_bcalm      |  99.03% |    107931 | 2.44M | 47 |      1146 |  13.96K | 11 |  232.0 | 13.0 |  64.3 | 406.5 |   0:01:02 |
-| 7_merge_mr_unitigs_superreads |  98.85% |    107929 | 2.44M | 48 |      1297 |  12.59K | 10 |  232.0 | 11.0 |  66.3 | 397.5 |   0:00:54 |
-| 7_merge_mr_unitigs_tadpole    |  98.92% |    107920 | 2.44M | 47 |      1146 |  13.33K | 11 |  234.0 | 13.0 |  65.0 | 409.5 |   0:00:57 |
-| 7_merge_unitigs_bcalm         |  98.82% |    101294 | 2.44M | 62 |      1036 |  63.85K | 57 |  229.0 | 14.0 |  62.3 | 406.5 |   0:00:53 |
-| 7_merge_unitigs_superreads    |  99.03% |    115893 | 2.44M | 47 |      1043 |  37.98K | 34 |  230.0 | 14.0 |  62.7 | 408.0 |   0:01:00 |
-| 7_merge_unitigs_tadpole       |  98.94% |    107951 | 2.44M | 49 |     19544 | 108.64K | 39 |  232.0 | 13.0 |  64.3 | 406.5 |   0:00:56 |
-
-
-Table: statOtherAnchors.md
-
-| Name         | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |  # | median |  MAD | lower | upper | RunTimeAN |
-|:-------------|--------:|----------:|------:|---:|----------:|-------:|---:|-------:|-----:|------:|------:|----------:|
-| 8_spades     |  98.88% |    125044 | 2.09M | 28 |      1433 |  12.8K | 48 |  232.0 | 13.0 |  64.3 | 406.5 |   0:00:31 |
-| 8_mr_spades  |  99.43% |    156581 | 2.44M | 26 |      1433 | 11.33K | 47 |  418.0 | 21.0 | 118.3 | 721.5 |   0:00:35 |
-| 8_megahit    |  98.77% |    100986 | 2.44M | 49 |      1433 | 12.95K | 94 |  232.0 | 15.0 |  62.3 | 415.5 |   0:00:31 |
-| 8_mr_megahit |  99.63% |    168237 | 2.45M | 25 |      1433 | 13.49K | 46 |  419.0 | 22.0 | 117.7 | 727.5 |   0:00:36 |
-| 8_platanus   |  98.26% |    130937 | 2.44M | 31 |      2331 |  8.37K | 54 |  232.0 | 12.0 |  65.3 | 402.0 |   0:00:31 |
-
-
-Table: statFinal
-
-| Name                     |     N50 |     Sum |   # |
-|:-------------------------|--------:|--------:|----:|
-| Genome                   | 2488635 | 2488635 |   1 |
-| Paralogs                 |    5627 |   56034 |  18 |
-| 7_merge_anchors.anchors  |  115865 | 2436051 |  46 |
-| 7_merge_anchors.others   |    1657 |  154752 |  81 |
-| glue_anchors             |  115865 | 2435141 |  45 |
-| fill_anchors             |  165179 | 2448055 |  24 |
-| spades.contig            |  310298 | 2456578 |  30 |
-| spades.scaffold          |  310298 | 2456778 |  28 |
-| spades.non-contained     |  310298 | 2453467 |  21 |
-| mr_spades.contig         |  179112 | 2457197 |  25 |
-| mr_spades.scaffold       |  179112 | 2457297 |  24 |
-| mr_spades.non-contained  |  179112 | 2455058 |  21 |
-| megahit.contig           |  115950 | 2456085 |  56 |
-| megahit.non-contained    |  115950 | 2451555 |  45 |
-| mr_megahit.contig        |  309887 | 2467956 |  40 |
-| mr_megahit.non-contained |  309887 | 2460204 |  21 |
-| platanus.contig          |   97966 | 2470281 | 178 |
-| platanus.scaffold        |  177073 | 2464981 | 125 |
-| platanus.non-contained   |  177073 | 2446423 |  23 |
-
-# Clostridioides difficile 630
-
-## Cdif: reference
-
-* Reference genome
-
-```shell script
-mkdir -p ~/data/anchr/Cdif/1_genome
-cd ~/data/anchr/Cdif/1_genome
-
-cp ~/data/anchr/ref/Cdif/genome.fa .
-cp ~/data/anchr/ref/Cdif/paralogs.fa .
-
-```
-
-## Cdif: download
-
-```shell script
-cd ~/data/anchr/Cdif
-
-mkdir -p ena
-cd ena
-
-cat << EOF > source.csv
-SRX2107163,Cdif,HiSeq 2500 PE100
-EOF
-
-anchr ena info | perl - -v source.csv > ena_info.yml
-anchr ena prep | perl - ena_info.yml
-
-mlr --icsv --omd cat ena_info.csv
-
-aria2c -x 9 -s 3 -c -i ena_info.ftp.txt
-
-md5sum --check ena_info.md5.txt
-
-```
-
-| name | srx        | platform | layout | ilength | srr        | spot    | base  |
-|:-----|:-----------|:---------|:-------|:--------|:-----------|:--------|:------|
-| Cdif | SRX2107163 | ILLUMINA | PAIRED | 523     | SRR4125185 | 6595393 | 1.24G |
-
-
-* Illumina
-
-```shell script
-cd ~/data/anchr/Cdif
-
-mkdir -p 2_illumina
-cd 2_illumina
-
-ln -s ../ena/SRR4125185_1.fastq.gz R1.fq.gz
-ln -s ../ena/SRR4125185_2.fastq.gz R2.fq.gz
-
-```
-
-## Cdif: template
-
-* template
-
-```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Cdif
-
-cd ${WORKING_DIR}/${BASE_NAME}
-
-rm *.sh
-anchr template \
-    --genome 4298133 \
-    --parallel 24 \
-    --xmx 80g \
-    --queue mpi \
-    \
-    --fastqc \
-    --insertsize \
-    --kat \
-    \
-    --trim "--dedupe --cutoff 50 --cutk 31" \
-    --sample 300 \
-    --qual "25 30" \
-    --len "60" \
-    --filter "adapter artifact" \
-    \
-    --quorum \
-    --merge \
-    --ecphase "1 2 3" \
-    \
-    --cov "40 80" \
-    --unitigger "superreads bcalm tadpole" \
-    --statp 2 \
-    --redo \
-    \
-    --extend
-
-```
-
-## Cdif: run
-
-```shell script
-WORKING_DIR=${HOME}/data/anchr
-BASE_NAME=Cdif
-
-cd ${WORKING_DIR}/${BASE_NAME}
-# rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
-
-# BASE_NAME=Cdif bash 0_bsub.sh
-bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
-#bkill -J "${BASE_NAME}-*"
-
-#bash 0_master.sh
-#bash 0_cleanup.sh
-#rm -fr 4_down_sampling 6_down_sampling
-
-```
-
-Table: statInsertSize
-
-| Group             |  Mean | Median |  STDev | PercentOfPairs/PairOrientation |
-|:------------------|------:|-------:|-------:|-------------------------------:|
-| R.genome.bbtools  | 690.7 |    320 | 3750.8 |                         98.38% |
-| R.tadpole.bbtools | 328.7 |    317 |   98.9 |                         91.94% |
-| R.genome.picard   | 330.2 |    319 |   87.9 |                             FR |
-| R.tadpole.picard  | 328.6 |    317 |   88.0 |                             FR |
-
-
-Table: statKAT
-
-| k    | mean_freq | est_genome_size | est_het_rate | mean_gc |
-|:-----|:----------|:----------------|:-------------|:--------|
-| R.21 | 234       | 4124061         | 0.0000       | 34.16   |
-| R.31 | 203       | 4243015         | 0.0000       | 33.33   |
-| R.41 | 172       | 4257860         | 0.0000       | 32.84   |
-| R.51 | 146       | 4281513         | 0.0000       | 32.49   |
-| R.61 | 116       | 4264133         | 0.0000       | 32.22   |
-| R.71 | 87        | 4371307         | 0.0000       | 31.97   |
-| R.81 | 58        | 4372831         | 0.0000       | 31.69   |
-
-
-Table: statReads
-
-| Name       |     N50 |     Sum |        # |
-|:-----------|--------:|--------:|---------:|
-| Genome     | 4290252 | 4298133 |        2 |
-| Paralogs   |    3264 |  345957 |      124 |
-| Illumina.R |     101 |   1.33G | 13190786 |
-| trim.R     |     100 |   1.23G | 12341962 |
-| Q25L60     |     100 |   1.19G | 12030616 |
-| Q30L60     |     100 |   1.14G | 11545462 |
-
-
-Table: statTrimReads
-
-| Name     | N50 |     Sum |        # |
-|:---------|----:|--------:|---------:|
-| clumpify | 101 |   1.32G | 13028936 |
-| highpass | 101 |   1.31G | 12944864 |
-| sample   | 101 |   1.29G | 12766730 |
-| trim     | 100 |   1.23G | 12342540 |
-| filter   | 100 |   1.23G | 12341962 |
-| R1       | 100 | 615.78M |  6170981 |
-| R2       | 100 | 611.06M |  6170981 |
-| Rs       |   0 |       0 |        0 |
-
-
-```text
-#R.trim
-#Matched	6618	0.05184%
-#Name	Reads	ReadsPct
-```
-
-```text
-#R.filter
-#Matched	290	0.00235%
-#Name	Reads	ReadsPct
-```
-
-```text
-#R.peaks
-#k	31
-#unique_kmers	23190790
-#error_kmers	18999837
-#genomic_kmers	4190953
-#main_peak	193
-#genome_size_in_peaks	4316023
-#genome_size	4333610
-#haploid_genome_size	4333610
-#fold_coverage	193
-#haploid_fold_coverage	193
-#ploidy	1
-#percent_repeat_in_peaks	2.903
-#percent_repeat	3.024
-#start	center	stop	max	volume
-```
-
-
-Table: statMergeReads
-
-| Name          | N50 |     Sum |        # |
-|:--------------|----:|--------:|---------:|
-| clumped       | 100 |   1.23G | 12341378 |
-| ecco          | 100 |   1.23G | 12341378 |
-| eccc          | 100 |   1.23G | 12341378 |
-| ecct          | 100 |   1.22G | 12278686 |
-| extended      | 140 |   1.71G | 12278686 |
-| merged.raw    | 343 |   1.53G |  4605632 |
-| unmerged.raw  | 140 |  423.4M |  3067422 |
-| unmerged.trim | 140 | 423.39M |  3067376 |
-| M1            | 343 |   1.52G |  4583705 |
-| U1            | 140 | 213.69M |  1533688 |
-| U2            | 140 |  209.7M |  1533688 |
-| Us            |   0 |       0 |        0 |
-| M.cor         | 321 |   1.95G | 12234786 |
-
-| Group              |  Mean | Median | STDev | PercentOfPairs |
-|:-------------------|------:|-------:|------:|---------------:|
-| M.ihist.merge1.txt | 165.6 |    170 |  17.8 |          1.94% |
-| M.ihist.merge.txt  | 331.1 |    333 |  54.3 |         75.02% |
-
-
-Table: statQuorum
-
-| Name     | CovIn | CovOut | Discard% | Kmer | RealG |  EstG | Est/Real |   RunTime |
-|:---------|------:|-------:|---------:|-----:|------:|------:|---------:|----------:|
-| Q0L0.R   | 285.4 |  266.1 |    6.76% | "71" |  4.3M | 4.22M |     0.98 | 0:02'23'' |
-| Q25L60.R | 278.0 |  263.2 |    5.35% | "71" |  4.3M |  4.2M |     0.98 | 0:02'22'' |
-| Q30L60.R | 264.5 |  253.7 |    4.10% | "71" |  4.3M |  4.2M |     0.98 | 0:02'19'' |
-
-
-Table: statUnitigsSuperreads.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  98.30% |     64970 | 4.14M | 133 |      7659 | 48.17K | 655 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:40 |   0:00:41 |
-| Q0L0X40P001   |   40.0 |  98.24% |     85663 | 4.14M | 132 |      7193 | 49.24K | 639 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:36 |   0:00:40 |
-| Q0L0X40P002   |   40.0 |  98.36% |     61710 | 4.07M | 135 |      1367 | 53.66K | 659 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:36 |   0:00:38 |
-| Q0L0X80P000   |   80.0 |  97.74% |     76413 | 4.14M | 125 |      5174 | 37.88K | 344 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:56 |   0:00:35 |
-| Q0L0X80P001   |   80.0 |  97.97% |     60975 | 4.14M | 148 |      5182 | 37.81K | 394 |   77.0 | 7.0 |  18.7 | 147.0 | "31,41,51,61,71,81" |   0:00:56 |   0:00:38 |
-| Q0L0X80P002   |   80.0 |  97.84% |     65830 | 4.14M | 136 |      4487 | 38.81K | 356 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:56 |   0:00:35 |
-| Q25L60X40P000 |   40.0 |  98.38% |     64973 | 4.14M | 138 |      1675 | 54.15K | 678 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:37 |   0:00:39 |
-| Q25L60X40P001 |   40.0 |  98.35% |     85233 | 4.14M | 117 |      7659 | 45.29K | 619 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:37 |   0:00:40 |
-| Q25L60X40P002 |   40.0 |  98.52% |     64982 | 3.92M | 136 |      7659 | 48.41K | 643 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:37 |   0:00:41 |
-| Q25L60X80P000 |   80.0 |  97.86% |     66526 | 4.14M | 131 |      3698 | 37.93K | 348 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:57 |   0:00:36 |
-| Q25L60X80P001 |   80.0 |  97.98% |     69167 | 4.14M | 122 |      5174 | 37.89K | 341 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:56 |   0:00:39 |
-| Q25L60X80P002 |   80.0 |  97.96% |     62220 | 4.14M | 133 |      4302 | 39.37K | 365 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:57 |   0:00:39 |
-| Q30L60X40P000 |   40.0 |  98.56% |     66524 | 4.12M | 137 |      7659 | 49.68K | 663 |   39.0 | 3.5 |   9.5 |  74.2 | "31,41,51,61,71,81" |   0:00:36 |   0:00:44 |
-| Q30L60X40P001 |   40.0 |  98.54% |     80166 | 4.13M | 126 |      7659 | 48.12K | 642 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:36 |   0:00:42 |
-| Q30L60X40P002 |   40.0 |  98.69% |     80150 | 4.14M | 130 |      1367 | 51.94K | 672 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:36 |   0:00:45 |
-| Q30L60X80P000 |   80.0 |  98.43% |     85256 | 4.14M | 126 |      4302 | 39.62K | 386 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:56 |   0:00:43 |
-| Q30L60X80P001 |   80.0 |  98.40% |     80155 | 4.14M | 119 |      6341 | 38.93K | 355 |   77.0 | 7.0 |  18.7 | 147.0 | "31,41,51,61,71,81" |   0:00:56 |   0:00:43 |
-| Q30L60X80P002 |   80.0 |  98.28% |     75201 | 4.14M | 125 |      5099 | 38.28K | 378 |   78.0 | 7.5 |  18.5 | 150.8 | "31,41,51,61,71,81" |   0:00:57 |   0:00:40 |
-
-
-Table: statMRUnitigsSuperreads.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  97.45% |     88664 | 4.13M |  98 |      7659 | 44.94K | 263 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:51 |   0:00:35 |
-| MRX40P001 |   40.0 |  96.80% |     76384 | 4.13M | 109 |      1215 |  40.5K | 292 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:50 |   0:00:36 |
-| MRX40P002 |   40.0 |  97.55% |     82553 | 4.13M | 108 |      7659 | 51.65K | 289 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:50 |   0:00:35 |
-| MRX80P000 |   80.0 |  97.08% |     67607 | 4.13M | 121 |      2321 | 49.13K | 308 |   78.0 | 8.0 |  18.0 | 153.0 | "31,41,51,61,71,81" |   0:01:23 |   0:00:35 |
-| MRX80P001 |   80.0 |  97.23% |     82588 | 4.13M | 114 |      7555 | 49.55K | 297 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:01:24 |   0:00:36 |
-| MRX80P002 |   80.0 |  97.25% |     65780 | 4.13M | 128 |      1367 |  51.6K | 323 |   77.0 | 7.0 |  18.7 | 147.0 | "31,41,51,61,71,81" |   0:01:24 |   0:00:38 |
-
-
-Table: statUnitigsBcalm.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|----:|----------:|--------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  97.93% |     68890 | 4.13M | 166 |      7911 | 101.39K | 825 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:01:08 |   0:00:38 |
-| Q0L0X40P001   |   40.0 |  98.08% |     67528 | 4.09M | 163 |      7911 |  104.6K | 882 |   40.0 | 3.0 |  10.3 |  73.5 | "31,41,51,61,71,81" |   0:01:08 |   0:00:42 |
-| Q0L0X40P002   |   40.0 |  97.97% |     61592 | 3.92M | 171 |      7911 | 100.69K | 860 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:01:08 |   0:00:39 |
-| Q0L0X80P000   |   80.0 |  98.17% |     88743 | 4.14M | 114 |      7941 |  65.74K | 515 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:01:18 |   0:00:41 |
-| Q0L0X80P001   |   80.0 |  98.33% |     85662 | 4.14M | 109 |      7931 |  83.72K | 539 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:01:18 |   0:00:42 |
-| Q0L0X80P002   |   80.0 |  98.22% |     88675 | 4.14M | 113 |      7931 |  74.18K | 512 |   78.0 | 6.0 |  20.0 | 144.0 | "31,41,51,61,71,81" |   0:01:17 |   0:00:39 |
-| Q25L60X40P000 |   40.0 |  97.96% |     66499 | 4.05M | 168 |      7921 |  99.69K | 837 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:01:08 |   0:00:37 |
-| Q25L60X40P001 |   40.0 |  98.03% |     58735 | 4.13M | 186 |      7921 |  94.32K | 876 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:01:08 |   0:00:38 |
-| Q25L60X40P002 |   40.0 |  98.06% |     67865 | 4.13M | 165 |      7921 |  97.33K | 875 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:01:08 |   0:00:41 |
-| Q25L60X80P000 |   80.0 |  98.28% |     85656 | 4.14M | 113 |      7931 |  78.25K | 503 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:01:17 |   0:00:41 |
-| Q25L60X80P001 |   80.0 |  98.28% |     85211 | 4.14M | 116 |      7931 |  78.61K | 524 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:01:18 |   0:00:42 |
-| Q25L60X80P002 |   80.0 |  98.37% |     88649 | 4.14M | 111 |      7941 |  64.78K | 545 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:01:18 |   0:00:42 |
-| Q30L60X40P000 |   40.0 |  98.03% |     57737 | 4.07M | 187 |      7659 |  110.9K | 950 |   40.0 | 3.0 |  10.3 |  73.5 | "31,41,51,61,71,81" |   0:01:07 |   0:00:40 |
-| Q30L60X40P001 |   40.0 |  98.02% |     61601 | 4.11M | 169 |      7911 | 100.21K | 898 |   40.0 | 3.0 |  10.3 |  73.5 | "31,41,51,61,71,81" |   0:01:08 |   0:00:40 |
-| Q30L60X40P002 |   40.0 |  97.98% |     68880 | 4.11M | 175 |      7921 |  96.29K | 904 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:01:08 |   0:00:41 |
-| Q30L60X80P000 |   80.0 |  98.52% |     85198 | 4.14M | 119 |      7931 |  81.66K | 592 |   80.0 | 6.0 |  20.7 | 147.0 | "31,41,51,61,71,81" |   0:01:19 |   0:00:46 |
-| Q30L60X80P001 |   80.0 |  98.46% |     84550 | 4.14M | 115 |      7931 |  78.79K | 582 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:01:18 |   0:00:44 |
-| Q30L60X80P002 |   80.0 |  98.50% |     85664 | 4.12M | 120 |      7921 |  90.87K | 593 |   80.0 | 6.0 |  20.7 | 147.0 | "31,41,51,61,71,81" |   0:01:18 |   0:00:44 |
-
-
-Table: statMRUnitigsBcalm.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  96.85% |    105361 | 4.13M | 90 |      7931 | 83.09K | 206 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:01:13 |   0:00:31 |
-| MRX40P001 |   40.0 |  97.18% |    105454 | 4.13M | 93 |      7931 | 82.28K | 209 |   40.0 | 3.5 |   9.8 |  75.8 | "31,41,51,61,71,81" |   0:01:12 |   0:00:32 |
-| MRX40P002 |   40.0 |  97.23% |    105406 | 4.13M | 91 |      7911 | 82.97K | 214 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:01:13 |   0:00:34 |
-| MRX80P000 |   80.0 |  96.77% |    105445 | 4.13M | 91 |      7931 | 75.21K | 200 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:01:28 |   0:00:31 |
-| MRX80P001 |   80.0 |  96.75% |    108137 | 4.13M | 91 |      7931 | 82.08K | 200 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:01:28 |   0:00:32 |
-| MRX80P002 |   80.0 |  96.70% |    107234 | 4.13M | 92 |      7931 | 82.72K | 198 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:01:26 |   0:00:33 |
-
-
-Table: statUnitigsTadpole.md
-
-| Name          | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:--------------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| Q0L0X40P000   |   40.0 |  98.16% |     85235 | 4.14M | 131 |      7883 |  85.9K | 579 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:34 |   0:00:37 |
-| Q0L0X40P001   |   40.0 |  98.33% |     85246 | 4.14M | 138 |      7883 | 91.79K | 599 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:36 |   0:00:39 |
-| Q0L0X40P002   |   40.0 |  98.45% |     76366 | 4.01M | 137 |      7883 | 91.12K | 641 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:36 |   0:00:50 |
-| Q0L0X80P000   |   80.0 |  98.26% |    108197 | 4.14M |  97 |      7883 | 77.56K | 327 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:46 |   0:00:40 |
-| Q0L0X80P001   |   80.0 |  98.19% |    105477 | 4.14M | 101 |      7883 | 79.19K | 333 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:00:41 |   0:00:40 |
-| Q0L0X80P002   |   80.0 |  98.13% |     89755 | 4.14M | 100 |      7883 | 75.28K | 311 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:45 |   0:00:39 |
-| Q25L60X40P000 |   40.0 |  98.31% |     85222 | 4.03M | 127 |      7883 | 89.74K | 602 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:38 |   0:00:41 |
-| Q25L60X40P001 |   40.0 |  98.34% |     68873 | 4.14M | 139 |      7883 | 73.75K | 630 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:35 |   0:00:39 |
-| Q25L60X40P002 |   40.0 |  98.43% |     66541 | 3.85M | 138 |      7883 | 93.27K | 628 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:35 |   0:00:39 |
-| Q25L60X80P000 |   80.0 |  98.23% |    105482 | 4.14M |  94 |      7883 | 79.84K | 316 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:00:42 |   0:00:40 |
-| Q25L60X80P001 |   80.0 |  98.35% |    105468 | 4.14M |  99 |      7883 | 77.59K | 335 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:00:44 |   0:00:42 |
-| Q25L60X80P002 |   80.0 |  98.28% |    108207 | 4.14M |  96 |      7883 | 79.55K | 313 |   78.0 | 7.0 |  19.0 | 148.5 | "31,41,51,61,71,81" |   0:00:46 |   0:00:40 |
-| Q30L60X40P000 |   40.0 |  98.39% |     64968 | 4.02M | 146 |      7883 | 102.7K | 644 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:36 |   0:00:40 |
-| Q30L60X40P001 |   40.0 |  98.50% |     67550 |    4M | 138 |      7883 | 93.34K | 619 |   39.0 | 3.0 |  10.0 |  72.0 | "31,41,51,61,71,81" |   0:00:36 |   0:00:42 |
-| Q30L60X40P002 |   40.0 |  98.42% |     68889 | 4.14M | 138 |      7883 | 88.94K | 604 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:38 |   0:00:41 |
-| Q30L60X80P000 |   80.0 |  98.45% |    105468 | 4.12M | 102 |      7883 | 78.82K | 389 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:00:46 |   0:00:47 |
-| Q30L60X80P001 |   80.0 |  98.46% |     85674 | 4.11M |  97 |      7883 | 80.69K | 358 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:00:43 |   0:00:46 |
-| Q30L60X80P002 |   80.0 |  98.47% |    105476 | 4.12M | 102 |      7883 |  79.1K | 395 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:00:44 |   0:00:43 |
-
-
-Table: statMRUnitigsTadpole.md
-
-| Name      | CovCor | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
-|:----------|-------:|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
-| MRX40P000 |   40.0 |  96.81% |    105361 | 4.13M | 89 |      7883 | 81.51K | 197 |   39.0 | 4.0 |   9.0 |  76.5 | "31,41,51,61,71,81" |   0:00:40 |   0:00:31 |
-| MRX40P001 |   40.0 |  96.92% |    105454 | 4.13M | 91 |      7883 | 83.62K | 199 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:46 |   0:00:33 |
-| MRX40P002 |   40.0 |  96.87% |    105406 | 4.13M | 91 |      7883 | 80.99K | 204 |   40.0 | 4.0 |   9.3 |  78.0 | "31,41,51,61,71,81" |   0:00:41 |   0:00:31 |
-| MRX80P000 |   80.0 |  96.75% |    105448 | 4.13M | 93 |      7883 | 83.12K | 202 |   79.0 | 8.0 |  18.3 | 154.5 | "31,41,51,61,71,81" |   0:00:52 |   0:00:33 |
-| MRX80P001 |   80.0 |  96.72% |    105405 | 4.13M | 94 |      7883 | 84.16K | 206 |   79.0 | 7.0 |  19.3 | 150.0 | "31,41,51,61,71,81" |   0:00:51 |   0:00:33 |
-| MRX80P002 |   80.0 |  96.69% |    101380 | 4.13M | 95 |      7883 | 82.94K | 206 |   79.0 | 6.0 |  20.3 | 145.5 | "31,41,51,61,71,81" |   0:00:51 |   0:00:33 |
-
-
-Table: statMergeAnchors.md
-
-| Name                          | Mapped% | N50Anchor |   Sum |  # | N50Others |     Sum |   # | median |  MAD | lower | upper | RunTimeAN |
-|:------------------------------|--------:|----------:|------:|---:|----------:|--------:|----:|-------:|-----:|------:|------:|----------:|
-| 7_merge_anchors               |  96.22% |    130460 | 4.13M | 83 |      7883 |   3.66M | 538 |  264.0 | 16.0 |  72.0 | 468.0 |   0:00:50 |
-| 7_merge_mr_unitigs_bcalm      |  98.10% |    130509 | 4.13M | 82 |      7941 | 591.77K |  82 |  262.0 | 17.0 |  70.3 | 469.5 |   0:01:27 |
-| 7_merge_mr_unitigs_superreads |  98.16% |    108133 | 4.13M | 85 |      7941 |   61.5K |  17 |  264.0 | 16.0 |  72.0 | 468.0 |   0:01:26 |
-| 7_merge_mr_unitigs_tadpole    |  98.10% |    108133 | 4.13M | 85 |      7883 | 750.91K |  99 |  263.0 | 16.5 |  71.2 | 468.8 |   0:01:25 |
-| 7_merge_unitigs_bcalm         |  97.95% |    108160 | 4.14M | 91 |      7941 |  909.6K | 169 |  262.0 | 18.0 |  69.3 | 474.0 |   0:01:20 |
-| 7_merge_unitigs_superreads    |  98.38% |    108180 | 4.14M | 89 |     10212 | 192.02K |  49 |  261.0 | 21.0 |  66.0 | 486.0 |   0:01:35 |
-| 7_merge_unitigs_tadpole       |  98.08% |    108162 | 4.14M | 88 |      7883 |   1.36M | 220 |  264.0 | 17.0 |  71.0 | 472.5 |   0:01:21 |
-
-
-Table: statOtherAnchors.md
-
-| Name         | Mapped% | N50Anchor |   Sum |  # | N50Others |    Sum |   # | median |  MAD | lower | upper | RunTimeAN |
-|:-------------|--------:|----------:|------:|---:|----------:|-------:|----:|-------:|-----:|------:|------:|----------:|
-| 8_spades     |  98.94% |    227363 | 4.15M | 46 |      7659 | 41.71K |  88 |  263.0 | 26.0 |  61.7 | 511.5 |   0:00:46 |
-| 8_mr_spades  |  98.72% |    225839 | 4.17M | 35 |      7659 | 38.83K |  75 |  447.0 | 45.0 | 104.0 | 873.0 |   0:00:49 |
-| 8_megahit    |  98.63% |    108259 | 4.14M | 81 |      7659 | 44.11K | 171 |  263.0 | 21.5 |  66.2 | 491.2 |   0:00:45 |
-| 8_mr_megahit |  99.20% |    224838 | 4.17M | 46 |      7384 | 50.48K | 102 |  447.0 | 49.5 |  99.5 | 893.2 |   0:00:50 |
-| 8_platanus   |  97.85% |    224881 | 4.15M | 50 |      7970 | 34.59K |  98 |  263.0 | 25.5 |  62.2 | 509.2 |   0:00:46 |
-
-
-Table: statFinal
-
-| Name                     |     N50 |     Sum |   # |
-|:-------------------------|--------:|--------:|----:|
-| Genome                   | 4290252 | 4298133 |   2 |
-| Paralogs                 |    3264 |  345957 | 124 |
-| 7_merge_anchors.anchors  |  130460 | 4134077 |  83 |
-| 7_merge_anchors.others   |    7883 | 3660571 | 538 |
-| glue_anchors             |  130460 | 4133118 |  81 |
-| fill_anchors             |  211856 | 4135038 |  57 |
-| spades.contig            |  227397 | 4223053 | 205 |
-| spades.scaffold          |  227397 | 4223110 | 203 |
-| spades.non-contained     |  227397 | 4194316 |  47 |
-| mr_spades.contig         |  225584 | 4221395 |  84 |
-| mr_spades.scaffold       |  225921 | 4221495 |  83 |
-| mr_spades.non-contained  |  225584 | 4204648 |  40 |
-| megahit.contig           |  108291 | 4208791 | 146 |
-| megahit.non-contained    |  108291 | 4184987 |  90 |
-| mr_megahit.contig        |  224907 | 4268641 | 160 |
-| mr_megahit.non-contained |  224907 | 4225251 |  56 |
-| platanus.contig          |  122109 | 4271614 | 620 |
-| platanus.scaffold        |  225740 | 4239225 | 410 |
-| platanus.non-contained   |  225740 | 4184447 |  48 |
 
