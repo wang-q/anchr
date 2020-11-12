@@ -104,9 +104,9 @@ rsync -avP \
 ### Yeast
 
 * *Saccharomyces cerevisiae* S288c
-    * Taxonomy ID: [559292](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=559292)
-    * Assembly: [GCF_000146045.2](https://www.ncbi.nlm.nih.gov/assembly/GCF_000146045.2)
-    * Proportion of paralogs (> 1000 bp): 0.058
+  * Taxonomy ID: [559292](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=559292)
+  * Assembly: [GCF_000146045.2](https://www.ncbi.nlm.nih.gov/assembly/GCF_000146045.2)
+  * Proportion of paralogs (> 1000 bp): 0.058
 
 
 ```shell script
@@ -244,3 +244,4 @@ for STRAIN in \
 done
 
 ```
+
