@@ -24,6 +24,10 @@ if [ -e 1_genome/paralogs.fa ]; then
     printf "| %s | %s | %s | %s |\n" \
         $(echo "Paralogs"; faops n50 -H -S -C 1_genome/paralogs.fa;) >> statReads.md
 fi
+if [ -e 1_genome/repetitives.fa ]; then
+    printf "| %s | %s | %s | %s |\n" \
+        $(echo "Repetitives"; faops n50 -H -S -C 1_genome/repetitives.fa;) >> statReads.md
+fi
 
 for PREFIX in R S T; do
     if [ -e 2_illumina/${PREFIX}1.fq.gz ]; then

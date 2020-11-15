@@ -20,6 +20,10 @@ if [ -e 1_genome/paralogs.fa ]; then
     printf "| %s | %s | %s | %s |\n" \
         $(echo "Paralogs"; faops n50 -H -S -C 1_genome/paralogs.fa;) >> statFinal.md
 fi
+if [ -e 1_genome/repetitives.fa ]; then
+    printf "| %s | %s | %s | %s |\n" \
+        $(echo "Repetitives"; faops n50 -H -S -C 1_genome/repetitives.fa;) >> statFinal.md
+fi
 
 # anchors
 for D in 7_merge_anchors; do

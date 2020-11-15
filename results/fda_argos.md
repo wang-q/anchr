@@ -456,6 +456,32 @@ mlr --icsv --omd cat cover.csv
 | Y_pseudot_YPIII                            | 4689441   | 114669 | 0.0245   |
 
 
+## Repetitives
+
+```shell script
+mkdir -p ~/data/anchr/fda_argos/repetitives
+cd ~/data/anchr/fda_argos/repetitives
+
+for STRAIN in \
+    $(
+        cat ../ena/source.csv |
+            grep -v "^#" |
+            cut -d, -f 2 |
+            sort -u
+    ) \
+    ; do
+    echo >&2 ${STRAIN};
+
+    kat sect -t 4 -o ${STRAIN} -F ../ref/${STRAIN}/genome.fa ../ref/${STRAIN}/genome.fa
+    
+    cat ${STRAIN}-repetitive.fa |
+        faops filter -N -d -a 100 stdin stdout \
+        > ../ref/${STRAIN}/repetitives.fa
+
+done
+
+```
+
 ## Copy/link files
 
 ```shell script
@@ -474,6 +500,7 @@ for STRAIN in \
     
     cp ref/${STRAIN}/genome.fa ${STRAIN}/1_genome
     cp ref/${STRAIN}/paralogs.fa ${STRAIN}/1_genome
+    cp ref/${STRAIN}/repetitives.fa ${STRAIN}/1_genome
 
 done
 

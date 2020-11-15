@@ -69,6 +69,11 @@ if [ -e 1_genome/paralogs.fa ]; then
     QUAST_LABEL+="paralogs,"
 fi
 
+if [ -e 1_genome/repetitives.fa ]; then
+    QUAST_TARGET+=" 1_genome/repetitives.fa "
+    QUAST_LABEL+="repetitives,"
+fi
+
 QUAST_LABEL=$( echo "${QUAST_LABEL}" | sed 's/,$//' )
 
 rm -fr 9_quast
