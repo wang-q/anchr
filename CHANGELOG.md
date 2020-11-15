@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+* Support SAMN and PRJNA in `anchr ena`
+* Add `repetitives.fa` to `1_genome`
 * Add docs
   * fda_argos.md
   * yeast.md
