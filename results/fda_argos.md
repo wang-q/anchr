@@ -1782,7 +1782,7 @@ cd ~/data/anchr/fda_argos
 
 cat paralogs/cover.csv |
     grep -v "^#" |
-    grep -v "^name" | tail -n 10 |
+    grep -v "^name" | head -n 10 | tail -n 5 |
     parallel -j 1 -k --colsep "," '
         WORKING_DIR=${HOME}/data/anchr/fda_argos
         BASE_NAME={1}
@@ -1818,6 +1818,16 @@ cat paralogs/cover.csv |
 
         bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
     '
+
+```
+
+* Cleanup
+
+```shell script
+cd ~/data/anchr/fda_argos
+
+find . -name "4_down_sampling" -type d | xargs rm -fr
+find . -name "6_down_sampling" -type d | xargs rm -fr
 
 ```
 

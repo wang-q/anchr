@@ -88,6 +88,7 @@ if [ ! -e trim.fq.gz ]; then
         maxns=0 ktrim=r k={{ opt.trimk }} mink=11 hdist=1 tbo tpe \
         minlen={% set lens = opt.len | split(pat=" ") %}{{ lens.0}} qtrim=r trimq={{ opt.trimq }} ftm=5 \
         stats={{ opt.prefix }}.trim.stats.txt overwrite \
+        tossbrokenreads=t \
         threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
 fi
 rm temp.fq.gz; ln -s trim.fq.gz temp.fq.gz
@@ -101,6 +102,7 @@ if [ ! -e filter.fq.gz ]; then
         ref={% set fs = opt.filter | split(pat=" ") %}{% for filter in fs %}{% if filter == "adapter" %}{{ opt.adapter }},{% endif %}{% if filter == "artifact" %}{{ opt.artifact }},{% endif %}{% endfor %} \
         k={{ opt.matchk }} cardinality \
         stats={{ opt.prefix }}.filter.stats.txt overwrite \
+        tossbrokenreads=t \
         threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
 fi
 rm temp.fq.gz; ln -s filter.fq.gz temp.fq.gz
