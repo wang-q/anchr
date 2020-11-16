@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.3.1 - 2020-11-16
+
 * Adjust `anchr template` default options
   * --gluemin 10
   * --fillmax 500
