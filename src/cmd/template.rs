@@ -313,7 +313,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("splitp", args.value_of("splitp").unwrap());
     opt.insert("statp", args.value_of("statp").unwrap());
     opt.insert("readl", args.value_of("readl").unwrap());
-    opt.insert("mscale", args.value_of("mscale").unwrap());
+    opt.insert("uscale", args.value_of("uscale").unwrap());
     opt.insert("redo", if args.is_present("redo") { "1" } else { "0" });
 
     opt.insert("extend", if args.is_present("extend") { "1" } else { "0" });

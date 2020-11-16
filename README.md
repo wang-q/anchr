@@ -18,7 +18,7 @@ cargo install --git https://github.com/wang-q/anchr --branch main
 
 # Compiled binary
 mkdir -p "~/bin"
-curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.3.0/anchr-x86_64-unknown-linux-musl.tar.gz |
+curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.3.1/anchr-x86_64-unknown-linux-musl.tar.gz |
     tar xvz
 cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
 rm -fr target
@@ -208,12 +208,10 @@ popd
     * [*Escherichia coli* str. K-12 substr. DH5alpha](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5alpha)
 
   * FDA-ARGOS bacteria
-    * [Francisella tularensis FDAARGOS_247](results/fda_argos.md#francisella-tularensis-fdaargos_247)
-    * [Haemophilus influenzae FDAARGOS_199](results/fda_argos.md#haemophilus-influenzae-fdaargos_199)
-    * [Campylobacter jejuni subsp. jejuni ATCC 700819](results/fda_argos.md#campylobacter-jejuni-subsp-jejuni-atcc-700819)
-    * [Legionella pneumophila subsp. pneumophila ATCC 33152D-5](results/fda_argos.md#legionella-pneumophila-subsp-pneumophila-atcc-33152d-5)
-    * [Corynebacterium diphtheriae FDAARGOS_197](results/fda_argos.md#corynebacterium-diphtheriae-fdaargos_197)
-    * [Clostridioides difficile 630](results/fda_argos.md#clostridioides-difficile-630)
+    * [Ca_jej_jejuni_NCTC_11168_ATCC_700819](results/fda_argos.md#ca_jej_jejuni_nctc_11168_atcc_700819)
+    * [Clostridio_dif_630](results/fda_argos.md#clostridio_dif_630)
+    * [Co_dip_NCTC_13129](results/fda_argos.md#co_dip_nctc_13129)
+    * [Fr_tul_tularensis_SCHU_S4](results/fda_argos.md#fr_tul_tularensis_schu_s4)
 
   * Yeast
     * [*Saccharomyces cerevisiae* S288c](results/yeast.md#saccharomyces-cerevisiae-s288c)
