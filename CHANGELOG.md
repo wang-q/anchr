@@ -7,6 +7,9 @@
   * Rename opt `--scale` to `--mscale`
   * Add opts `--readl`, `--lscale`, `--uscale`
   * Remove opt `--lower`
+* `anchr template`
+  * Add opts `--readl` and `--uscale`
+
 ## 0.3.1 - 2020-11-16
 
 * Adjust `anchr template` default options

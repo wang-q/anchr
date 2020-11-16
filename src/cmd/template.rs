@@ -42,9 +42,11 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 * Down sampling, unitigs, and anchors
 
     * --cov "40 80"
-    * --unitigger "superreads"
+    * --unitigger "bcalm"
     * --splitp 20
     * --statp 2
+    * --readl 100
+    * --uscale 3
     * --redo
 
 * Extend anchors
@@ -180,9 +182,9 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
             Arg::with_name("unitigger")
                 .long("unitigger")
                 .short("u")
-                .help("Unitigger used: superreads, tadpole, or bcalm")
+                .help("Unitigger used: bcalm, superreads, or tadpole")
                 .takes_value(true)
-                .default_value("superreads")
+                .default_value("bcalm")
                 .empty_values(false),
         )
         .arg(
@@ -199,6 +201,22 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .help("Parts of stats")
                 .takes_value(true)
                 .default_value("2")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("readl")
+                .long("readl")
+                .help("Length of reads")
+                .takes_value(true)
+                .default_value("100")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("uscale")
+                .long("uscale")
+                .help("The scale factor for upper, (median + k * MAD) * u")
+                .takes_value(true)
+                .default_value("3")
                 .empty_values(false),
         )
         .arg(
@@ -294,6 +312,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("unitigger", args.value_of("unitigger").unwrap());
     opt.insert("splitp", args.value_of("splitp").unwrap());
     opt.insert("statp", args.value_of("statp").unwrap());
+    opt.insert("readl", args.value_of("readl").unwrap());
+    opt.insert("mscale", args.value_of("mscale").unwrap());
     opt.insert("redo", if args.is_present("redo") { "1" } else { "0" });
 
     opt.insert("extend", if args.is_present("extend") { "1" } else { "0" });

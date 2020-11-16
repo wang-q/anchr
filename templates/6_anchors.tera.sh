@@ -40,6 +40,8 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
     anchr anchors \
         ../unitigs.fasta \
         ../pe.cor.fa \
+        --readl {{ opt.readl }} \
+        --uscale {{ opt.uscale }} \
         -p {{ parallel2 }} \
         -o anchors.sh
     bash anchors.sh
