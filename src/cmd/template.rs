@@ -50,8 +50,8 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 * Extend anchors
 
     * --extend
-    * --gluemin 30
-    * --fillmax 2000
+    * --gluemin 10
+    * --fillmax 500
 
 "#,
         )
@@ -217,7 +217,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("gluemin")
                 .help("Min length of overlaps to be glued")
                 .takes_value(true)
-                .default_value("30")
+                .default_value("10")
                 .empty_values(false),
         )
         .arg(
@@ -225,7 +225,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("fillmax")
                 .help("Max length of gaps")
                 .takes_value(true)
-                .default_value("2000")
+                .default_value("500")
                 .empty_values(false),
         )
 }
@@ -934,7 +934,7 @@ fn gen_bsub(context: &Context) -> std::result::Result<(), std::io::Error> {
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/0_bsub.tera.sh")),
     ])
-        .unwrap();
+    .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
