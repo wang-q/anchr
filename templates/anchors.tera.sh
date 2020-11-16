@@ -124,19 +124,16 @@ cat contigs.coverage.tsv |
             my $abs_res_stat = Statistics::Descriptive::Full->new();
             $abs_res_stat->add_data(@abs_res);
             my $MAD = $abs_res_stat->median();
-            my $k   = {{ opt.scale }};   # the scale factor
 
-            my $lower = ( $median - $k * $MAD ) / 3;
+            my $lower = ( $median - {{ opt.mscale }} * $MAD ) / {{ opt.lscale }};
             $lower = {{ opt.mincov }} if $lower < {{ opt.mincov }};
-{% if opt.lower != "0" -%}
-            $lower = {{ opt.lower }} if $lower > {{ opt.lower }};
-{% endif -%}
-            my $upper = ( $median + $k * $MAD ) * 1.5;
-            $upper = $median * 2 if $upper > $median * 2;
+            my $upper = ( $median + {{ opt.mscale }} * $MAD ) * {{ opt.uscale }};
 
             $json->{contig_median} = $contig_median;
             $json->{MAD} = $MAD;
-            $json->{k} = $k;
+            $json->{mscale} = {{ opt.mscale }};
+            $json->{lscale} = {{ opt.lscale }};
+            $json->{uscale} = {{ opt.uscale }};
             $json->{lower} = $lower;
             $json->{upper} = $upper;
 
@@ -148,18 +145,20 @@ cat contigs.coverage.tsv |
 # Properly covered regions by reads
 #----------------------------#
 # at least some reads covered
+# basecov.txt
 # Pos is 0-based
 #RefName	Pos	Coverage
 log_debug "covered"
 cat basecov.txt |
     grep -v '^#' |
-    perl -nla -MPath::Tiny -MJSON -e '
+    perl -nla -MPath::Tiny -MJSON -MApp::RL::Common -e '
         BEGIN {
             our $name;
             our @list;
             our $limit = JSON->new->decode(
-                Path::Tiny::path( q{env.json} )->slurp
+                Path::Tiny::path( q(env.json) )->slurp
             );
+            our $length_of = App::RL::Common::read_sizes( q(sr.chr.sizes) );
         }
 
         sub list_to_ranges {
@@ -176,15 +175,40 @@ cat basecov.txt |
             return @ranges;
         }
 
-        if ( $F[2] < $limit->{lower} or $F[2] > $limit->{upper} ) {
-            next;
-        }
-
         if ( !defined $name ) {
             $name = $F[0];
             @list = ( $F[1] );
         }
-        elsif ( $name eq $F[0] ) {
+
+        if ( $F[1] < {{ opt.readl }} ) { # left edges
+            if ( $F[2] < {{ opt.mincov }} ) {
+                next;
+            }
+
+            my $lower = $limit->{lower} * $F[1] / {{ opt.readl }};
+            my $upper = $limit->{upper} * $F[1] / {{ opt.readl }};
+            if ( $F[2] < $lower or $F[2] > $upper ) {
+                next;
+            }
+        }
+        elsif ( $F[1] >= $length_of->{$name} - {{ opt.readl }} ) { # right edges
+            if ( $F[2] < {{ opt.mincov }} ) {
+                next;
+            }
+
+            my $lower = $limit->{lower} * ($length_of->{$name} - $F[1]) / {{ opt.readl }};
+            my $upper = $limit->{upper} * ($length_of->{$name} - $F[1]) / {{ opt.readl }};
+            if ( $F[2] < $lower or $F[2] > $upper ) {
+                next;
+            }
+        }
+        else {
+            if ( $F[2] < $limit->{lower} or $F[2] > $limit->{upper} ) {
+                next;
+            }
+        }
+
+        if ( $name eq $F[0] ) {
             push @list, $F[1];
         }
         else {
@@ -300,14 +324,14 @@ perl -MYAML::Syck -MAlignDB::IntSpan -e '
         my $end = $set->max;
 
         if ( $sets[0]->size >= {{ opt.min }} ) {
-            my $new_begin = $begin - {{ opt.fill }};
+            my $new_begin = $begin - {{ opt.fill }} * 10;
             $new_begin = 1 if $new_begin < 1;
 
             $set->add_pair($new_begin, $begin);
         }
 
         if ( $sets[-1]->size >= {{ opt.min }} ) {
-            my $new_end = $end + {{ opt.fill }};
+            my $new_end = $end + {{ opt.fill }} * 10;
             $new_end = $length if $new_end > $length;
 
             $set->add_pair($end, $new_end);

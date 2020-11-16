@@ -2,6 +2,11 @@
 
 ## Unreleased - ReleaseDate
 
+* `anchr anchors`
+  * Proportional read coverages near edges of contigs
+  * Rename opt `--scale` to `--mscale`
+  * Add opts `--readl`, `--lscale`, `--uscale`
+  * Remove opt `--lower`
 ## 0.3.1 - 2020-11-16
 
 * Adjust `anchr template` default options

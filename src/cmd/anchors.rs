@@ -12,6 +12,9 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 <contig.fasta> <pe.cor.fa> [more reads]
 
 Fasta files can‘t be gzipped
+
+To get single-copy regions, set --uscale to 1.5
+
 "#,
         )
         .arg(
@@ -38,19 +41,35 @@ Fasta files can‘t be gzipped
                 .empty_values(false),
         )
         .arg(
-            Arg::with_name("scale")
-                .long("scale")
-                .help("The scale factor for MAD")
+            Arg::with_name("readl")
+                .long("readl")
+                .help("Length of reads")
+                .takes_value(true)
+                .default_value("100")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("mscale")
+                .long("mscale")
+                .help("The scale factor for MAD, median +/- k * MAD")
                 .takes_value(true)
                 .default_value("3")
                 .empty_values(false),
         )
         .arg(
-            Arg::with_name("ratio")
-                .long("ratio")
-                .help("Consider as anchor")
+            Arg::with_name("lscale")
+                .long("lscale")
+                .help("The scale factor for lower, (median - k * MAD) / l")
                 .takes_value(true)
-                .default_value("0.98")
+                .default_value("3")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("uscale")
+                .long("uscale")
+                .help("The scale factor for upper, (median + k * MAD) * u")
+                .takes_value(true)
+                .default_value("3")
                 .empty_values(false),
         )
         .arg(
@@ -62,10 +81,11 @@ Fasta files can‘t be gzipped
                 .empty_values(false),
         )
         .arg(
-            Arg::with_name("lower")
-                .long("lower")
-                .help("Lower limit of coverage ranges")
+            Arg::with_name("ratio")
+                .long("ratio")
+                .help("Fill large holes (opt.fill * 10) when covered ratio larger than this")
                 .takes_value(true)
+                .default_value("0.98")
                 .empty_values(false),
         )
         .arg(
@@ -106,18 +126,13 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     let mut opt = HashMap::new();
     opt.insert("min", args.value_of("min").unwrap());
     opt.insert("mincov", args.value_of("mincov").unwrap());
-    opt.insert("scale", args.value_of("scale").unwrap());
+    opt.insert("readl", args.value_of("readl").unwrap());
+    opt.insert("mscale", args.value_of("mscale").unwrap());
+    opt.insert("lscale", args.value_of("lscale").unwrap());
+    opt.insert("uscale", args.value_of("uscale").unwrap());
     opt.insert("ratio", args.value_of("ratio").unwrap());
     opt.insert("fill", args.value_of("fill").unwrap());
 
-    opt.insert(
-        "lower",
-        if args.is_present("lower") {
-            args.value_of("lower").unwrap()
-        } else {
-            "0"
-        },
-    );
     opt.insert(
         "longest",
         if args.is_present("longest") { "1" } else { "0" },

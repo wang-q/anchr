@@ -183,12 +183,13 @@ bash unitigs.sh
 popd
 
 # anchors
-mkdir -p tests/superreads/anchors
-pushd tests/superreads/anchors
+mkdir -p tests/bcalm/anchors
+pushd tests/bcalm/anchors
 
 anchr anchors \
     ../unitigs.fasta \
     ../pe.cor.fa \
+    --readl 150 \
     -p 4 \
     -o anchors.sh
 bash anchors.sh
