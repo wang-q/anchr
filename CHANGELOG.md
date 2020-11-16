@@ -2,6 +2,9 @@
 
 ## Unreleased - ReleaseDate
 
+* Adjust `anchr template` default options
+  * --gluemin 10
+  * --fillmax 500
 * Support SAMN and PRJNA in `anchr ena`
 * Add `repetitives.fa` to `1_genome`
 * Add docs
