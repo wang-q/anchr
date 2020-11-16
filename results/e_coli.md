@@ -55,6 +55,8 @@ brew install wang-q/tap/platanus
 
 # *Escherichia* virus Lambda
 
+Runs under macOS and Linux.
+
 ## lambda: reference
 
 * Reference genome
@@ -141,7 +143,8 @@ anchr template \
     \
     --cov "40 80" \
     --unitigger "bcalm tadpole" \
-    --statp 2 
+    --statp 2 \
+    --readl 108
 
 ```
 
