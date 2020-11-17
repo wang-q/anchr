@@ -245,3 +245,25 @@ done
 
 ```
 
+## Repetitives
+
+```shell script
+mkdir -p ~/data/anchr/repetitives
+cd ~/data/anchr/repetitives
+
+for STRAIN in \
+    lambda mg1655 dh5alpha \
+    Bcer Mabs Rsph Vcho \
+    s288c \
+    ; do
+    echo >&2 ${STRAIN};
+
+    kat sect -t 4 -o ${STRAIN} -F ../ref/${STRAIN}/genome.fa ../ref/${STRAIN}/genome.fa
+    
+    cat ${STRAIN}-repetitive.fa |
+        faops filter -N -d -a 100 stdin stdout \
+        > ../ref/${STRAIN}/repetitives.fa
+
+done
+
+```
