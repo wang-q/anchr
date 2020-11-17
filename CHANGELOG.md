@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.3.6 - 2020-11-18
+
 * `anchr anchors`
   * Proportional read coverages near edges of contigs
   * Rename opt `--scale` to `--mscale`
