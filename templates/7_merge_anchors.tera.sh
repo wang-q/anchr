@@ -58,6 +58,9 @@ cd ${DIR_MERGE}/anchor
 anchr anchors \
     ../anchor.non-contained.fasta \
     ${BASH_DIR}/2_illumina/trim/pe.cor.fa.gz \
+    --readl {{ opt.readl }} \
+    --uscale {{ opt.uscale }} \
+    --lscale {{ opt.lscale }} \
     -p {{ opt.parallel }} \
     --keepedge \
     --ratio 0.98 \

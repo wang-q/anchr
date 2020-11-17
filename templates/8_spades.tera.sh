@@ -73,6 +73,9 @@ cd 8_spades/anchor
 anchr anchors \
     ../spades.non-contained.fasta \
     ${DIR_READS}/pe.cor.fa.gz \
+    --readl {{ opt.readl }} \
+    --uscale {{ opt.uscale }} \
+    --lscale {{ opt.lscale }} \
     -p {{ opt.parallel }} \
     --ratio 0.98 \
     -o anchors.sh

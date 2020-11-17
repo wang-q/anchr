@@ -51,6 +51,9 @@ cd 8_mr_megahit/anchor
 anchr anchors \
     ../megahit.non-contained.fasta \
     ${BASH_DIR}/2_illumina/merge/pe.cor.fa.gz \
+    --readl {{ opt.readl }} \
+    --uscale {{ opt.uscale }} \
+    --lscale {{ opt.lscale }} \
     -p {{ opt.parallel }} \
     --ratio 0.98 \
     -o anchors.sh

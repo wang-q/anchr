@@ -4,15 +4,13 @@
 
 ## 0.3.5 - 2020-11-17
 
-## 0.3.4 - 2020-11-17
-
 * `anchr anchors`
   * Proportional read coverages near edges of contigs
   * Rename opt `--scale` to `--mscale`
-  * Add opts `--readl`, `--lscale`, `--uscale`
+  * Add opts `--readl`, `--lscale`, and `--uscale`
   * Remove opt `--lower`
 * `anchr template`
-  * Add opts `--readl` and `--uscale`
+  * Add opts `--readl`, `--lscale`, and `--uscale`
 
 ## 0.3.1 - 2020-11-16
 
