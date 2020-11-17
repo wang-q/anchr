@@ -216,7 +216,15 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("uscale")
                 .help("The scale factor for upper, (median + k * MAD) * u")
                 .takes_value(true)
-                .default_value("3")
+                .default_value("2")
+                .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("lscale")
+                .long("lscale")
+                .help("The scale factor for upper, (median - k * MAD) / l")
+                .takes_value(true)
+                .default_value("2")
                 .empty_values(false),
         )
         .arg(
@@ -314,6 +322,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     opt.insert("statp", args.value_of("statp").unwrap());
     opt.insert("readl", args.value_of("readl").unwrap());
     opt.insert("uscale", args.value_of("uscale").unwrap());
+    opt.insert("lscale", args.value_of("lscale").unwrap());
     opt.insert("redo", if args.is_present("redo") { "1" } else { "0" });
 
     opt.insert("extend", if args.is_present("extend") { "1" } else { "0" });

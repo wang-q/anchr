@@ -42,6 +42,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         ../pe.cor.fa \
         --readl {{ opt.readl }} \
         --uscale {{ opt.uscale }} \
+        --lscale {{ opt.lscale }} \
         -p {{ parallel2 }} \
         -o anchors.sh
     bash anchors.sh

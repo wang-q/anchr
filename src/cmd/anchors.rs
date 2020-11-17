@@ -53,7 +53,7 @@ To get single-copy regions, set --uscale to 1.5
                 .long("mscale")
                 .help("The scale factor for MAD, median +/- k * MAD")
                 .takes_value(true)
-                .default_value("3")
+                .default_value("2")
                 .empty_values(false),
         )
         .arg(
@@ -61,7 +61,7 @@ To get single-copy regions, set --uscale to 1.5
                 .long("lscale")
                 .help("The scale factor for lower, (median - k * MAD) / l")
                 .takes_value(true)
-                .default_value("3")
+                .default_value("2")
                 .empty_values(false),
         )
         .arg(
