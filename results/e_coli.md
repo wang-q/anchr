@@ -373,6 +373,7 @@ cd ~/data/anchr/mg1655/1_genome
 
 cp ~/data/anchr/ref/mg1655/genome.fa .
 cp ~/data/anchr/ref/mg1655/paralogs.fa .
+cp ~/data/anchr/ref/mg1655/repetitives.fa .
 
 ```
 
@@ -420,6 +421,7 @@ anchr template \
     --genome 4641652 \
     --parallel 24 \
     --xmx 80g \
+    --queue mpi \
     \
     --fastqc \
     --insertsize \
@@ -437,6 +439,8 @@ anchr template \
     --cov "40 80" \
     --unitigger "superreads bcalm tadpole" \
     --statp 2 \
+    --readl 151 \
+    --uscale 3 \
     --redo \
     \
     --extend
@@ -452,14 +456,14 @@ BASE_NAME=mg1655
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
 # rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 4_down_sampling 6_down_sampling
 
 # BASE_NAME=mg1655 bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
-#bkill -J "${BASE_NAME}-*"
+# bkill -J "${BASE_NAME}-*"
 
-#bash 0_master.sh
-#bash 0_cleanup.sh
-#rm -fr 4_down_sampling 6_down_sampling
+# bash 0_master.sh
+# bash 0_cleanup.sh
 
 ```
 
@@ -742,6 +746,7 @@ cd ~/data/anchr/dh5alpha/1_genome
 
 cp ~/data/anchr/ref/dh5alpha/genome.fa .
 cp ~/data/anchr/ref/dh5alpha/paralogs.fa .
+cp ~/data/anchr/ref/dh5alpha/repetitives.fa .
 
 ```
 

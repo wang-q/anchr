@@ -180,24 +180,24 @@ cat basecov.txt |
             @list = ( $F[1] );
         }
 
-        if ( $F[1] < {{ opt.readl }} ) { # left edges
+        if ( $F[1] < {{ opt.readl }} / 2 ) { # left edges
             if ( $F[2] < {{ opt.mincov }} ) {
                 next;
             }
 
-            my $lower = $limit->{lower} * $F[1] / {{ opt.readl }};
-            my $upper = $limit->{upper} * $F[1] / {{ opt.readl }};
+            my $lower = $limit->{lower} * $F[1] * 2 / {{ opt.readl }};
+            my $upper = $limit->{upper} * $F[1] * 2 / {{ opt.readl }};
             if ( $F[2] < $lower or $F[2] > $upper ) {
                 next;
             }
         }
-        elsif ( $F[1] >= $length_of->{$name} - {{ opt.readl }} ) { # right edges
+        elsif ( $F[1] >= $length_of->{$name} - {{ opt.readl }} / 2 ) { # right edges
             if ( $F[2] < {{ opt.mincov }} ) {
                 next;
             }
 
-            my $lower = $limit->{lower} * ($length_of->{$name} - $F[1]) / {{ opt.readl }};
-            my $upper = $limit->{upper} * ($length_of->{$name} - $F[1]) / {{ opt.readl }};
+            my $lower = $limit->{lower} * ($length_of->{$name} - $F[1]) * 2 / {{ opt.readl }};
+            my $upper = $limit->{upper} * ($length_of->{$name} - $F[1]) * 2 / {{ opt.readl }};
             if ( $F[2] < $lower or $F[2] > $upper ) {
                 next;
             }
