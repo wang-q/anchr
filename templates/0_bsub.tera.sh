@@ -60,15 +60,11 @@ bsub -w "ended(${BASE_NAME}-2_quorum)" \
 {% for u in unitiggers -%}
 bsub -w "ended(${BASE_NAME}-4_down_sampling)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-4_unitigs_{{ u }}" \
-    "bash 4_unitigs_{{ u }}.sh"
-
-bsub -w "ended(${BASE_NAME}-4_unitigs_{{ u }})" \
-    -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-4_anchors_{{ u }}" \
-    "bash 4_anchors.sh 4_unitigs_{{ u }}"
-
-bsub -w "ended(${BASE_NAME}-4_anchors_{{ u }})" \
-    -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_stat_anchors_{{ u }}" \
-    "bash 9_stat_anchors.sh 4_unitigs_{{ u }} statUnitigs{{ u | title }}.md"
+    "
+    bash 4_unitigs_{{ u }}.sh
+    bash 4_anchors.sh 4_unitigs_{{ u }}
+    bash 9_stat_anchors.sh 4_unitigs_{{ u }} statUnitigs{{ u | title }}.md
+    "
 
 {% endfor -%}
 {# Keep a blank line #}
@@ -83,15 +79,11 @@ bsub -w "ended(${BASE_NAME}-2_merge)" \
 {% for u in unitiggers -%}
 bsub -w "ended(${BASE_NAME}-6_down_sampling)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-6_unitigs_{{ u }}" \
-    "bash 6_unitigs_{{ u }}.sh"
-
-bsub -w "ended(${BASE_NAME}-6_unitigs_{{ u }})" \
-    -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-6_anchors_{{ u }}" \
-    "bash 6_anchors.sh 6_unitigs_{{ u }}"
-
-bsub -w "ended(${BASE_NAME}-6_anchors_{{ u }})" \
-    -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_stat_mr_anchors{{ u }}" \
-    "bash 9_stat_mr_anchors.sh 6_unitigs_{{ u }} statMRUnitigs{{ u | title }}.md"
+    "
+    bash 6_unitigs_{{ u }}.sh
+    bash 6_anchors.sh 6_unitigs_{{ u }}
+    bash 9_stat_mr_anchors.sh 6_unitigs_{{ u }} statMRUnitigs{{ u | title }}.md
+    "
 
 {% endfor -%}
 {% endif -%}
@@ -100,14 +92,14 @@ bsub -w "ended(${BASE_NAME}-6_anchors_{{ u }})" \
 # merge anchors
 #----------------------------#
 {% for u in unitiggers -%}
-bsub -w "ended(${BASE_NAME}-4_anchors_{{ u }})" \
+bsub -w "ended(${BASE_NAME}-4_unitigs_{{ u }})" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-7_merge_anchors_4_unitigs_{{ u }}" \
     "bash 7_merge_anchors.sh 4_unitigs_{{ u }} 7_merge_unitigs_{{ u }}"
 {% endfor -%}
 {# Keep a blank line #}
 {% if opt.merge == "1" and opt.se == "0" -%}
 {% for u in unitiggers -%}
-bsub -w "ended(${BASE_NAME}-6_anchors_{{ u }})" \
+bsub -w "ended(${BASE_NAME}-6_unitigs_{{ u }})" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-7_merge_anchors_6_unitigs_{{ u }}" \
     "bash 7_merge_anchors.sh 6_unitigs_{{ u }} 7_merge_mr_unitigs_{{ u }}"
 {% endfor -%}
