@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.3.3 - 2020-11-17
+
 * More strict coverages on edges
 
 ## 0.3.2 - 2020-11-17

@@ -8,7 +8,7 @@ Anchr - **A**ssembler of **N**-free **CHR**omosomes
 
 ## INSTALL
 
-Current release: 0.3.2
+Current release: 0.3.3
 
 ```shell script
 # Via cargo
