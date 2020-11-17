@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+* More strict coverages on edges
+
 ## 0.3.2 - 2020-11-17
 
 * `anchr anchors`
