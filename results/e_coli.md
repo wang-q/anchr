@@ -440,7 +440,8 @@ anchr template \
     --unitigger "superreads bcalm tadpole" \
     --statp 2 \
     --readl 151 \
-    --uscale 3 \
+    --uscale 2 \
+    --lscale 3 \
     --redo \
     \
     --extend

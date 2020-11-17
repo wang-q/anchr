@@ -37,7 +37,7 @@ To get single-copy regions, set --uscale to 1.5
                 .long("mincov")
                 .help("Minimal coverage of reads")
                 .takes_value(true)
-                .default_value("5")
+                .default_value("3")
                 .empty_values(false),
         )
         .arg(

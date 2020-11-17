@@ -4,8 +4,6 @@
 
 ## 0.3.4 - 2020-11-17
 
-## 0.3.3 - 2020-11-17
-
 * `anchr anchors`
   * Proportional read coverages near edges of contigs
   * Rename opt `--scale` to `--mscale`
