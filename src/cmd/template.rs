@@ -224,7 +224,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("lscale")
                 .help("The scale factor for upper, (median - k * MAD) / l")
                 .takes_value(true)
-                .default_value("2")
+                .default_value("3")
                 .empty_values(false),
         )
         .arg(
