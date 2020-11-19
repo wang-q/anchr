@@ -25,7 +25,7 @@ log_info "anchor.non-contained"
 
 mkdir -p ${DIR_MERGE}
 
-# reverse sorted files, so that Q30L60X80 will be infile_0
+# reversely sorted files, so that Q30L60X80 will be infile_0
 dazz contained \
     $( find . -path "*${DIR_PREFIX}*" -name "anchor.fasta" -or -path "*${DIR_PREFIX}*" -name "anchor.merge.fasta" | sort -r ) \
     --len 1000 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \

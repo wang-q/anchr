@@ -91,6 +91,7 @@ cat basecov.txt |
         BEGIN {
             our $name;
             our @list;
+            our @edges;
             our $limit = JSON->new->decode(
                 Path::Tiny::path( q(env.json) )->slurp
             );
@@ -99,6 +100,7 @@ cat basecov.txt |
 
         sub list_to_ranges {
             my @ranges;
+            my @list = sort { $a <=> $b } @_;
             my $count = scalar @list;
             my $pos   = 0;
             while ( $pos < $count ) {
@@ -113,42 +115,42 @@ cat basecov.txt |
 
         if ( !defined $name ) {
             $name = $F[0];
-            @list = ( $F[1] );
+            @list = ();
+            @edges = ();
         }
 
+{% if opt.keepedge == "1" -%}
         if ( $F[1] < {{ opt.readl }} / 2 ) { # left edges
-            if ( $F[2] < {{ opt.mincov }} ) {
-                next;
-            }
-
-            my $lower = $limit->{lower} * $F[1] * 2 / {{ opt.readl }};
-            my $upper = $limit->{upper} * $F[1] * 2 / {{ opt.readl }};
-            if ( $F[2] < $lower or $F[2] > $upper ) {
-                next;
+            if ( $F[2] >= {{ opt.mincov }} ) {
+                # proportionally decreases the limits
+                my $lower = $limit->{lower} * $F[1] * 2 / {{ opt.readl }};
+                my $upper = $limit->{upper} * $F[1] * 2 / {{ opt.readl }};
+                if ( $F[2] >= $lower and $F[2] <= $upper ) {
+                    push @edges, $F[1];
+                }
             }
         }
         elsif ( $F[1] >= $length_of->{$name} - {{ opt.readl }} / 2 ) { # right edges
-            if ( $F[2] < {{ opt.mincov }} ) {
-                next;
-            }
-
-            my $lower = $limit->{lower} * ($length_of->{$name} - $F[1]) * 2 / {{ opt.readl }};
-            my $upper = $limit->{upper} * ($length_of->{$name} - $F[1]) * 2 / {{ opt.readl }};
-            if ( $F[2] < $lower or $F[2] > $upper ) {
-                next;
+            if ( $F[2] >= {{ opt.mincov }} ) {
+                # proportionally decreases the limits
+                my $lower = $limit->{lower} * ($length_of->{$name} - $F[1]) * 2 / {{ opt.readl }};
+                my $upper = $limit->{upper} * ($length_of->{$name} - $F[1]) * 2 / {{ opt.readl }};
+                if ( $F[2] >= $lower and $F[2] <= $upper ) {
+                    push @edges, $F[1];
+                }
             }
         }
-        else {
-            if ( $F[2] < $limit->{lower} or $F[2] > $limit->{upper} ) {
-                next;
-            }
+{% endif -%}
+
+        if ( $F[2] < $limit->{lower} or $F[2] > $limit->{upper} ) {
+            next;
         }
 
         if ( $name eq $F[0] ) {
             push @list, $F[1];
         }
         else {
-            my @ranges = list_to_ranges();
+            my @ranges = list_to_ranges(@list{% if opt.keepedge == "1" %}, @edges{% endif %});
             for ( my $i = 0; $i < $#ranges; $i += 2 ) {
                 if ( $ranges[$i] == $ranges[ $i + 1 ] ) {
                     printf qq(%s:%s\n), $name, $ranges[$i] + 1;
@@ -160,10 +162,26 @@ cat basecov.txt |
 
             $name = $F[0];
             @list = ( $F[1] );
+{% if opt.keepedge == "1" -%}
+            if ( $F[2] >= {{ opt.mincov }} ) {
+                my $lower = $limit->{lower} * $F[1] * 2 / {{ opt.readl }};
+                my $upper = $limit->{upper} * $F[1] * 2 / {{ opt.readl }};
+                if ( $F[2] >= $lower and $F[2] <= $upper ) {
+                    @edges = ( $F[1] );
+                }
+                else {
+                    @edges = ();
+                }
+            }
+            else {
+                @edges = ();
+            }
+{% endif -%}
+
         }
 
         END {
-            my @ranges = list_to_ranges();
+            my @ranges = list_to_ranges(@list{% if opt.keepedge == "1" %}, @edges{% endif %});
             for ( my $i = 0; $i < $#ranges; $i += 2 ) {
                 if ( $ranges[$i] == $ranges[ $i + 1 ] ) {
                     printf qq(%s:%s\n), $name, $ranges[$i] + 1;
@@ -175,7 +193,7 @@ cat basecov.txt |
         }
     ' \
     > contig.covered.txt
-find . -type f -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
+#find . -type f -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
 
 #----------------------------#
 # anchor
@@ -246,36 +264,6 @@ perl -MYAML::Syck -MAlignDB::IntSpan -e '
     for my $key ( sort keys %{$yml2} ) {
         $yml->{$key} = $yml2->{$key};
     }
-
-{% if opt.keepedge == "1" -%}
-    # repeats on the edge hurt assembling, so fill edges near big island by {{ opt.fill }}
-    for my $key ( sort keys %{$yml} ) {
-        my $length = AlignDB::IntSpan->new( $yml_chr->{$key} )->max;
-
-        my $set = AlignDB::IntSpan->new( $yml->{$key} );
-        next if $set->is_empty;
-
-        my @sets = $set->sets;
-        my $begin = $set->min;
-        my $end = $set->max;
-
-        if ( $sets[0]->size >= {{ opt.min }} ) {
-            my $new_begin = $begin - {{ opt.fill }} * 10;
-            $new_begin = 1 if $new_begin < 1;
-
-            $set->add_pair($new_begin, $begin);
-        }
-
-        if ( $sets[-1]->size >= {{ opt.min }} ) {
-            my $new_end = $end + {{ opt.fill }} * 10;
-            $new_end = $length if $new_end > $length;
-
-            $set->add_pair($end, $new_end);
-        }
-
-        $yml->{$key} = $set->runlist;
-    }
-{% endif -%}
 
     YAML::Syck::DumpFile( q{contig.proper.yml}, $yml );
     '

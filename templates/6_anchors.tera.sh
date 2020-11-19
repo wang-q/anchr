@@ -44,6 +44,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         --uscale {{ opt.uscale }} \
         --lscale {{ opt.lscale }} \
         -p {{ parallel2 }} \
+        --keepedge \
         -o anchors.sh
     bash anchors.sh
 
