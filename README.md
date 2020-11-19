@@ -16,9 +16,12 @@ cargo install --force --path .
 
 cargo install --git https://github.com/wang-q/anchr --branch main
 
-# Compiled binary
+# Compiled binary for linux
 mkdir -p "~/bin"
-curl -fsSL https://github.com/wang-q/anchr/releases/download/v0.3.6/anchr-x86_64-unknown-linux-musl.tar.gz |
+curl -fsSL $(
+    curl -fsSL https://api.github.com/repos/wang-q/anchr/releases/latest |
+        jq -r '.assets[] | select(.name == "anchr-x86_64-unknown-linux-musl.tar.gz").browser_download_url'
+    ) |
     tar xvz
 cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
 rm -fr target

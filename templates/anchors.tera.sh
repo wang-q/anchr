@@ -193,7 +193,7 @@ cat basecov.txt |
         }
     ' \
     > contig.covered.txt
-#find . -type f -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
+find . -type f -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
 
 #----------------------------#
 # anchor
