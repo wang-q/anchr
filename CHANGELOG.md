@@ -2,6 +2,12 @@
 
 ## Unreleased - ReleaseDate
 
+* bbtools 37.77
+* sort keys of env.json
+* `anchr anchors`
+    * Use tsv-summarize to replace Perl codes
+    * Rewrite --keepedge
+
 ## 0.3.6 - 2020-11-18
 
 * `anchr anchors`
