@@ -48,97 +48,33 @@ find . -type f -name "unmapped.sam" | parallel --no-run-if-empty -j 1 rm
 # basecov
 #----------------------------#
 log_info "basecov"
-cat basecov.txt |
-    grep -v '^#' |
-    perl -nla -MPath::Tiny -MJSON -MApp::Fasops::Common -MApp::Dazz::Common -e '
-        BEGIN {
-            our $name;
-            our @list;
-            our %hist_of;
-            our $json = JSON->new->decode( Path::Tiny::path( q{env.json} )->slurp );
-        }
-
-        if ( !defined $name ) {
-            $name = $F[0];
-            @list = ( $F[2] );
-        }
-        elsif ( $name eq $F[0] ) {
-            push @list, $F[2];
-        }
-        else {
-            my $mean_cov = App::Fasops::Common::mean(@list);
-            printf qq(%s\t%d\n), $name, int $mean_cov;
-
-            $name = $F[0];
-            @list = ( $F[2] );
-        }
-
-        $hist_of{$F[2]}++;
-
-        END {
-            my $mean_cov = App::Fasops::Common::mean(@list);
-            printf qq(%s\t%d\n), $name, int $mean_cov;
-
-            my $content;
-            for my $key ( sort {$a <=> $b} keys %hist_of ) {
-                $content .= sprintf qq(%s\t%d\n), $key, $hist_of{$key};
-            }
-            Path::Tiny::path(q{basecov.hist.tsv})->spew( $content );
-
-            # Non-covered regions should be ignored
-            delete $hist_of{0};
-
-            my $median = App::Dazz::Common::histogram_percentile(\%hist_of, 0.5);
-            my $q25 = App::Dazz::Common::histogram_percentile(\%hist_of, 0.25);
-            my $q75 = App::Dazz::Common::histogram_percentile(\%hist_of, 0.75);
-            my $IQR = $q75 - $q25;
-
-            $json->{median} = $median;
-            $json->{IQR} = $IQR;
-            Path::Tiny::path(q{env.json})->spew( JSON->new->encode($json) );
-        }
-    ' \
-    > contigs.coverage.tsv
 
 # How to best eliminate values in a list that are outliers
-# http://www.perlmonks.org/?node_id=1147296
 # http://exploringdatablog.blogspot.com/2013/02/finding-outliers-in-numerical-data.html
-cat contigs.coverage.tsv |
-    perl -nla -MPath::Tiny -MJSON -MStatistics::Descriptive -e '
-        BEGIN {
-            our $stat   = Statistics::Descriptive::Full->new();
-            our %cov_of = ();
-            our $json = JSON->new->decode( Path::Tiny::path( q{env.json} )->slurp );
-        }
+cat basecov.txt |
+    grep -v '^#' |
+    tsv-summarize --median 3 --mad 3 --quantile 3:0.25,0.75 |
+    perl -MPath::Tiny -MJSON -e '
+        my $json = JSON->new->decode( Path::Tiny::path( q(env.json) )->slurp );
 
-        next if $F[1] < {{ opt.mincov }};
+        my $line = <>;
+        my @fields = split qq(\t), $line;
 
-        $cov_of{ $F[0] } = $F[1];
-        $stat->add_data( $F[1] );
+        $json->{median} = $fields[0];
+        $json->{MAD} = $fields[1];
+        $json->{IQR} = $fields[3] - $fields[2];
 
-        END {
-            my $contig_median = $stat->median();
+        my $lower = ( $json->{median} - {{ opt.mscale }} * $json->{MAD} ) / {{ opt.lscale }};
+        $lower = {{ opt.mincov }} if $lower < {{ opt.mincov }};
+        my $upper = ( $json->{median} + {{ opt.mscale }} * $json->{MAD} ) * {{ opt.uscale }};
 
-            my $median = $json->{median};
-            my @abs_res      = map { abs( $median - $_ ) } $stat->get_data();
-            my $abs_res_stat = Statistics::Descriptive::Full->new();
-            $abs_res_stat->add_data(@abs_res);
-            my $MAD = $abs_res_stat->median();
+        $json->{mscale} = {{ opt.mscale }};
+        $json->{lscale} = {{ opt.lscale }};
+        $json->{uscale} = {{ opt.uscale }};
+        $json->{lower} = $lower;
+        $json->{upper} = $upper;
 
-            my $lower = ( $median - {{ opt.mscale }} * $MAD ) / {{ opt.lscale }};
-            $lower = {{ opt.mincov }} if $lower < {{ opt.mincov }};
-            my $upper = ( $median + {{ opt.mscale }} * $MAD ) * {{ opt.uscale }};
-
-            $json->{contig_median} = $contig_median;
-            $json->{MAD} = $MAD;
-            $json->{mscale} = {{ opt.mscale }};
-            $json->{lscale} = {{ opt.lscale }};
-            $json->{uscale} = {{ opt.uscale }};
-            $json->{lower} = $lower;
-            $json->{upper} = $upper;
-
-            Path::Tiny::path(q{env.json})->spew( JSON->new->encode($json) );
-        }
+        Path::Tiny::path(q(env.json))->spew( JSON->new->encode($json) );
     '
 
 #----------------------------#
