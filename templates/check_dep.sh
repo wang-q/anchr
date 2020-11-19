@@ -62,7 +62,7 @@ hash kat 2>/dev/null || {
 #----------------------------#
 hash bbduk.sh 2>/dev/null || {
     echo >&2 "bbtools is required but it's not installed.";
-    echo >&2 "Install with homebrew: brew install wang-q/tap/bbtools@38.59";
+    echo >&2 "Install with homebrew: brew install wang-q/tap/bbtools@37.77";
     exit 1;
 }
 
