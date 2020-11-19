@@ -109,7 +109,7 @@ mkdir -p tests/trim
 pushd tests/trim
 
 anchr trim \
-    ../Labmda/R1.fq.gz ../Labmda/R2.fq.gz \
+    ../Lambda/R1.fq.gz ../Lambda/R2.fq.gz \
     -q 25 -l 60 \
     -o stdout |
     bash
