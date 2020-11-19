@@ -51,11 +51,11 @@ save () {
 
     if [ -e env.json ]; then
         cat env.json |
-            jq -f jq.filter.txt \
+            jq --sort-keys --from-file jq.filter.txt \
             > env.json.new
         rm env.json
     else
-        jq -f jq.filter.txt -n \
+        jq --from-file jq.filter.txt --null-input \
             > env.json.new
     fi
 
