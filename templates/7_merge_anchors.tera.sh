@@ -44,8 +44,8 @@ dazz merge \
 dazz contained \
     ${DIR_MERGE}/anchor.intermediate_1.fasta \
     --len 1000 --idt 0.98 --proportion 0.99 --parallel {{ opt.parallel }} \
-    -o stdout \
-    | faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.merge.fasta
+    -o stdout |
+    faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.merge.fasta
 {% else -%}
 #----------------------------#
 # anchors with Q0L0 reads
@@ -91,8 +91,8 @@ dazz contained \
     ${DIR_MERGE}/anchor.merge.fasta \
     ${DIR_MERGE}/others.intermediate_0.fasta \
     --len 500 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
-    -o stdout \
-    | faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_1.fasta
+    -o stdout |
+    faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_1.fasta
 
 cat ${DIR_MERGE}/others.intermediate_1.fasta |
     grep '>infile_1/' |
