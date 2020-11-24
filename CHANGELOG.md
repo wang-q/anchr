@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.3.9 - 2020-11-25
+
 ## 0.3.8 - 2020-11-20
 
 * bbtools 37.77
