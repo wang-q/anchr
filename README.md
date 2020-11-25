@@ -16,7 +16,7 @@ cargo install --force --path .
 
 cargo install --git https://github.com/wang-q/anchr --branch main
 
-# Compiled binary for linux
+# Compiled static binary for linux
 mkdir -p "~/bin"
 curl -fsSL $(
     curl -fsSL https://api.github.com/repos/wang-q/anchr/releases/latest |
