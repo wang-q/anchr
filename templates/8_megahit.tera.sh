@@ -37,7 +37,7 @@ else
 
     dazz contained \
         8_megahit/final.contigs.fa \
-        --len 1000 --idt 0.9999 --proportion 0.99999 --parallel 16 \
+        --len 1000 --idt 0.98 --proportion 0.99999 --parallel 16 \
         -o stdout |
         faops filter -a 1000 -l 0 stdin 8_megahit/megahit.non-contained.fasta
 
