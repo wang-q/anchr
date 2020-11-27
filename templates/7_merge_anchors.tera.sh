@@ -43,7 +43,7 @@ dazz merge \
     -o ${DIR_MERGE}/anchor.intermediate_1.fasta
 dazz contained \
     ${DIR_MERGE}/anchor.intermediate_1.fasta \
-    --len 1000 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len 1000 --idt 0.98 --proportion 0.99 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.merge.fasta
 {% else -%}
@@ -90,7 +90,7 @@ dazz contained \
 dazz contained \
     ${DIR_MERGE}/anchor.merge.fasta \
     ${DIR_MERGE}/others.intermediate_0.fasta \
-    --len 500 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len 500 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_1.fasta
 

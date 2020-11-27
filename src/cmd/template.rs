@@ -46,14 +46,15 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
     * --splitp 20
     * --statp 2
     * --readl 100
-    * --uscale 3
+    * --uscale 2
+    * --lscale 3
     * --redo
 
 * Extend anchors
 
     * --extend
-    * --gluemin 10
-    * --fillmax 500
+    * --gluemin 30
+    * --fillmax 100
 
 "#,
         )
@@ -243,7 +244,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("gluemin")
                 .help("Min length of overlaps to be glued")
                 .takes_value(true)
-                .default_value("10")
+                .default_value("30")
                 .empty_values(false),
         )
         .arg(
@@ -251,7 +252,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("fillmax")
                 .help("Max length of gaps")
                 .takes_value(true)
-                .default_value("500")
+                .default_value("100")
                 .empty_values(false),
         )
 }

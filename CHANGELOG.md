@@ -14,6 +14,9 @@
 	* `dazz orient` - 0.999
 	* `dazz merge` - 0.9999
 	* `dazz group` - 0.999
+* Adjust `anchr template` default options
+  * --gluemin 30
+  * --fillmax 100
 
 ## 0.3.6 - 2020-11-18
 
