@@ -2,13 +2,16 @@
 
 ## Unreleased - ReleaseDate
 
-## 0.3.9 - 2020-11-25
-
 * bbtools 37.77
 * sort keys of env.json
 * `anchr anchors`
     * Use tsv-summarize to replace Perl codes
     * Rewrite --keepedge
+* Set `dazz --idt` to a higher level
+	* `dazz contained` - 0.9999
+	* `dazz orient` - 0.999
+	* `dazz merge` - 0.9999
+	* `dazz group` - 0.999
 
 ## 0.3.6 - 2020-11-18
 

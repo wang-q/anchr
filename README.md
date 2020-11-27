@@ -131,14 +131,14 @@ anchr merge \
 popd
 
 # quorum
-pushd -p tests/trim
+pushd tests/trim
 anchr quorum \
     R1.fq.gz R2.fq.gz \
     -o stdout |
     bash
 popd
 
-pushd -p tests/trim/Q25L60
+pushd tests/trim/Q25L60
 anchr quorum \
     R1.fq.gz R2.fq.gz Rs.fq.gz \
     -o stdout |
@@ -146,10 +146,10 @@ anchr quorum \
 popd
 
 # unitigs
+gzip -dcf tests/trim/pe.cor.fa.gz > tests/trim/pe.cor.fa
+
 mkdir -p tests/superreads
 pushd tests/superreads
-
-gzip -dcf ../trim/pe.cor.fa.gz > ../trim/pe.cor.fa
 
 anchr unitigs \
     ../trim/pe.cor.fa ../trim/env.json \
@@ -193,6 +193,7 @@ anchr anchors \
     ../unitigs.fasta \
     ../pe.cor.fa \
     --readl 150 \
+    --keepedge \
     -p 4 \
     -o anchors.sh
 bash anchors.sh
