@@ -36,7 +36,7 @@ dazz overlap2 \
     ${FILE_ANCHOR} \
     ${FILE_LONG} \
     -d 7_fill_anchors \
-    -b 50 --len 1000 --idt 0.995 --all
+    -b 50 --len 1000 --idt 0.999 --all
 
 cd 7_fill_anchors
 
@@ -50,7 +50,7 @@ dazz group \
     anchorLong.ovlp.tsv \
     --parallel {{ opt.parallel }} \
     --keep \
-    --range "1-${CONTIG_COUNT}" --len 1000 --idt 0.995 --max {{ opt.fillmax }} -c ${GAP_COV}
+    --range "1-${CONTIG_COUNT}" --len 1000 --idt 0.999 --max {{ opt.fillmax }} -c ${GAP_COV}
 
 log_info "Processing each groups"
 {% set parallel2 = opt.parallel | int / 2 -%}
@@ -60,13 +60,13 @@ cat group/groups.txt |
     parallel --no-run-if-empty --linebuffer -k -j {{ parallel2 }} '
         echo {};
         dazz orient \
-            --len 1000 --idt 0.995 \
+            --len 1000 --idt 0.999 \
             group/{}.anchor.fasta \
             group/{}.long.fasta \
             -r group/{}.restrict.tsv \
             -o group/{}.strand.fasta;
 
-        dazz overlap --len 1000 --idt 0.995 --all \
+        dazz overlap --len 1000 --idt 0.9999 --all \
             group/{}.strand.fasta \
             -o stdout |
             ovlpr restrict \

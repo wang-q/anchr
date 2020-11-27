@@ -60,7 +60,7 @@ else
 
         dazz contained \
             out_gapClosed.fa \
-            --len 1000 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
+            --len 1000 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
             -o stdout |
             faops filter -a 1000 -l 0 stdin platanus.non-contained.fasta
     else
@@ -70,7 +70,7 @@ else
 
         dazz contained \
             out_contig.fa out_contigBubble.fa \
-            --len 1000 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
+            --len 1000 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
             -o stdout |
             faops filter -a 1000 -l 0 stdin platanus.non-contained.fasta
     fi

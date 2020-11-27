@@ -53,7 +53,7 @@ else
 
     dazz contained \
         contigs.fasta \
-        --len 1000 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
+        --len 1000 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
         -o stdout |
         faops filter -a 1000 -l 0 stdin spades.non-contained.fasta
 

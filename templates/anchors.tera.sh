@@ -327,18 +327,18 @@ faops region -l 0 SR.fasta others.regions.txt pe.others.fa
 log_info "Merging anchors"
 dazz contained \
     pe.anchor.fa \
-    --len {{ opt.min }} --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len {{ opt.min }} --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
     -o anchor.non-contained.fasta
 dazz orient \
     anchor.non-contained.fasta \
-    --len {{ opt.min }} --idt 0.98 --parallel {{ opt.parallel }} \
+    --len {{ opt.min }} --idt 0.999 --parallel {{ opt.parallel }} \
     -o anchor.orient.fasta
 dazz merge \
-    anchor.orient.fasta --len {{ opt.min }} --idt 0.999 --parallel {{ opt.parallel }} \
+    anchor.orient.fasta --len {{ opt.min }} --idt 0.9999 --parallel {{ opt.parallel }} \
     -o anchor.merge0.fasta
 dazz contained \
     anchor.merge0.fasta \
-    --len {{ opt.min }} --idt 0.98 --proportion 0.99 --parallel {{ opt.parallel }} \
+    --len {{ opt.min }} --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
     -o anchor.fasta
 
 #----------------------------#

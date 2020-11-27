@@ -28,22 +28,22 @@ mkdir -p ${DIR_MERGE}
 # reversely sorted files, so that Q30L60X80 will be infile_0
 dazz contained \
     $( find . -path "*${DIR_PREFIX}*" -name "anchor.fasta" -or -path "*${DIR_PREFIX}*" -name "anchor.merge.fasta" | sort -r ) \
-    --len 1000 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len 1000 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.non-contained.fasta
 
 {% if opt.redo == "0" -%}
 dazz orient \
     ${DIR_MERGE}/anchor.non-contained.fasta \
-    --len 1000 --idt 0.98 --parallel {{ opt.parallel }} \
+    --len 1000 --idt 0.999 --parallel {{ opt.parallel }} \
     -o ${DIR_MERGE}/anchor.intermediate_0.fasta
 dazz merge \
     ${DIR_MERGE}/anchor.intermediate_0.fasta \
-    --len 1000 --idt 0.999 --parallel {{ opt.parallel }} \
+    --len 1000 --idt 0.9999 --parallel {{ opt.parallel }} \
     -o ${DIR_MERGE}/anchor.intermediate_1.fasta
 dazz contained \
     ${DIR_MERGE}/anchor.intermediate_1.fasta \
-    --len 1000 --idt 0.98 --proportion 0.99 --parallel {{ opt.parallel }} \
+    --len 1000 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.merge.fasta
 {% else -%}
@@ -83,14 +83,14 @@ dazz contained \
 {% if opt.redo == "1" -%}
     ${DIR_MERGE}/anchor/pe.others.fa \
 {% endif -%}
-    --len 500 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len 500 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_0.fasta
 
 dazz contained \
     ${DIR_MERGE}/anchor.merge.fasta \
     ${DIR_MERGE}/others.intermediate_0.fasta \
-    --len 500 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len 500 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_1.fasta
 
