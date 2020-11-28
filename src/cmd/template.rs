@@ -255,6 +255,13 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .default_value("100")
                 .empty_values(false),
         )
+        // Extend anchors
+        .arg(
+            Arg::with_name("busco")
+                .long("busco")
+                .help("Run busco"),
+        )
+
 }
 
 // command implementation
@@ -398,6 +405,10 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     gen_quast(&context)?;
     gen_stat_final(&context)?;
+
+    if args.is_present("busco") {
+        gen_busco(&context)?;
+    }
 
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
@@ -878,6 +889,23 @@ fn gen_quast(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/9_quast.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_busco(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "9_busco.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/9_busco.tera.sh")),
     ])
     .unwrap();
 

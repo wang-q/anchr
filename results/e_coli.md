@@ -477,7 +477,9 @@ anchr template \
     --lscale 3 \
     --redo \
     \
-    --extend
+    --extend \
+    \
+    --busco
 
 ```
 
