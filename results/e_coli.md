@@ -772,6 +772,47 @@ Table: statFinal
 | platanus.non-contained   |  176491 | 4559854 |   64 |
 
 
+Table: statBusco run_bacteria_odb10
+
+| NAME                |   C |   S |  D |  F |  M | Total |
+|:--------------------|----:|----:|---:|---:|---:|------:|
+| Genome              | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_superreads    | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_bcalm         | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_tadpole       | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_mr_superreads | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_mr_bcalm      | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_mr_tadpole    | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_anchors       | 124 | 124 |  0 |  0 |  0 |   124 |
+| glue_anchors        | 124 | 124 |  0 |  0 |  0 |   124 |
+| fill_anchors        | 124 | 124 |  0 |  0 |  0 |   124 |
+| spades              | 124 | 124 |  0 |  0 |  0 |   124 |
+| mr_spades           | 124 | 124 |  0 |  0 |  0 |   124 |
+| megahit             | 124 | 124 |  0 |  0 |  0 |   124 |
+| mr_megahit          | 124 | 124 |  0 |  0 |  0 |   124 |
+| platanus            | 124 | 124 |  0 |  0 |  0 |   124 |
+
+Table: statBusco run_enterobacterales_odb10
+
+| NAME                |   C |   S |  D |  F |  M | Total |
+|:--------------------|----:|----:|---:|---:|---:|------:|
+| Genome              | 440 | 438 |  2 |  0 |  0 |   440 |
+| merge_superreads    | 437 | 435 |  2 |  3 |  0 |   440 |
+| merge_bcalm         | 437 | 435 |  2 |  3 |  0 |   440 |
+| merge_tadpole       | 437 | 435 |  2 |  3 |  0 |   440 |
+| merge_mr_superreads | 438 | 436 |  2 |  2 |  0 |   440 |
+| merge_mr_bcalm      | 438 | 436 |  2 |  2 |  0 |   440 |
+| merge_mr_tadpole    | 438 | 436 |  2 |  2 |  0 |   440 |
+| merge_anchors       | 438 | 436 |  2 |  2 |  0 |   440 |
+| glue_anchors        | 439 | 437 |  2 |  1 |  0 |   440 |
+| fill_anchors        | 439 | 437 |  2 |  1 |  0 |   440 |
+| spades              | 440 | 438 |  2 |  0 |  0 |   440 |
+| mr_spades           | 440 | 438 |  2 |  0 |  0 |   440 |
+| megahit             | 440 | 438 |  2 |  0 |  0 |   440 |
+| mr_megahit          | 440 | 438 |  2 |  0 |  0 |   440 |
+| platanus            | 440 | 438 |  2 |  0 |  0 |   440 |
+
+
 # *Escherichia coli* str. K-12 substr. DH5alpha
 
 ## dh5alpha: reference
@@ -868,7 +909,9 @@ anchr template \
     --lscale 3 \
     --redo \
     \
-    --extend
+    --extend \
+    \
+    --busco
 
 ```
 
@@ -1160,4 +1203,44 @@ Table: statFinal
 | platanus.contig          |  108571 | 4558622 | 408 |
 | platanus.scaffold        |  125790 | 4514164 | 168 |
 | platanus.non-contained   |  132296 | 4492200 |  65 |
+
+Table: statBusco run_bacteria_odb10
+
+| NAME                |   C |   S |  D |  F |  M | Total |
+|:--------------------|----:|----:|---:|---:|---:|------:|
+| Genome              | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_superreads    | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_bcalm         | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_tadpole       | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_mr_superreads | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_mr_bcalm      | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_mr_tadpole    | 124 | 124 |  0 |  0 |  0 |   124 |
+| merge_anchors       | 124 | 124 |  0 |  0 |  0 |   124 |
+| glue_anchors        | 124 | 124 |  0 |  0 |  0 |   124 |
+| fill_anchors        | 124 | 124 |  0 |  0 |  0 |   124 |
+| spades              | 124 | 124 |  0 |  0 |  0 |   124 |
+| mr_spades           | 124 | 124 |  0 |  0 |  0 |   124 |
+| megahit             | 124 | 124 |  0 |  0 |  0 |   124 |
+| mr_megahit          | 124 | 124 |  0 |  0 |  0 |   124 |
+| platanus            | 124 | 124 |  0 |  0 |  0 |   124 |
+
+Table: statBusco run_enterobacterales_odb10
+
+| NAME                |   C |   S |  D |  F |  M | Total |
+|:--------------------|----:|----:|---:|---:|---:|------:|
+| Genome              | 440 | 438 |  2 |  0 |  0 |   440 |
+| merge_superreads    | 440 | 438 |  2 |  0 |  0 |   440 |
+| merge_bcalm         | 440 | 438 |  2 |  0 |  0 |   440 |
+| merge_tadpole       | 440 | 438 |  2 |  0 |  0 |   440 |
+| merge_mr_superreads | 440 | 438 |  2 |  0 |  0 |   440 |
+| merge_mr_bcalm      | 440 | 438 |  2 |  0 |  0 |   440 |
+| merge_mr_tadpole    | 440 | 438 |  2 |  0 |  0 |   440 |
+| merge_anchors       | 440 | 438 |  2 |  0 |  0 |   440 |
+| glue_anchors        | 440 | 438 |  2 |  0 |  0 |   440 |
+| fill_anchors        | 440 | 438 |  2 |  0 |  0 |   440 |
+| spades              | 440 | 438 |  2 |  0 |  0 |   440 |
+| mr_spades           | 440 | 438 |  2 |  0 |  0 |   440 |
+| megahit             | 440 | 438 |  2 |  0 |  0 |   440 |
+| mr_megahit          | 440 | 438 |  2 |  0 |  0 |   440 |
+| platanus            | 440 | 438 |  2 |  0 |  0 |   440 |
 
