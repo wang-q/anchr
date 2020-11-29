@@ -2,8 +2,6 @@
 
 ## Unreleased - ReleaseDate
 
-## 0.3.12 - 2020-11-28
-
 * bbtools 37.77
 * sort keys of env.json
 * `anchr anchors`
@@ -17,6 +15,8 @@
 * Adjust `anchr template` default options
   * --gluemin 30
   * --fillmax 100
+* Add `anchr template` scripts
+  * 9_busco.sh
 
 ## 0.3.6 - 2020-11-18
 
