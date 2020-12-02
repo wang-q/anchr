@@ -13,11 +13,11 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    if [ -e ${PREFIX}-gcp-21.dist_analysis.json ]; then
+    if [ -e ${PREFIX}-gcp-31.mx.png ]; then
         continue;
     fi
 
-    for KMER in 21 31 41 51 61 71 81; do
+    for KMER in 31 51 71; do
         log_info "PREFIX: ${PREFIX}; KMER: ${KMER}"
 
         kat hist \
