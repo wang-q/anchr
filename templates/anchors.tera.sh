@@ -51,8 +51,13 @@ log_info "basecov"
 
 # How to best eliminate values in a list that are outliers
 # http://exploringdatablog.blogspot.com/2013/02/finding-outliers-in-numerical-data.html
+#
+# basecov.txt
+# Pos is 0-based
+#RefName	Pos	Coverage
 cat basecov.txt |
     grep -v '^#' |
+    tsv-filter --ne 3:0 | # Non-covered regions should be ignored
     tsv-summarize --median 3 --mad 3 --quantile 3:0.25,0.75 |
     perl -MPath::Tiny -MJSON -e '
         my $json = JSON->new->decode( Path::Tiny::path( q(env.json) )->slurp );
@@ -81,12 +86,10 @@ cat basecov.txt |
 # Properly covered regions by reads
 #----------------------------#
 # at least some reads covered
-# basecov.txt
-# Pos is 0-based
-#RefName	Pos	Coverage
 log_debug "covered"
 cat basecov.txt |
     grep -v '^#' |
+    tsv-filter --ne 3:0 | # Non-covered regions should be ignored
     perl -nla -MPath::Tiny -MJSON -MApp::RL::Common -e '
         BEGIN {
             our $name;
@@ -120,9 +123,9 @@ cat basecov.txt |
         }
 
 {% if opt.keepedge == "1" -%}
+        # proportionally decreases the limits
         if ( $F[1] < {{ opt.readl }} / 2 ) { # left edges
             if ( $F[2] >= {{ opt.mincov }} ) {
-                # proportionally decreases the limits
                 my $lower = $limit->{lower} * $F[1] * 2 / {{ opt.readl }};
                 my $upper = $limit->{upper} * $F[1] * 2 / {{ opt.readl }};
                 if ( $F[2] >= $lower and $F[2] <= $upper ) {
@@ -132,7 +135,6 @@ cat basecov.txt |
         }
         elsif ( $F[1] >= $length_of->{$name} - {{ opt.readl }} / 2 ) { # right edges
             if ( $F[2] >= {{ opt.mincov }} ) {
-                # proportionally decreases the limits
                 my $lower = $limit->{lower} * ($length_of->{$name} - $F[1]) * 2 / {{ opt.readl }};
                 my $upper = $limit->{upper} * ($length_of->{$name} - $F[1]) * 2 / {{ opt.readl }};
                 if ( $F[2] >= $lower and $F[2] <= $upper ) {

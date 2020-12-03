@@ -2,18 +2,17 @@
 
 ## Unreleased - ReleaseDate
 
-## 0.3.13 - 2020-11-30
-
 * bbtools 37.77
 * sort keys of env.json
 * `anchr anchors`
-    * Use tsv-summarize to replace Perl codes
-    * Rewrite --keepedge
+  * Use tsv-summarize to replace Perl codes
+  * Rewrite --keepedge
+  * Non-covered regions should be ignored
 * Set `dazz --idt` to a higher level
-	* `dazz contained` - 0.9999
-	* `dazz orient` - 0.999
-	* `dazz merge` - 0.9999
-	* `dazz group` - 0.999
+  * `dazz contained` - 0.9999
+  * `dazz orient` - 0.999
+  * `dazz merge` - 0.9999
+  * `dazz group` - 0.999
 * Adjust `anchr template` default options
   * --gluemin 30
   * --fillmax 100
