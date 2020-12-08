@@ -10,7 +10,7 @@ NUM_THREADS={{ opt.parallel }}
 save NUM_THREADS
 
 # Add masurca to $PATH
-export PATH="$(readlink -f $(which masurca) | xargs dirname):$PATH"
+export PATH="$(readlinkf "$(which masurca)" | xargs dirname):$PATH"
 
 #----------------------------#
 # Read stats of PE reads
@@ -66,7 +66,7 @@ log_info Creating unitigs
         > unitigs_K{{ kmer }}.fasta
 {% endif -%}
 {% endfor -%}
-
+{# Keep a blank line #}
 log_info Creating non-contained unitigs
     dazz contained \
 {% for kmer in kmers -%}

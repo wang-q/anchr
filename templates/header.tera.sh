@@ -80,3 +80,7 @@ time_format () {
             print parse_duration($_);
         '
 }
+
+readlinkf () {
+    perl -MCwd -l -e 'print Cwd::abs_path shift' "$1";
+}

@@ -6,7 +6,7 @@
 START_TIME=$(date +%s)
 
 # Add masurca to $PATH
-export PATH="$(readlink -f $(which masurca) | xargs dirname):$PATH"
+export PATH="$(readlinkf "$(which masurca)" | xargs dirname):$PATH"
 
 #----------------------------#
 # Renaming reads
