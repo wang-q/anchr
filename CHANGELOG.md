@@ -2,8 +2,6 @@
 
 ## Unreleased - ReleaseDate
 
-## 0.3.14 - 2020-12-03
-
 * bbtools 37.77
 * sort keys of env.json
 * `anchr anchors`
@@ -20,6 +18,7 @@
   * --fillmax 100
 * Add `anchr template` scripts
   * 9_busco.sh
+* Perl version of `readlink -f`
 
 ## 0.3.6 - 2020-11-18
 
