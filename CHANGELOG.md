@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.3.15 - 2020-12-15
+
 * bbtools 37.77
 * sort keys of env.json
 * `anchr anchors`
