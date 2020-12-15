@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+brew tap brewsci/bio
+brew tap brewsci/science
+brew tap wang-q/tap
+
 check_install () {
     if brew list --versions "$1" > /dev/null; then
         echo "$1 already installed"
