@@ -28,13 +28,15 @@ fi
 #----------------------------#
 # Mapping
 #----------------------------#
+{% set parallel2 = opt.parallel | int - 3 -%}
+{% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
 if [ ! -e R.sort.bai ]; then
     gzip -dcf \
         ../2_illumina/trim/{{ opt.bowtie }}/R1.fq.gz \
         ../2_illumina/trim/{{ opt.bowtie }}/R2.fq.gz \
         ../2_illumina/trim/{{ opt.bowtie }}/Rs.fq.gz |
         faops filter -l 0 stdin stdout | # ignore QUAL
-        bowtie2 -p 20 --very-fast -t \
+        bowtie2 -p {{ parallel2 }} --very-fast -t \
             -x genome.fa \
             -f -U /dev/stdin \
             2> >(tee bowtie.R.log >&2) |

@@ -32,7 +32,7 @@ rm -fr target
 
 ```
 $ anchr help
-anchr 0.2.8
+anchr 0.3.16-alpha.1
 wang-q <wang-q@outlook.com>
 Anchr - Assembler of N-free CHRomosomes
 
