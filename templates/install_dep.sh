@@ -20,7 +20,7 @@ for package in jq parallel pigz; do
     check_install ${package}
 done
 
-for package in fastqc sickle; do
+for package in fastqc sickle bowtie2; do
     check_install ${package}
 done
 
@@ -39,6 +39,7 @@ done
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     check_install brewsci/bio/masurca
+    check_install brewsci/bio/mosdepth
 fi
 
 exit 0

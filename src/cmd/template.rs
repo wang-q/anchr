@@ -38,6 +38,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
     * --merge
     * --prefilter
     * --ecphase "1 2 3"
+    * --bowtie
 
 * Down sampling, unitigs, and anchors
 
@@ -170,6 +171,13 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .default_value("1 2 3")
                 .empty_values(false),
         )
+        .arg(
+            Arg::with_name("bowtie")
+                .long("bowtie")
+                .help("Map trimmed reads to genome")
+                .takes_value(true)
+                .empty_values(false),
+        )
         // Down sampling, unitigs, and anchors
         .arg(
             Arg::with_name("cov")
@@ -256,12 +264,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .empty_values(false),
         )
         // Extend anchors
-        .arg(
-            Arg::with_name("busco")
-                .long("busco")
-                .help("Run busco"),
-        )
-
+        .arg(Arg::with_name("busco").long("busco").help("Run busco"))
 }
 
 // command implementation
@@ -323,6 +326,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         },
     );
     opt.insert("ecphase", args.value_of("ecphase").unwrap());
+    opt.insert(
+        "bowtie",
+        if args.is_present("bowtie") {
+            args.value_of("bowtie").unwrap()
+        } else {
+            "0"
+        },
+    );
 
     opt.insert("cov", args.value_of("cov").unwrap());
     opt.insert("unitigger", args.value_of("unitigger").unwrap());
@@ -356,6 +367,10 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     gen_trim(&context)?;
 
     gen_stat_reads(&context)?;
+
+    if args.is_present("bowtie") {
+        gen_bowtie(&context)?;
+    }
 
     if args.is_present("quorum") {
         gen_quorum(&context)?;
@@ -547,6 +562,23 @@ fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_merge.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_bowtie(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "3_bowtie.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/3_bowtie.tera.sh")),
     ])
     .unwrap();
 

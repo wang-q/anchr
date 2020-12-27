@@ -99,6 +99,23 @@ perl -MNumber::Format -e "1" 2>/dev/null || {
 }
 
 #----------------------------#
+# bowtie
+#----------------------------#
+hash bowtie2 2>/dev/null || {
+    echo >&2 "bowtie2 is required but it's not installed.";
+    echo >&2 "Install with homebrew: brew install bowtie2";
+    exit 1;
+}
+
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    hash mosdepth 2>/dev/null || {
+        echo >&2 "mosdepth is required but it's not installed.";
+        echo >&2 "Install with homebrew: brew install brewsci/bio/mosdepth";
+        exit 1;
+    }
+fi
+
+#----------------------------#
 # unitigs
 #----------------------------#
 hash bcalm 2>/dev/null || {
