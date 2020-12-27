@@ -47,6 +47,13 @@ if [ -e 2_quorum.sh ]; then
 fi
 
 #----------------------------#
+# bowtie
+#----------------------------#
+if [ -e 3_bowtie.sh ]; then
+    bash 3_bowtie.sh;
+fi
+
+#----------------------------#
 # down sampling trimmed reads; build unitigs and anchors
 #----------------------------#
 if [ -e 4_down_sampling.sh ]; then
