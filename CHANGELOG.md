@@ -2,6 +2,9 @@
 
 ## Unreleased - ReleaseDate
 
+* Add `anchr template` scripts
+  * 3_bowtie.sh
+
 ## 0.3.15 - 2020-12-15
 
 * bbtools 37.77
