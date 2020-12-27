@@ -33,7 +33,8 @@ fi
 if [ ! -e R.sort.bai ]; then
     if [ -f ../2_illumina/trim/{{ opt.bowtie }}/pe.cor.fa.gz ]; then
         gzip -dcf \
-            ../2_illumina/trim/{{ opt.bowtie }}/pe.cor.fa.gz
+            ../2_illumina/trim/{{ opt.bowtie }}/pe.cor.fa.gz |
+            faops filter -l 0 -a 50 stdin stdout # ignore empty reads
     elif [ -f ../2_illumina/trim/{{ opt.bowtie }}/R1.fq.gz ]; then
         gzip -dcf \
             ../2_illumina/trim/{{ opt.bowtie }}/R1.fq.gz \
