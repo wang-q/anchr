@@ -5,6 +5,7 @@
 * Add `anchr template` scripts
   * 3_bowtie.sh
   * Give priority to pe.cor.fa.gz
+* Add dependency on samtools
 
 ## 0.3.15 - 2020-12-15
 

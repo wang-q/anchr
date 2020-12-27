@@ -20,7 +20,7 @@ for package in jq parallel pigz; do
     check_install ${package}
 done
 
-for package in fastqc sickle bowtie2; do
+for package in fastqc sickle bowtie2 samtools; do
     check_install ${package}
 done
 

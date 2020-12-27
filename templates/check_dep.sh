@@ -107,6 +107,12 @@ hash bowtie2 2>/dev/null || {
     exit 1;
 }
 
+hash samtools 2>/dev/null || {
+    echo >&2 "samtools is required but it's not installed.";
+    echo >&2 "Install with homebrew: brew install samtools";
+    exit 1;
+}
+
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     hash mosdepth 2>/dev/null || {
         echo >&2 "mosdepth is required but it's not installed.";

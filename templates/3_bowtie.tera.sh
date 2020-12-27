@@ -46,6 +46,7 @@ if [ ! -e R.sort.bai ]; then
             -x genome.fa \
             -f -U /dev/stdin \
             2> >(tee bowtie.R.log >&2) |
+        samtools view -F 4 -u - | # Remove unmapped reads, write uncompressed BAM output
         picard CleanSam \
             --INPUT /dev/stdin \
             --OUTPUT /dev/stdout \
