@@ -17,13 +17,13 @@ cargo install --force --path .
 cargo install --git https://github.com/wang-q/anchr --branch main
 
 # Compiled static binary for Linux
-mkdir -p "~/bin"
+mkdir -p ${HOME}/bin
 curl -fsSL $(
     curl -fsSL https://api.github.com/repos/wang-q/anchr/releases/latest |
         jq -r '.assets[] | select(.name == "anchr-x86_64-unknown-linux-musl.tar.gz").browser_download_url'
     ) |
     tar xvz
-cp target/x86_64-unknown-linux-musl/release/anchr ~/bin
+cp target/x86_64-unknown-linux-musl/release/anchr ${HOME}/bin
 rm -fr target
 
 ```

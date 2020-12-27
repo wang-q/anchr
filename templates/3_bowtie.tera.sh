@@ -31,11 +31,16 @@ fi
 {% set parallel2 = opt.parallel | int - 3 -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
 if [ ! -e R.sort.bai ]; then
-    gzip -dcf \
-        ../2_illumina/trim/{{ opt.bowtie }}/R1.fq.gz \
-        ../2_illumina/trim/{{ opt.bowtie }}/R2.fq.gz \
-        ../2_illumina/trim/{{ opt.bowtie }}/Rs.fq.gz |
-        faops filter -l 0 stdin stdout | # ignore QUAL
+    if [ -f ../2_illumina/trim/{{ opt.bowtie }}/pe.cor.fa.gz ]; then
+        gzip -dcf \
+            ../2_illumina/trim/{{ opt.bowtie }}/pe.cor.fa.gz
+    elif [ -f ../2_illumina/trim/{{ opt.bowtie }}/R1.fq.gz ]; then
+        gzip -dcf \
+            ../2_illumina/trim/{{ opt.bowtie }}/R1.fq.gz \
+            ../2_illumina/trim/{{ opt.bowtie }}/R2.fq.gz \
+            ../2_illumina/trim/{{ opt.bowtie }}/Rs.fq.gz |
+            faops filter -l 0 stdin stdout # ignore QUAL
+    fi |
         bowtie2 -p {{ parallel2 }} --very-fast -t \
             -x genome.fa \
             -f -U /dev/stdin \
