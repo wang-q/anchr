@@ -26,17 +26,19 @@ Create downloading files for ENA.
 Usage: perl %c [options] <infile.yml>
 
 * Three files will be generated
-    * .csv for information
+    * .csv of run information
     * .ftp.txt for aria2c
     * .md5.txt for checkup
 * Example:
     * `sra_prep.pl sra_info.yml`
-    * `aria2c -x 9 -s 3 -c -i sra_info.ftp.txt`
+    * `aria2c -j 4 -x 4 -s 1 -c -i sra_info.ftp.txt`
     * `md5sum --check sra_info.md5.txt`
+
 MARKDOWN
 
     [ 'platform|p=s', 'illumina, 454 or pacbio', ],
     [ 'layout|l=s',   'pair or single', ],
+    [ 'ascp',         'Aspera commands', ],
     [],
     [ 'help|h', 'display this message' ],
     { show_defaults => 1, }
@@ -59,7 +61,7 @@ for (@ARGV) {
 #----------------------------------------------------------#
 # start
 #----------------------------------------------------------#
-my $yml = YAML::Syck::LoadFile( $ARGV[0] );
+my $yml      = YAML::Syck::LoadFile( $ARGV[0] );
 my $basename = Path::Tiny::path( $ARGV[0] )->basename( ".yml", ".yaml" );
 
 my $csv = Text::CSV_XS->new( { binary => 1 } )
@@ -67,12 +69,14 @@ my $csv = Text::CSV_XS->new( { binary => 1 } )
 $csv->eol("\n");
 open my $csv_fh, ">", "$basename.csv";
 
-my $ftp_fn = "$basename.ftp.txt";
-my $md5_fn = "$basename.md5.txt";
+my $ftp_fn  = "$basename.ftp.txt";
+my $md5_fn  = "$basename.md5.txt";
+my $ascp_fn = "$basename.ascp.sh";
 Path::Tiny::path($ftp_fn)->remove;
 Path::Tiny::path($md5_fn)->remove;
+Path::Tiny::path($ascp_fn)->remove;
 
-$csv->print( $csv_fh, [qw{ name srx platform layout ilength srr spot base }] );
+$csv->print( $csv_fh, [qw{ name srx platform layout ilength srr spots bases }] );
 for my $name ( sort keys %{$yml} ) {
     print "$name\n";
 
@@ -99,15 +103,41 @@ for my $name ( sort keys %{$yml} ) {
         for my $i ( 0 .. scalar @{ $info->{srr} } - 1 ) {
             my $srr = $info->{srr}[$i];
 
-            my $spot = $info->{srr_info}{$srr}{read_count};
-            my $base = $info->{srr_info}{$srr}{base_count};
+            my $spots = $info->{srr_info}{$srr}{read_count};
+            my $bases = $info->{srr_info}{$srr}{base_count};
 
             $csv->print( $csv_fh,
-                [ $name, $srx, $platform, $layout, $ilength, $srr, $spot, $base, ] );
+                [ $name, $srx, $platform, $layout, $ilength, $srr, $spots, $bases, ] );
         }
 
         Path::Tiny::path($ftp_fn)->append( map {"$_\n"} @{ $info->{downloads} } );
         Path::Tiny::path($md5_fn)->append( map {"$_\n"} @{ $info->{md5s} } );
+
+        for my $line ( @{ $info->{downloads} } ) {
+            my $base = Path::Tiny::path($line)->basename();
+
+            # https://www.biostars.org/p/325010/
+            next unless $opt->{ascp};
+            next if Path::Tiny::path($base)->is_file;
+
+            $line =~ s/ftp:\/\/ftp.sra.ebi.ac.uk\//era-fasp\@fasp.sra.ebi.ac.uk:/;
+
+            my $cmd;
+            $cmd .= "[ ! -e $base ] && ";
+            if ( $^O eq 'darwin' ) {
+                $cmd .= ' $HOME/Applications/Aspera\ Connect.app/Contents/Resources/ascp';
+                $cmd
+                    .= ' -i $HOME/Applications/Aspera\ Connect.app/Contents/Resources/asperaweb_id_dsa.openssh';
+            }
+            else {
+                $cmd .= ' $HOME/.aspera/connect/bin/ascp';
+                $cmd .= ' -i $HOME/.aspera/connect/etc/asperaweb_id_dsa.openssh';
+            }
+            $cmd .= ' -TQ -k1 -p -v -P33001';
+            $cmd .= " $line";
+            $cmd .= " .";
+            Path::Tiny::path($ascp_fn)->append( $cmd . "\n" );
+        }
     }
 }
 
