@@ -113,11 +113,11 @@ for my $name ( sort keys %{$yml} ) {
         Path::Tiny::path($ftp_fn)->append( map {"$_\n"} @{ $info->{downloads} } );
         Path::Tiny::path($md5_fn)->append( map {"$_\n"} @{ $info->{md5s} } );
 
+        # https://www.biostars.org/p/325010/
+        next unless $opt->{ascp};
         for my $line ( @{ $info->{downloads} } ) {
             my $base = Path::Tiny::path($line)->basename();
 
-            # https://www.biostars.org/p/325010/
-            next unless $opt->{ascp};
             next if Path::Tiny::path($base)->is_file;
 
             $line =~ s/ftp:\/\/ftp.sra.ebi.ac.uk\//era-fasp\@fasp.sra.ebi.ac.uk:/;
