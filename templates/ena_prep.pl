@@ -115,15 +115,17 @@ for my $name ( sort keys %{$yml} ) {
 
         # https://www.biostars.org/p/325010/
         next unless $opt->{ascp};
-        for my $line ( @{ $info->{downloads} } ) {
-            my $base = Path::Tiny::path($line)->basename();
+        for my $i ( 0 .. $#{ $info->{downloads} } ) {
+            my $url = $info->{downloads}[$i];
+            my $md5 = $info->{md5s}[$i];
+            my $fn = Path::Tiny::path($url)->basename();
 
-            next if Path::Tiny::path($base)->is_file;
+            next if Path::Tiny::path($fn)->is_file;
 
-            $line =~ s/ftp:\/\/ftp.sra.ebi.ac.uk\//era-fasp\@fasp.sra.ebi.ac.uk:/;
+            $url =~ s/ftp:\/\/ftp.sra.ebi.ac.uk\//era-fasp\@fasp.sra.ebi.ac.uk:/;
 
             my $cmd;
-            $cmd .= "[ ! -e $base ] && ";
+            $cmd .= "[ ! -e $fn ] && ";
             if ( $^O eq 'darwin' ) {
                 $cmd .= ' $HOME/Applications/Aspera\ Connect.app/Contents/Resources/ascp';
                 $cmd
@@ -133,9 +135,12 @@ for my $name ( sort keys %{$yml} ) {
                 $cmd .= ' $HOME/.aspera/connect/bin/ascp';
                 $cmd .= ' -i $HOME/.aspera/connect/etc/asperaweb_id_dsa.openssh';
             }
-            $cmd .= ' -TQ -k1 -p -v -P33001';
-            $cmd .= " $line";
-            $cmd .= " .";
+            $cmd .= ' -TQ -k1 -v -P33001';
+            $cmd .= " $url";
+            $cmd .= " . && ";
+            $cmd .= " if [ \$(openssl dgst -md5 -r $fn | cut -d' ' -f 1) != \$(echo '$md5' | cut -d' ' -f 1) ]; then ";
+            $cmd .= " echo -e '$fn\\tNot OK'; rm $fn; ";
+            $cmd .= " else echo -e '$fn\\tOK'; fi ";
             Path::Tiny::path($ascp_fn)->append( $cmd . "\n" );
         }
     }
