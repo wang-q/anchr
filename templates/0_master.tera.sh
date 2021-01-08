@@ -47,10 +47,13 @@ if [ -e 2_quorum.sh ]; then
 fi
 
 #----------------------------#
-# bwa
+# mapping
 #----------------------------#
 if [ -e 3_bwa.sh ]; then
     bash 3_bwa.sh;
+fi
+if [ -e 3_gatk.sh ]; then
+    bash 3_gatk.sh;
 fi
 
 #----------------------------#

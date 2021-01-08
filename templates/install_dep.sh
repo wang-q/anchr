@@ -20,7 +20,7 @@ for package in fastqc sickle bwa samtools picard-tools; do
     check_install ${package}
 done
 
-for package in jellyfish bcalm; do
+for package in jellyfish bcalm gatk; do
     check_install brewsci/bio/${package};
 done
 

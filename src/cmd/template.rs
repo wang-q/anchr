@@ -38,7 +38,10 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
     * --merge
     * --prefilter
     * --ecphase "1 2 3"
+
+* Mapping
     * --bwa
+    * --gatk
 
 * Down sampling, unitigs, and anchors
 
@@ -171,12 +174,18 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .default_value("1 2 3")
                 .empty_values(false),
         )
+        // Mapping
         .arg(
             Arg::with_name("bwa")
                 .long("bwa")
-                .help("Map trimmed reads to genome")
+                .help("Map trimmed reads to the genome")
                 .takes_value(true)
                 .empty_values(false),
+        )
+        .arg(
+            Arg::with_name("gatk")
+                .long("gatk")
+                .help("Calling variants with GATK Mutect2"),
         )
         // Down sampling, unitigs, and anchors
         .arg(
@@ -326,6 +335,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
         },
     );
     opt.insert("ecphase", args.value_of("ecphase").unwrap());
+
     opt.insert(
         "bwa",
         if args.is_present("bwa") {
@@ -334,6 +344,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
             "0"
         },
     );
+    opt.insert("gatk", if args.is_present("gatk") { "1" } else { "0" });
 
     opt.insert("cov", args.value_of("cov").unwrap());
     opt.insert("unitigger", args.value_of("unitigger").unwrap());
@@ -370,6 +381,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     if args.is_present("bwa") {
         gen_bwa(&context)?;
+    }
+    if args.is_present("gatk") {
+        gen_gatk(&context)?;
     }
 
     if args.is_present("quorum") {
@@ -579,6 +593,23 @@ fn gen_bwa(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/3_bwa.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_gatk(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "3_gatk.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/3_gatk.tera.sh")),
     ])
     .unwrap();
 

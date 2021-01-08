@@ -4,7 +4,8 @@
 
 * Add `anchr template` scripts
   * 3_bwa.sh
-  * Add dependency on bwa and samtools
+  * 3_gatk.sh
+  * Add dependency on bwa, samtools, and gatk
 * Add --ascp to ena_prep.pl
 
 ## 0.3.15 - 2020-12-15

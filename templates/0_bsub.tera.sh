@@ -40,6 +40,12 @@ if [ -e 3_bwa.sh ]; then
         "bash 3_bwa.sh"
 fi
 
+if [ -e 3_gatk.sh ]; then
+    bsub  -w "ended(${BASE_NAME}-3_bwa)" \
+        -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-3_gatk" \
+        "bash 3_gatk.sh"
+fi
+
 {% if opt.merge == "1" and opt.se == "0" -%}
 #----------------------------#
 # merge reads

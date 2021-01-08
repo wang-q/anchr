@@ -99,7 +99,7 @@ perl -MNumber::Format -e "1" 2>/dev/null || {
 }
 
 #----------------------------#
-# bwa
+# mapping
 #----------------------------#
 hash bwa 2>/dev/null || {
     echo >&2 "bwa is required but it's not installed.";
@@ -110,6 +110,12 @@ hash bwa 2>/dev/null || {
 hash samtools 2>/dev/null || {
     echo >&2 "samtools is required but it's not installed.";
     echo >&2 "Install with homebrew: brew install samtools";
+    exit 1;
+}
+
+hash gatk 2>/dev/null || {
+    echo >&2 "gatk is required but it's not installed.";
+    echo >&2 "Install with homebrew: brew install brewsci/bio/gatk";
     exit 1;
 }
 
