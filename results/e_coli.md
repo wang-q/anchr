@@ -134,6 +134,7 @@ anchr template \
     --ecphase "1 2 3" \
     \
     --bwa "Q25L60" \
+    --gatk \
     \
     --cov "40 80" \
     --unitigger "bcalm tadpole" \
