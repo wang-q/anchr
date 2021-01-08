@@ -16,8 +16,18 @@ cd 3_bwa
 ln -fs ../1_genome/genome.fa genome.fa
 
 # bwa index
-if [ ! -e genome.fa.rev.1.bt2 ]; then
+if [ ! -e genome.fa.bwt ]; then
     bwa index genome.fa
+fi
+
+# faidx
+if [ ! -e genome.fa.fai ]; then
+    samtools faidx genome.fa
+fi
+
+# dict
+if [ ! -e genome.dict ]; then
+    picard CreateSequenceDictionary --REFERENCE genome.fa
 fi
 
 # chr.sizes
@@ -30,6 +40,7 @@ fi
 #----------------------------#
 {% set parallel2 = opt.parallel | int - 3 -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
+SAMPLE=$(readlinkf .. | xargs dirname)
 if [ ! -e R.sort.bai ]; then
     bwa mem -t {{ parallel2 }} \
         -M -K 100000000 -v 3 -Y \
@@ -38,6 +49,14 @@ if [ ! -e R.sort.bai ]; then
         ../2_illumina/{{ opt.bwa }}/R2.fq.gz \
         2> >(tee R.bwa.log >&2) |
         samtools view -F 4 -u - | # Remove unmapped reads, write uncompressed BAM output
+        picard AddOrReplaceReadGroups \
+            --INPUT /dev/stdin \
+            --OUTPUT /dev/stdout \
+            --RGLB ${SAMPLE} \
+            --RGPL ILLUMINA \
+            --RGPU ${SAMPLE} \
+            --RGSM ${SAMPLE} \
+            --VALIDATION_STRINGENCY LENIENT --COMPRESSION_LEVEL 0 |
         picard CleanSam \
             --INPUT /dev/stdin \
             --OUTPUT /dev/stdout \
@@ -54,7 +73,7 @@ if [ ! -e R.sort.bai ]; then
         --METRICS_FILE R.dedup.metrics \
         --ASSUME_SORT_ORDER queryname \
         --REMOVE_DUPLICATES true \
-        --VALIDATION_STRINGENCY LENIENT  --COMPRESSION_LEVEL 0 |
+        --VALIDATION_STRINGENCY LENIENT --COMPRESSION_LEVEL 0 |
     picard SortSam \
         --INPUT /dev/stdin \
         --OUTPUT R.sort.bam \
@@ -64,6 +83,12 @@ if [ ! -e R.sort.bai ]; then
     picard BuildBamIndex \
         --INPUT R.sort.bam \
         --VALIDATION_STRINGENCY LENIENT
+
+    picard CollectWgsMetrics \
+        --INPUT R.sort.bam \
+        --REFERENCE_SEQUENCE genome.fa \
+        --OUTPUT R.wgs.metrics \
+        --VALIDATION_STRINGENCY SILENT
 fi
 
 #----------------------------#
