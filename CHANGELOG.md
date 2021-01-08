@@ -4,8 +4,8 @@
 
 * Add `anchr template` scripts
   * 3_bwa.sh
-  * Give priority to pe.cor.fa.gz
-* Add dependency on samtools
+  * Add dependency on bwa and samtools
+* Add --ascp to ena_prep.pl
 
 ## 0.3.15 - 2020-12-15
 

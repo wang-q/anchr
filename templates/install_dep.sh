@@ -12,15 +12,11 @@ check_install () {
     fi
 }
 
-if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    check_install openjdk
-fi
-
-for package in jq parallel pigz; do
+for package in openjdk jq parallel pigz; do
     check_install ${package}
 done
 
-for package in fastqc sickle bwa samtools; do
+for package in fastqc sickle bwa samtools picard-tools; do
     check_install ${package}
 done
 

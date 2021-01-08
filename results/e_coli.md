@@ -28,19 +28,11 @@
 ## Extra external executables
 
 ```shell script
-brew install aria2 curl         # downloading tools
-brew install miller
-
 brew tap brewsci/bio
 brew tap brewsci/science
 
 brew install --HEAD quast       # assembly quality assessment. https://github.com/ablab/quast/issues/140
 quast --test                    # may recompile the bundled nucmer
-
-brew install --ignore-dependencies picard-tools
-
-#kat comp -t 4 -n -o R 2_illumina/R1.fq.gz 2_illumina/R2.fq.gz -m 51
-#kat plot spectra-mx -i -o R-spectra R-main.mx
 
 ```
 
