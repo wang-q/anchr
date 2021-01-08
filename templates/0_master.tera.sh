@@ -47,10 +47,10 @@ if [ -e 2_quorum.sh ]; then
 fi
 
 #----------------------------#
-# bowtie
+# bwa
 #----------------------------#
-if [ -e 3_bowtie.sh ]; then
-    bash 3_bowtie.sh;
+if [ -e 3_bwa.sh ]; then
+    bash 3_bwa.sh;
 fi
 
 #----------------------------#

@@ -3,21 +3,21 @@
 #----------------------------#
 # Run
 #----------------------------#
-log_warn 3_bowtie.sh
+log_warn 3_bwa.sh
 
 if [ ! -e 1_genome/genome.fa ]; then
     log_info "1_genome/genome.fa does not exist"
     exit;
 fi
 
-mkdir -p 3_bowtie
-cd 3_bowtie
+mkdir -p 3_bwa
+cd 3_bwa
 
 ln -fs ../1_genome/genome.fa genome.fa
 
-# bowtie2 index
+# bwa index
 if [ ! -e genome.fa.rev.1.bt2 ]; then
-    bowtie2-build --threads {{ opt.parallel }} genome.fa genome.fa
+    bwa index genome.fa
 fi
 
 # chr.sizes
@@ -31,31 +31,35 @@ fi
 {% set parallel2 = opt.parallel | int - 3 -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
 if [ ! -e R.sort.bai ]; then
-    if [ -f ../2_illumina/trim/{{ opt.bowtie }}/pe.cor.fa.gz ]; then
-        gzip -dcf \
-            ../2_illumina/trim/{{ opt.bowtie }}/pe.cor.fa.gz |
-            faops filter -l 0 -a 50 stdin stdout # ignore empty reads
-    elif [ -f ../2_illumina/trim/{{ opt.bowtie }}/R1.fq.gz ]; then
-        gzip -dcf \
-            ../2_illumina/trim/{{ opt.bowtie }}/R1.fq.gz \
-            ../2_illumina/trim/{{ opt.bowtie }}/R2.fq.gz \
-            ../2_illumina/trim/{{ opt.bowtie }}/Rs.fq.gz |
-            faops filter -l 0 stdin stdout # ignore QUAL
-    fi |
-        bowtie2 -p {{ parallel2 }} --very-fast -t \
-            -x genome.fa \
-            -f -U /dev/stdin \
-            2> >(tee bowtie.R.log >&2) |
+    bwa mem -t {{ parallel2 }} \
+        -M -K 100000000 -v 3 -Y \
+        genome.fa \
+        ../2_illumina/{{ opt.bwa }}/R1.fq.gz \
+        ../2_illumina/{{ opt.bwa }}/R2.fq.gz \
+        2> >(tee R.bwa.log >&2) |
         samtools view -F 4 -u - | # Remove unmapped reads, write uncompressed BAM output
         picard CleanSam \
             --INPUT /dev/stdin \
             --OUTPUT /dev/stdout \
             --VALIDATION_STRINGENCY LENIENT --COMPRESSION_LEVEL 0 |
-        picard SortSam \
+        picard FixMateInformation \
             --INPUT /dev/stdin \
-            --OUTPUT R.sort.bam \
-            --SORT_ORDER coordinate \
+            --OUTPUT R.mate.bam \
+            --SORT_ORDER queryname \
             --VALIDATION_STRINGENCY LENIENT --COMPRESSION_LEVEL 1
+
+    picard MarkDuplicates \
+        --INPUT R.mate.bam \
+        --OUTPUT /dev/stdout \
+        --METRICS_FILE R.dedup.metrics \
+        --ASSUME_SORT_ORDER queryname \
+        --REMOVE_DUPLICATES true \
+        --VALIDATION_STRINGENCY LENIENT  --COMPRESSION_LEVEL 0 |
+    picard SortSam \
+        --INPUT /dev/stdin \
+        --OUTPUT R.sort.bam \
+        --SORT_ORDER coordinate \
+        --VALIDATION_STRINGENCY LENIENT --COMPRESSION_LEVEL 1
 
     picard BuildBamIndex \
         --INPUT R.sort.bam \

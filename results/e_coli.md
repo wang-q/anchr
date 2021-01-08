@@ -141,7 +141,7 @@ anchr template \
     --merge \
     --ecphase "1 2 3" \
     \
-    --bowtie "Q25L60" \
+    --bwa "Q25L60" \
     \
     --cov "40 80" \
     --unitigger "bcalm tadpole" \

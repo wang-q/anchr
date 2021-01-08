@@ -38,7 +38,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
     * --merge
     * --prefilter
     * --ecphase "1 2 3"
-    * --bowtie
+    * --bwa
 
 * Down sampling, unitigs, and anchors
 
@@ -172,8 +172,8 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .empty_values(false),
         )
         .arg(
-            Arg::with_name("bowtie")
-                .long("bowtie")
+            Arg::with_name("bwa")
+                .long("bwa")
                 .help("Map trimmed reads to genome")
                 .takes_value(true)
                 .empty_values(false),
@@ -327,9 +327,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     );
     opt.insert("ecphase", args.value_of("ecphase").unwrap());
     opt.insert(
-        "bowtie",
-        if args.is_present("bowtie") {
-            args.value_of("bowtie").unwrap()
+        "bwa",
+        if args.is_present("bwa") {
+            args.value_of("bwa").unwrap()
         } else {
             "0"
         },
@@ -368,8 +368,8 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 
     gen_stat_reads(&context)?;
 
-    if args.is_present("bowtie") {
-        gen_bowtie(&context)?;
+    if args.is_present("bwa") {
+        gen_bwa(&context)?;
     }
 
     if args.is_present("quorum") {
@@ -571,14 +571,14 @@ fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_bowtie(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "3_bowtie.sh";
+fn gen_bwa(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "3_bwa.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/3_bowtie.tera.sh")),
+        ("t", include_str!("../../templates/3_bwa.tera.sh")),
     ])
     .unwrap();
 

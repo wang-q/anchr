@@ -34,6 +34,12 @@ bsub -w "ended(${BASE_NAME}-2_trim)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_stat_reads" \
     "bash 9_stat_reads.sh"
 
+if [ -e 3_bwa.sh ]; then
+    bsub  -w "ended(${BASE_NAME}-2_trim)" \
+        -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-3_bwa" \
+        "bash 3_bwa.sh"
+fi
+
 {% if opt.merge == "1" and opt.se == "0" -%}
 #----------------------------#
 # merge reads
@@ -49,12 +55,6 @@ bsub -w "ended(${BASE_NAME}-2_trim)" \
 bsub -w "ended(${BASE_NAME}-2_trim)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-2_quorum" \
     "bash 2_quorum.sh"
-
-if [ -e 3_bowtie.sh ]; then
-    bsub  -w "ended(${BASE_NAME}-2_quorum)" \
-        -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-3_bowtie" \
-        "bash 3_bowtie.sh"
-fi
 
 #----------------------------#
 # down sampling trimmed reads; build unitigs and anchors

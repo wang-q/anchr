@@ -99,11 +99,11 @@ perl -MNumber::Format -e "1" 2>/dev/null || {
 }
 
 #----------------------------#
-# bowtie
+# bwa
 #----------------------------#
-hash bowtie2 2>/dev/null || {
-    echo >&2 "bowtie2 is required but it's not installed.";
-    echo >&2 "Install with homebrew: brew install bowtie2";
+hash bwa 2>/dev/null || {
+    echo >&2 "bwa is required but it's not installed.";
+    echo >&2 "Install with homebrew: brew install bwa";
     exit 1;
 }
 

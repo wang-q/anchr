@@ -3,7 +3,7 @@
 ## Unreleased - ReleaseDate
 
 * Add `anchr template` scripts
-  * 3_bowtie.sh
+  * 3_bwa.sh
   * Give priority to pe.cor.fa.gz
 * Add dependency on samtools
 
