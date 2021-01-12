@@ -25,10 +25,11 @@ cd 3_gatk
 # Mutect2
 #----------------------------#
 #https://github.com/gatk-workflows/gatk4-mitochondria-pipeline/blob/master/tasks/align-and-call.wdl
-gatk Mutect2 \
+gatk --java-options "-Xmx{{ opt.xmx }}" \
+    Mutect2 \
+    --native-pair-hmm-threads {{ parallel2 }} \
     -R ../3_bwa/genome.fa \
     -I ../3_bwa/R.sort.bam \
-    --native-pair-hmm-threads {{ parallel2 }} \
     --max-reads-per-alignment-start 100 \
     --max-mnp-distance 0 \
     --annotation StrandBiasBySample \
@@ -38,7 +39,8 @@ gatk Mutect2 \
 #----------------------------#
 # Filter
 #----------------------------#
-gatk FilterMutectCalls \
+gatk --java-options "-Xmx{{ opt.xmx }}" \
+    FilterMutectCalls \
     -R ../3_bwa/genome.fa \
     -V R.raw.vcf \
     --max-alt-allele-count 4 \
