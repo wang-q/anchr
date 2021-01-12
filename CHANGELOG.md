@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.3.16 - 2021-01-12
+
 * Add `anchr template` scripts
   * 3_bwa.sh
   * 3_gatk.sh
