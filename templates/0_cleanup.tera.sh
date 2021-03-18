@@ -17,6 +17,11 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
 # insertSize
 rm -f 2_illumina/insert_size/*tadpole.contig.fa*
 
+# bwa
+find 3_bwa -type f -name "genome.fa*"        | parallel --no-run-if-empty -j 1 rm
+find 3_bwa -type f -name "*mate.ba[mi]"      | parallel --no-run-if-empty -j 1 rm
+find 3_bwa -type f -name "*.per-base.bed.gz" | parallel --no-run-if-empty -j 1 rm
+
 # quorum
 find 2_illumina -type f -name "quorum_mer_db.jf" | parallel --no-run-if-empty -j 1 rm
 find 2_illumina -type f -name "k_u_hash_0"       | parallel --no-run-if-empty -j 1 rm

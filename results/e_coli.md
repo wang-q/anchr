@@ -119,7 +119,7 @@ rm *.sh
 anchr template \
     --genome 48502 \
     --parallel 4 \
-    --xmx 6g \
+    --xmx 2g \
     \
     --fastqc \
     --insertsize \
@@ -463,6 +463,9 @@ anchr template \
     --quorum \
     --merge \
     --ecphase "1 2 3" \
+    \
+    --bwa "Q25L60" \
+    --gatk \
     \
     --cov "40 80" \
     --unitigger "superreads bcalm tadpole" \

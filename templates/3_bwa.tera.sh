@@ -40,7 +40,7 @@ fi
 #----------------------------#
 {% set parallel2 = opt.parallel | int - 3 -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
-SAMPLE=$(readlinkf .. | xargs dirname)
+SAMPLE=$(readlinkf "${BASH_DIR}" | xargs dirname)
 if [ ! -e R.sort.bai ]; then
     bwa mem -t {{ parallel2 }} \
         -M -K 100000000 -v 3 -Y \

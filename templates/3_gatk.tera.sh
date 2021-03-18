@@ -25,27 +25,31 @@ cd 3_gatk
 # Mutect2
 #----------------------------#
 #https://github.com/gatk-workflows/gatk4-mitochondria-pipeline/blob/master/tasks/align-and-call.wdl
-gatk --java-options "-Xmx{{ opt.xmx }}" \
-    Mutect2 \
-    --native-pair-hmm-threads {{ parallel2 }} \
-    -R ../3_bwa/genome.fa \
-    -I ../3_bwa/R.sort.bam \
-    --max-reads-per-alignment-start 100 \
-    --max-mnp-distance 0 \
-    --annotation StrandBiasBySample \
-    --mitochondria-mode \
-    -O R.raw.vcf
+if [ ! -e R.raw.vcf ]; then
+    gatk --java-options "-Xmx{{ opt.xmx }}" \
+        Mutect2 \
+        --native-pair-hmm-threads {{ parallel2 }} \
+        -R ../3_bwa/genome.fa \
+        -I ../3_bwa/R.sort.bam \
+        --max-reads-per-alignment-start 100 \
+        --max-mnp-distance 0 \
+        --annotation StrandBiasBySample \
+        --mitochondria-mode \
+        -O R.raw.vcf
+fi
 
 #----------------------------#
 # Filter
 #----------------------------#
-gatk --java-options "-Xmx{{ opt.xmx }}" \
-    FilterMutectCalls \
-    -R ../3_bwa/genome.fa \
-    -V R.raw.vcf \
-    --max-alt-allele-count 4 \
-    --mitochondria-mode \
-    -O R.filtered.vcf
+if [ ! -e R.filtered.vcf ]; then
+    gatk --java-options "-Xmx{{ opt.xmx }}" \
+        FilterMutectCalls \
+        -R ../3_bwa/genome.fa \
+        -V R.raw.vcf \
+        --max-alt-allele-count 4 \
+        --mitochondria-mode \
+        -O R.filtered.vcf
+fi
 
 log_info Done.
 
