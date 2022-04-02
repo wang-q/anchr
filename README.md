@@ -2,9 +2,9 @@
 
 ![Publish](https://github.com/wang-q/anchr/workflows/Publish/badge.svg)
 ![Build](https://github.com/wang-q/anchr/workflows/Build/badge.svg)
-[![Lines of code](https://tokei.rs/b1/github/wang-q/anchr?category=code)](https://github.com//wang-q/anchr)
+[![Lines of code](https://tokei.ekzhang.com/b1/github/wang-q/anchr?category=code)](https://github.com//wang-q/anchr)
 
-Anchr - **A**ssembler of **N**-free **CHR**omosomes
+Anchr - the **A**ssembler of **N**-free **CHR**omosomes
 
 ## INSTALL
 
@@ -34,7 +34,7 @@ rm -fr target
 $ anchr help
 anchr 0.3.16-alpha.1
 wang-q <wang-q@outlook.com>
-Anchr - Assembler of N-free CHRomosomes
+Anchr - the Assembler of N-free CHRomosomes
 
 USAGE:
     anchr [SUBCOMMAND]
