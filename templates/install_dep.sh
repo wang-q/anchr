@@ -29,9 +29,12 @@ for package in poa; do
     check_install brewsci/science/${package};
 done
 
-for package in tsv-utils faops sparsemem dazz_db@20201008 daligner@20201008 bbtools@37.77 intspan; do
+for package in tsv-utils faops sparsemem bbtools@37.77 intspan; do
     check_install wang-q/tap/${package};
 done
+
+brew install --HEAD dazz_db
+brew install --HEAD daligner
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     check_install brewsci/bio/masurca

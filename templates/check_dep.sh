@@ -138,13 +138,13 @@ hash bcalm 2>/dev/null || {
 
 hash fasta2DB 2>/dev/null || {
     echo >&2 "DAZZ_DB is required but it's not installed.";
-    echo >&2 "Install with homebrew: brew install wang-q/tap/dazz_db@20201008";
+    echo >&2 "Install with homebrew: brew install --HEAD wang-q/tap/dazz_db";
     exit 1;
 }
 
 hash daligner 2>/dev/null || {
     echo >&2 "daligner is required but it's not installed.";
-    echo >&2 "Install with homebrew: brew install wang-q/tap/daligner@20201008";
+    echo >&2 "Install with homebrew: brew install --HEAD wang-q/tap/daligner";
     exit 1;
 }
 
