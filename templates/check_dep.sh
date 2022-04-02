@@ -150,7 +150,7 @@ hash daligner 2>/dev/null || {
 
 hash dazz 2>/dev/null || {
     echo >&2 "dazz is required but it's not installed.";
-    echo >&2 "Install with cpanm: cpanm App::dazz";
+    echo >&2 "Install with cpanm: cpanm App::Dazz";
     exit 1;
 }
 
@@ -159,7 +159,7 @@ hash dazz 2>/dev/null || {
 #----------------------------#
 hash spanr 2>/dev/null || {
     echo >&2 "spanr is required but it's not installed.";
-    echo >&2 "Install with cargo: cargo install intspan";
+    echo >&2 "Install with homebrew: brew install wang-q/tap/intspan";
     exit 1;
 }
 
