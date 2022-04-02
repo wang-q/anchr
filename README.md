@@ -68,6 +68,9 @@ brew install datamash mlr
 brew tap wang-q/tap
 brew install wang-q/tap/tsv-utils wang-q/tap/intspan
 
+anchr dep install | bash
+anchr dep check | bash
+
 ```
 
 ## EXAMPLES

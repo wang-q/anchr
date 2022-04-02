@@ -51,7 +51,7 @@ hash picard 2>/dev/null || {
 }
 
 hash kat 2>/dev/null || {
-    echo >&2 "picard is required but it's not installed.";
+    echo >&2 "KAT is required but it's not installed.";
     echo >&2 "Install with homebrew: brew install brewsci/bio/kat";
     echo >&2 "                       pip3 install tabulate";
     exit 1;
@@ -80,7 +80,7 @@ hash tsv-sample 2>/dev/null || {
 
 hash jellyfish 2>/dev/null || {
     echo >&2 "jellyfish is required but it's not installed.";
-    echo >&2 "Install with homebrew: brew install brewsci/bio/jellyfish";
+    echo >&2 "Install with homebrew: brew install jellyfish";
     exit 1;
 }
 

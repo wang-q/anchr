@@ -16,11 +16,11 @@ for package in openjdk jq parallel pigz; do
     check_install ${package}
 done
 
-for package in fastqc sickle bwa samtools picard-tools; do
+for package in fastqc sickle bwa samtools picard-tools jellyfish; do
     check_install ${package}
 done
 
-for package in jellyfish bcalm gatk; do
+for package in bcalm gatk; do
     check_install brewsci/bio/${package};
 done
 
