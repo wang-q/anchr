@@ -14,6 +14,12 @@ brew install --HEAD wang-q/tap/merquryfk
 
 # GeneScope.FK is bundled
 
+parallel -j 1 -k --line-buffer '
+    Rscript -e '\'' if (!requireNamespace("{}", quietly = FALSE)) { install.packages("{}", repos="https://mirrors.tuna.tsinghua.edu.cn/CRAN") } '\''
+    ' ::: \
+        argparse minpack.lm \
+        ggplot2 scales viridis
+
 ```
 
 ## GeneScope
