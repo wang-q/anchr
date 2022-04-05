@@ -140,4 +140,19 @@ KatComp -T4 -s R1-21 R2-21 Merqury/KatComp-21
 
 Fastrm R1-21 R2-21
 
+# Find repetitive regions
+faops size ../1_genome/genome.fa > chr.sizes
+FastK -v -p -k21 ../1_genome/genome -Ngenome
+Profex genome 1 |
+    sed '1,2 d' |
+    perl -nl -e '/(\d+).+(\d+)/ and print qq{$1\t$2}' |
+    tsv-filter --ge 2:2 |
+    cut -f 1 |
+    sed 's/^/NC_000913:/ ' |
+    spanr cover stdin |
+    spanr span --op fill -n 2 stdin |
+    spanr span --op excise -n 100 stdin |
+    spanr span --op fill -n 10 stdin |
+    spanr stat chr.sizes stdin
+
 ```
