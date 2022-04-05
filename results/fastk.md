@@ -62,9 +62,13 @@ for K in 21 51; do
         sed "2 s/^/${K}\t/" |
         sed "3,7 s/^/\t/" |
         perl -nlp -e 's/\s{2,}/\t/g; s/\s+$//g;' |
-        perl -nla -F'\t' -e '@fields = map {/\bNA\b/ ? q{} : $_ } @F; print join qq{\t}, @fields'
+        perl -nla -F'\t' -e '
+            @fields = map {/\bNA\b/ ? q{} : $_ } @F;        # Remove NA fields
+            $fields[2] = q{} if $fields[2] eq $fields[3];   # Remove identical fields
+            print join qq{\t}, @fields
+        '
         
-    printf "\tKmer Cov\t${COV}\t\n"
+    printf "\tKmer Cov\t\t${COV}\n"
 done |
     keep-header -- grep -v '^K' |
     mlr --itsv --omd cat
@@ -86,20 +90,19 @@ done |
 | 262164    | Table-51.hist    |
 | 134217744 | Table-51.ktab    |
 
-
 | K   | property              | min          | max          |
 |-----|-----------------------|--------------|--------------|
-| 21  | Homozygous (a)        | 100%         | 100%         |
+| 21  | Homozygous (a)        |              | 100%         |
 |     | Genome Haploid Length |              | 4,478,083 bp |
 |     | Genome Repeat Length  | 136,755 bp   | 136,883 bp   |
 |     | Genome Unique Length  | 4,339,242 bp | 4,343,288 bp |
 |     | Model Fit             | 97.2749%     | 97.3934%     |
-|     | Read Error Rate       | 0.531821%    | 0.531821%    |
-|     | Kmer Cov              | 299.7        |              |
-| 51  | Homozygous (a)        | 100%         | 100%         |
+|     | Read Error Rate       |              | 0.531821%    |
+|     | Kmer Cov              |              | 299.7        |
+| 51  | Homozygous (a)        |              | 100%         |
 |     | Genome Haploid Length |              | 4,385,263 bp |
 |     | Genome Repeat Length  | 91,444 bp    | 91,569 bp    |
 |     | Genome Unique Length  | 4,290,813 bp | 4,296,704 bp |
 |     | Model Fit             | 97.3222%     | 97.6265%     |
-|     | Read Error Rate       | 0.326106%    | 0.326106%    |
-|     | Kmer Cov              | 223.4        |              |
+|     | Read Error Rate       |              | 0.326106%    |
+|     | Kmer Cov              |              | 223.4        |
