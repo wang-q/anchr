@@ -120,16 +120,24 @@ done |
 ```shell
 cd ~/data/anchr/mg1655/2_illumina
 
-mkdir "KatGC"
+mkdir "Merqury"
 
+# KatGC
 FastK -v -t1 -k21 R*.fq.gz -NTable-21
 
 FastK -v -t1 -k51 R*.fq.gz -NTable-51
 
-KatGC -T4 -x1.9 -s Table-21 KatGC/KatGC-21
-KatGC -T4 -x1.9 -s Table-51 KatGC/KatGC-51
+KatGC -T4 -x1.9 -s Table-21 Merqury/KatGC-21
+KatGC -T4 -x1.9 -s Table-51 Merqury/KatGC-51
 
 Fastrm Table-21 Table-51
 
+# KatComp
+FastK -v -t1 -k21 R1.fq.gz -NR1-21
+FastK -v -t1 -k21 R2.fq.gz -NR2-21
+
+KatComp -T4 -s R1-21 R2-21 Merqury/KatComp-21
+
+Fastrm R1-21 R2-21
 
 ```
