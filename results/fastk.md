@@ -61,7 +61,7 @@ for K in 21 51; do
             cut -f 2 |
             perl -nl -e 'printf qq{%.1f\n}, $_'
     )
-        
+
     cat GeneScope-${K}/summary.txt |
         sed '1,6 d' |
         sed '1 s/^/K\t/' |
@@ -73,7 +73,7 @@ for K in 21 51; do
             $fields[2] = q{} if $fields[2] eq $fields[3];   # Remove identical fields
             print join qq{\t}, @fields
         '
-        
+
     printf "\tKmer Cov\t\t${COV}\n"
 done |
     keep-header -- grep -v '^K' |
@@ -140,19 +140,43 @@ KatComp -T4 -s R1-21 R2-21 Merqury/KatComp-21
 
 Fastrm R1-21 R2-21
 
-# Find repetitive regions
-faops size ../1_genome/genome.fa > chr.sizes
-FastK -v -p -k21 ../1_genome/genome -Ngenome
-Profex genome 1 |
-    sed '1,2 d' |
-    perl -nl -e '/(\d+).+(\d+)/ and print qq{$1\t$2}' |
-    tsv-filter --ge 2:2 |
-    cut -f 1 |
-    sed 's/^/NC_000913:/ ' |
-    spanr cover stdin |
-    spanr span --op fill -n 2 stdin |
-    spanr span --op excise -n 100 stdin |
-    spanr span --op fill -n 10 stdin |
-    spanr stat chr.sizes stdin
+```
+
+## Find repetitive regions
+
+```shell
+cd ~/data/anchr/mg1655/1_genome/
+
+faops size genome.fa > chr.sizes
+
+FastK -v -p -k21 genome
+
+cat chr.sizes |
+    number-lines |
+    parallel --col-sep "\t" --no-run-if-empty --linebuffer -k -j 4 '
+        Profex genome {1} |
+            sed "1,2 d" |
+            perl -nl -e '\''/(\d+).+(\d+)/ and print qq{$1\t$2}'\'' |
+            tsv-filter --ge 2:2 |
+            cut -f 1 |
+            sed "s/^/{2}:/" |
+            spanr cover stdin |
+            spanr span --op fill -n 2 stdin |
+            spanr span --op excise -n 100 stdin |
+            spanr span --op fill -n 10 stdin
+    ' |
+    spanr combine stdin \
+    > repetitive.yml
+
+spanr stat chr.sizes repetitive.yml
+#chr,chrLength,size,coverage
+#NC_000913,4641652,91989,0.0198
+#all,4641652,91989,0.0198
+
+faops size repetitives.fa | tsv-summarize --sum 2
+#110138
+
+faops size paralogs.fa | tsv-summarize --sum 2
+#187300
 
 ```
