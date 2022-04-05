@@ -35,31 +35,7 @@ Histex -G Table-21 | Rscript ~/Scripts/rust/anchr/templates/genescopefk.R -k 21 
 
 Histex -G Table-51 | Rscript ~/Scripts/rust/anchr/templates/genescopefk.R -k 51 -p 1 -o GeneScope-51
 
-Fastrm Table-21 Table-51
-
-for K in 21 51; do
-    echo ${K}
-    cat GeneScope-${K}/model.txt |
-        grep '^kmercov' |
-        tr -s ' ' '\t' |
-        cut -f 2 |
-        perl -nl -e 'printf qq{%.1f\n}, $_'
-done |
-    paste - - |
-    ( echo -e 'K\tCov' && cat ) |
-    mlr --itsv --omd cat
-
-for K in 21 51; do
-    cat GeneScope-${K}/summary.txt |
-        sed '1,6 d' |
-        sed '1 s/^/K\t/' |
-        sed "2 s/^/${K}\t/" |
-        sed "3,7 s/^/\t/" |
-        perl -nlp -e 's/\s{2,}/\t/g; s/\s+$//g;'
-done |
-    tsv-uniq |
-    mlr --itsv --omd cat
-
+# disk usages
 ll |
     grep Table |
     tr -s ' ' '\t' |
@@ -68,27 +44,32 @@ ll |
     ( echo -e 'Size\tName' && cat ) |
     mlr --itsv --omd cat
 
+Fastrm Table-21 Table-51
+
+# Reports
+for K in 21 51; do
+    COV=$(
+        cat GeneScope-${K}/model.txt |
+            grep '^kmercov' |
+            tr -s ' ' '\t' |
+            cut -f 2 |
+            perl -nl -e 'printf qq{%.1f\n}, $_'
+    )
+        
+    cat GeneScope-${K}/summary.txt |
+        sed '1,6 d' |
+        sed '1 s/^/K\t/' |
+        sed "2 s/^/${K}\t/" |
+        sed "3,7 s/^/\t/" |
+        perl -nlp -e 's/\s{2,}/\t/g; s/\s+$//g;' |
+        perl -nla -F'\t' -e '@fields = map {/\bNA\b/ ? q{} : $_ } @F; print join qq{\t}, @fields'
+        
+    printf "\tKmer Cov\t${COV}\t\n"
+done |
+    keep-header -- grep -v '^K' |
+    mlr --itsv --omd cat
+
 ```
-
-| K   | Cov   |
-|-----|-------|
-| 21  | 299.7 |
-| 51  | 223.4 |
-
-| K   | property              | min          | max          |
-|-----|-----------------------|--------------|--------------|
-| 21  | Homozygous (a)        | 100%         | 100%         |
-|     | Genome Haploid Length | NA bp        | 4,478,083 bp |
-|     | Genome Repeat Length  | 136,755 bp   | 136,883 bp   |
-|     | Genome Unique Length  | 4,339,242 bp | 4,343,288 bp |
-|     | Model Fit             | 97.2749%     | 97.3934%     |
-|     | Read Error Rate       | 0.531821%    | 0.531821%    |
-| 51  | Homozygous (a)        | 100%         | 100%         |
-|     | Genome Haploid Length | NA bp        | 4,385,263 bp |
-|     | Genome Repeat Length  | 91,444 bp    | 91,569 bp    |
-|     | Genome Unique Length  | 4,290,813 bp | 4,296,704 bp |
-|     | Model Fit             | 97.3222%     | 97.6265%     |
-|     | Read Error Rate       | 0.326106%    | 0.326106%    |
 
 | Size      | Name             |
 |-----------|------------------|
@@ -106,3 +87,19 @@ ll |
 | 134217744 | Table-51.ktab    |
 
 
+| K   | property              | min          | max          |
+|-----|-----------------------|--------------|--------------|
+| 21  | Homozygous (a)        | 100%         | 100%         |
+|     | Genome Haploid Length |              | 4,478,083 bp |
+|     | Genome Repeat Length  | 136,755 bp   | 136,883 bp   |
+|     | Genome Unique Length  | 4,339,242 bp | 4,343,288 bp |
+|     | Model Fit             | 97.2749%     | 97.3934%     |
+|     | Read Error Rate       | 0.531821%    | 0.531821%    |
+|     | Kmer Cov              | 299.7        |              |
+| 51  | Homozygous (a)        | 100%         | 100%         |
+|     | Genome Haploid Length |              | 4,385,263 bp |
+|     | Genome Repeat Length  | 91,444 bp    | 91,569 bp    |
+|     | Genome Unique Length  | 4,290,813 bp | 4,296,704 bp |
+|     | Model Fit             | 97.3222%     | 97.6265%     |
+|     | Read Error Rate       | 0.326106%    | 0.326106%    |
+|     | Kmer Cov              | 223.4        |              |
