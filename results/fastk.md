@@ -112,3 +112,24 @@ done |
 |     | Model Fit             | 97.3222%     | 97.6265%     |
 |     | Read Error Rate       |              | 0.326106%    |
 |     | Kmer Cov              |              | 223.4        |
+
+## Merqury
+
+> these tables must be produced with the option -t1 set
+
+```shell
+cd ~/data/anchr/mg1655/2_illumina
+
+mkdir "KatGC"
+
+FastK -v -t1 -k21 R*.fq.gz -NTable-21
+
+FastK -v -t1 -k51 R*.fq.gz -NTable-51
+
+KatGC -T4 -x1.9 -s Table-21 KatGC/KatGC-21
+KatGC -T4 -x1.9 -s Table-51 KatGC/KatGC-51
+
+Fastrm Table-21 Table-51
+
+
+```
