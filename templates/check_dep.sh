@@ -51,10 +51,9 @@ hash picard 2>/dev/null || {
 }
 
 hash kat 2>/dev/null || {
-    echo >&2 "KAT is required but it's not installed.";
+    echo >&2 "KAT is optional but it's not installed.";
     echo >&2 "Install with homebrew: brew install brewsci/bio/kat";
     echo >&2 "                       pip3 install tabulate";
-    exit 1;
 }
 
 #----------------------------#
