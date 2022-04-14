@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+## 0.3.17 - 2022-04-15
+
 * Update check_dep.sh and install_dep.sh
 * Add fastk.md. It will replace KAT in the near future.
   * FastK
