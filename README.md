@@ -10,7 +10,7 @@ Anchr - the **A**ssembler of **N**-free **CHR**omosomes
 
 Current release: 0.3.16
 
-```shell script
+```shell
 # Via cargo
 cargo install --force --path .
 
@@ -30,7 +30,7 @@ rm -fr target
 
 ## SYNOPSIS
 
-```
+```text
 $ anchr help
 anchr 0.3.16-alpha.1
 wang-q <wang-q@outlook.com>
@@ -61,12 +61,19 @@ SUBCOMMANDS:
 * Command line tools managed by `Linuxbrew`
 
 ```bash
-brew install perl
+brew install perl cpanminus
 brew install parallel wget pigz
-brew install datamash mlr
+brew install datamash miller
+
+# cite parallel
+# parallel --will-cite
 
 brew tap wang-q/tap
 brew install wang-q/tap/tsv-utils wang-q/tap/intspan
+
+# Myer's dazzler wrapper
+cpanm --installdeps App::Dazz
+cpanm -nq App::Dazz
 
 anchr dep install | bash
 anchr dep check | bash
@@ -75,9 +82,11 @@ anchr dep check | bash
 
 ## EXAMPLES
 
-* Data soruce: *E. coli* virus Lambda
+### Fetching data
 
-```shell script
+Data soruce: *E. coli* virus Lambda
+
+```shell
 # ena
 mkdir -p ~/data/ena
 cd ~/data/ena
@@ -105,25 +114,32 @@ seqtk sample -s 23 SRR5042715_2.fastq.gz 20000 | pigz > R2.fq.gz
 |:-------|:-----------|:---------|:-------|:--------|:-----------|:---------|:------|
 | Lambda | SRX2365802 | ILLUMINA | PAIRED |         | SRR5042715 | 16540237 | 3.33G |
 
-* Individual subcommands
+### Individual subcommands
 
-```shell script
-cd ~/Scripts/rust/anchr
+```shell
+mkdir -p ~/data/anchr_test
+cd ~/data/anchr_test
+
+# Lambda
+for F in R1.fq.gz R2.fq.gz; do
+    1>&2 echo ${F}
+    curl -fsSLO "https://raw.githubusercontent.com/wang-q/anchr/main/tests/Lambda/${F}"
+done
 
 # trim
-mkdir -p tests/trim
-pushd tests/trim
+mkdir -p trim
+pushd trim
 
 anchr trim \
-    ../Lambda/R1.fq.gz ../Lambda/R2.fq.gz \
+    ../R1.fq.gz ../R2.fq.gz \
     -q 25 -l 60 \
     -o stdout |
     bash
 popd
 
 # merge
-mkdir -p tests/merge
-pushd tests/merge
+mkdir -p merge
+pushd merge
 
 anchr merge \
     ../trim/R1.fq.gz ../trim/R2.fq.gz ../trim/Rs.fq.gz \
@@ -134,14 +150,14 @@ anchr merge \
 popd
 
 # quorum
-pushd tests/trim
+pushd trim
 anchr quorum \
     R1.fq.gz R2.fq.gz \
     -o stdout |
     bash
 popd
 
-pushd tests/trim/Q25L60
+pushd trim/Q25L60
 anchr quorum \
     R1.fq.gz R2.fq.gz Rs.fq.gz \
     -o stdout |
@@ -149,10 +165,10 @@ anchr quorum \
 popd
 
 # unitigs
-gzip -dcf tests/trim/pe.cor.fa.gz > tests/trim/pe.cor.fa
+gzip -dcf trim/pe.cor.fa.gz > trim/pe.cor.fa
 
-mkdir -p tests/superreads
-pushd tests/superreads
+mkdir -p superreads
+pushd superreads
 
 anchr unitigs \
     ../trim/pe.cor.fa ../trim/env.json \
@@ -163,8 +179,8 @@ bash unitigs.sh
 popd
 
 # unitigs - tadpole
-mkdir -p tests/tadpole
-pushd tests/tadpole
+mkdir -p tadpole
+pushd tadpole
 
 anchr unitigs \
     ../trim/pe.cor.fa ../trim/env.json \
@@ -176,8 +192,8 @@ bash unitigs.sh
 popd
 
 # unitigs - bcalm
-mkdir -p tests/bcalm
-pushd tests/bcalm
+mkdir -p bcalm
+pushd bcalm
 
 anchr unitigs \
     ../trim/pe.cor.fa ../trim/env.json \
@@ -189,8 +205,8 @@ bash unitigs.sh
 popd
 
 # anchors
-mkdir -p tests/bcalm/anchors
-pushd tests/bcalm/anchors
+mkdir -p bcalm/anchors
+pushd bcalm/anchors
 
 anchr anchors \
     ../unitigs.fasta \
@@ -204,23 +220,25 @@ popd
 
 ```
 
-* `anchr template`
+### `anchr template`
 
-  With a conventional directory structure, `anchr template` creates all scripts from reads QC to
-  assembly evaluations.
+With a conventional directory structure, `anchr template` creates all scripts from reads QC to
+assembly evaluations.
 
-  * E. coli
+* E. coli
     * [*Escherichia* virus Lambda](results/e_coli.md#escherichia-virus-lambda)
-    * [*Escherichia coli* str. K-12 substr. MG1655](results/e_coli.md#escherichia-coli-str-k-12-substr-mg1655)
-    * [*Escherichia coli* str. K-12 substr. DH5alpha](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5alpha)
+    * [*E.
+      coli* str. K-12 substr. MG1655](results/e_coli.md#escherichia-coli-str-k-12-substr-mg1655)
+    * [*E.
+      coli* str. K-12 substr. DH5alpha](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5alpha)
 
-  * FDA-ARGOS bacteria
+* FDA-ARGOS bacteria
     * [Ca_jej_jejuni_NCTC_11168_ATCC_700819](results/fda_argos.md#ca_jej_jejuni_nctc_11168_atcc_700819)
     * [Clostridio_dif_630](results/fda_argos.md#clostridio_dif_630)
     * [Co_dip_NCTC_13129](results/fda_argos.md#co_dip_nctc_13129)
     * [Fr_tul_tularensis_SCHU_S4](results/fda_argos.md#fr_tul_tularensis_schu_s4)
 
-  * Yeast
+* Yeast
     * [*Saccharomyces cerevisiae* S288c](results/yeast.md#saccharomyces-cerevisiae-s288c)
 
 ## AUTHOR
