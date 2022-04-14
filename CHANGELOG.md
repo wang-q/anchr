@@ -2,6 +2,12 @@
 
 ## Unreleased - ReleaseDate
 
+* Update check_dep.sh and install_dep.sh
+* Add fastk.md. It will replace KAT in the near future.
+  * FastK
+  * Merqury.FK
+  * GeneScope.FK
+
 ## 0.3.16 - 2021-01-12
 
 * Add `anchr template` scripts
