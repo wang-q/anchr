@@ -78,6 +78,17 @@ cpanm -nq App::Dazz
 anchr dep install | bash
 anchr dep check | bash
 
+# Optional
+# assembly quality assessment. https://github.com/ablab/quast/issues/140
+brew install brewsci/bio/quast --HEAD
+
+# Optional
+# leading assemblers
+brew install spades
+spades.py --test
+brew install brewsci/bio/megahit
+brew install wang-q/tap/platanus
+
 ```
 
 ## EXAMPLES
@@ -100,7 +111,7 @@ anchr ena prep | perl - ena_info.yml
 
 mlr --icsv --omd cat ena_info.csv
 
-aria2c -j 4 -x 4 -s 2 --file-allocation=none -c -i ena_info.ftp.txt
+aria2c -j 4 -x 4 -s 2 -c --file-allocation=none -i ena_info.ftp.txt
 
 md5sum --check ena_info.md5.txt
 

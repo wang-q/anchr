@@ -22,29 +22,6 @@
   - [dh5alpha: template](#dh5alpha-template)
   - [dh5alpha: run](#dh5alpha-run)
 
-
-# More tools on downloading and preprocessing data
-
-## Extra external executables
-
-```shell script
-brew tap brewsci/bio
-brew tap brewsci/science
-
-brew install --HEAD quast       # assembly quality assessment. https://github.com/ablab/quast/issues/140
-quast --test                    # may recompile the bundled nucmer
-
-```
-
-## Other leading assemblers
-
-```shell script
-brew install spades
-brew install megahit
-brew install wang-q/tap/platanus
-
-```
-
 # *Escherichia* virus Lambda
 
 Runs under macOS and Linux.
@@ -78,13 +55,9 @@ anchr ena prep | perl - ena_info.yml
 
 mlr --icsv --omd cat ena_info.csv
 
-aria2c -x 9 -s 3 -c -i ena_info.ftp.txt
+aria2c -j 4 -x 4 -s 2 -c --file-allocation=none -i ena_info.ftp.txt
 
 md5sum --check ena_info.md5.txt
-
-# sampling reads as test materials
-seqtk sample -s 23 SRR5042715_1.fastq.gz 100000 | pigz > R1.fq.gz
-seqtk sample -s 23 SRR5042715_2.fastq.gz 100000 | pigz > R2.fq.gz
 
 ```
 
@@ -119,7 +92,7 @@ rm *.sh
 anchr template \
     --genome 48502 \
     --parallel 4 \
-    --xmx 2g \
+    --xmx 8g \
     \
     --fastqc \
     --insertsize \
@@ -153,7 +126,7 @@ BASE_NAME=lambda
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 bash 0_master.sh
 #bash 0_cleanup.sh
@@ -489,7 +462,7 @@ BASE_NAME=mg1655
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
 
 # BASE_NAME=mg1655 bash 0_bsub.sh
@@ -921,7 +894,7 @@ BASE_NAME=dh5alpha
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
 
 # BASE_NAME=dh5alpha bash 0_bsub.sh
