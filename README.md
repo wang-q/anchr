@@ -1,8 +1,9 @@
 # Anchr
 
-![Publish](https://github.com/wang-q/anchr/workflows/Publish/badge.svg)
-![Build](https://github.com/wang-q/anchr/workflows/Build/badge.svg)
-[![Lines of code](https://tokei.ekzhang.com/b1/github/wang-q/anchr?category=code)](https://github.com//wang-q/anchr)
+[![Publish](https://github.com/wang-q/anchr/actions/workflows/publish.yml/badge.svg)](https://github.com/wang-q/anchr/actions)
+[![Build](https://github.com/wang-q/anchr/actions/workflows/build.yml/badge.svg)](https://github.com/wang-q/anchr/actions)
+[![Codecov](https://img.shields.io/codecov/c/github/wang-q/nwr/master.svg)](https://codecov.io/github/wang-q/nwr?branch=master)
+[![Lines of code](https://tokei.rs/b1/github/wang-q/anchr?category=code)](https://github.com//wang-q/anchr)
 
 Anchr - the **A**ssembler of **N**-free **CHR**omosomes
 
