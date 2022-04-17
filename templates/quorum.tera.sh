@@ -5,37 +5,32 @@
 #----------------------------#
 START_TIME=$(date +%s)
 
-# Add masurca to $PATH
-export PATH="$(readlinkf "$(which masurca)" | xargs dirname):$PATH"
-
 #----------------------------#
 # Renaming reads
 #----------------------------#
 log_info 'Processing pe and/or se library reads'
 
 {% if args | length == 2 -%}
-rename_filter_fastq \
-    'pe' \
-    <(exec expand_fastq '{{ args.0 }}' ) \
-    <(exec expand_fastq '{{ args.1 }}' ) \
+faops interleave \
+    -q -p pe \
+    '{{ args.0 }}' \
+    '{{ args.1 }}' \
     > 'pe.renamed.fastq'
 {% elif args | length == 3 -%}
-rename_filter_fastq \
-    'pe' \
-    <(exec expand_fastq '{{ args.0 }}' ) \
-    <(exec expand_fastq '{{ args.1 }}' ) \
+faops interleave \
+    -q -p pe \
+    '{{ args.0 }}' \
+    '{{ args.1 }}' \
     > 'pe.renamed.fastq'
 
-rename_filter_fastq \
-    'se' \
-    <(exec expand_fastq '{{ args.2 }}' ) \
-    '' \
+faops interleave \
+    -q -p se \
+    '{{ args.2 }}' \
     > 'se.renamed.fastq'
 {% else -%}
-rename_filter_fastq \
-    'pe' \
-    <(exec expand_fastq '{{ args.0 }}' ) \
-    '' \
+faops interleave \
+    -q -p pe \
+    '{{ args.0 }}' \
     > 'pe.renamed.fastq'
 {% endif -%}
 {# Keep a blank line #}
