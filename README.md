@@ -63,6 +63,7 @@ SUBCOMMANDS:
 
 ```bash
 brew install perl cpanminus
+brew install r
 brew install parallel wget pigz
 brew install datamash miller
 
@@ -79,12 +80,22 @@ cpanm -nq App::Dazz
 anchr dep install | bash
 anchr dep check | bash
 
+# Optional: fastk
+brew install --HEAD wang-q/tap/fastk
+brew install --HEAD wang-q/tap/merquryfk
+
+parallel -j 1 -k --line-buffer '
+    Rscript -e '\'' if (!requireNamespace("{}", quietly = FALSE)) { install.packages("{}", repos="https://mirrors.tuna.tsinghua.edu.cn/CRAN") } '\''
+    ' ::: \
+        argparse minpack.lm \
+        ggplot2 scales viridis
+
+
 # Optional
 # assembly quality assessment. https://github.com/ablab/quast/issues/140
 brew install brewsci/bio/quast --HEAD
 
-# Optional
-# leading assemblers
+# Optional: leading assemblers
 brew install spades
 spades.py --test
 brew install brewsci/bio/megahit

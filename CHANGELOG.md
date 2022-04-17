@@ -6,6 +6,8 @@
     * Use a container with GLIBC 2.17 to build linux-gnu binary
     * Codecov with cargo-tarpaulin
 * Simplify `quorum.sh`
+* Add `anchr template` scripts
+    * 2_fastk.sh
 
 ## 0.3.17 - 2022-04-15
 

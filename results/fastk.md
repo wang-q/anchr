@@ -25,9 +25,9 @@ parallel -j 1 -k --line-buffer '
 ## GeneScope
 
 ```shell
-cd ~/data/anchr/mg1655/2_illumina
+cd ~/data/anchr/g37/ena/
 
-time FastK -v -t1 -k21 R1.fq.gz R2.fq.gz -NTable-21
+time FastK -v -t1 -k21 *.fastq.gz -NTable-21
 #real	0m50.853s
 #user	1m27.788s
 #sys	0m4.377s

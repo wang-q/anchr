@@ -21,6 +21,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 
     * --fastqc
     * --kat
+    * --fastk
     * --insertsize
     * --reads 1000000
 
@@ -98,6 +99,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
         // Quality check
         .arg(Arg::with_name("fastqc").long("fastqc").help("Run FastQC"))
         .arg(Arg::with_name("kat").long("kat").help("Run KAT"))
+        .arg(Arg::with_name("fastk").long("fastk").help("Run FastK"))
         .arg(
             Arg::with_name("insertsize")
                 .long("insertsize")
@@ -374,6 +376,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     if args.is_present("kat") {
         gen_kat(&context)?;
     }
+    if args.is_present("fastk") {
+        gen_fastk(&context)?;
+    }
 
     gen_trim(&context)?;
 
@@ -491,6 +496,23 @@ fn gen_kat(context: &Context) -> std::result::Result<(), std::io::Error> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_kat.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_fastk(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "2_fastk.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/2_fastk.tera.sh")),
     ])
     .unwrap();
 
