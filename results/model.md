@@ -1,26 +1,20 @@
 # Assemble genomes of model organisms by Anchr
 
-[TOC levels=1-3]: # ""
-
 - [Assemble genomes of model organisms by Anchr](#assemble-genomes-of-model-organisms-by-anchr)
-- [More tools on downloading and preprocessing data](#more-tools-on-downloading-and-preprocessing-data)
-  - [Extra external executables](#extra-external-executables)
-  - [Other leading assemblers](#other-leading-assemblers)
-- [*Escherichia* virus Lambda](#escherichia-virus-lambda)
-  - [lambda: reference](#lambda-reference)
-  - [lambda: download](#lambda-download)
-  - [lambda: template](#lambda-template)
-  - [lambda: run](#lambda-run)
-- [*Escherichia coli* str. K-12 substr. MG1655](#escherichia-coli-str-k-12-substr-mg1655)
-  - [mg1655: reference](#mg1655-reference)
-  - [mg1655: download](#mg1655-download)
-  - [mg1655: template](#mg1655-template)
-  - [mg1655: run](#mg1655-run)
-- [*Escherichia coli* str. K-12 substr. DH5alpha](#escherichia-coli-str-k-12-substr-dh5alpha)
-  - [dh5alpha: reference](#dh5alpha-reference)
-  - [dh5alpha: download](#dh5alpha-download)
-  - [dh5alpha: template](#dh5alpha-template)
-  - [dh5alpha: run](#dh5alpha-run)
+    * [*Mycoplasma genitalium* G37](#mycoplasma-genitalium-g37)
+        + [g37: download](#g37-download)
+        + [g37: template](#g37-template)
+        + [g37: run](#g37-run)
+    * [*E. coli* str. K-12 substr. MG1655](#e-coli-str-k-12-substr-mg1655)
+        + [mg1655: reference](#mg1655-reference)
+        + [mg1655: download](#mg1655-download)
+        + [mg1655: template](#mg1655-template)
+        + [mg1655: run](#mg1655-run)
+    * [*E. coli* str. K-12 substr. DH5alpha](#e-coli-str-k-12-substr-dh5alpha)
+        + [dh5alpha: reference](#dh5alpha-reference)
+        + [dh5alpha: download](#dh5alpha-download)
+        + [dh5alpha: template](#dh5alpha-template)
+        + [dh5alpha: run](#dh5alpha-run)
 
 ## *Mycoplasma genitalium* G37
 
@@ -48,7 +42,6 @@ md5sum --check ena_info.md5.txt
 | name | srx       | platform | layout | ilength | srr       | spots  | bases  |
 |------|-----------|----------|--------|---------|-----------|--------|--------|
 | G37  | ERX452667 | ILLUMINA | PAIRED | 447     | ERR486835 | 680644 | 97.37M |
-
 
 * Illumina
 
@@ -106,7 +99,7 @@ anchr template \
 
 ```
 
-## g37: run
+### g37: run
 
 ```shell script
 WORKING_DIR=${HOME}/data/anchr
@@ -122,9 +115,9 @@ bash 0_master.sh
 
 ```
 
-# *Escherichia coli* str. K-12 substr. MG1655
+## *E. coli* str. K-12 substr. MG1655
 
-## mg1655: reference
+### mg1655: reference
 
 * Reference genome
 
@@ -138,7 +131,7 @@ cp ~/data/anchr/ref/mg1655/repetitives.fa .
 
 ```
 
-## mg1655: download
+### mg1655: download
 
 * Illumina
 
@@ -156,7 +149,7 @@ ln -s MiSeq_Ecoli_MG1655_110721_PF_R2.fastq.gz R2.fq.gz
 
 ```
 
-## mg1655: template
+### mg1655: template
 
 * Rsync to hpcc
 
@@ -214,7 +207,7 @@ anchr template \
 
 ```
 
-## mg1655: run
+### mg1655: run
 
 ```shell script
 WORKING_DIR=${HOME}/data/anchr
@@ -243,7 +236,6 @@ Table: statInsertSize
 | R.genome.picard   | 298.2 |    298 |  18.0 |                             FR |
 | R.tadpole.picard  | 294.9 |    296 |  21.6 |                             FR |
 
-
 Table: statKAT
 
 | k    | mean_freq | est_genome_size | est_het_rate | mean_gc |
@@ -255,7 +247,6 @@ Table: statKAT
 | R.61 | 191       | 4393867         | 0.1081       | 53.68   |
 | R.71 | 168       | 4390152         | 0.1042       | 53.58   |
 | R.81 | 144       | 4387393         | 0.0989       | 53.50   |
-
 
 Table: statReads
 
@@ -269,7 +260,6 @@ Table: statReads
 | Q25L60      |     148 |   1.32G |  9945743 |
 | Q30L60      |     128 |   1.11G |  9316333 |
 
-
 Table: statTrimReads
 
 | Name           | N50 |     Sum |        # |
@@ -282,7 +272,6 @@ Table: statTrimReads
 | R1             | 150 | 736.47M |  5185416 |
 | R2             | 144 | 690.82M |  5185416 |
 | Rs             |   0 |       0 |        0 |
-
 
 ```text
 #R.trim
@@ -314,7 +303,6 @@ Table: statTrimReads
 #start	center	stop	max	volume
 ```
 
-
 Table: statMergeReads
 
 | Name          | N50 |    Sum |        # |
@@ -338,7 +326,6 @@ Table: statMergeReads
 | M.ihist.merge1.txt | 271.6 |    277 |  23.6 |         10.85% |
 | M.ihist.merge.txt  | 337.7 |    338 |  19.3 |         98.69% |
 
-
 Table: statQuorum
 
 | Name     | CovIn | CovOut | Discard% | Kmer | RealG |  EstG | Est/Real |   RunTime |
@@ -346,7 +333,6 @@ Table: statQuorum
 | Q0L0.R   | 307.5 |  285.8 |    7.06% | "93" | 4.64M | 4.66M |     1.00 | 0:02'49'' |
 | Q25L60.R | 284.2 |  273.2 |    3.85% | "61" | 4.64M | 4.57M |     0.98 | 0:02'39'' |
 | Q30L60.R | 238.4 |  233.6 |    2.03% | "71" | 4.64M | 4.55M |     0.98 | 0:02'23'' |
-
 
 Table: statUnitigsSuperreads.md
 
@@ -370,7 +356,6 @@ Table: statUnitigsSuperreads.md
 | Q30L60X80P000 |   80.0 |  98.49% |     30851 | 4.54M |  242 |        33 | 29.58K | 1097 |   79.0 | 14.0 |  12.3 | 242.0 | "31,41,51,61,71,81" |   0:01:07 |   0:00:44 |
 | Q30L60X80P001 |   80.0 |  98.50% |     30332 | 4.55M |  240 |        37 | 33.81K | 1093 |   79.0 | 13.0 |  13.3 | 236.0 | "31,41,51,61,71,81" |   0:01:07 |   0:00:43 |
 
-
 Table: statMRUnitigsSuperreads.md
 
 | Name      | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
@@ -381,7 +366,6 @@ Table: statMRUnitigsSuperreads.md
 | MRX80P000 |   80.0 |  96.31% |     28330 |  4.5M | 277 |       108 | 45.02K | 631 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:01:32 |   0:00:35 |
 | MRX80P001 |   80.0 |  96.20% |     26887 |  4.5M | 279 |       108 | 41.96K | 620 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:01:31 |   0:00:33 |
 | MRX80P002 |   80.0 |  96.23% |     27814 |  4.5M | 268 |       115 | 46.23K | 601 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:01:32 |   0:00:34 |
-
 
 Table: statUnitigsBcalm.md
 
@@ -405,7 +389,6 @@ Table: statUnitigsBcalm.md
 | Q30L60X80P000 |   80.0 |  98.60% |     29369 | 4.54M | 255 |        32 |  40.2K | 1416 |   80.0 | 14.0 |  12.7 | 244.0 | "31,41,51,61,71,81" |   0:01:40 |   0:00:48 |
 | Q30L60X80P001 |   80.0 |  98.53% |     28067 | 4.53M | 247 |        31 | 37.48K | 1374 |   80.0 | 14.0 |  12.7 | 244.0 | "31,41,51,61,71,81" |   0:01:29 |   0:00:45 |
 
-
 Table: statMRUnitigsBcalm.md
 
 | Name      | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
@@ -416,7 +399,6 @@ Table: statMRUnitigsBcalm.md
 | MRX80P000 |   80.0 |  96.38% |     47694 | 4.51M | 195 |       108 | 28.22K | 409 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:01:37 |   0:00:33 |
 | MRX80P001 |   80.0 |  96.34% |     42717 | 4.51M | 194 |       103 |  26.1K | 398 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:01:37 |   0:00:34 |
 | MRX80P002 |   80.0 |  96.39% |     36596 | 4.51M | 201 |       109 |  31.9K | 422 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:01:36 |   0:00:32 |
-
 
 Table: statUnitigsTadpole.md
 
@@ -440,7 +422,6 @@ Table: statUnitigsTadpole.md
 | Q30L60X80P000 |   80.0 |  98.58% |     34032 | 4.53M | 219 |        29 |  28.8K | 1209 |   80.0 | 14.0 |  12.7 | 244.0 | "31,41,51,61,71,81" |   0:00:42 |   0:00:46 |
 | Q30L60X80P001 |   80.0 |  98.58% |     31599 | 4.53M | 221 |        40 | 40.82K | 1206 |   80.0 | 13.0 |  13.7 | 238.0 | "31,41,51,61,71,81" |   0:00:42 |   0:00:44 |
 
-
 Table: statMRUnitigsTadpole.md
 
 | Name      | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
@@ -451,7 +432,6 @@ Table: statMRUnitigsTadpole.md
 | MRX80P000 |   80.0 |  96.55% |     53721 | 4.52M | 151 |        94 | 21.47K | 322 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:00:52 |   0:00:33 |
 | MRX80P001 |   80.0 |  96.51% |     52134 | 4.52M | 154 |        98 | 20.63K | 324 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:00:51 |   0:00:33 |
 | MRX80P002 |   80.0 |  96.59% |     51879 | 4.51M | 159 |       105 |  24.9K | 337 |   79.0 | 10.0 |  16.3 | 218.0 | "31,41,51,61,71,81" |   0:00:52 |   0:00:35 |
-
 
 Table: statMergeAnchors.md
 
@@ -465,7 +445,6 @@ Table: statMergeAnchors.md
 | 7_merge_unitigs_superreads    |  98.80% |     58785 | 4.53M | 141 |      9743 |  98.18K | 40 |  284.0 | 36.0 |  58.7 | 784.0 |   0:01:45 |
 | 7_merge_unitigs_tadpole       |  98.99% |     63481 | 4.53M | 133 |      1091 |  33.87K | 29 |  284.0 | 35.0 |  59.7 | 778.0 |   0:01:42 |
 
-
 Table: statOtherAnchors.md
 
 | Name         | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper | RunTimeAN |
@@ -475,7 +454,6 @@ Table: statOtherAnchors.md
 | 8_megahit    |  98.18% |     65379 | 4.53M | 125 |       960 | 18.07K | 230 |  285.0 | 35.0 |  60.0 | 780.0 |   0:00:47 |
 | 8_mr_megahit |  98.81% |    132772 | 4.57M |  70 |       781 | 19.29K | 138 |  372.0 | 36.0 |  88.0 | 960.0 |   0:01:03 |
 | 8_platanus   |  97.87% |     96792 | 4.06M |  81 |       254 |  9.36K | 138 |  285.0 | 35.0 |  60.0 | 780.0 |   0:00:43 |
-
 
 Table: statFinal
 
@@ -501,7 +479,6 @@ Table: statFinal
 | platanus.contig          |   14890 | 4712258 | 1171 |
 | platanus.scaffold        |  148483 | 4577638 |  142 |
 | platanus.non-contained   |  176491 | 4559854 |   64 |
-
 
 Table: statBusco run_bacteria_odb10
 
@@ -543,10 +520,9 @@ Table: statBusco run_enterobacterales_odb10
 | mr_megahit          | 440 | 438 |  2 |  0 |  0 |   440 |
 | platanus            | 440 | 438 |  2 |  0 |  0 |   440 |
 
+## *E. coli* str. K-12 substr. DH5alpha
 
-# *Escherichia coli* str. K-12 substr. DH5alpha
-
-## dh5alpha: reference
+### dh5alpha: reference
 
 * Reference genome
 
@@ -560,7 +536,7 @@ cp ~/data/anchr/ref/dh5alpha/repetitives.fa .
 
 ```
 
-## dh5alpha: download
+### dh5alpha: download
 
 ```shell script
 cd ~/data/anchr/dh5alpha
@@ -588,7 +564,6 @@ md5sum --check ena_info.md5.txt
 | dh5alpha | SRX7856678 | ILLUMINA        | PAIRED |         | SRR11245239 | 5881654 | 1.37G |
 | dh5alpha | SRX7856679 | OXFORD_NANOPORE | SINGLE |         | SRR11245238 | 346489  | 3.35G |
 
-
 * Illumina
 
 ```shell script
@@ -602,7 +577,7 @@ ln -s ../ena/SRR11245239_2.fastq.gz R2.fq.gz
 
 ```
 
-## dh5alpha: template
+### dh5alpha: template
 
 * template
 
@@ -646,7 +621,7 @@ anchr template \
 
 ```
 
-## dh5alpha: run
+### dh5alpha: run
 
 ```shell script
 WORKING_DIR=${HOME}/data/anchr
@@ -666,7 +641,6 @@ bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
 
 ```
 
-
 Table: statInsertSize
 
 | Group             |  Mean | Median |  STDev | PercentOfPairs/PairOrientation |
@@ -675,7 +649,6 @@ Table: statInsertSize
 | R.tadpole.bbtools | 389.1 |    341 |  206.1 |                         95.12% |
 | R.genome.picard   | 394.8 |    346 |  208.3 |                             FR |
 | R.tadpole.picard  | 389.1 |    341 |  205.7 |                             FR |
-
 
 Table: statKAT
 
@@ -689,7 +662,6 @@ Table: statKAT
 | R.71 | 132       | 4495949         | 0.0194       | 51.44   |
 | R.81 | 107       | 4475448         | 0.0160       | 51.42   |
 
-
 Table: statReads
 
 | Name        |     N50 |     Sum |        # |
@@ -702,7 +674,6 @@ Table: statReads
 | Q25L60      |     125 |   1.25G | 10280938 |
 | Q30L60      |     125 |   1.13G |  9405535 |
 
-
 Table: statTrimReads
 
 | Name     | N50 |     Sum |        # |
@@ -714,7 +685,6 @@ Table: statTrimReads
 | R1       | 125 |    683M |  5481131 |
 | R2       | 125 | 683.63M |  5481131 |
 | Rs       |   0 |       0 |        0 |
-
 
 ```text
 #R.trim
@@ -747,7 +717,6 @@ Table: statTrimReads
 #start	center	stop	max	volume
 ```
 
-
 Table: statMergeReads
 
 | Name          | N50 |     Sum |        # |
@@ -771,7 +740,6 @@ Table: statMergeReads
 | M.ihist.merge1.txt | 180.2 |    180 |  32.0 |         24.10% |
 | M.ihist.merge.txt  | 312.5 |    310 |  87.7 |         64.12% |
 
-
 Table: statQuorum
 
 | Name     | CovIn | CovOut | Discard% | Kmer | RealG |  EstG | Est/Real |   RunTime |
@@ -779,7 +747,6 @@ Table: statQuorum
 | Q0L0.R   | 298.2 |  262.2 |   12.07% | "87" | 4.58M |  4.6M |     1.00 | 0:02'44'' |
 | Q25L60.R | 273.7 |  253.6 |    7.35% | "87" | 4.58M | 4.53M |     0.99 | 0:02'37'' |
 | Q30L60.R | 246.5 |  232.4 |    5.71% | "87" | 4.58M | 4.52M |     0.99 | 0:02'14'' |
-
 
 Table: statUnitigsSuperreads.md
 
@@ -803,7 +770,6 @@ Table: statUnitigsSuperreads.md
 | Q30L60X80P000 |   80.0 |  97.29% |     27104 | 4.45M | 280 |        32 | 23.52K |  640 |   80.0 | 9.0 |  17.7 | 214.0 | "31,41,51,61,71,81" |   0:01:06 |   0:00:32 |
 | Q30L60X80P001 |   80.0 |  97.29% |     27205 | 4.45M | 275 |        34 | 25.26K |  642 |   80.0 | 9.0 |  17.7 | 214.0 | "31,41,51,61,71,81" |   0:01:06 |   0:00:32 |
 
-
 Table: statMRUnitigsSuperreads.md
 
 | Name      | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
@@ -814,7 +780,6 @@ Table: statMRUnitigsSuperreads.md
 | MRX80P000 |   80.0 |  97.48% |     64119 | 4.46M | 121 |        72 | 16.97K | 324 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:01:27 |   0:00:38 |
 | MRX80P001 |   80.0 |  97.59% |     67250 | 4.46M | 113 |        77 | 17.27K | 325 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:01:28 |   0:00:38 |
 | MRX80P002 |   80.0 |  97.56% |     64176 | 4.46M | 121 |        84 | 19.81K | 335 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:01:27 |   0:00:40 |
-
 
 Table: statUnitigsBcalm.md
 
@@ -838,7 +803,6 @@ Table: statUnitigsBcalm.md
 | Q30L60X80P000 |   80.0 |  97.34% |     54822 | 4.46M | 149 |        66 | 16.58K | 327 |   80.0 | 9.0 |  17.7 | 214.0 | "31,41,51,61,71,81" |   0:01:29 |   0:00:32 |
 | Q30L60X80P001 |   80.0 |  97.44% |     53170 | 4.46M | 157 |        43 | 16.11K | 358 |   80.0 | 9.0 |  17.7 | 214.0 | "31,41,51,61,71,81" |   0:01:32 |   0:00:33 |
 
-
 Table: statMRUnitigsBcalm.md
 
 | Name      | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
@@ -849,7 +813,6 @@ Table: statMRUnitigsBcalm.md
 | MRX80P000 |   80.0 |  96.85% |     67364 | 4.28M | 112 |        74 | 11.51K | 228 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:01:41 |   0:00:36 |
 | MRX80P001 |   80.0 |  96.84% |     73702 | 4.46M | 111 |        81 | 12.61K | 226 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:01:36 |   0:00:33 |
 | MRX80P002 |   80.0 |  96.84% |     66225 | 4.46M | 118 |        80 | 13.06K | 236 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:01:36 |   0:00:34 |
-
 
 Table: statUnitigsTadpole.md
 
@@ -873,7 +836,6 @@ Table: statUnitigsTadpole.md
 | Q30L60X80P000 |   80.0 |  97.36% |     67334 | 4.46M | 118 |        50 | 11.82K | 247 |   80.0 | 9.0 |  17.7 | 214.0 | "31,41,51,61,71,81" |   0:00:41 |   0:00:33 |
 | Q30L60X80P001 |   80.0 |  97.46% |     63673 | 4.46M | 122 |        51 | 12.96K | 271 |   80.0 | 9.0 |  17.7 | 214.0 | "31,41,51,61,71,81" |   0:00:42 |   0:00:33 |
 
-
 Table: statMRUnitigsTadpole.md
 
 | Name      | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
@@ -884,7 +846,6 @@ Table: statMRUnitigsTadpole.md
 | MRX80P000 |   80.0 |  96.87% |     73678 | 4.46M | 115 |        86 | 14.15K | 234 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:00:49 |   0:00:31 |
 | MRX80P001 |   80.0 |  96.86% |     73689 | 4.46M | 111 |       103 | 13.52K | 229 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:00:52 |   0:00:33 |
 | MRX80P002 |   80.0 |  96.85% |     66221 | 4.46M | 116 |        81 | 12.82K | 234 |   80.0 | 8.0 |  18.7 | 208.0 | "31,41,51,61,71,81" |   0:00:49 |   0:00:32 |
-
 
 Table: statMergeAnchors.md
 
@@ -898,7 +859,6 @@ Table: statMergeAnchors.md
 | 7_merge_unitigs_superreads    |  98.98% |     67353 | 4.46M | 113 |     23775 | 126.43K | 32 |  262.0 | 22.0 |  65.3 | 656.0 |   0:01:43 |
 | 7_merge_unitigs_tadpole       |  98.88% |     67350 | 4.46M | 111 |     19926 |  77.76K | 26 |  262.0 | 22.0 |  65.3 | 656.0 |   0:01:36 |
 
-
 Table: statOtherAnchors.md
 
 | Name         | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper | RunTimeAN |
@@ -908,7 +868,6 @@ Table: statOtherAnchors.md
 | 8_megahit    |  98.47% |     73665 | 4.46M | 116 |      1031 | 25.17K | 231 |  263.0 | 22.0 |  65.7 | 658.0 |   0:00:41 |
 | 8_mr_megahit |  99.22% |    132754 |  4.5M |  75 |       673 | 22.14K | 147 |  376.0 | 28.0 |  97.3 | 920.0 |   0:00:46 |
 | 8_platanus   |  97.80% |    114608 | 4.48M |  72 |       374 | 10.89K | 137 |  263.0 | 22.0 |  65.7 | 658.0 |   0:00:42 |
-
 
 Table: statFinal
 

@@ -263,11 +263,9 @@ With a conventional directory structure, `anchr template` creates all scripts fr
 assembly evaluations.
 
 * E. coli
-    * [*Escherichia* virus Lambda](results/e_coli.md#escherichia-virus-lambda)
-    * [*E.
-      coli* str. K-12 substr. MG1655](results/e_coli.md#escherichia-coli-str-k-12-substr-mg1655)
-    * [*E.
-      coli* str. K-12 substr. DH5alpha](results/e_coli.md#escherichia-coli-str-k-12-substr-dh5alpha)
+    * [*Mycoplasma genitalium* G37](results/model.md#mycoplasma-genitalium-g37)
+    * [*E. coli* str. K-12 substr. MG1655](results/model.md#e-coli-str-k-12-substr-mg1655)
+    * [*E. coli* str. K-12 substr. DH5alpha](results/model.md#e-coli-str-k-12-substr-dh5alpha)
 
 * FDA-ARGOS bacteria
     * [Ca_jej_jejuni_NCTC_11168_ATCC_700819](results/fda_argos.md#ca_jej_jejuni_nctc_11168_atcc_700819)
