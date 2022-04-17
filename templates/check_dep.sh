@@ -73,8 +73,12 @@ hash jellyfish 2>/dev/null || {
 }
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    hash quorum 2>/dev/null || {
+        echo >&2 "quorum is required but it's not installed."
+        echo >&2 "Install with homebrew: brew install wang-q/tap/quorum@1.1.1"
+    }
     hash masurca 2>/dev/null || {
-        echo >&2 "masurca is required but it's not installed."
+        echo >&2 "masurca is optional but it's not installed."
         echo >&2 "Install with homebrew: brew install brewsci/bio/masurca"
     }
 fi

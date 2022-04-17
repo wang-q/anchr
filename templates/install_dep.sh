@@ -39,6 +39,7 @@ brew install --HEAD wang-q/tap/daligner
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     check_install brewsci/bio/masurca
     check_install brewsci/bio/mosdepth
+    check_install wang-q/tap/quorum@1.1.1
 fi
 
 exit 0
