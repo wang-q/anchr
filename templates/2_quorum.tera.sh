@@ -39,7 +39,7 @@ for Q in 0 {{ opt.qual }}; do
 {% if opt.se == "0" -%}
                 ${PREFIX}2.fq.gz \
                 $(
-                    if [ -e ${PREFIX}s.fq.gz ]; then
+                    if [ -s ${PREFIX}s.fq.gz ]; then
                         echo ${PREFIX}s.fq.gz;
                     fi
                 ) \
