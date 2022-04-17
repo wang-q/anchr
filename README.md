@@ -94,38 +94,6 @@ brew install wang-q/tap/platanus
 
 ## EXAMPLES
 
-### Fetching data
-
-Data soruce: *E. coli* virus Lambda
-
-```shell
-# ena
-mkdir -p ~/data/ena
-cd ~/data/ena
-
-cat << EOF > source.csv
-SRX2365802,Lambda,HiSeq 2500
-EOF
-
-anchr ena info | perl - -v source.csv > ena_info.yml
-anchr ena prep | perl - ena_info.yml
-
-mlr --icsv --omd cat ena_info.csv
-
-aria2c -j 4 -x 4 -s 2 -c --file-allocation=none -i ena_info.ftp.txt
-
-md5sum --check ena_info.md5.txt
-
-# sampling reads as test materials
-seqtk sample -s 23 SRR5042715_1.fastq.gz 20000 | pigz > R1.fq.gz
-seqtk sample -s 23 SRR5042715_2.fastq.gz 20000 | pigz > R2.fq.gz
-
-```
-
-| name   | srx        | platform | layout | ilength | srr        | spot     | base  |
-|:-------|:-----------|:---------|:-------|:--------|:-----------|:---------|:------|
-| Lambda | SRX2365802 | ILLUMINA | PAIRED |         | SRR5042715 | 16540237 | 3.33G |
-
 ### Individual subcommands
 
 ```shell
@@ -231,6 +199,63 @@ bash anchors.sh
 popd
 
 ```
+
+### Fetching data
+
+* Data source: *Mycoplasma genitalium* G37
+
+```shell
+mkdir -p ~/data/anchr/g37/ena
+cd ~/data/anchr/g37/ena
+
+cat << EOF > source.csv
+ERX452667,G37,MiSeq
+EOF
+
+anchr ena info | perl - -v source.csv > ena_info.yml
+anchr ena prep | perl - ena_info.yml
+
+mlr --icsv --omd cat ena_info.csv
+
+aria2c -j 4 -x 4 -s 2 -c --file-allocation=none -i ena_info.ftp.txt
+
+md5sum --check ena_info.md5.txt
+
+```
+
+| name | srx       | platform | layout | ilength | srr       | spots  | bases  |
+|------|-----------|----------|--------|---------|-----------|--------|--------|
+| G37  | ERX452667 | ILLUMINA | PAIRED | 447     | ERR486835 | 680644 | 97.37M |
+
+* Data source: *E. coli* virus Lambda
+
+```shell
+# ena
+mkdir -p ~/data/ena
+cd ~/data/ena
+
+cat << EOF > source.csv
+SRX2365802,Lambda,HiSeq 2500
+EOF
+
+anchr ena info | perl - -v source.csv > ena_info.yml
+anchr ena prep | perl - ena_info.yml
+
+mlr --icsv --omd cat ena_info.csv
+
+aria2c -j 4 -x 4 -s 2 -c --file-allocation=none -i ena_info.ftp.txt
+
+md5sum --check ena_info.md5.txt
+
+# sampling reads as test materials
+seqtk sample -s 23 SRR5042715_1.fastq.gz 20000 | pigz > R1.fq.gz
+seqtk sample -s 23 SRR5042715_2.fastq.gz 20000 | pigz > R2.fq.gz
+
+```
+
+| name   | srx        | platform | layout | ilength | srr        | spot     | base  |
+|:-------|:-----------|:---------|:-------|:--------|:-----------|:---------|:------|
+| Lambda | SRX2365802 | ILLUMINA | PAIRED |         | SRR5042715 | 16540237 | 3.33G |
 
 ### `anchr template`
 
