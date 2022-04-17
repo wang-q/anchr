@@ -5,6 +5,9 @@
 #----------------------------#
 START_TIME=$(date +%s)
 
+# Add masurca to $PATH
+export PATH="$(readlinkf "$(which masurca)" | xargs dirname):$PATH"
+
 #----------------------------#
 # Renaming reads
 #----------------------------#
@@ -150,67 +153,18 @@ quorum_error_correct_reads \
 
 log_debug "Discard any reads with subs"
 mv {{ opt.prefix }}.cor.fa {{ opt.prefix }}.cor.sub.fa
+
+# The quorum appended string styled is 42:sub:C-T or 43:3_trunc
 cat {{ opt.prefix }}.cor.sub.fa |
-    grep -E '^>\w+\s*$' -A 1 |
-    sed '/^--$/d' |
-    perl -nl -e '
-        BEGIN {
-            our $prev_name, $prev_idx, $prev_seq, $cur_name, $cur_idx, $cur_seq;
-        }
+    grep ':sub:' |
+    perl -nl -e '/^>([\w\/]+)/ and print $1' \
+    > {{ opt.prefix }}.discard.lst
+cat {{ opt.prefix }}.cor.sub.fa |
+    grep 'trunc' |
+    perl -nl -e '/^>([\w\/]+)/ and print $1' \
+    >> {{ opt.prefix }}.discard.lst
 
-        if ( substr( $_, 0, 1 ) eq q{>} ) {
-            ($cur_name) = split /\s+/, $_;
-            $cur_name =~ s/^>//;
-            $cur_idx = substr $cur_name, 2;
-        }
-        else {
-            $cur_seq = $_;
-
-            if ( $cur_idx & 1 ) { # odd
-                if ( defined $prev_name ) {
-                    if ( $cur_idx - $prev_idx == 1 ) {
-                        print qq{>$prev_name/1};
-                        print qq{$prev_seq};
-                        print qq{>$prev_name/2};
-                        print qq{$cur_seq};
-                    }
-                    else {
-                        print qq{>$prev_name/1};
-                        print qq{$prev_seq};
-                        print qq{>$prev_name/2};
-                        print qq{N};
-
-                        print qq{>$cur_name/1};
-                        print qq{N};
-                        print qq{>$cur_name/2};
-                        print qq{$cur_seq};
-                    }
-
-                    undef $prev_name;
-                    undef $prev_idx;
-                    undef $prev_seq;
-                }
-                else {
-                    print qq{>$cur_name/1};
-                    print qq{N};
-                    print qq{>$cur_name/2};
-                    print qq{$cur_seq};
-                }
-            }
-            else { # even
-                if ( defined $prev_name ) {
-                    print qq{>$prev_name/1};
-                    print qq{$prev_seq};
-                    print qq{>$prev_name/2};
-                    print qq{N};
-                }
-
-                $prev_name = $cur_name;
-                $prev_idx = $cur_idx;
-                $prev_seq = $cur_seq;
-            }
-        }
-    ' \
+faops some -i -l 0 {{ opt.prefix }}.cor.sub.fa {{ opt.prefix }}.discard.lst stdout \
     > {{ opt.prefix }}.cor.fa
 
 rm {{ opt.prefix }}.cor.sub.fa
