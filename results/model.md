@@ -70,11 +70,12 @@ rm *.sh
 anchr template \
     --genome 580076 \
     --parallel 8 \
-    --xmx 8g \
+    --xmx 4g \
     \
     --fastqc \
     --insertsize \
     --kat \
+    --fastk \
     \
     --trim "--dedupe --cutoff 30 --cutk 31" \
     --qual "25 30" \

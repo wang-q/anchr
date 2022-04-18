@@ -75,7 +75,7 @@ brew install wang-q/tap/tsv-utils wang-q/tap/intspan
 
 # Myer's dazzler wrapper
 cpanm --installdeps App::Dazz
-cpanm -nq App::Dazz
+cpanm --verbose App::Dazz
 
 anchr dep install | bash
 anchr dep check | bash
@@ -90,10 +90,10 @@ parallel -j 1 -k --line-buffer '
         argparse minpack.lm \
         ggplot2 scales viridis
 
-
 # Optional
 # assembly quality assessment. https://github.com/ablab/quast/issues/140
 brew install brewsci/bio/quast --HEAD
+quast --test
 
 # Optional: leading assemblers
 brew install spades

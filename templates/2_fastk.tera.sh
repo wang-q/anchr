@@ -44,7 +44,7 @@ for PREFIX in R S T; do
                 grep '^kmercov' |
                 tr -s ' ' '\t' |
                 cut -f 2 |
-                perl -nl -e 'printf qq{%.1f\n}, $_'
+                perl -nl -e 'printf qq(%.1f\n), $_'
         )
 
         cat ${PREFIX}-GeneScope-${KMER}/summary.txt |
@@ -54,9 +54,9 @@ for PREFIX in R S T; do
             sed "3,7 s/^/\t/" |
             perl -nlp -e 's/\s{2,}/\t/g; s/\s+$//g;' |
             perl -nla -F'\t' -e '
-                @fields = map {/\bNA\b/ ? q{} : $_ } @F;        # Remove NA fields
-                $fields[2] = q{} if $fields[2] eq $fields[3];   # Remove identical fields
-                print join qq{\t}, @fields
+                @fields = map {/\bNA\b/ ? q() : $_ } @F;        # Remove NA fields
+                $fields[2] = q() if $fields[2] eq $fields[3];   # Remove identical fields
+                print join qq(\t), @fields
             '
 
         printf "\tKmer Cov\t\t${COV}\n"
