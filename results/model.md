@@ -74,7 +74,6 @@ anchr template \
     \
     --fastqc \
     --insertsize \
-    --kat \
     --fastk \
     \
     --trim "--dedupe --cutoff 30 --cutk 31" \
