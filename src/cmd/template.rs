@@ -202,7 +202,7 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
             Arg::with_name("unitigger")
                 .long("unitigger")
                 .short("u")
-                .help("Unitigger used: bcalm, superreads, or tadpole")
+                .help("Unitigger used: bcalm, bifrost, superreads, or tadpole")
                 .takes_value(true)
                 .default_value("bcalm")
                 .empty_values(false),

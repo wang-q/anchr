@@ -25,7 +25,7 @@ Fasta files can't be gzipped
             Arg::with_name("unitigger")
                 .long("unitigger")
                 .short("u")
-                .help("Which unitig constructor to use: superreads, tadpole, or bcalm")
+                .help("Which unitig constructor to use: bcalm, bifrost, superreads, or tadpole")
                 .takes_value(true)
                 .default_value("superreads")
                 .empty_values(false),

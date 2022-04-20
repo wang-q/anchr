@@ -8,6 +8,7 @@
 * Simplify `quorum.sh`
 * Add `anchr template` scripts
     * 2_fastk.sh
+* Add bifrost as a unitigger
 
 ## 0.3.17 - 2022-04-15
 

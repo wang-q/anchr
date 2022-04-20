@@ -18,6 +18,18 @@
 
 ## *Mycoplasma genitalium* G37
 
+### g37: reference
+
+* Reference genome
+
+```shell script
+mkdir -p ~/data/anchr/g37/1_genome
+cd ~/data/anchr/g37/1_genome
+
+cp ~/data/anchr/ref/g37/genome.fa .
+
+```
+
 ### g37: download
 
 ```shell script
@@ -74,7 +86,6 @@ anchr template \
     \
     --fastqc \
     --insertsize \
-    --fastk \
     \
     --trim "--dedupe --cutoff 30 --cutk 31" \
     --qual "25 30" \
@@ -86,16 +97,14 @@ anchr template \
     --ecphase "1 2 3" \
     \
     --cov "40 80" \
-    --unitigger "superreads bcalm tadpole" \
+    --unitigger "bcalm bifrost superreads tadpole" \
     --statp 2 \
     --readl 125 \
     --uscale 2 \
     --lscale 3 \
     --redo \
     \
-    --extend \
-    \
-    --busco
+    --extend
 
 ```
 

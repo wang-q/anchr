@@ -59,6 +59,10 @@ log_info Creating unitigs
         -kmer-size {{ kmer }} -abundance-min 3 -verbose 0 \
         -nb-cores {{ opt.parallel }} -out K{{ kmer }}
     mv K{{ kmer }}.unitigs.fa unitigs_K{{ kmer }}.fasta
+{% elif opt.unitigger == "bifrost" -%}
+    Bifrost build --input-seq-file pe.cor.fa  \
+        --kmer-length {{ kmer }} --clip-tips --del-isolated \
+        --threads {{ opt.parallel }} --fasta --output-file unitigs_K{{ kmer }}
 {% else -%}
     create_k_unitigs_large_k -c $(({{ kmer }}-1)) -t {{ opt.parallel }} \
         -m {{ kmer }} -n $ESTIMATED_GENOME_SIZE -l {{ kmer }} -f 0.000001 \
