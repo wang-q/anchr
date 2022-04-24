@@ -128,16 +128,14 @@ prettier -w 9_markdown/*.md
 
 ```
 
+| Group             |   Mean | Median |   STDev | Pairs%/Orientation |
+|:------------------|-------:|-------:|--------:|-------------------:|
+| R.genome.bbtools  | 3490.1 |    466 | 14777.0 |             96.05% |
+| R.tadpole.bbtools |  468.7 |    452 |   136.0 |             83.57% |
+| R.genome.picard   |  475.2 |    460 |   133.4 |                 FR |
+| R.tadpole.picard  |  468.5 |    452 |   131.9 |                 FR |
+
 Table: statInsertSize
-
-| Group             |   Mean | Median |   STDev | PercentOfPairs/PairOrientation |
-|:------------------|-------:|-------:|--------:|-------------------------------:|
-| R.genome.bbtools  | 3490.1 |    466 | 14777.0 |                         96.05% |
-| R.tadpole.bbtools |  468.7 |    452 |   136.0 |                         83.57% |
-| R.genome.picard   |  475.2 |    460 |   133.4 |                             FR |
-| R.tadpole.picard  |  468.5 |    452 |   131.9 |                             FR |
-
-Table: statFastK
 
 | K    | property              |        min |        max |
 |:-----|:----------------------|-----------:|-----------:|
@@ -156,16 +154,18 @@ Table: statFastK
 |      | Read Error Rate       |            | 0.0942288% |
 |      | Kmer Cov              |            |      112.2 |
 
-Table: statReads
+Table: statFastK
 
 | Name       |    N50 |     Sum |      # |
 |:-----------|-------:|--------:|-------:|
-| Genome     | 580076 |  580076 |      1 |
+| genome     | 580076 | 580.08K |      1 |
 | Illumina.R |    150 |  102.1M | 680644 |
 | trim.R     |    150 | 101.56M | 677478 |
+| Q0L0       |    150 | 101.56M | 677478 |
 | Q25L60     |    150 |  98.27M | 658139 |
 | Q30L60     |    150 |  95.05M | 638376 |
 
+Table: statReads
 
 | Name     | N50 |     Sum |      # |
 |:---------|----:|--------:|-------:|
@@ -191,27 +191,6 @@ Table: statTrimReads
 #Name   Reads   ReadsPct
 ```
 
-```text
-#R.peaks
-#k      31
-#unique_kmers   3021099
-#error_kmers    2436111
-#genomic_kmers  584988
-#main_peak      133
-#genome_size_in_peaks   15594307
-#genome_size    15751528
-#haploid_genome_size    605828
-#fold_coverage  5
-#haploid_fold_coverage  133
-#ploidy 26
-#het_rate       0.00061
-#percent_repeat_in_peaks        1.659
-#percent_repeat 96.278
-#start  center  stop    max     volume
-```
-
-Table: statMergeReads
-
 | Name          | N50 |     Sum |      # |
 |:--------------|----:|--------:|-------:|
 | clumped       | 150 | 101.56M | 677478 |
@@ -222,24 +201,28 @@ Table: statMergeReads
 | merged.raw    | 443 |   77.9M | 183292 |
 | unmerged.raw  | 190 |  54.74M | 289830 |
 | unmerged.trim | 190 |  54.74M | 289830 |
-| M1            | 443 |  77.86M | 183201 |
+| M1            | 443 |  77.86M | 183204 |
 | U1            | 190 |  27.48M | 144915 |
 | U2            | 190 |  27.26M | 144915 |
 | Us            |   0 |       0 |      0 |
-| M.cor         | 363 | 132.78M | 656232 |
+| M.cor         | 363 | 132.78M | 656238 |
 
-| Group              |  Mean | Median | STDev | PercentOfPairs |
-|:-------------------|------:|-------:|------:|---------------:|
-| M.ihist.merge1.txt | 258.5 |    264 |  24.6 |          4.25% |
-| M.ihist.merge.txt  | 425.0 |    431 |  64.8 |         55.85% |
+Table: statMergeReads
+
+| Group              |  Mean | Median | STDev | Pairs% |
+|:-------------------|------:|-------:|------:|-------:|
+| M.ihist.merge1.txt | 258.5 |    264 |  24.6 |  4.25% |
+| M.ihist.merge.txt  | 425.0 |    431 |  64.8 | 55.85% |
+
+Table: statMergeInsert
+
+| Name     | CovIn | CovOut | Discard% |  Kmer |   RealG |    EstG | Est/Real | RunTime |
+|:---------|------:|-------:|---------:|------:|--------:|--------:|---------:|--------:|
+| Q0L0.R   | 175.1 |  160.8 |    8.16% | "105" | 580.08K | 584.05K |     1.01 | 0:00:58 |
+| Q25L60.R | 169.4 |  160.4 |    5.31% | "105" | 580.08K | 582.89K |     1.00 | 0:00:59 |
+| Q30L60.R | 163.9 |  157.3 |    4.05% | "105" | 580.08K | 582.28K |     1.00 | 0:01:03 |
 
 Table: statQuorum
-
-| Name     | CovIn | CovOut | Discard% |  Kmer |   RealG |    EstG | Est/Real |   RunTime |
-|:---------|------:|-------:|---------:|------:|--------:|--------:|---------:|----------:|
-| Q0L0.R   | 175.1 |  160.8 |    8.16% | "105" | 580.08K | 584.05K |     1.01 | 0:00'57'' |
-| Q25L60.R | 169.4 |  160.4 |    5.31% | "105" | 580.08K | 582.89K |     1.00 | 0:00'56'' |
-| Q30L60.R | 163.9 |  157.3 |    4.05% | "105" | 580.08K | 582.28K |     1.00 | 0:00'55'' |
 
 ## *E. coli* str. K-12 substr. MG1655
 
