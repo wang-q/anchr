@@ -18,18 +18,22 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
 rm -f 2_illumina/insert_size/*tadpole.contig.fa*
 
 # bwa
-find 3_bwa -type f -name "genome.fa*"        | parallel --no-run-if-empty -j 1 rm
-find 3_bwa -type f -name "*mate.ba[mi]"      | parallel --no-run-if-empty -j 1 rm
-find 3_bwa -type f -name "*.per-base.bed.gz" | parallel --no-run-if-empty -j 1 rm
+if [ -d 3_bwa ]; then
+    find 3_bwa -type f -name "genome.fa*"        | parallel --no-run-if-empty -j 1 rm
+    find 3_bwa -type f -name "*mate.ba[mi]"      | parallel --no-run-if-empty -j 1 rm
+    find 3_bwa -type f -name "*.per-base.bed.gz" | parallel --no-run-if-empty -j 1 rm
+fi
 
 # quorum
-find 2_illumina -type f -name "quorum_mer_db.jf" | parallel --no-run-if-empty -j 1 rm
-find 2_illumina -type f -name "k_u_hash_0"       | parallel --no-run-if-empty -j 1 rm
-find 2_illumina -type f -name "*.tmp"            | parallel --no-run-if-empty -j 1 rm
-find 2_illumina -type f -name "pe.renamed.fastq" | parallel --no-run-if-empty -j 1 rm
-find 2_illumina -type f -name "se.renamed.fastq" | parallel --no-run-if-empty -j 1 rm
-find 2_illumina -type f -name "pe.cor.sub.fa"    | parallel --no-run-if-empty -j 1 rm
-find 2_illumina -type f -name "pe.cor.log"       | parallel --no-run-if-empty -j 1 rm
+if [ -d 2_illumina ]; then
+    find 2_illumina -type f -name "quorum_mer_db.jf" | parallel --no-run-if-empty -j 1 rm
+    find 2_illumina -type f -name "k_u_hash_0"       | parallel --no-run-if-empty -j 1 rm
+    find 2_illumina -type f -name "*.tmp"            | parallel --no-run-if-empty -j 1 rm
+    find 2_illumina -type f -name "pe.renamed.fastq" | parallel --no-run-if-empty -j 1 rm
+    find 2_illumina -type f -name "se.renamed.fastq" | parallel --no-run-if-empty -j 1 rm
+    find 2_illumina -type f -name "pe.cor.sub.fa"    | parallel --no-run-if-empty -j 1 rm
+    find 2_illumina -type f -name "pe.cor.log"       | parallel --no-run-if-empty -j 1 rm
+fi
 
 # down sampling
 {% for u in unitiggers -%}
@@ -90,9 +94,14 @@ if [ -e 9_markdown/statTrimReads.md ]; then
     cat 9_markdown/statTrimReads.md;
     echo;
 fi
-if [ -e statMergeReads.md ]; then
+if [ -e 9_markdown/statMergeReads.md ]; then
     echo;
-    cat statMergeReads.md;
+    cat 9_markdown/statMergeReads.md;
+    echo;
+fi
+if [ -e 9_markdown/statMergeInsert.md ]; then
+    echo;
+    cat 9_markdown/statMergeInsert.md;
     echo;
 fi
 if [ -e statQuorum.md ]; then

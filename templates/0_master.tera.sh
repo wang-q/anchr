@@ -10,69 +10,69 @@ log_warn 0_master.sh
 # Illumina QC
 #----------------------------#
 if [ -e 2_fastqc.sh ]; then
-    bash 2_fastqc.sh;
+    bash 2_fastqc.sh
 fi
 
 if [ -e 2_insert_size.sh ]; then
-    bash 2_insert_size.sh;
+    bash 2_insert_size.sh
 fi
 
 if [ -e 2_fastk.sh ]; then
-    bash 2_fastk.sh;
+    bash 2_fastk.sh
 fi
 
 if [ -e 2_kat.sh ]; then
-    bash 2_kat.sh;
+    bash 2_kat.sh
 fi
 
 #----------------------------#
 # trim reads
 #----------------------------#
 if [ -e 2_trim.sh ]; then
-    bash 2_trim.sh;
+    bash 2_trim.sh
 fi
 
 if [ -e 9_stat_reads.sh ]; then
-    bash 9_stat_reads.sh;
+    bash 9_stat_reads.sh
 fi
 
 #----------------------------#
 # merge reads
 #----------------------------#
 if [ -e 2_merge.sh ]; then
-    bash 2_merge.sh;
+    bash 2_merge.sh
 fi
 
 #----------------------------#
 # quorum
 #----------------------------#
 if [ -e 2_quorum.sh ]; then
-    bash 2_quorum.sh;
+    bash 2_quorum.sh
 fi
 
 #----------------------------#
 # mapping
 #----------------------------#
 if [ -e 3_bwa.sh ]; then
-    bash 3_bwa.sh;
+    bash 3_bwa.sh
 fi
 if [ -e 3_gatk.sh ]; then
-    bash 3_gatk.sh;
+    bash 3_gatk.sh
 fi
 
 #----------------------------#
 # down sampling trimmed reads; build unitigs and anchors
 #----------------------------#
 if [ -e 4_down_sampling.sh ]; then
-    bash 4_down_sampling.sh;
+    bash 4_down_sampling.sh
 fi
 
 {% for u in unitiggers -%}
 if [ -e 4_unitigs_{{ u }}.sh ]; then
-    bash 4_unitigs_{{ u }}.sh;
+    bash 4_unitigs_{{ u }}.sh
 fi
 if [ -e 4_anchors.sh ]; then
-    bash 4_anchors.sh 4_unitigs_{{ u }};
+    bash 4_anchors.sh 4_unitigs_{{ u }}
 fi
 if [ -e 9_stat_anchors.sh ]; then
     bash 9_stat_anchors.sh 4_unitigs_{{ u }} statUnitigs{{ u | title }}.md
@@ -89,10 +89,10 @@ fi
 
 {% for u in unitiggers -%}
 if [ -e 6_unitigs_{{ u }}.sh ]; then
-    bash 6_unitigs_{{ u }}.sh;
+    bash 6_unitigs_{{ u }}.sh
 fi
 if [ -e 6_anchors.sh ]; then
-    bash 6_anchors.sh 6_unitigs_{{ u }};
+    bash 6_anchors.sh 6_unitigs_{{ u }}
 fi
 if [ -e 9_stat_anchors.sh ]; then
     bash 9_stat_mr_anchors.sh 6_unitigs_{{ u }} statMRUnitigs{{ u | title }}.md
@@ -105,7 +105,7 @@ fi
 #----------------------------#
 {% for u in unitiggers -%}
 if [ -e 7_merge_anchors.sh ]; then
-    bash 7_merge_anchors.sh 4_unitigs_{{ u }} 7_merge_unitigs_{{ u }};
+    bash 7_merge_anchors.sh 4_unitigs_{{ u }} 7_merge_unitigs_{{ u }}
 fi
 {% endfor -%}
 {# Keep a blank line #}
@@ -118,7 +118,7 @@ fi
 {% endif -%}
 {# Keep a blank line #}
 if [ -e 7_merge_anchors.sh ]; then
-    bash 7_merge_anchors.sh 7_merge 7_merge_anchors;
+    bash 7_merge_anchors.sh 7_merge 7_merge_anchors
 fi
 
 if [ -e 9_stat_merge_anchors.sh ]; then
@@ -129,23 +129,23 @@ fi
 # spades, megahit and platanus
 #----------------------------#
 if [ -e 8_spades.sh ]; then
-    bash 8_spades.sh;
+    bash 8_spades.sh
 fi
 if [ -e 8_mr_spades.sh ]; then
-    bash 8_mr_spades.sh;
+    bash 8_mr_spades.sh
 fi
 if [ -e 8_megahit.sh ]; then
-    bash 8_megahit.sh;
+    bash 8_megahit.sh
 fi
 if [ -e 8_mr_megahit.sh ]; then
-    bash 8_mr_megahit.sh;
+    bash 8_mr_megahit.sh
 fi
 if [ -e 8_platanus.sh ]; then
-    bash 8_platanus.sh;
+    bash 8_platanus.sh
 fi
 
 if [ -e 9_stat_other_anchors.sh ]; then
-    bash 9_stat_other_anchors.sh;
+    bash 9_stat_other_anchors.sh
 fi
 
 #----------------------------#
@@ -166,10 +166,10 @@ cat \
     | faops filter -a 1000 -l 0 stdin 7_extend_anchors/contigs.2GS.fasta
 
 if [ -e 7_glue_anchors.sh ]; then
-    bash 7_glue_anchors.sh 7_merge_anchors/anchor.merge.fasta 7_extend_anchors/contigs.2GS.fasta 3;
+    bash 7_glue_anchors.sh 7_merge_anchors/anchor.merge.fasta 7_extend_anchors/contigs.2GS.fasta 3
 fi
 if [ -e 7_fill_anchors.sh ]; then
-    bash 7_fill_anchors.sh 7_glue_anchors/contig.fasta 7_extend_anchors/contigs.2GS.fasta 3;
+    bash 7_fill_anchors.sh 7_glue_anchors/contig.fasta 7_extend_anchors/contigs.2GS.fasta 3
 fi
 {% endif -%}
 {# Keep a blank line #}
@@ -177,8 +177,8 @@ fi
 # final stats
 #----------------------------#
 if [ -e 9_stat_final.sh ]; then
-    bash 9_stat_final.sh;
+    bash 9_stat_final.sh
 fi
 if [ -e 9_quast.sh ]; then
-    bash 9_quast.sh;
+    bash 9_quast.sh
 fi
