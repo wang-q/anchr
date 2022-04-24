@@ -22,7 +22,7 @@
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/g37/1_genome
 cd ~/data/anchr/g37/1_genome
 
@@ -32,7 +32,7 @@ cp ~/data/anchr/ref/g37/genome.fa .
 
 ### g37: download
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/g37/ena
 cd ~/data/anchr/g37/ena
 
@@ -57,7 +57,7 @@ md5sum --check ena_info.md5.txt
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/g37
 
 mkdir -p 2_illumina
@@ -72,7 +72,7 @@ ln -s ../ena/ERR486835_2.fastq.gz R2.fq.gz
 
 * template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=g37
 
@@ -111,7 +111,7 @@ anchr template \
 
 ### g37: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=g37
 
@@ -210,7 +210,7 @@ Table: statTrimReads
 Table: statMergeReads
 
 | Name          | N50 |     Sum |      # |
-| :------------ | --: | ------: | -----: |
+|:--------------|----:|--------:|-------:|
 | clumped       | 150 | 101.56M | 677478 |
 | ecco          | 150 | 101.56M | 677478 |
 | eccc          | 150 | 101.56M | 677478 |
@@ -244,7 +244,7 @@ Table: statQuorum
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/mg1655/1_genome
 cd ~/data/anchr/mg1655/1_genome
 
@@ -258,7 +258,7 @@ cp ~/data/anchr/ref/mg1655/repetitives.fa .
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/mg1655
 
 mkdir -p 2_illumina
@@ -276,7 +276,7 @@ ln -s MiSeq_Ecoli_MG1655_110721_PF_R2.fastq.gz R2.fq.gz
 
 * Rsync to hpcc
 
-```shell script
+```shell
 rsync -avP \
     ~/data/anchr/mg1655/ \
     wangq@202.119.37.251:data/anchr/mg1655
@@ -287,7 +287,7 @@ rsync -avP \
 
 * template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=mg1655
 
@@ -332,7 +332,7 @@ anchr template \
 
 ### mg1655: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=mg1655
 
@@ -649,7 +649,7 @@ Table: statBusco run_enterobacterales_odb10
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/dh5alpha/1_genome
 cd ~/data/anchr/dh5alpha/1_genome
 
@@ -661,7 +661,7 @@ cp ~/data/anchr/ref/dh5alpha/repetitives.fa .
 
 ### dh5alpha: download
 
-```shell script
+```shell
 cd ~/data/anchr/dh5alpha
 
 mkdir -p ena
@@ -689,7 +689,7 @@ md5sum --check ena_info.md5.txt
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/dh5alpha
 
 mkdir -p 2_illumina
@@ -704,7 +704,7 @@ ln -s ../ena/SRR11245239_2.fastq.gz R2.fq.gz
 
 * template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=dh5alpha
 
@@ -746,7 +746,7 @@ anchr template \
 
 ### dh5alpha: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=dh5alpha
 
