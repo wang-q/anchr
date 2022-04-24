@@ -1,6 +1,7 @@
 use clap::*;
 use itertools::Itertools;
 use std::collections::HashMap;
+use std::fs;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
@@ -367,6 +368,9 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     //----------------------------
     // create scripts
     //----------------------------
+    fs::create_dir_all("0_script")?;
+    fs::create_dir_all("0_markdown")?;
+
     if args.is_present("fastqc") {
         gen_fastqc(&context)?;
     }
@@ -456,7 +460,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
 }
 
 fn gen_fastqc(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "2_fastqc.sh";
+    let outname = "0_script/2_fastqc.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -473,7 +477,7 @@ fn gen_fastqc(context: &Context) -> std::result::Result<(), std::io::Error> {
 }
 
 fn gen_insert_size(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "2_insert_size.sh";
+    let outname = "0_script/2_insert_size.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -490,7 +494,7 @@ fn gen_insert_size(context: &Context) -> std::result::Result<(), std::io::Error>
 }
 
 fn gen_kat(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "2_kat.sh";
+    let outname = "0_script/2_kat.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -507,7 +511,7 @@ fn gen_kat(context: &Context) -> std::result::Result<(), std::io::Error> {
 }
 
 fn gen_fastk(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "2_fastk.sh";
+    let outname = "0_script/2_fastk.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -524,7 +528,7 @@ fn gen_fastk(context: &Context) -> std::result::Result<(), std::io::Error> {
 }
 
 fn gen_genescopefk(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "genescopefk.R";
+    let outname = "0_script/genescopefk.R";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -541,7 +545,7 @@ fn gen_genescopefk(context: &Context) -> std::result::Result<(), std::io::Error>
 }
 
 fn gen_trim(context: &Context) -> std::result::Result<(), std::io::Error> {
-    let outname = "2_trim.sh";
+    let outname = "0_script/2_trim.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
