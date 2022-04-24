@@ -35,8 +35,6 @@ for PREFIX in R S T; do
     done
 done
 
-echo -e "Table: statFastK\n" > statFastK.md
-
 for PREFIX in R S T; do
     for KMER in 21 51; do
         if [ ! -e ${PREFIX}-GeneScope-${KMER}/summary.txt ]; then
@@ -66,10 +64,15 @@ for PREFIX in R S T; do
         printf "\tKmer Cov\t\t${COV}\n"
     done
 done |
-    keep-header -- grep -v 'property' |
+    keep-header -- grep -v 'property' \
+    > statFastK.tsv
+
+cat statFastK.tsv |
     mlr --itsv --omd cat |
     perl -nlp -e '$. == 2 and $_ = q(|:---|:---|---:|---:|)' \
-    >> statFastK.md
+    > statFastK.md
+
+echo -e "\nTable: statFastK\n" >> statFastK.md
 
 cat statFastK.md
 mv statFastK.md ../../
