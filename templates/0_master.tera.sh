@@ -17,6 +17,10 @@ if [ -e 2_insert_size.sh ]; then
     bash 2_insert_size.sh;
 fi
 
+if [ -e 2_fastk.sh ]; then
+    bash 2_fastk.sh;
+fi
+
 if [ -e 2_kat.sh ]; then
     bash 2_kat.sh;
 fi

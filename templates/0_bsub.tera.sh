@@ -19,6 +19,11 @@ if [ -e 2_insert_size.sh ]; then
         "bash 2_insert_size.sh"
 fi
 
+if [ -e 2_fastk.sh ]; then
+    bsub -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-2_fastk" \
+        "bash 2_fastk.sh"
+fi
+
 if [ -e 2_kat.sh ]; then
     bsub -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-2_kat" \
         "bash 2_kat.sh"
