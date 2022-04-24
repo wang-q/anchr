@@ -53,8 +53,8 @@ for PREFIX in R S T; do
 
         cat ${PREFIX}-GeneScope-${KMER}/summary.txt |
             sed '1,6 d' |
-            sed "1 s/^/${PREFIX}-K\t/" |
-            sed "2 s/^/${KMER}\t/" |
+            sed "1 s/^/K\t/" |
+            sed "2 s/^/${PREFIX}.${KMER}\t/" |
             sed "3,7 s/^/\t/" |
             perl -nlp -e 's/\s{2,}/\t/g; s/\s+$//g;' |
             perl -nla -F'\t' -e '
@@ -67,7 +67,8 @@ for PREFIX in R S T; do
     done
 done |
     keep-header -- grep -v 'property' |
-    mlr --itsv --omd cat \
+    mlr --itsv --omd cat |
+    perl -nlp -e '$. == 2 and $_ = q(|:---|:---|---:|---:|)' \
     >> statFastK.md
 
 cat statFastK.md
