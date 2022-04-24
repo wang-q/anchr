@@ -70,8 +70,15 @@ stat_format () {
         '
 }
 
+byte_format () {
+    echo "$@" |
+        perl -nl -MNumber::Format -e '
+            print Number::Format::format_bytes($_, base => 1000,);
+        '
+}
+
 time_format () {
-    echo $@ |
+    echo "$@" |
         perl -nl -e '
             sub parse_duration {
                 use integer;
