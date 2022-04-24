@@ -82,32 +82,29 @@ for PREFIX in R S T; do
     pigz -p {{ opt.parallel }} ${PREFIXM}.cor.fa
 
     log_info "stats of all .fq.gz files"
-    if [ ! -e statMergeReads.md ]; then
-        echo -e "Table: statMergeReads\n" > statMergeReads.md
+    if [ ! -e statMergeReads.tsv ]; then
+        printf "%s\t%s\t%s\t%s\n" \
+            "Name" "N50" "Sum" "#" \
+            > statMergeReads.tsv
     fi
-
-    printf "| %s | %s | %s | %s |\n" \
-        "Name" "N50" "Sum" "#" \
-        >> statMergeReads.md
-    printf "|:--|--:|--:|--:|\n" >> statMergeReads.md
 
     for NAME in clumped ecco eccc ecct extended merged.raw unmerged.raw unmerged.trim ${PREFIXM}1 ${PREFIXU}1 ${PREFIXU}2 ${PREFIXU}s; do
         if [ ! -e ${NAME}.fq.gz ]; then
-            continue;
+            continue
         fi
-
-        printf "| %s | %s | %s | %s |\n" \
-            $(echo ${NAME}; stat_format ${NAME}.fq.gz;) >> statMergeReads.md
+        printf "%s\t%s\t%s\t%s\n" \
+            $(echo ${NAME}; stat_format ${NAME}.fq.gz;) >> statMergeReads.tsv
     done
-    printf "| %s | %s | %s | %s |\n" \
-        $(echo ${PREFIXM}.cor; stat_format ${PREFIXM}.cor.fa.gz;) >> statMergeReads.md
-    echo >> statMergeReads.md
+
+    printf "%s\t%s\t%s\t%s\n" \
+        $(echo ${PREFIXM}.cor; stat_format ${PREFIXM}.cor.fa.gz;) >> statMergeReads.tsv
 
     log_info "stats of insert sizes"
-    printf "| %s | %s | %s | %s | %s |\n" \
-        "Group" "Mean" "Median" "STDev" "PercentOfPairs" \
-        >> statMergeReads.md
-    printf "|:--|--:|--:|--:|--:|\n" >> statMergeReads.md
+    if [ ! -e statMergeInsert.tsv ]; then
+        printf "%s\t%s\t%s\t%s\t%s\n" \
+            "Group" "Mean" "Median" "STDev" "Pairs%" \
+            > statMergeInsert.tsv
+    fi
 
     #Mean	339.868
     #Median	312
@@ -117,23 +114,23 @@ for PREFIX in R S T; do
     for NAME in ${PREFIXM}.ihist.merge1.txt ${PREFIXM}.ihist.merge.txt; do
         printf "| %s " ${NAME} >> statMergeReads.md
         cat ${NAME} |
-            perl -nla -e '
+            GROUP="${NAME}" perl -nla -e '
                 BEGIN { our $stat = { }; };
 
                 m{\#(Mean|Median|STDev|PercentOfPairs)} or next;
                 $stat->{$1} = $F[1];
 
                 END {
-                    printf qq{| %.1f | %s | %.1f | %.2f%% |\n},
+                    printf qq(%s\t%.1f\t%s\t%.1f\t%.2f%%\n),
+                        qq($ENV{GROUP}),
                         $stat->{Mean},
                         $stat->{Median},
                         $stat->{STDev},
                         $stat->{PercentOfPairs};
                 }
                 ' \
-            >> statMergeReads.md
+            >> statMergeInsert.tsv
     done
-    echo >> statMergeReads.md
 
     log_info "clear unneeded .fq.gz files"
     for NAME in temp clumped ecco eccc ecct extended merged.raw unmerged.raw unmerged.trim; do
@@ -166,10 +163,25 @@ log_debug "Reads stats with faops"
 SUM_OUT=$( faops n50 -H -N 0 -S pe.cor.fa.gz )
 save SUM_OUT
 
-if [ -s statMergeReads.md ]; then
-    cat statMergeReads.md
-    mv statMergeReads.md ../../
-fi
+cat statMergeReads.tsv |
+    mlr --itsv --omd cat |
+    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|)' \
+    > statMergeReads.md
+
+echo -e "\nTable: statMergeReads\n" >> statMergeReads.md
+
+cat statMergeReads.md
+mv statMergeReads.md ${BASH_DIR}/9_markdown
+
+cat statMergeInsert.tsv |
+    mlr --itsv --omd cat |
+    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|---:|)' \
+    > statMergeInsert.md
+
+echo -e "\nTable: statMergeInsert\n" >> statMergeInsert.md
+
+cat statMergeInsert.md
+mv statMergeInsert.md ${BASH_DIR}/9_markdown
 
 END_TIME=$(date +%s)
 save END_TIME
