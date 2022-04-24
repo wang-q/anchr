@@ -85,11 +85,9 @@ for PREFIX in R S T; do
         parallel --no-run-if-empty -j 1 rm
 done
 
-echo -e "Table: statInsertSize\n" > statInsertSize.md
-printf "| %s | %s | %s | %s | %s |\n" \
-    "Group" "Mean" "Median" "STDev" "PercentOfPairs/PairOrientation" \
-    >> statInsertSize.md
-printf "|:--|--:|--:|--:|--:|\n" >> statInsertSize.md
+printf "%s\t%s\t%s\t%s\t%s\n" \
+    "Group" "Mean" "Median" "STDev" "Pairs%/Orientation" \
+    > statInsertSize.tsv
 
 # bbtools reformat.sh
 #Mean	339.868
@@ -103,25 +101,25 @@ for PREFIX in R S T; do
             continue;
         fi
 
-        printf "| %s " "${PREFIX}.${G}.bbtools" >> statInsertSize.md
         cat ${PREFIX}.ihist.${G}.txt |
-            perl -nla -e '
+            GROUP="${PREFIX}.${G}" perl -nla -e '
                 BEGIN { our $stat = { }; };
 
                 m{\#(Mean|Median|STDev|PercentOfPairs)} or next;
                 $stat->{$1} = $F[1];
 
                 END {
-                    printf qq{| %.1f | %s | %.1f | %.2f%% |\n},
+                    printf qq(%s\t%.1f\t%s\t%.1f\t%.2f%%\n),
+                        qq($ENV{GROUP}.bbtools),
                         $stat->{Mean},
                         $stat->{Median},
                         $stat->{STDev},
                         $stat->{PercentOfPairs};
                 }
-                ' \
-            >> statInsertSize.md
+                '
     done
-done
+done \
+    >> statInsertSize.tsv
 
 # picard CollectInsertSizeMetrics
 #MEDIAN_INSERT_SIZE	MODE_INSERT_SIZE	MEDIAN_ABSOLUTE_DEVIATION	MIN_INSERT_SIZE	MAX_INSERT_SIZE	MEAN_INSERT_SIZE	STANDARD_DEVIATION	READ_PAIRS	PAIR_ORIENTATION	WIDTH_OF_10_PERCENT	WIDTH_OF_20_PERCENT	WIDTH_OF_30_PERCENT	WIDTH_OF_40_PERCENT	WIDTH_OF_50_PERCENT	WIDTH_OF_60_PERCENT	WIDTH_OF_70_PERCENT	WIDTH_OF_80_PERCENT	WIDTH_OF_90_PERCENT	WIDTH_OF_95_PERCENT	WIDTH_OF_99_PERCENT	SAMPLE	LIBRARY	READ_GROUP
@@ -136,17 +134,23 @@ for PREFIX in R S T; do
             GROUP="${PREFIX}.${G}" perl -nla -F"\t" -e '
                 next if @F < 9;
                 next unless /^\d/;
-                printf qq{| %s | %.1f | %s | %.1f | %s |\n},
-                    qq{$ENV{GROUP}.picard},
+                printf qq(%s\t%.1f\t%s\t%.1f\t%s\n),
+                    qq($ENV{GROUP}.picard),
                     $F[5],
                     $F[0],
                     $F[6],
                     $F[8];
-                ' \
-            >> statInsertSize.md
+                '
     done
-done
+done \
+    >> statInsertSize.tsv
+
+cat statInsertSize.tsv |
+    mlr --itsv --omd cat |
+    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|---:|)' \
+    > statInsertSize.md
+
+echo -e "\nTable: statInsertSize\n" >> statInsertSize.md
 
 cat statInsertSize.md
-
 mv statInsertSize.md ../../
