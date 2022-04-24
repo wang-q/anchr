@@ -2,6 +2,10 @@
 
 ## Unreleased - ReleaseDate
 
+* Use `mlr` instead of manual `printf` to create markdown files
+* `anchr template`
+    * Place markdowns to `0_markdown/`
+
 ## 0.3.18 - 2022-04-21
 
 * Update Github actions
