@@ -109,8 +109,6 @@ done
 cd ${BASH_DIR}/2_illumina
 
 if [ -e Q0L0/statQuorum.R.tsv ]; then
-    echo -e "Table: statQuorum\n" > statQuorum.md
-
     for PREFIX in R S T; do
         for Q in 0 {{ opt.qual }}; do
             for L in 0 {{ opt.len }}; do
@@ -127,10 +125,12 @@ if [ -e Q0L0/statQuorum.R.tsv ]; then
             && cat) |
         mlr --itsv --omd cat |
         perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|---:|---:|---:|---:|---:|)' \
-        >> statQuorum.md
+        > statQuorum.md
+
+    echo -e "\nTable: statQuorum\n" >> statQuorum.md
 
     cat statQuorum.md
-    mv statQuorum.md ../
+    mv statQuorum.md ${BASH_DIR}/9_markdown
 fi
 
 log_info Done.
