@@ -378,6 +378,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
     }
     if args.is_present("fastk") {
         gen_fastk(&context)?;
+        gen_genescopefk(&context)?;
     }
 
     gen_trim(&context)?;
@@ -514,6 +515,23 @@ fn gen_fastk(context: &Context) -> std::result::Result<(), std::io::Error> {
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_fastk.tera.sh")),
     ])
+    .unwrap();
+
+    let rendered = tera.render("t", &context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
+}
+
+fn gen_genescopefk(context: &Context) -> std::result::Result<(), std::io::Error> {
+    let outname = "genescopefk.R";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![(
+        "t",
+        include_str!("../../templates/genescopefk.R"),
+    )])
     .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();

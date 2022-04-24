@@ -75,6 +75,11 @@ if [ -e statKAT.md ]; then
     cat statKAT.md;
     echo;
 fi
+if [ -e statFastK.md ]; then
+    echo;
+    cat statFastK.md;
+    echo;
+fi
 if [ -e statSgaStats.md ]; then
     echo;
     cat statSgaStats.md;

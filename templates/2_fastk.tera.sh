@@ -27,7 +27,7 @@ for PREFIX in R S T; do
 
         log_info "GeneScope"
         Histex -G Table-${KMER} |
-            Rscript genescopefk.R -k ${KMER} -p 1 -o ${PREFIX}-GeneScope-${KMER}
+            Rscript ../../genescopefk.R -k ${KMER} -p 1 -o ${PREFIX}-GeneScope-${KMER}
 
         KatGC -T{{ opt.parallel }} -x1.9 -s Table-${KMER} ${PREFIX}-Merqury-KatGC-${KMER}
 
@@ -39,6 +39,10 @@ echo -e "Table: statFastK\n" > statFastK.md
 
 for PREFIX in R S T; do
     for KMER in 21 51; do
+        if [ ! -e ${PREFIX}-GeneScope-${KMER}/summary.txt ]; then
+            continue
+        fi
+
         COV=$(
             cat ${PREFIX}-GeneScope-${KMER}/model.txt |
                 grep '^kmercov' |
