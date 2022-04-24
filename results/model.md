@@ -121,6 +121,9 @@ cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_down_sampling 6_down_sampling
 
 bash 0_master.sh
+
+prettier -w 9_markdown/*.md
+
 # bash 0_cleanup.sh
 
 ```

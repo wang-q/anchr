@@ -65,10 +65,11 @@ SUBCOMMANDS:
 brew install perl cpanminus
 brew install r
 brew install parallel wget pigz
-brew install datamash miller
+brew install datamash miller prettier
 
 # cite parallel
-# parallel --will-cite
+# parallel --citation
+# will cite
 
 brew tap wang-q/tap
 brew install wang-q/tap/tsv-utils wang-q/tap/intspan
