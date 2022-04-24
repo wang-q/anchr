@@ -49,24 +49,24 @@ for Q in 0 {{ opt.qual }}; do
                 -o quorum.sh
             bash quorum.sh
 
-            log_info "statQuorum.${PREFIX}"
+            log_info "statQuorum.${PREFIX}.tsv"
 
             SUM_IN=$( cat env.json | jq '.SUM_IN | tonumber' )
             SUM_OUT=$( cat env.json | jq '.SUM_OUT | tonumber' )
             EST_G=$( cat env.json | jq '.ESTIMATED_GENOME_SIZE | tonumber' )
             SECS=$( cat env.json | jq '.RUNTIME | tonumber' )
 
-            printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
+            printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
                 "Q${Q}L${L}.${PREFIX}" \
                 $( perl -e "printf qq(%.1f), ${SUM_IN} / {{ opt.genome }};" ) \
                 $( perl -e "printf qq(%.1f), ${SUM_OUT} / {{ opt.genome }};" ) \
                 $( perl -e "printf qq(%.2f%%), (1 - ${SUM_OUT} / ${SUM_IN}) * 100;" ) \
                 $( cat env.json | jq '.KMER' ) \
-                $( perl -MNumber::Format -e "print Number::Format::format_bytes({{ opt.genome }}, base => 1000,);" ) \
-                $( perl -MNumber::Format -e "print Number::Format::format_bytes(${EST_G}, base => 1000,);" ) \
+                $( byte_format {{ opt.genome }} ) \
+                $( byte_format ${EST_G} ) \
                 $( perl -e "printf qq(%.2f), ${EST_G} / {{ opt.genome }}" ) \
-                $( printf "%d:%02d'%02d''\n" $((${SECS}/3600)) $((${SECS}%3600/60)) $((${SECS}%60)) ) \
-                > statQuorum.${PREFIX}
+                $( time_format ${SECS} ) \
+                > statQuorum.${PREFIX}.tsv
 
         done
 
@@ -108,25 +108,26 @@ done
 
 cd ${BASH_DIR}/2_illumina
 
-if [ -e Q0L0/statQuorum.R ]; then
+if [ -e Q0L0/statQuorum.R.tsv ]; then
     echo -e "Table: statQuorum\n" > statQuorum.md
-    printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
-        "Name" "CovIn" "CovOut" "Discard%" \
-        "Kmer" "RealG" "EstG" "Est/Real" \
-        "RunTime" \
-        >> statQuorum.md
-    printf "|:--|--:|--:|--:|--:|--:|--:|--:|--:|\n" \
-        >> statQuorum.md
 
     for PREFIX in R S T; do
         for Q in 0 {{ opt.qual }}; do
             for L in 0 {{ opt.len }}; do
-                if [ -e Q${Q}L${L}/statQuorum.${PREFIX} ]; then
-                    cat Q${Q}L${L}/statQuorum.${PREFIX} >> statQuorum.md;
+                if [ -e Q${Q}L${L}/statQuorum.${PREFIX}.tsv ]; then
+                    cat Q${Q}L${L}/statQuorum.${PREFIX}.tsv
                 fi
             done
         done
-    done
+    done |
+        (printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+                 "Name" "CovIn" "CovOut" "Discard%" \
+                 "Kmer" "RealG" "EstG" "Est/Real" \
+                 "RunTime" \
+            && cat) |
+        mlr --itsv --omd cat |
+        perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|---:|---:|---:|---:|---:|)' \
+        >> statQuorum.md
 
     cat statQuorum.md
     mv statQuorum.md ../
