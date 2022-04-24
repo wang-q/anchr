@@ -82,7 +82,7 @@ rm *.sh
 anchr template \
     --genome 580076 \
     --parallel 8 \
-    --xmx 4g \
+    --xmx 12g \
     \
     --fastqc \
     --insertsize \
@@ -124,6 +124,119 @@ bash 0_master.sh
 # bash 0_cleanup.sh
 
 ```
+
+Table: statInsertSize
+
+| Group             |   Mean | Median |   STDev | PercentOfPairs/PairOrientation |
+|:------------------|-------:|-------:|--------:|-------------------------------:|
+| R.genome.bbtools  | 3490.1 |    466 | 14777.0 |                         96.05% |
+| R.tadpole.bbtools |  468.7 |    452 |   136.0 |                         83.57% |
+| R.genome.picard   |  475.2 |    460 |   133.4 |                             FR |
+| R.tadpole.picard  |  468.5 |    452 |   131.9 |                             FR |
+
+Table: statFastK
+
+| K    | property              |        min |        max |
+|:-----|:----------------------|-----------:|-----------:|
+| R.21 | Homozygous (a)        |            |       100% |
+|      | Genome Haploid Length |            | 577,872 bp |
+|      | Genome Repeat Length  |   3,638 bp |   3,643 bp |
+|      | Genome Unique Length  | 573,811 bp | 574,653 bp |
+|      | Model Fit             |   92.6091% |   93.3366% |
+|      | Read Error Rate       |            |  0.137192% |
+|      | Kmer Cov              |            |      148.8 |
+| R.51 | Homozygous (a)        |            |       100% |
+|      | Genome Haploid Length |            | 578,025 bp |
+|      | Genome Repeat Length  |            |       0 bp |
+|      | Genome Unique Length  |            | 578,025 bp |
+|      | Model Fit             |   95.6385% |   95.7255% |
+|      | Read Error Rate       |            | 0.0942288% |
+|      | Kmer Cov              |            |      112.2 |
+
+Table: statReads
+
+| Name       |    N50 |     Sum |      # |
+|:-----------|-------:|--------:|-------:|
+| Genome     | 580076 |  580076 |      1 |
+| Illumina.R |    150 |  102.1M | 680644 |
+| trim.R     |    150 | 101.56M | 677478 |
+| Q25L60     |    150 |  98.27M | 658139 |
+| Q30L60     |    150 |  95.05M | 638376 |
+
+
+| Name     | N50 |     Sum |      # |
+|:---------|----:|--------:|-------:|
+| clumpify | 150 | 102.01M | 680076 |
+| highpass | 150 | 101.67M | 677786 |
+| trim     | 150 | 101.56M | 677478 |
+| filter   | 150 | 101.56M | 677478 |
+| R1       | 150 |   50.8M | 338739 |
+| R2       | 150 |  50.76M | 338739 |
+| Rs       |   0 |       0 |      0 |
+
+Table: statTrimReads
+
+```text
+#R.trim
+#Matched        602     0.08882%
+#Name   Reads   ReadsPct
+```
+
+```text
+#R.filter
+#Matched        0       0.00000%
+#Name   Reads   ReadsPct
+```
+
+```text
+#R.peaks
+#k      31
+#unique_kmers   3021099
+#error_kmers    2436111
+#genomic_kmers  584988
+#main_peak      133
+#genome_size_in_peaks   15594307
+#genome_size    15751528
+#haploid_genome_size    605828
+#fold_coverage  5
+#haploid_fold_coverage  133
+#ploidy 26
+#het_rate       0.00061
+#percent_repeat_in_peaks        1.659
+#percent_repeat 96.278
+#start  center  stop    max     volume
+```
+
+Table: statMergeReads
+
+| Name          | N50 |     Sum |      # |
+| :------------ | --: | ------: | -----: |
+| clumped       | 150 | 101.56M | 677478 |
+| ecco          | 150 | 101.56M | 677478 |
+| eccc          | 150 | 101.56M | 677478 |
+| ecct          | 150 |  98.41M | 656414 |
+| extended      | 190 | 124.32M | 656414 |
+| merged.raw    | 443 |   77.9M | 183292 |
+| unmerged.raw  | 190 |  54.74M | 289830 |
+| unmerged.trim | 190 |  54.74M | 289830 |
+| M1            | 443 |  77.86M | 183201 |
+| U1            | 190 |  27.48M | 144915 |
+| U2            | 190 |  27.26M | 144915 |
+| Us            |   0 |       0 |      0 |
+| M.cor         | 363 | 132.78M | 656232 |
+
+| Group              |  Mean | Median | STDev | PercentOfPairs |
+|:-------------------|------:|-------:|------:|---------------:|
+| M.ihist.merge1.txt | 258.5 |    264 |  24.6 |          4.25% |
+| M.ihist.merge.txt  | 425.0 |    431 |  64.8 |         55.85% |
+
+Table: statQuorum
+
+| Name     | CovIn | CovOut | Discard% |  Kmer |   RealG |    EstG | Est/Real |   RunTime |
+|:---------|------:|-------:|---------:|------:|--------:|--------:|---------:|----------:|
+| Q0L0.R   | 175.1 |  160.8 |    8.16% | "105" | 580.08K | 584.05K |     1.01 | 0:00'57'' |
+| Q25L60.R | 169.4 |  160.4 |    5.31% | "105" | 580.08K | 582.89K |     1.00 | 0:00'56'' |
+| Q30L60.R | 163.9 |  157.3 |    4.05% | "105" | 580.08K | 582.28K |     1.00 | 0:00'55'' |
 
 ## *E. coli* str. K-12 substr. MG1655
 
@@ -445,15 +558,15 @@ Table: statMRUnitigsTadpole.md
 
 Table: statMergeAnchors.md
 
-| Name                          | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |  # | median |  MAD | lower | upper | RunTimeAN |
-|:------------------------------|--------:|----------:|------:|----:|----------:|--------:|---:|-------:|-----:|------:|------:|----------:|
-| 7_merge_anchors               |  98.10% |     65406 | 4.54M | 129 |     36465 |  337.8K | 77 |  285.0 | 35.0 |  60.0 | 780.0 |   0:00:59 |
-| 7_merge_mr_unitigs_bcalm      |  98.98% |     63214 | 4.53M | 133 |     60806 | 190.19K | 11 |  284.0 | 36.0 |  58.7 | 784.0 |   0:01:37 |
-| 7_merge_mr_unitigs_superreads |  99.00% |     59608 | 4.52M | 137 |     12585 |  21.76K | 10 |  284.0 | 36.0 |  58.7 | 784.0 |   0:01:40 |
-| 7_merge_mr_unitigs_tadpole    |  98.94% |     63616 | 4.53M | 130 |      1054 |   8.01K |  8 |  285.0 | 35.0 |  60.0 | 780.0 |   0:01:30 |
-| 7_merge_unitigs_bcalm         |  99.01% |     58780 | 4.54M | 142 |      3101 | 105.89K | 53 |  284.0 | 35.0 |  59.7 | 778.0 |   0:01:57 |
-| 7_merge_unitigs_superreads    |  98.80% |     58785 | 4.53M | 141 |      9743 |  98.18K | 40 |  284.0 | 36.0 |  58.7 | 784.0 |   0:01:45 |
-| 7_merge_unitigs_tadpole       |  98.99% |     63481 | 4.53M | 133 |      1091 |  33.87K | 29 |  284.0 | 35.0 |  59.7 | 778.0 |   0:01:42 |
+| Name                          | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |   # | median |  MAD | lower | upper | RunTimeAN |
+|:------------------------------|--------:|----------:|------:|----:|----------:|--------:|----:|-------:|-----:|------:|------:|----------:|
+| 7_merge_anchors               |  98.10% |     65406 | 4.54M | 129 |     36465 |  337.8K |  77 |  285.0 | 35.0 |  60.0 | 780.0 |   0:00:59 |
+| 7_merge_mr_unitigs_bcalm      |  98.98% |     63214 | 4.53M | 133 |     60806 | 190.19K |  11 |  284.0 | 36.0 |  58.7 | 784.0 |   0:01:37 |
+| 7_merge_mr_unitigs_superreads |  99.00% |     59608 | 4.52M | 137 |     12585 |  21.76K |  10 |  284.0 | 36.0 |  58.7 | 784.0 |   0:01:40 |
+| 7_merge_mr_unitigs_tadpole    |  98.94% |     63616 | 4.53M | 130 |      1054 |   8.01K |   8 |  285.0 | 35.0 |  60.0 | 780.0 |   0:01:30 |
+| 7_merge_unitigs_bcalm         |  99.01% |     58780 | 4.54M | 142 |      3101 | 105.89K |  53 |  284.0 | 35.0 |  59.7 | 778.0 |   0:01:57 |
+| 7_merge_unitigs_superreads    |  98.80% |     58785 | 4.53M | 141 |      9743 |  98.18K |  40 |  284.0 | 36.0 |  58.7 | 784.0 |   0:01:45 |
+| 7_merge_unitigs_tadpole       |  98.99% |     63481 | 4.53M | 133 |      1091 |  33.87K |  29 |  284.0 | 35.0 |  59.7 | 778.0 |   0:01:42 |
 
 Table: statOtherAnchors.md
 
@@ -492,43 +605,43 @@ Table: statFinal
 
 Table: statBusco run_bacteria_odb10
 
-| NAME                |   C |   S |  D |  F |  M | Total |
-|:--------------------|----:|----:|---:|---:|---:|------:|
-| Genome              | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_superreads    | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_bcalm         | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_tadpole       | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_mr_superreads | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_mr_bcalm      | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_mr_tadpole    | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_anchors       | 124 | 124 |  0 |  0 |  0 |   124 |
-| glue_anchors        | 124 | 124 |  0 |  0 |  0 |   124 |
-| fill_anchors        | 124 | 124 |  0 |  0 |  0 |   124 |
-| spades              | 124 | 124 |  0 |  0 |  0 |   124 |
-| mr_spades           | 124 | 124 |  0 |  0 |  0 |   124 |
-| megahit             | 124 | 124 |  0 |  0 |  0 |   124 |
-| mr_megahit          | 124 | 124 |  0 |  0 |  0 |   124 |
-| platanus            | 124 | 124 |  0 |  0 |  0 |   124 |
+| NAME                |   C |   S |   D |   F |   M | Total |
+|:--------------------|----:|----:|----:|----:|----:|------:|
+| Genome              | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_superreads    | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_bcalm         | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_tadpole       | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_mr_superreads | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_mr_bcalm      | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_mr_tadpole    | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_anchors       | 124 | 124 |   0 |   0 |   0 |   124 |
+| glue_anchors        | 124 | 124 |   0 |   0 |   0 |   124 |
+| fill_anchors        | 124 | 124 |   0 |   0 |   0 |   124 |
+| spades              | 124 | 124 |   0 |   0 |   0 |   124 |
+| mr_spades           | 124 | 124 |   0 |   0 |   0 |   124 |
+| megahit             | 124 | 124 |   0 |   0 |   0 |   124 |
+| mr_megahit          | 124 | 124 |   0 |   0 |   0 |   124 |
+| platanus            | 124 | 124 |   0 |   0 |   0 |   124 |
 
 Table: statBusco run_enterobacterales_odb10
 
-| NAME                |   C |   S |  D |  F |  M | Total |
-|:--------------------|----:|----:|---:|---:|---:|------:|
-| Genome              | 440 | 438 |  2 |  0 |  0 |   440 |
-| merge_superreads    | 437 | 435 |  2 |  3 |  0 |   440 |
-| merge_bcalm         | 437 | 435 |  2 |  3 |  0 |   440 |
-| merge_tadpole       | 437 | 435 |  2 |  3 |  0 |   440 |
-| merge_mr_superreads | 438 | 436 |  2 |  2 |  0 |   440 |
-| merge_mr_bcalm      | 438 | 436 |  2 |  2 |  0 |   440 |
-| merge_mr_tadpole    | 438 | 436 |  2 |  2 |  0 |   440 |
-| merge_anchors       | 438 | 436 |  2 |  2 |  0 |   440 |
-| glue_anchors        | 439 | 437 |  2 |  1 |  0 |   440 |
-| fill_anchors        | 439 | 437 |  2 |  1 |  0 |   440 |
-| spades              | 440 | 438 |  2 |  0 |  0 |   440 |
-| mr_spades           | 440 | 438 |  2 |  0 |  0 |   440 |
-| megahit             | 440 | 438 |  2 |  0 |  0 |   440 |
-| mr_megahit          | 440 | 438 |  2 |  0 |  0 |   440 |
-| platanus            | 440 | 438 |  2 |  0 |  0 |   440 |
+| NAME                |   C |   S |   D |   F |   M | Total |
+|:--------------------|----:|----:|----:|----:|----:|------:|
+| Genome              | 440 | 438 |   2 |   0 |   0 |   440 |
+| merge_superreads    | 437 | 435 |   2 |   3 |   0 |   440 |
+| merge_bcalm         | 437 | 435 |   2 |   3 |   0 |   440 |
+| merge_tadpole       | 437 | 435 |   2 |   3 |   0 |   440 |
+| merge_mr_superreads | 438 | 436 |   2 |   2 |   0 |   440 |
+| merge_mr_bcalm      | 438 | 436 |   2 |   2 |   0 |   440 |
+| merge_mr_tadpole    | 438 | 436 |   2 |   2 |   0 |   440 |
+| merge_anchors       | 438 | 436 |   2 |   2 |   0 |   440 |
+| glue_anchors        | 439 | 437 |   2 |   1 |   0 |   440 |
+| fill_anchors        | 439 | 437 |   2 |   1 |   0 |   440 |
+| spades              | 440 | 438 |   2 |   0 |   0 |   440 |
+| mr_spades           | 440 | 438 |   2 |   0 |   0 |   440 |
+| megahit             | 440 | 438 |   2 |   0 |   0 |   440 |
+| mr_megahit          | 440 | 438 |   2 |   0 |   0 |   440 |
+| platanus            | 440 | 438 |   2 |   0 |   0 |   440 |
 
 ## *E. coli* str. K-12 substr. DH5alpha
 
@@ -859,15 +972,15 @@ Table: statMRUnitigsTadpole.md
 
 Table: statMergeAnchors.md
 
-| Name                          | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |  # | median |  MAD | lower | upper | RunTimeAN |
-|:------------------------------|--------:|----------:|------:|----:|----------:|--------:|---:|-------:|-----:|------:|------:|----------:|
-| 7_merge_anchors               |  97.99% |     67358 | 4.46M | 112 |     24692 | 203.78K | 42 |  262.0 | 22.0 |  65.3 | 656.0 |   0:00:57 |
-| 7_merge_mr_unitigs_bcalm      |  98.74% |     67362 | 4.46M | 112 |      1345 |  17.74K | 12 |  263.0 | 22.0 |  65.7 | 658.0 |   0:01:17 |
-| 7_merge_mr_unitigs_superreads |  98.75% |     67361 | 4.46M | 111 |      3330 |   14.7K |  8 |  263.0 | 23.0 |  64.7 | 664.0 |   0:01:23 |
-| 7_merge_mr_unitigs_tadpole    |  98.85% |     73698 | 4.46M | 110 |      1377 |  16.47K | 10 |  260.0 | 22.0 |  64.7 | 652.0 |   0:01:26 |
-| 7_merge_unitigs_bcalm         |  98.93% |     67344 | 4.46M | 111 |     39382 | 154.36K | 40 |  263.0 | 22.0 |  65.7 | 658.0 |   0:01:35 |
-| 7_merge_unitigs_superreads    |  98.98% |     67353 | 4.46M | 113 |     23775 | 126.43K | 32 |  262.0 | 22.0 |  65.3 | 656.0 |   0:01:43 |
-| 7_merge_unitigs_tadpole       |  98.88% |     67350 | 4.46M | 111 |     19926 |  77.76K | 26 |  262.0 | 22.0 |  65.3 | 656.0 |   0:01:36 |
+| Name                          | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |   # | median |  MAD | lower | upper | RunTimeAN |
+|:------------------------------|--------:|----------:|------:|----:|----------:|--------:|----:|-------:|-----:|------:|------:|----------:|
+| 7_merge_anchors               |  97.99% |     67358 | 4.46M | 112 |     24692 | 203.78K |  42 |  262.0 | 22.0 |  65.3 | 656.0 |   0:00:57 |
+| 7_merge_mr_unitigs_bcalm      |  98.74% |     67362 | 4.46M | 112 |      1345 |  17.74K |  12 |  263.0 | 22.0 |  65.7 | 658.0 |   0:01:17 |
+| 7_merge_mr_unitigs_superreads |  98.75% |     67361 | 4.46M | 111 |      3330 |   14.7K |   8 |  263.0 | 23.0 |  64.7 | 664.0 |   0:01:23 |
+| 7_merge_mr_unitigs_tadpole    |  98.85% |     73698 | 4.46M | 110 |      1377 |  16.47K |  10 |  260.0 | 22.0 |  64.7 | 652.0 |   0:01:26 |
+| 7_merge_unitigs_bcalm         |  98.93% |     67344 | 4.46M | 111 |     39382 | 154.36K |  40 |  263.0 | 22.0 |  65.7 | 658.0 |   0:01:35 |
+| 7_merge_unitigs_superreads    |  98.98% |     67353 | 4.46M | 113 |     23775 | 126.43K |  32 |  262.0 | 22.0 |  65.3 | 656.0 |   0:01:43 |
+| 7_merge_unitigs_tadpole       |  98.88% |     67350 | 4.46M | 111 |     19926 |  77.76K |  26 |  262.0 | 22.0 |  65.3 | 656.0 |   0:01:36 |
 
 Table: statOtherAnchors.md
 
@@ -906,41 +1019,41 @@ Table: statFinal
 
 Table: statBusco run_bacteria_odb10
 
-| NAME                |   C |   S |  D |  F |  M | Total |
-|:--------------------|----:|----:|---:|---:|---:|------:|
-| Genome              | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_superreads    | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_bcalm         | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_tadpole       | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_mr_superreads | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_mr_bcalm      | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_mr_tadpole    | 124 | 124 |  0 |  0 |  0 |   124 |
-| merge_anchors       | 124 | 124 |  0 |  0 |  0 |   124 |
-| glue_anchors        | 124 | 124 |  0 |  0 |  0 |   124 |
-| fill_anchors        | 124 | 124 |  0 |  0 |  0 |   124 |
-| spades              | 124 | 124 |  0 |  0 |  0 |   124 |
-| mr_spades           | 124 | 124 |  0 |  0 |  0 |   124 |
-| megahit             | 124 | 124 |  0 |  0 |  0 |   124 |
-| mr_megahit          | 124 | 124 |  0 |  0 |  0 |   124 |
-| platanus            | 124 | 124 |  0 |  0 |  0 |   124 |
+| NAME                |   C |   S |   D |   F |   M | Total |
+|:--------------------|----:|----:|----:|----:|----:|------:|
+| Genome              | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_superreads    | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_bcalm         | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_tadpole       | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_mr_superreads | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_mr_bcalm      | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_mr_tadpole    | 124 | 124 |   0 |   0 |   0 |   124 |
+| merge_anchors       | 124 | 124 |   0 |   0 |   0 |   124 |
+| glue_anchors        | 124 | 124 |   0 |   0 |   0 |   124 |
+| fill_anchors        | 124 | 124 |   0 |   0 |   0 |   124 |
+| spades              | 124 | 124 |   0 |   0 |   0 |   124 |
+| mr_spades           | 124 | 124 |   0 |   0 |   0 |   124 |
+| megahit             | 124 | 124 |   0 |   0 |   0 |   124 |
+| mr_megahit          | 124 | 124 |   0 |   0 |   0 |   124 |
+| platanus            | 124 | 124 |   0 |   0 |   0 |   124 |
 
 Table: statBusco run_enterobacterales_odb10
 
-| NAME                |   C |   S |  D |  F |  M | Total |
-|:--------------------|----:|----:|---:|---:|---:|------:|
-| Genome              | 440 | 438 |  2 |  0 |  0 |   440 |
-| merge_superreads    | 440 | 438 |  2 |  0 |  0 |   440 |
-| merge_bcalm         | 440 | 438 |  2 |  0 |  0 |   440 |
-| merge_tadpole       | 440 | 438 |  2 |  0 |  0 |   440 |
-| merge_mr_superreads | 440 | 438 |  2 |  0 |  0 |   440 |
-| merge_mr_bcalm      | 440 | 438 |  2 |  0 |  0 |   440 |
-| merge_mr_tadpole    | 440 | 438 |  2 |  0 |  0 |   440 |
-| merge_anchors       | 440 | 438 |  2 |  0 |  0 |   440 |
-| glue_anchors        | 440 | 438 |  2 |  0 |  0 |   440 |
-| fill_anchors        | 440 | 438 |  2 |  0 |  0 |   440 |
-| spades              | 440 | 438 |  2 |  0 |  0 |   440 |
-| mr_spades           | 440 | 438 |  2 |  0 |  0 |   440 |
-| megahit             | 440 | 438 |  2 |  0 |  0 |   440 |
-| mr_megahit          | 440 | 438 |  2 |  0 |  0 |   440 |
-| platanus            | 440 | 438 |  2 |  0 |  0 |   440 |
+| NAME                |   C |   S |   D |   F |   M | Total |
+|:--------------------|----:|----:|----:|----:|----:|------:|
+| Genome              | 440 | 438 |   2 |   0 |   0 |   440 |
+| merge_superreads    | 440 | 438 |   2 |   0 |   0 |   440 |
+| merge_bcalm         | 440 | 438 |   2 |   0 |   0 |   440 |
+| merge_tadpole       | 440 | 438 |   2 |   0 |   0 |   440 |
+| merge_mr_superreads | 440 | 438 |   2 |   0 |   0 |   440 |
+| merge_mr_bcalm      | 440 | 438 |   2 |   0 |   0 |   440 |
+| merge_mr_tadpole    | 440 | 438 |   2 |   0 |   0 |   440 |
+| merge_anchors       | 440 | 438 |   2 |   0 |   0 |   440 |
+| glue_anchors        | 440 | 438 |   2 |   0 |   0 |   440 |
+| fill_anchors        | 440 | 438 |   2 |   0 |   0 |   440 |
+| spades              | 440 | 438 |   2 |   0 |   0 |   440 |
+| mr_spades           | 440 | 438 |   2 |   0 |   0 |   440 |
+| megahit             | 440 | 438 |   2 |   0 |   0 |   440 |
+| mr_megahit          | 440 | 438 |   2 |   0 |   0 |   440 |
+| platanus            | 440 | 438 |   2 |   0 |   0 |   440 |
 
