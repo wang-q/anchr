@@ -68,47 +68,25 @@ find . -type f -path "*contigs_reports/*" -name "*.stdout*" -or -name "*.stderr*
 find . -type f -name "output.*" | parallel --no-run-if-empty -j 1 rm
 find . -type f -name "core.*"   | parallel --no-run-if-empty -j 1 rm
 
-# cat all .md
-if [ -e 9_markdown/statInsertSize.md ]; then
-    echo;
-    cat 9_markdown/statInsertSize.md;
-    echo;
-fi
-if [ -e 9_markdown/statKAT.md ]; then
-    echo;
-    cat 9_markdown/statKAT.md;
-    echo;
-fi
-if [ -e 9_markdown/statFastK.md ]; then
-    echo;
-    cat 9_markdown/statFastK.md;
-    echo;
-fi
-if [ -e 9_markdown/statReads.md ]; then
-    echo;
-    cat 9_markdown/statReads.md;
-    echo;
-fi
-if [ -e 9_markdown/statTrimReads.md ]; then
-    echo;
-    cat 9_markdown/statTrimReads.md;
-    echo;
-fi
-if [ -e 9_markdown/statMergeReads.md ]; then
-    echo;
-    cat 9_markdown/statMergeReads.md;
-    echo;
-fi
-if [ -e 9_markdown/statMergeInsert.md ]; then
-    echo;
-    cat 9_markdown/statMergeInsert.md;
-    echo;
-fi
-if [ -e statQuorum.md ]; then
-    echo;
-    cat statQuorum.md;
-    echo;
-fi
+log_info cat all .md
+for NAME in \
+    statInsertSize \
+    statKAT \
+    statFastK \
+    statReads \
+    statTrimReads \
+    statMergeReads \
+    statMergeInsert \
+    statQuorum \
+    ; do
+    if [ -e 9_markdown/${NAME}.md ]; then
+        echo;
+        cat 9_markdown/${NAME}.md;
+        echo;
+    fi
+
+done
+
 if [ -e statAnchors.md ]; then
     echo;
     cat statAnchors.md;
