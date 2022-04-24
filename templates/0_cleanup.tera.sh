@@ -65,29 +65,29 @@ find . -type f -name "output.*" | parallel --no-run-if-empty -j 1 rm
 find . -type f -name "core.*"   | parallel --no-run-if-empty -j 1 rm
 
 # cat all .md
-if [ -e statInsertSize.md ]; then
+if [ -e 9_markdown/statInsertSize.md ]; then
     echo;
-    cat statInsertSize.md;
-    echo;
-fi
-if [ -e statKAT.md ]; then
-    echo;
-    cat statKAT.md;
+    cat 9_markdown/statInsertSize.md;
     echo;
 fi
-if [ -e statFastK.md ]; then
+if [ -e 9_markdown/statKAT.md ]; then
     echo;
-    cat statFastK.md;
-    echo;
-fi
-if [ -e statReads.md ]; then
-    echo;
-    cat statReads.md;
+    cat 9_markdown/statKAT.md;
     echo;
 fi
-if [ -e statTrimReads.md ]; then
+if [ -e 9_markdown/statFastK.md ]; then
     echo;
-    cat statTrimReads.md;
+    cat 9_markdown/statFastK.md;
+    echo;
+fi
+if [ -e 9_markdown/statReads.md ]; then
+    echo;
+    cat 9_markdown/statReads.md;
+    echo;
+fi
+if [ -e 9_markdown/statTrimReads.md ]; then
+    echo;
+    cat 9_markdown/statTrimReads.md;
     echo;
 fi
 if [ -e statMergeReads.md ]; then

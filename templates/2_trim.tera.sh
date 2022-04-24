@@ -38,12 +38,10 @@ for PREFIX in R S T; do
 
     log_info "stats of all .fq.gz files"
 
-    if [ ! -e statTrimReads.md ]; then
-        echo -e "Table: statTrimReads\n" > statTrimReads.md
-        printf "| %s | %s | %s | %s |\n" \
+    if [ ! -e statTrimReads.tsv ]; then
+        printf "%s\t%s\t%s\t%s\n" \
             "Name" "N50" "Sum" "#" \
-            >> statTrimReads.md
-        printf "|:--|--:|--:|--:|\n" >> statTrimReads.md
+            > statTrimReads.tsv
     fi
 
     for NAME in clumpify filteredbytile highpass sample trim filter ${PREFIX}1 ${PREFIX}2 ${PREFIX}s; do
@@ -51,8 +49,8 @@ for PREFIX in R S T; do
             continue;
         fi
 
-        printf "| %s | %s | %s | %s |\n" \
-            $(echo ${NAME}; stat_format ${NAME}.fq.gz;) >> statTrimReads.md
+        printf "%s\t%s\t%s\t%s\n" \
+            $(echo ${NAME}; stat_format ${NAME}.fq.gz;) >> statTrimReads.tsv
     done
 
     log_info "clear unneeded .fq.gz files"
@@ -63,12 +61,17 @@ for PREFIX in R S T; do
     done
 done
 
+cat statTrimReads.tsv |
+    mlr --itsv --omd cat |
+    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|)' \
+    > statTrimReads.md
+
+echo -e "\nTable: statTrimReads\n" >> statTrimReads.md
+
 for PREFIX in R S T; do
     if [ ! -s statTrimReads.md ]; then
         continue;
     fi
-
-    echo >> statTrimReads.md
 
     if [ -e ${PREFIX}.trim.stats.txt ]; then
         echo >> statTrimReads.md
@@ -98,20 +101,20 @@ for PREFIX in R S T; do
         echo '```' >> statTrimReads.md
     fi
 
-    if [ -e ${PREFIX}.peaks.txt ]; then
-        echo >> statTrimReads.md
-        echo '```text' >> statTrimReads.md
-        echo "#${PREFIX}.peaks" >> statTrimReads.md
-        cat ${PREFIX}.peaks.txt |
-            grep "^#" \
-            >> statTrimReads.md
-        echo '```' >> statTrimReads.md
-    fi
+#    if [ -e ${PREFIX}.peaks.txt ]; then
+#        echo >> statTrimReads.md
+#        echo '```text' >> statTrimReads.md
+#        echo "#${PREFIX}.peaks" >> statTrimReads.md
+#        cat ${PREFIX}.peaks.txt |
+#            grep "^#" \
+#            >> statTrimReads.md
+#        echo '```' >> statTrimReads.md
+#    fi
 done
 
 if [ -s statTrimReads.md ]; then
     cat statTrimReads.md
-    mv statTrimReads.md ../../
+    mv statTrimReads.md ${BASH_DIR}/9_markdown
 fi
 
 cd ${BASH_DIR}

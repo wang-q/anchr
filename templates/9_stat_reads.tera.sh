@@ -5,67 +5,69 @@
 #----------------------------#
 log_warn 9_stat_reads.sh
 
-if [ -e statReads.md ]; then
-    log_debug "statReads.md presents";
-    exit;
-fi
+cd 2_illumina
 
-echo -e "Table: statReads\n" > statReads.md
-printf "| %s | %s | %s | %s |\n" \
+if [ -e statReads.tsv ]; then
+    log_debug "statReads.tsv presents"
+else
+
+printf "%s\t%s\t%s\t%s\n" \
     "Name" "N50" "Sum" "#" \
-    >> statReads.md
-printf "|:--|--:|--:|--:|\n" >> statReads.md
+    > statReads.tsv
 
-if [ -e 1_genome/genome.fa ]; then
-    printf "| %s | %s | %s | %s |\n" \
-        $(echo "Genome";   faops n50 -H -S -C 1_genome/genome.fa;) >> statReads.md
-fi
-if [ -e 1_genome/paralogs.fa ]; then
-    printf "| %s | %s | %s | %s |\n" \
-        $(echo "Paralogs"; faops n50 -H -S -C 1_genome/paralogs.fa;) >> statReads.md
-fi
-if [ -e 1_genome/repetitives.fa ]; then
-    printf "| %s | %s | %s | %s |\n" \
-        $(echo "Repetitives"; faops n50 -H -S -C 1_genome/repetitives.fa;) >> statReads.md
-fi
+for NAME in genome paralogs repetitives; do
+    if [ -e ../1_genome/${NAME}.fa ]; then
+        printf "%s\t%s\t%s\t%s\n" \
+            $(echo "${NAME}"; stat_format ../1_genome/${NAME}.fa;)
+    fi
+done \
+    >> statReads.tsv
 
 for PREFIX in R S T; do
-    if [ -e 2_illumina/${PREFIX}1.fq.gz ]; then
-        printf "| %s | %s | %s | %s |\n" \
-            $(echo "Illumina.${PREFIX}"; stat_format 2_illumina/${PREFIX}1.fq.gz {% if opt.se == "0" %}2_illumina/${PREFIX}2.fq.gz{% endif %};) >> statReads.md
+    if [ -e ${PREFIX}1.fq.gz ]; then
+        printf "%s\t%s\t%s\t%s\n" \
+            $(echo "Illumina.${PREFIX}"; stat_format ${PREFIX}1.fq.gz {% if opt.se == "0" %}${PREFIX}2.fq.gz{% endif %};)
     fi
-    if [ -e 2_illumina/trim/${PREFIX}1.fq.gz ]; then
-        printf "| %s | %s | %s | %s |\n" \
-            $(echo "trim.${PREFIX}"; stat_format 2_illumina/trim/${PREFIX}1.fq.gz {% if opt.se == "0" %}2_illumina/trim/${PREFIX}2.fq.gz 2_illumina/trim/${PREFIX}s.fq.gz{% endif %};) >> statReads.md
+    if [ -e trim/${PREFIX}1.fq.gz ]; then
+        printf "%s\t%s\t%s\t%s\n" \
+            $(echo "trim.${PREFIX}"; stat_format trim/${PREFIX}1.fq.gz {% if opt.se == "0" %}trim/${PREFIX}2.fq.gz trim/${PREFIX}s.fq.gz{% endif %};)
     fi
+done \
+    >> statReads.tsv
 
-    parallel --no-run-if-empty -k -j 2 "
-        stat_format () {
-            echo \$(faops n50 -H -N 50 -S -C \$@) \
-                | perl -nla -MNumber::Format -e '
-                    printf qq(%d\t%s\t%d\n), \$F[0], Number::Format::format_bytes(\$F[1], base => 1000,), \$F[2];
-                '
-        }
+for PREFIX in R S T; do
+    for Q in 0 {{ opt.qual }}; do
+        for L in 0 {{ opt.len }}; do
+            if [ ! -e Q${Q}L${L}/${PREFIX}1.fq.gz ]; then
+                continue
+            fi
 
-        if [ ! -e 2_illumina/Q{1}L{2}/${PREFIX}1.fq.gz ]; then
-            exit;
-        fi
-
-        printf \"| %s | %s | %s | %s |\n\" \
-            \$(
-                echo Q{1}L{2};
+            printf "%s\t%s\t%s\t%s\n" \
+                $(
+                    echo Q${Q}L${L};
 {% if opt.se == "0" %}
-                stat_format \
-                    2_illumina/Q{1}L{2}/${PREFIX}1.fq.gz \
-                    2_illumina/Q{1}L{2}/${PREFIX}2.fq.gz \
-                    2_illumina/Q{1}L{2}/${PREFIX}s.fq.gz;
+                    stat_format \
+                        Q${Q}L${L}/${PREFIX}1.fq.gz \
+                        Q${Q}L${L}/${PREFIX}2.fq.gz \
+                        Q${Q}L${L}/${PREFIX}s.fq.gz;
 {% else %}
-                stat_format \
-                    2_illumina/Q{1}L{2}/${PREFIX}1.fq.gz;
+                    stat_format \
+                        Q${Q}L${L}/${PREFIX}1.fq.gz;
 {% endif %}
-            )
-        " ::: {{ opt.qual }} ::: {{ opt.len }} \
-        >> statReads.md
-done
+                )
+        done
+    done
+done \
+    >> statReads.tsv
+
+fi # end of statReads
+
+cat statReads.tsv |
+    mlr --itsv --omd cat |
+    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|)' \
+    > statReads.md
+
+echo -e "\nTable: statReads\n" >> statReads.md
 
 cat statReads.md
+mv statReads.md ${BASH_DIR}/9_markdown
