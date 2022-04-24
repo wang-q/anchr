@@ -4,7 +4,7 @@
 
 * Use `mlr` instead of manual `printf` to create markdown files
 * `anchr template`
-    * Place markdowns to `0_markdown/`
+    * Place markdowns to `9_markdown/`
 
 ## 0.3.18 - 2022-04-21
 

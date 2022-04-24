@@ -80,11 +80,6 @@ if [ -e statFastK.md ]; then
     cat statFastK.md;
     echo;
 fi
-if [ -e statSgaStats.md ]; then
-    echo;
-    cat statSgaStats.md;
-    echo;
-fi
 if [ -e statReads.md ]; then
     echo;
     cat statReads.md;
