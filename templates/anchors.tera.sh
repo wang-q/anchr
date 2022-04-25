@@ -1,19 +1,19 @@
 {%- include "header" -%}
 {# Keep a blank line #}
 #----------------------------#
-# Prepare SR
+# Prepare UT
 #----------------------------#
 START_TIME=$(date +%s)
 
 log_info Symlink input files
 
-if [ ! -e SR.fasta ]; then
-    ln -s {{ args.0 }} SR.fasta
+if [ ! -e UT.fasta ]; then
+    ln -s {{ args.0 }} UT.fasta
 fi
 
-log_debug "SR sizes"
-faops size SR.fasta > sr.chr.sizes
-spanr genome sr.chr.sizes -o sr.chr.yml
+log_debug "UT sizes"
+faops size UT.fasta > ut.chr.sizes
+spanr genome ut.chr.sizes -o ut.chr.yml
 
 #----------------------------#
 # Mapping reads
@@ -29,7 +29,7 @@ bbwrap.sh \
     threads={{ opt.parallel }} \
     ambiguous=all \
     nodisk append \
-    ref=SR.fasta \
+    ref=UT.fasta \
     in={{ args | slice(start=1) | join(sep=",") }} \
     outm=mapped.sam outu=unmapped.sam \
     basecov=basecov.txt \
@@ -98,7 +98,7 @@ cat basecov.txt |
             our $limit = JSON->new->decode(
                 Path::Tiny::path( q(env.json) )->slurp
             );
-            our $length_of = App::RL::Common::read_sizes( q(sr.chr.sizes) );
+            our $length_of = App::RL::Common::read_sizes( q(ut.chr.sizes) );
         }
 
         sub list_to_ranges {
@@ -209,7 +209,7 @@ save OPT_MIN
 
 # covered region
 spanr cover contig.covered.txt -o contig.covered.yml
-spanr stat sr.chr.sizes contig.covered.yml -o contig.covered.csv
+spanr stat ut.chr.sizes contig.covered.yml -o contig.covered.csv
 
 # fill all holes of {{ opt.ratio }} covered contigs
 cat contig.covered.csv |
@@ -235,7 +235,7 @@ if [ -s fill_all.txt ]; then
 fi
 
 # fill small holes
-cat sr.chr.sizes |
+cat ut.chr.sizes |
     cut -f 1 |
     grep -Fx -f fill_all.txt -v \
     > fill_hole.txt
@@ -256,7 +256,7 @@ perl -MYAML::Syck -MAlignDB::IntSpan -e '
     my $yml1 = YAML::Syck::LoadFile( q{contig.fill_all.temp.yml} );
     my $yml2 = YAML::Syck::LoadFile( q{contig.fill_hole.temp.yml} );
 
-    my $yml_chr = YAML::Syck::LoadFile( q{sr.chr.yml} );
+    my $yml_chr = YAML::Syck::LoadFile( q{ut.chr.yml} );
 
     my $yml = {};
 
@@ -269,7 +269,7 @@ perl -MYAML::Syck -MAlignDB::IntSpan -e '
 
     YAML::Syck::DumpFile( q{contig.proper.yml}, $yml );
     '
-spanr stat sr.chr.sizes contig.proper.yml -o contig.proper.csv
+spanr stat ut.chr.sizes contig.proper.yml -o contig.proper.csv
 
 {% if opt.longest == "1" -%}
 perl -MYAML::Syck -MAlignDB::IntSpan -e '
@@ -303,7 +303,7 @@ ln -s contig.proper.yml anchor.yml
 #----------------------------#
 # others
 #----------------------------#
-spanr compare sr.chr.yml anchor.yml --op diff -o others.yml
+spanr compare ut.chr.yml anchor.yml --op diff -o others.yml
 
 perl -MYAML::Syck -MAlignDB::IntSpan -e '
     my $yml = YAML::Syck::LoadFile( q{others.yml} );
@@ -316,12 +316,12 @@ perl -MYAML::Syck -MAlignDB::IntSpan -e '
     > others.regions.txt
 
 #----------------------------#
-# Split SR.fasta to anchor and others
+# Split UT.fasta to anchor and others
 #----------------------------#
 log_info "pe.anchor.fa & pe.others.fa"
 
-faops region -l 0 SR.fasta anchor.regions.txt pe.anchor.fa
-faops region -l 0 SR.fasta others.regions.txt pe.others.fa
+faops region -l 0 UT.fasta anchor.regions.txt pe.anchor.fa
+faops region -l 0 UT.fasta others.regions.txt pe.others.fa
 
 #----------------------------#
 # Merging anchors
