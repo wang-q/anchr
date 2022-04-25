@@ -153,6 +153,13 @@ Table: statInsertSize
 |      | Model Fit             |   95.6385% |   95.7255% |
 |      | Read Error Rate       |            | 0.0942288% |
 |      | Kmer Cov              |            |      112.2 |
+| R.81 | Homozygous (a)        |            |       100% |
+|      | Genome Haploid Length |            | 578,301 bp |
+|      | Genome Repeat Length  |            |       0 bp |
+|      | Genome Unique Length  |            | 578,301 bp |
+|      | Model Fit             |   97.0931% |   97.1094% |
+|      | Read Error Rate       |            | 0.0778153% |
+|      | Kmer Cov              |            |       77.3 |
 
 Table: statFastK
 

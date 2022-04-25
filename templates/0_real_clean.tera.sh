@@ -16,6 +16,7 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
 
 rm -fr 2_illumina/trim/
 rm -fr 2_illumina/merge/
+rm -fr 2_illumina/*.tsv
 
 # down sampling
 rm -fr 4_down_sampling
@@ -51,7 +52,7 @@ find . -type f -name "output.*" | parallel --no-run-if-empty -j 1 rm
 find . -type f -name "core.*"   | parallel --no-run-if-empty -j 1 rm
 
 # .md
-rm *.md
+rm -fr 9_markdown
 
 # bash
 rm *.sh

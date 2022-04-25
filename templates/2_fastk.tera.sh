@@ -17,7 +17,7 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    for KMER in 21 51; do
+    for KMER in 21 51 81; do
         log_info "PREFIX: ${PREFIX}; KMER: ${KMER}"
 
         log_info "FastK"
@@ -36,7 +36,7 @@ for PREFIX in R S T; do
 done
 
 for PREFIX in R S T; do
-    for KMER in 21 51; do
+    for KMER in 21 51 81; do
         if [ ! -e ${PREFIX}-GeneScope-${KMER}/summary.txt ]; then
             continue
         fi
