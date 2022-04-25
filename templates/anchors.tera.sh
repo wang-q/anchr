@@ -356,7 +356,6 @@ find . -type l -name "contig.fill_hole.*.yml" | parallel --no-run-if-empty -j 1 
 find . -type f -name "contig.fill_all.*.yml"  | parallel --no-run-if-empty -j 1 rm
 find . -type l -name "contig.fill_all.*.yml"  | parallel --no-run-if-empty -j 1 rm
 
-
 save START_TIME
 
 END_TIME=$(date +%s)
