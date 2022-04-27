@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("merge")
+pub fn make_subcommand<'a>() -> Command<'a> {
+    Command::new("merge")
         .about("Merge Illumina PE reads with bbtools")
         .after_help(
             r#"
@@ -17,85 +17,85 @@ Rs is single
 "#,
         )
         .arg(
-            Arg::with_name("infiles")
+            Arg::new("infiles")
                 .help("Sets the input file to use")
                 .required(true)
                 .min_values(1)
                 .index(1),
         )
         .arg(
-            Arg::with_name("len")
+            Arg::new("len")
                 .long("len")
-                .short("l")
+                .short('l')
                 .help("Filter reads less or equal to this length")
                 .takes_value(true)
                 .default_value("60")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("qual")
+            Arg::new("qual")
                 .long("qual")
-                .short("q")
+                .short('q')
                 .help("Quality score for 3' end")
                 .takes_value(true)
                 .default_value("15")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("prefilter")
+            Arg::new("prefilter")
                 .long("prefilter")
                 .help("Prefilter=N (1 or 2) for tadpole and bbmerge")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("ecphase")
+            Arg::new("ecphase")
                 .long("ecphase")
                 .help("Error-correct phases. Phase 2 can be skipped")
                 .takes_value(true)
                 .default_value("1 2 3")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("prefixm")
+            Arg::new("prefixm")
                 .long("prefixm")
                 .help("Prefix of merged reads")
                 .takes_value(true)
                 .default_value("M")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("prefixu")
+            Arg::new("prefixu")
                 .long("prefixu")
                 .help("Prefix of unmerged reads")
                 .takes_value(true)
                 .default_value("U")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("xmx")
+            Arg::new("xmx")
                 .long("xmx")
                 .help("Set Java memory usage")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("parallel")
+            Arg::new("parallel")
                 .long("parallel")
-                .short("p")
+                .short('p')
                 .help("Number of threads")
                 .takes_value(true)
                 .default_value("8")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("outfile")
+            Arg::new("outfile")
                 .long("outfile")
-                .short("o")
+                .short('o')
                 .help("Output filename. [stdout] for screen")
                 .takes_value(true)
                 .default_value("merge.sh")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
 }
 

@@ -5,8 +5,8 @@ use std::fs;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("template")
+pub fn make_subcommand<'a>() -> Command<'a> {
+    Command::new("template")
         .about("Creates Bash scripts")
         .after_help(
             r#"
@@ -66,217 +66,213 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
         )
         // Info
         .arg(
-            Arg::with_name("genome")
+            Arg::new("genome")
                 .long("genome")
                 .help("Your best guess of the haploid genome size")
                 .takes_value(true)
                 .default_value("1000000")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
-        .arg(Arg::with_name("se").long("se").help("Single end mode"))
+        .arg(Arg::new("se").long("se").help("Single end mode"))
         .arg(
-            Arg::with_name("xmx")
+            Arg::new("xmx")
                 .long("xmx")
                 .help("Set Java memory usage")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("parallel")
+            Arg::new("parallel")
                 .long("parallel")
-                .short("p")
+                .short('p')
                 .help("Number of threads")
                 .takes_value(true)
                 .default_value("8")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("queue")
+            Arg::new("queue")
                 .long("queue")
                 .help("Queue name of the LSF cluster")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         // Quality check
-        .arg(Arg::with_name("fastqc").long("fastqc").help("Run FastQC"))
-        .arg(Arg::with_name("kat").long("kat").help("Run KAT"))
-        .arg(Arg::with_name("fastk").long("fastk").help("Run FastK"))
+        .arg(Arg::new("fastqc").long("fastqc").help("Run FastQC"))
+        .arg(Arg::new("kat").long("kat").help("Run KAT"))
+        .arg(Arg::new("fastk").long("fastk").help("Run FastK"))
         .arg(
-            Arg::with_name("insertsize")
+            Arg::new("insertsize")
                 .long("insertsize")
                 .help("Calc insert sizes"),
         )
         .arg(
-            Arg::with_name("reads")
+            Arg::new("reads")
                 .long("reads")
                 .help("How many reads to estimate insert sizes")
                 .takes_value(true)
                 .default_value("1000000")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         // Trimming
         .arg(
-            Arg::with_name("trim")
+            Arg::new("trim")
                 .long("trim")
                 .help("Opts for trim")
                 .takes_value(true)
                 .default_value("--dedupe")
-                .empty_values(false)
+                .forbid_empty_values(true)
                 .allow_hyphen_values(true),
         )
         .arg(
-            Arg::with_name("sample")
+            Arg::new("sample")
                 .long("sample")
                 .help("Sampling coverage")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("qual")
+            Arg::new("qual")
                 .long("qual")
                 .help("Quality threshold")
                 .takes_value(true)
                 .default_value("25 30")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("len")
+            Arg::new("len")
                 .long("len")
                 .help("Filter reads less or equal to this length")
                 .takes_value(true)
                 .default_value("60")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("filter")
+            Arg::new("filter")
                 .long("filter")
                 .help("Adapter, artifact, or both")
                 .takes_value(true)
                 .default_value("adapter")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         // Post-trimming
-        .arg(Arg::with_name("quorum").long("quorum").help("Run quorum"))
+        .arg(Arg::new("quorum").long("quorum").help("Run quorum"))
+        .arg(Arg::new("merge").long("merge").help("Run merge reads"))
         .arg(
-            Arg::with_name("merge")
-                .long("merge")
-                .help("Run merge reads"),
-        )
-        .arg(
-            Arg::with_name("prefilter")
+            Arg::new("prefilter")
                 .long("prefilter")
                 .help("Prefilter=N (1 or 2) for tadpole and bbmerge, 1 use less memories")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("ecphase")
+            Arg::new("ecphase")
                 .long("ecphase")
                 .help("Error-correct phases. Phase 2 can be skipped")
                 .takes_value(true)
                 .default_value("1 2 3")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         // Mapping
         .arg(
-            Arg::with_name("bwa")
+            Arg::new("bwa")
                 .long("bwa")
                 .help("Map trimmed reads to the genome")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("gatk")
+            Arg::new("gatk")
                 .long("gatk")
                 .help("Calling variants with GATK Mutect2"),
         )
         // Down sampling, unitigs, and anchors
         .arg(
-            Arg::with_name("cov")
+            Arg::new("cov")
                 .long("cov")
                 .help("Down sampling coverages")
                 .takes_value(true)
                 .default_value("40 80")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("unitigger")
+            Arg::new("unitigger")
                 .long("unitigger")
-                .short("u")
+                .short('u')
                 .help("Unitigger used: bcalm, bifrost, superreads, or tadpole")
                 .takes_value(true)
                 .default_value("bcalm")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("splitp")
+            Arg::new("splitp")
                 .long("splitp")
                 .help("Parts of splitting")
                 .takes_value(true)
                 .default_value("20")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("statp")
+            Arg::new("statp")
                 .long("statp")
                 .help("Parts of stats")
                 .takes_value(true)
                 .default_value("2")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("readl")
+            Arg::new("readl")
                 .long("readl")
                 .help("Length of reads")
                 .takes_value(true)
                 .default_value("100")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("uscale")
+            Arg::new("uscale")
                 .long("uscale")
                 .help("The scale factor for upper, (median + k * MAD) * u")
                 .takes_value(true)
                 .default_value("2")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("lscale")
+            Arg::new("lscale")
                 .long("lscale")
                 .help("The scale factor for upper, (median - k * MAD) / l")
                 .takes_value(true)
                 .default_value("3")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("redo")
+            Arg::new("redo")
                 .long("redo")
                 .help("Redo anchors when merging anchors"),
         )
         // Extend anchors
         .arg(
-            Arg::with_name("extend")
+            Arg::new("extend")
                 .long("extend")
                 .help("Extend anchors with other contigs"),
         )
         .arg(
-            Arg::with_name("gluemin")
+            Arg::new("gluemin")
                 .long("gluemin")
                 .help("Min length of overlaps to be glued")
                 .takes_value(true)
                 .default_value("30")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("fillmax")
+            Arg::new("fillmax")
                 .long("fillmax")
                 .help("Max length of gaps")
                 .takes_value(true)
                 .default_value("100")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         // Extend anchors
-        .arg(Arg::with_name("busco").long("busco").help("Run busco"))
+        .arg(Arg::new("busco").long("busco").help("Run busco"))
 }
 
 // command implementation
@@ -531,11 +527,8 @@ fn gen_genescopefk(context: &Context) -> std::result::Result<(), std::io::Error>
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
-    tera.add_raw_templates(vec![(
-        "t",
-        include_str!("../../templates/genescopefk.R"),
-    )])
-    .unwrap();
+    tera.add_raw_templates(vec![("t", include_str!("../../templates/genescopefk.R"))])
+        .unwrap();
 
     let rendered = tera.render("t", &context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;

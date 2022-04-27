@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("anchors")
+pub fn make_subcommand<'a>() -> Command<'a> {
+    Command::new("anchors")
         .about("Select anchors (proper covered regions) from contigs")
         .after_help(
             r#"
@@ -18,103 +18,103 @@ To get single-copy regions, set --uscale to 1.5
 "#,
         )
         .arg(
-            Arg::with_name("infiles")
+            Arg::new("infiles")
                 .help("Sets the input file to use")
                 .required(true)
                 .min_values(1)
                 .index(1),
         )
         .arg(
-            Arg::with_name("min")
+            Arg::new("min")
                 .long("min")
                 .help("Minimal length of anchors")
                 .takes_value(true)
                 .default_value("1000")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("mincov")
+            Arg::new("mincov")
                 .long("mincov")
                 .help("Minimal coverage of reads")
                 .takes_value(true)
                 .default_value("5")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("readl")
+            Arg::new("readl")
                 .long("readl")
                 .help("Length of reads")
                 .takes_value(true)
                 .default_value("100")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("mscale")
+            Arg::new("mscale")
                 .long("mscale")
                 .help("The scale factor for MAD, median +/- k * MAD")
                 .takes_value(true)
                 .default_value("3")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("lscale")
+            Arg::new("lscale")
                 .long("lscale")
                 .help("The scale factor for lower, (median - k * MAD) / l")
                 .takes_value(true)
                 .default_value("3")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("uscale")
+            Arg::new("uscale")
                 .long("uscale")
                 .help("The scale factor for upper, (median + k * MAD) * u")
                 .takes_value(true)
                 .default_value("2")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("fill")
+            Arg::new("fill")
                 .long("fill")
                 .help("Fill holes short than or equal to this")
                 .takes_value(true)
                 .default_value("1")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("ratio")
+            Arg::new("ratio")
                 .long("ratio")
                 .help("Fill large holes (opt.fill * 10) when covered ratio larger than this")
                 .takes_value(true)
                 .default_value("0.98")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("longest")
+            Arg::new("longest")
                 .long("longest")
                 .help("Only keep the longest proper region"),
         )
         .arg(
-            Arg::with_name("keepedge")
+            Arg::new("keepedge")
                 .long("keepedge")
                 .help("Keep edges of anchors"),
         )
         .arg(
-            Arg::with_name("parallel")
+            Arg::new("parallel")
                 .long("parallel")
-                .short("p")
+                .short('p')
                 .help("Number of threads")
                 .takes_value(true)
                 .default_value("8")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("outfile")
+            Arg::new("outfile")
                 .long("outfile")
-                .short("o")
+                .short('o')
                 .help("Output filename. [stdout] for screen")
                 .takes_value(true)
                 .default_value("anchors.sh")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
 }
 

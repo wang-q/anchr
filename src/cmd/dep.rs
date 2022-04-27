@@ -1,8 +1,8 @@
 use clap::*;
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("dep")
+pub fn make_subcommand<'a>() -> Command<'a> {
+    Command::new("dep")
         .about("Dependencies")
         .after_help(
             r#"
@@ -11,18 +11,18 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
 "#,
         )
         .arg(
-            Arg::with_name("infile")
+            Arg::new("infile")
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1),
         )
         .arg(
-            Arg::with_name("outfile")
-                .short("o")
+            Arg::new("outfile")
+                .short('o')
                 .long("outfile")
                 .takes_value(true)
                 .default_value("stdout")
-                .empty_values(false)
+                .forbid_empty_values(true)
                 .help("Output filename. [stdout] for screen"),
         )
 }

@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("quorum")
+pub fn make_subcommand<'a>() -> Command<'a> {
+    Command::new("quorum")
         .about("Run quorum to discard bad reads")
         .after_help(
             r#"
@@ -15,53 +15,53 @@ Fastq files can be gzipped
 "#,
         )
         .arg(
-            Arg::with_name("infiles")
+            Arg::new("infiles")
                 .help("Sets the input file to use")
                 .required(true)
                 .min_values(1)
                 .index(1),
         )
         .arg(
-            Arg::with_name("jf")
+            Arg::new("jf")
                 .long("coverage")
                 .help("Jellyfish hash size")
                 .takes_value(true)
                 .default_value("500000000")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("estsize")
+            Arg::new("estsize")
                 .long("estsize")
                 .help("Estimated genome size")
                 .takes_value(true)
                 .default_value("auto")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("prefix")
+            Arg::new("prefix")
                 .long("prefix")
                 .help("Prefix of .cor.fa.gz")
                 .takes_value(true)
                 .default_value("pe")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("parallel")
+            Arg::new("parallel")
                 .long("parallel")
-                .short("p")
+                .short('p')
                 .help("Number of threads")
                 .takes_value(true)
                 .default_value("8")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("outfile")
+            Arg::new("outfile")
                 .long("outfile")
-                .short("o")
+                .short('o')
                 .help("Output filename. [stdout] for screen")
                 .takes_value(true)
                 .default_value("quorum.sh")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
 }
 

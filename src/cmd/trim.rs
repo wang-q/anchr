@@ -6,8 +6,8 @@ use std::{env, fs};
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("trim")
+pub fn make_subcommand<'a>() -> Command<'a> {
+    Command::new("trim")
         .about("Trim Illumina PE/SE fastq files")
         .after_help(
             r#"
@@ -17,140 +17,136 @@ Fastq files can be gzipped
 "#,
         )
         .arg(
-            Arg::with_name("infiles")
+            Arg::new("infiles")
                 .help("Sets the input file to use")
                 .required(true)
                 .min_values(1)
                 .index(1),
         )
         .arg(
-            Arg::with_name("qual")
+            Arg::new("qual")
                 .long("qual")
-                .short("q")
+                .short('q')
                 .help("Quality threshold")
                 .takes_value(true)
                 .default_value("25")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("len")
+            Arg::new("len")
                 .long("len")
-                .short("l")
+                .short('l')
                 .help("Filter reads less or equal to this length")
                 .takes_value(true)
                 .default_value("60")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("filter")
+            Arg::new("filter")
                 .long("filter")
                 .help("Adapter, artifact, or both")
                 .takes_value(true)
                 .default_value("adapter")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("trimq")
+            Arg::new("trimq")
                 .long("trimq")
                 .help("Quality score for 3' end")
                 .takes_value(true)
                 .default_value("15")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("trimk")
+            Arg::new("trimk")
                 .long("trimk")
                 .help("Kmer for 5' adapter trimming")
                 .takes_value(true)
                 .default_value("23")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("matchk")
+            Arg::new("matchk")
                 .long("matchk")
                 .help("Kmer for decontamination")
                 .takes_value(true)
                 .default_value("27")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("cutk")
+            Arg::new("cutk")
                 .long("cutk")
                 .help("Kmer for cutoff")
                 .takes_value(true)
                 .default_value("31")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("adapter")
+            Arg::new("adapter")
                 .long("adapter")
                 .help("The adapter file")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("artifact")
+            Arg::new("artifact")
                 .long("artifact")
                 .help("The artifact file")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("prefix")
+            Arg::new("prefix")
                 .long("prefix")
                 .help("Prefix of trimmed reads")
                 .takes_value(true)
                 .default_value("R")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
+        .arg(Arg::new("dedupe").long("dedupe").help("Do the dedupe step"))
         .arg(
-            Arg::with_name("dedupe")
-                .long("dedupe")
-                .help("Do the dedupe step"),
-        )
-        .arg(
-            Arg::with_name("tile")
+            Arg::new("tile")
                 .long("tile")
                 .help("With normal Illumina names, do tile-based filtering"),
         )
         .arg(
-            Arg::with_name("cutoff")
+            Arg::new("cutoff")
                 .long("cutoff")
                 .help("Min kmer depth cutoff")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("sample")
+            Arg::new("sample")
                 .long("sample")
                 .help("The sampling step")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("xmx")
+            Arg::new("xmx")
                 .long("xmx")
                 .help("Set Java memory usage")
                 .takes_value(true)
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("parallel")
+            Arg::new("parallel")
                 .long("parallel")
-                .short("p")
+                .short('p')
                 .help("Number of threads")
                 .takes_value(true)
                 .default_value("8")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
         .arg(
-            Arg::with_name("outfile")
+            Arg::new("outfile")
                 .long("outfile")
-                .short("o")
+                .short('o')
                 .help("Output filename. [stdout] for screen")
                 .takes_value(true)
                 .default_value("trim.sh")
-                .empty_values(false),
+                .forbid_empty_values(true),
         )
 }
 
