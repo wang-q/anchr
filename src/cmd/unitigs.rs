@@ -81,7 +81,7 @@ Fasta files can't be gzipped
 }
 
 // command implementation
-pub fn execute(args: &ArgMatches) -> std::result::Result<(), std::io::Error> {
+pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut writer = intspan::writer(args.value_of("outfile").unwrap());
 
     // context from args
