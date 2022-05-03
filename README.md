@@ -76,6 +76,7 @@ brew install wang-q/tap/tsv-utils wang-q/tap/intspan
 
 # Myer's dazzler wrapper
 cpanm --installdeps App::Dazz
+cpanm -nq App::Dazz
 cpanm --verbose App::Dazz
 
 anchr dep install | bash
