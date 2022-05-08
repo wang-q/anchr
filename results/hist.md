@@ -53,4 +53,7 @@ gzip -dcf tests/G37/basecov.txt.gz |
     tsv-summarize -H --group-by 3 --count |
     keep-header -- tsv-sort -k1,1n
 
+gzip -dcf tests/G37/basecov.txt.gz |
+    tsv-summarize -H --mean 3 --median 3
+
 ```
