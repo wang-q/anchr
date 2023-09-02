@@ -13,7 +13,7 @@ Current release: 0.3.18
 
 ```shell
 # Via cargo
-cargo install --force --path .
+cargo install --path . --force --offline
 
 cargo install --git https://github.com/wang-q/anchr --branch main
 
