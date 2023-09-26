@@ -31,8 +31,8 @@ Usage: perl %c [options] <infile.yml>
     * .md5.txt for checkup
 * Example:
     * `sra_prep.pl sra_info.yml`
-    * `aria2c -j 4 -x 4 -s 1 -c -i sra_info.ftp.txt`
-    * `md5sum --check sra_info.md5.txt`
+    * `aria2c -j 4 -x 4 -s 1 -c -i ena_info.ftp.txt`
+    * `md5sum --check ena_info.md5.txt`
 
 MARKDOWN
 
