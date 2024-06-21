@@ -1,11 +1,11 @@
 use clap::*;
-use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs;
+use itertools::Itertools;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a>() -> Command<'a> {
+pub fn make_subcommand() -> Command {
     Command::new("template")
         .about("Creates Bash scripts")
         .after_help(
@@ -69,121 +69,140 @@ pub fn make_subcommand<'a>() -> Command<'a> {
             Arg::new("genome")
                 .long("genome")
                 .help("Your best guess of the haploid genome size")
-                .takes_value(true)
-                .default_value("1000000")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("1000000"),
         )
-        .arg(Arg::new("se").long("se").help("Single end mode"))
+        .arg(
+            Arg::new("se")
+                .long("se")
+                .action(ArgAction::SetTrue)
+                .help("Single end mode"),
+        )
         .arg(
             Arg::new("xmx")
                 .long("xmx")
                 .help("Set Java memory usage")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
                 .help("Number of threads")
-                .takes_value(true)
-                .default_value("8")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("8"),
         )
         .arg(
             Arg::new("queue")
                 .long("queue")
                 .help("Queue name of the LSF cluster")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         // Quality check
-        .arg(Arg::new("fastqc").long("fastqc").help("Run FastQC"))
-        .arg(Arg::new("kat").long("kat").help("Run KAT"))
-        .arg(Arg::new("fastk").long("fastk").help("Run FastK"))
+        .arg(
+            Arg::new("fastqc")
+                .long("fastqc")
+                .action(ArgAction::SetTrue)
+                .help("Run FastQC"),
+        )
+        .arg(
+            Arg::new("kat")
+                .long("kat")
+                .action(ArgAction::SetTrue)
+                .help("Run KAT"),
+        )
+        .arg(
+            Arg::new("fastk")
+                .long("fastk")
+                .action(ArgAction::SetTrue)
+                .help("Run FastK"),
+        )
         .arg(
             Arg::new("insertsize")
                 .long("insertsize")
+                .action(ArgAction::SetTrue)
                 .help("Calc insert sizes"),
         )
         .arg(
             Arg::new("reads")
                 .long("reads")
                 .help("How many reads to estimate insert sizes")
-                .takes_value(true)
-                .default_value("1000000")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("1000000"),
         )
         // Trimming
         .arg(
             Arg::new("trim")
                 .long("trim")
                 .help("Opts for trim")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("--dedupe")
-                .forbid_empty_values(true)
                 .allow_hyphen_values(true),
         )
         .arg(
             Arg::new("sample")
                 .long("sample")
                 .help("Sampling coverage")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("qual")
                 .long("qual")
                 .help("Quality threshold")
-                .takes_value(true)
-                .default_value("25 30")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("25 30"),
         )
         .arg(
             Arg::new("len")
                 .long("len")
                 .help("Filter reads less or equal to this length")
-                .takes_value(true)
-                .default_value("60")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("60"),
         )
         .arg(
             Arg::new("filter")
                 .long("filter")
                 .help("Adapter, artifact, or both")
-                .takes_value(true)
-                .default_value("adapter")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("adapter"),
         )
         // Post-trimming
-        .arg(Arg::new("quorum").long("quorum").help("Run quorum"))
-        .arg(Arg::new("merge").long("merge").help("Run merge reads"))
+        .arg(
+            Arg::new("quorum")
+                .long("quorum")
+                .action(ArgAction::SetTrue)
+                .help("Run quorum"),
+        )
+        .arg(
+            Arg::new("merge")
+                .long("merge")
+                .action(ArgAction::SetTrue)
+                .help("Run merge reads"),
+        )
         .arg(
             Arg::new("prefilter")
                 .long("prefilter")
                 .help("Prefilter=N (1 or 2) for tadpole and bbmerge, 1 use less memories")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("ecphase")
                 .long("ecphase")
                 .help("Error-correct phases. Phase 2 can be skipped")
-                .takes_value(true)
-                .default_value("1 2 3")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("1 2 3"),
         )
         // Mapping
         .arg(
             Arg::new("bwa")
                 .long("bwa")
                 .help("Map trimmed reads to the genome")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("gatk")
                 .long("gatk")
+                .action(ArgAction::SetTrue)
                 .help("Calling variants with GATK Mutect2"),
         )
         // Down sampling, unitigs, and anchors
@@ -191,172 +210,207 @@ pub fn make_subcommand<'a>() -> Command<'a> {
             Arg::new("cov")
                 .long("cov")
                 .help("Down sampling coverages")
-                .takes_value(true)
-                .default_value("40 80")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("40 80"),
         )
         .arg(
             Arg::new("unitigger")
                 .long("unitigger")
                 .short('u')
                 .help("Unitigger used: bcalm, bifrost, superreads, or tadpole")
-                .takes_value(true)
-                .default_value("bcalm")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("bcalm"),
         )
         .arg(
             Arg::new("splitp")
                 .long("splitp")
                 .help("Parts of splitting")
-                .takes_value(true)
-                .default_value("20")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("20"),
         )
         .arg(
             Arg::new("statp")
                 .long("statp")
                 .help("Parts of stats")
-                .takes_value(true)
-                .default_value("2")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("2"),
         )
         .arg(
             Arg::new("readl")
                 .long("readl")
                 .help("Length of reads")
-                .takes_value(true)
-                .default_value("100")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("100"),
         )
         .arg(
             Arg::new("uscale")
                 .long("uscale")
                 .help("The scale factor for upper, (median + k * MAD) * u")
-                .takes_value(true)
-                .default_value("2")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("2"),
         )
         .arg(
             Arg::new("lscale")
                 .long("lscale")
                 .help("The scale factor for upper, (median - k * MAD) / l")
-                .takes_value(true)
-                .default_value("3")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("3"),
         )
         .arg(
             Arg::new("redo")
                 .long("redo")
+                .action(ArgAction::SetTrue)
                 .help("Redo anchors when merging anchors"),
         )
         // Extend anchors
         .arg(
             Arg::new("extend")
                 .long("extend")
+                .action(ArgAction::SetTrue)
                 .help("Extend anchors with other contigs"),
         )
         .arg(
             Arg::new("gluemin")
                 .long("gluemin")
                 .help("Min length of overlaps to be glued")
-                .takes_value(true)
-                .default_value("30")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("30"),
         )
         .arg(
             Arg::new("fillmax")
                 .long("fillmax")
                 .help("Max length of gaps")
-                .takes_value(true)
-                .default_value("100")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("100"),
         )
         // Extend anchors
-        .arg(Arg::new("busco").long("busco").help("Run busco"))
+        .arg(
+            Arg::new("busco")
+                .long("busco")
+                .action(ArgAction::SetTrue)
+                .help("Run busco"),
+        )
 }
 
 // command implementation
-pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error::Error>> {
+pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
     // context from args
     //----------------------------
     let mut opt = HashMap::new();
 
+    let binding_1 = "1".to_string();
+    let binding_0 = "0".to_string();
+
     opt.insert(
         "genome",
-        if args.is_present("genome") {
-            args.value_of("genome").unwrap()
+        if args.get_flag("genome") {
+            args.get_one::<String>("genome").unwrap()
         } else {
             "0"
         },
     );
-    opt.insert("se", if args.is_present("se") { "1" } else { "0" });
+    opt.insert(
+        "se",
+        if args.get_flag("se") {
+            &binding_1
+        } else {
+            &binding_0
+        },
+    );
     opt.insert(
         "xmx",
-        if args.is_present("xmx") {
-            args.value_of("xmx").unwrap()
+        if args.contains_id("xmx") {
+            args.get_one::<String>("xmx").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
-    opt.insert("parallel", args.value_of("parallel").unwrap());
+    opt.insert("parallel", args.get_one::<String>("parallel").unwrap());
     opt.insert(
         "queue",
-        if args.is_present("queue") {
-            args.value_of("queue").unwrap()
+        if args.contains_id("queue") {
+            args.get_one::<String>("queue").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
 
-    opt.insert("reads", args.value_of("reads").unwrap());
+    opt.insert("reads", args.get_one::<String>("reads").unwrap());
 
-    opt.insert("trim", args.value_of("trim").unwrap());
+    opt.insert("trim", args.get_one::<String>("trim").unwrap());
     opt.insert(
         "sample",
-        if args.is_present("sample") {
-            args.value_of("sample").unwrap()
+        if args.contains_id("sample") {
+            args.get_one::<String>("sample").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
-    opt.insert("qual", args.value_of("qual").unwrap());
-    opt.insert("len", args.value_of("len").unwrap());
-    opt.insert("filter", args.value_of("filter").unwrap());
+    opt.insert("qual", args.get_one::<String>("qual").unwrap());
+    opt.insert("len", args.get_one::<String>("len").unwrap());
+    opt.insert("filter", args.get_one::<String>("filter").unwrap());
 
-    opt.insert("merge", if args.is_present("merge") { "1" } else { "0" });
+    opt.insert(
+        "merge",
+        if args.get_flag("merge") {
+            &binding_1
+        } else {
+            &binding_0
+        },
+    );
     opt.insert(
         "prefilter",
-        if args.is_present("prefilter") {
-            args.value_of("prefilter").unwrap()
+        if args.get_flag("prefilter") {
+            args.get_one::<String>("prefilter").unwrap()
         } else {
             "0"
         },
     );
-    opt.insert("ecphase", args.value_of("ecphase").unwrap());
+    opt.insert("ecphase", args.get_one::<String>("ecphase").unwrap());
 
     opt.insert(
         "bwa",
-        if args.is_present("bwa") {
-            args.value_of("bwa").unwrap()
+        if args.contains_id("bwa") {
+            args.get_one::<String>("bwa").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
-    opt.insert("gatk", if args.is_present("gatk") { "1" } else { "0" });
+    opt.insert(
+        "gatk",
+        if args.get_flag("gatk") {
+            &binding_1
+        } else {
+            &binding_0
+        },
+    );
 
-    opt.insert("cov", args.value_of("cov").unwrap());
-    opt.insert("unitigger", args.value_of("unitigger").unwrap());
-    opt.insert("splitp", args.value_of("splitp").unwrap());
-    opt.insert("statp", args.value_of("statp").unwrap());
-    opt.insert("readl", args.value_of("readl").unwrap());
-    opt.insert("uscale", args.value_of("uscale").unwrap());
-    opt.insert("lscale", args.value_of("lscale").unwrap());
-    opt.insert("redo", if args.is_present("redo") { "1" } else { "0" });
-
-    opt.insert("extend", if args.is_present("extend") { "1" } else { "0" });
-    opt.insert("gluemin", args.value_of("gluemin").unwrap());
-    opt.insert("fillmax", args.value_of("fillmax").unwrap());
+    opt.insert("cov", args.get_one::<String>("cov").unwrap());
+    opt.insert("unitigger", args.get_one::<String>("unitigger").unwrap());
+    opt.insert("splitp", args.get_one::<String>("splitp").unwrap());
+    opt.insert("statp", args.get_one::<String>("statp").unwrap());
+    opt.insert("readl", args.get_one::<String>("readl").unwrap());
+    opt.insert("uscale", args.get_one::<String>("uscale").unwrap());
+    opt.insert("lscale", args.get_one::<String>("lscale").unwrap());
+    opt.insert(
+        "redo",
+        if args.get_flag("redo") {
+            &binding_1
+        } else {
+            &binding_0
+        },
+    );
+    opt.insert(
+        "extend",
+        if args.get_flag("extend") {
+            &binding_1
+        } else {
+            &binding_0
+        },
+    );
+    opt.insert("gluemin", args.get_one::<String>("gluemin").unwrap());
+    opt.insert("fillmax", args.get_one::<String>("fillmax").unwrap());
 
     let mut context = Context::new();
     context.insert("opt", &opt);
@@ -366,16 +420,16 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error:
     //----------------------------
     fs::create_dir_all("9_markdown")?;
 
-    if args.is_present("fastqc") {
+    if args.get_flag("fastqc") {
         gen_fastqc(&context)?;
     }
-    if args.is_present("insertsize") {
+    if args.get_flag("insertsize") {
         gen_insert_size(&context)?;
     }
-    if args.is_present("kat") {
+    if args.get_flag("kat") {
         gen_kat(&context)?;
     }
-    if args.is_present("fastk") {
+    if args.get_flag("fastk") {
         gen_fastk(&context)?;
         gen_genescopefk(&context)?;
     }
@@ -384,14 +438,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error:
 
     gen_stat_reads(&context)?;
 
-    if args.is_present("bwa") {
+    if args.get_flag("bwa") {
         gen_bwa(&context)?;
     }
-    if args.is_present("gatk") {
+    if args.get_flag("gatk") {
         gen_gatk(&context)?;
     }
 
-    if args.is_present("quorum") {
+    if args.get_flag("quorum") {
         gen_quorum(&context)?;
     } else {
         gen_no_quorum(&context)?;
@@ -399,7 +453,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error:
     gen_down_sampling(&context)?;
 
     let unitiggers = args
-        .value_of("unitigger")
+        .get_one::<String>("unitigger")
         .unwrap()
         .split_ascii_whitespace()
         .collect_vec();
@@ -410,7 +464,7 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error:
     gen_anchors(&context)?;
     gen_stat_anchors(&context)?;
 
-    if !args.is_present("se") && args.is_present("merge") {
+    if !args.get_flag("se") && args.get_flag("merge") {
         gen_merge(&context)?;
         gen_mr_down_sampling(&context)?;
         for u in unitiggers.clone() {
@@ -426,13 +480,13 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error:
     gen_spades(&context)?;
     gen_megahit(&context)?;
     gen_platanus(&context)?;
-    if !args.is_present("se") && args.is_present("merge") {
+    if !args.get_flag("se") && args.get_flag("merge") {
         gen_mr_spades(&context)?;
         gen_mr_megahit(&context)?;
     }
     gen_stat_other_anchors(&context)?;
 
-    if args.is_present("extend") {
+    if args.get_flag("extend") {
         gen_glue_anchors(&context)?;
         gen_fill_anchors(&context)?;
     }
@@ -440,14 +494,14 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error:
     gen_quast(&context)?;
     gen_stat_final(&context)?;
 
-    if args.is_present("busco") {
+    if args.get_flag("busco") {
         gen_busco(&context)?;
     }
 
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
     gen_master(&context)?;
-    if args.is_present("queue") {
+    if args.get_flag("queue") {
         gen_bsub(&context)?;
     }
 

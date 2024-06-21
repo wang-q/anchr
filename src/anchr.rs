@@ -1,9 +1,10 @@
 extern crate clap;
+
 use clap::*;
 
 mod cmd;
 
-fn main() -> std::io::Result<()> {
+fn main() -> anyhow::Result<()> {
     let app = Command::new("anchr")
         .version(crate_version!())
         .author(crate_authors!())
@@ -17,7 +18,38 @@ fn main() -> std::io::Result<()> {
         .subcommand(cmd::quorum::make_subcommand())
         .subcommand(cmd::template::make_subcommand())
         .subcommand(cmd::trim::make_subcommand())
-        .subcommand(cmd::unitigs::make_subcommand());
+        .subcommand(cmd::unitigs::make_subcommand())
+        .after_help(
+            r###"
+Subcommand groups:
+
+* Standalone
+    * paf2ovlp
+    * show2ovlp
+    * covered
+    * restrict
+    * dazzname
+
+* Pipeline
+    * overlap
+    * contained
+    * merge
+    * orient
+    * group
+    * layout
+    * overlap2
+
+* Scripts
+    * anchors
+    * dep
+    * ena
+    * merge
+    * quorum
+    * trim
+    * unitigs
+
+"###,
+        );
 
     // Check which subcomamnd the user ran...
     match app.get_matches().subcommand() {

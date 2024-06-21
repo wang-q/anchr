@@ -6,7 +6,7 @@ use std::{env, fs};
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a>() -> Command<'a> {
+pub fn make_subcommand() -> Command {
     Command::new("trim")
         .about("Trim Illumina PE/SE fastq files")
         .after_help(
@@ -20,7 +20,7 @@ Fastq files can be gzipped
             Arg::new("infiles")
                 .help("Sets the input file to use")
                 .required(true)
-                .min_values(1)
+                .num_args(1..)
                 .index(1),
         )
         .arg(
@@ -28,173 +28,186 @@ Fastq files can be gzipped
                 .long("qual")
                 .short('q')
                 .help("Quality threshold")
-                .takes_value(true)
-                .default_value("25")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("25"),
         )
         .arg(
             Arg::new("len")
                 .long("len")
                 .short('l')
                 .help("Filter reads less or equal to this length")
-                .takes_value(true)
-                .default_value("60")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("60"),
         )
         .arg(
             Arg::new("filter")
                 .long("filter")
                 .help("Adapter, artifact, or both")
-                .takes_value(true)
-                .default_value("adapter")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("adapter"),
         )
         .arg(
             Arg::new("trimq")
                 .long("trimq")
                 .help("Quality score for 3' end")
-                .takes_value(true)
-                .default_value("15")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("15"),
         )
         .arg(
             Arg::new("trimk")
                 .long("trimk")
                 .help("Kmer for 5' adapter trimming")
-                .takes_value(true)
-                .default_value("23")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("23"),
         )
         .arg(
             Arg::new("matchk")
                 .long("matchk")
                 .help("Kmer for decontamination")
-                .takes_value(true)
-                .default_value("27")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("27"),
         )
         .arg(
             Arg::new("cutk")
                 .long("cutk")
                 .help("Kmer for cutoff")
-                .takes_value(true)
-                .default_value("31")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("31"),
         )
         .arg(
             Arg::new("adapter")
                 .long("adapter")
                 .help("The adapter file")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("artifact")
                 .long("artifact")
                 .help("The artifact file")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("prefix")
                 .long("prefix")
                 .help("Prefix of trimmed reads")
-                .takes_value(true)
-                .default_value("R")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("R"),
         )
-        .arg(Arg::new("dedupe").long("dedupe").help("Do the dedupe step"))
+        .arg(
+            Arg::new("dedupe")
+                .long("dedupe")
+                .action(ArgAction::SetTrue)
+                .help("Do the dedupe step"),
+        )
         .arg(
             Arg::new("tile")
                 .long("tile")
+                .action(ArgAction::SetTrue)
                 .help("With normal Illumina names, do tile-based filtering"),
         )
         .arg(
             Arg::new("cutoff")
                 .long("cutoff")
                 .help("Min kmer depth cutoff")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("sample")
                 .long("sample")
                 .help("The sampling step")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("xmx")
                 .long("xmx")
                 .help("Set Java memory usage")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
                 .help("Number of threads")
-                .takes_value(true)
-                .default_value("8")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("8"),
         )
         .arg(
             Arg::new("outfile")
                 .long("outfile")
                 .short('o')
                 .help("Output filename. [stdout] for screen")
-                .takes_value(true)
-                .default_value("trim.sh")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("trim.sh"),
         )
 }
 
 // command implementation
-pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let mut writer = intspan::writer(args.value_of("outfile").unwrap());
+pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
+    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
 
     // context from args
     let mut opt = HashMap::new();
-    opt.insert("qual", args.value_of("qual").unwrap());
-    opt.insert("len", args.value_of("len").unwrap());
-    opt.insert("filter", args.value_of("filter").unwrap());
-    opt.insert("trimq", args.value_of("trimq").unwrap());
-    opt.insert("trimk", args.value_of("trimk").unwrap());
-    opt.insert("matchk", args.value_of("matchk").unwrap());
-    opt.insert("cutk", args.value_of("cutk").unwrap());
-    opt.insert("prefix", args.value_of("prefix").unwrap());
-    opt.insert("dedupe", if args.is_present("dedupe") { "1" } else { "0" });
-    opt.insert("tile", if args.is_present("tile") { "1" } else { "0" });
+    opt.insert("qual", args.get_one::<String>("qual").unwrap());
+    opt.insert("len", args.get_one::<String>("len").unwrap());
+    opt.insert("filter", args.get_one::<String>("filter").unwrap());
+    opt.insert("trimq", args.get_one::<String>("trimq").unwrap());
+    opt.insert("trimk", args.get_one::<String>("trimk").unwrap());
+    opt.insert("matchk", args.get_one::<String>("matchk").unwrap());
+    opt.insert("cutk", args.get_one::<String>("cutk").unwrap());
+    opt.insert("prefix", args.get_one::<String>("prefix").unwrap());
+
+    let binding_1 = "1".to_string();
+    let binding_0 = "0".to_string();
+
+    opt.insert(
+        "dedupe",
+        if args.get_flag("dedupe") {
+            &binding_1
+        } else {
+            &binding_0
+        },
+    );
+    opt.insert(
+        "tile",
+        if args.contains_id("tile") {
+            &binding_1
+        } else {
+            &binding_0
+        },
+    );
+
     opt.insert(
         "cutoff",
-        if args.is_present("cutoff") {
-            args.value_of("cutoff").unwrap()
+        if args.contains_id("cutoff") {
+            args.get_one::<String>("cutoff").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
+
     opt.insert(
         "sample",
-        if args.is_present("sample") {
-            args.value_of("sample").unwrap()
+        if args.contains_id("sample") {
+            args.get_one::<String>("sample").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
+
     opt.insert(
         "xmx",
-        if args.is_present("xmx") {
-            args.value_of("xmx").unwrap()
+        if args.contains_id("xmx") {
+            args.get_one::<String>("xmx").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
-    opt.insert("parallel", args.value_of("parallel").unwrap());
+
+    opt.insert("parallel", args.get_one::<String>("parallel").unwrap());
 
     // Default adapter and artifact files
-    let path = if args.is_present("adapter") {
-        PathBuf::from(args.value_of("adapter").unwrap())
+    let path = if args.get_flag("adapter") {
+        PathBuf::from(args.get_one::<String>("adapter").unwrap())
             .canonicalize()
             .unwrap()
     } else {
@@ -203,10 +216,11 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error:
         fs::write(file, include_str!("../../templates/illumina_adapters.fa"))?;
         env::current_dir()?.join(file).canonicalize().unwrap()
     };
-    opt.insert("adapter", path.to_str().unwrap());
+    let binding = path.to_str().unwrap().to_string();
+    opt.insert("adapter", &binding);
 
-    let path = if args.is_present("artifact") {
-        PathBuf::from(args.value_of("artifact").unwrap())
+    let path = if args.get_flag("artifact") {
+        PathBuf::from(args.get_one::<String>("artifact").unwrap())
             .canonicalize()
             .unwrap()
     } else {
@@ -218,9 +232,10 @@ pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error:
         )?;
         env::current_dir()?.join(file).canonicalize().unwrap()
     };
-    opt.insert("artifact", path.to_str().unwrap());
+    let binding = path.to_str().unwrap().to_string();
+    opt.insert("artifact", &binding);
 
-    let infiles = args.values_of("infiles").unwrap().collect_vec();
+    let infiles = args.get_many::<String>("infiles").unwrap().collect_vec();
 
     let mut context = Context::new();
     context.insert("opt", &opt);

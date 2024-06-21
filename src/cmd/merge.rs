@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a>() -> Command<'a> {
+pub fn make_subcommand() -> Command {
     Command::new("merge")
         .about("Merge Illumina PE reads with bbtools")
         .after_help(
@@ -20,7 +20,7 @@ Rs is single
             Arg::new("infiles")
                 .help("Sets the input file to use")
                 .required(true)
-                .min_values(1)
+                .num_args(1..)
                 .index(1),
         )
         .arg(
@@ -28,107 +28,101 @@ Rs is single
                 .long("len")
                 .short('l')
                 .help("Filter reads less or equal to this length")
-                .takes_value(true)
-                .default_value("60")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("60"),
         )
         .arg(
             Arg::new("qual")
                 .long("qual")
                 .short('q')
                 .help("Quality score for 3' end")
-                .takes_value(true)
-                .default_value("15")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("15"),
         )
         .arg(
             Arg::new("prefilter")
                 .long("prefilter")
                 .help("Prefilter=N (1 or 2) for tadpole and bbmerge")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("ecphase")
                 .long("ecphase")
                 .help("Error-correct phases. Phase 2 can be skipped")
-                .takes_value(true)
-                .default_value("1 2 3")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("1 2 3"),
         )
         .arg(
             Arg::new("prefixm")
                 .long("prefixm")
                 .help("Prefix of merged reads")
-                .takes_value(true)
-                .default_value("M")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("M"),
         )
         .arg(
             Arg::new("prefixu")
                 .long("prefixu")
                 .help("Prefix of unmerged reads")
-                .takes_value(true)
-                .default_value("U")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("U"),
         )
         .arg(
             Arg::new("xmx")
                 .long("xmx")
                 .help("Set Java memory usage")
-                .takes_value(true)
-                .forbid_empty_values(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
                 .help("Number of threads")
-                .takes_value(true)
-                .default_value("8")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("8"),
         )
         .arg(
             Arg::new("outfile")
                 .long("outfile")
                 .short('o')
                 .help("Output filename. [stdout] for screen")
-                .takes_value(true)
-                .default_value("merge.sh")
-                .forbid_empty_values(true),
+                .num_args(1)
+                .default_value("merge.sh"),
         )
 }
 
 // command implementation
-pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let mut writer = intspan::writer(args.value_of("outfile").unwrap());
+pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
+    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
 
     // context from args
     let mut opt = HashMap::new();
-    opt.insert("len", args.value_of("len").unwrap());
-    opt.insert("qual", args.value_of("qual").unwrap());
+    opt.insert("len", args.get_one::<String>("len").unwrap());
+    opt.insert("qual", args.get_one::<String>("qual").unwrap());
+    opt.insert("ecphase", args.get_one::<String>("ecphase").unwrap());
+    opt.insert("prefixm", args.get_one::<String>("prefixm").unwrap());
+    opt.insert("prefixu", args.get_one::<String>("prefixu").unwrap());
+    opt.insert("parallel", args.get_one::<String>("parallel").unwrap());
+
+    let binding_0 = "0".to_string();
     opt.insert(
         "prefilter",
-        if args.is_present("prefilter") {
-            args.value_of("prefilter").unwrap()
+        if args.contains_id("prefilter") {
+            args.get_one::<String>("prefilter").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
-    opt.insert("ecphase", args.value_of("ecphase").unwrap());
-    opt.insert("prefixm", args.value_of("prefixm").unwrap());
-    opt.insert("prefixu", args.value_of("prefixu").unwrap());
+
     opt.insert(
         "xmx",
-        if args.is_present("xmx") {
-            args.value_of("xmx").unwrap()
+        if args.contains_id("xmx") {
+            args.get_one::<String>("xmx").unwrap()
         } else {
-            "0"
+            &binding_0
         },
     );
-    opt.insert("parallel", args.value_of("parallel").unwrap());
 
-    let infiles = args.values_of("infiles").unwrap().collect_vec();
+    let infiles = args.get_many::<String>("infiles").unwrap().collect_vec();
 
     let mut context = Context::new();
     context.insert("opt", &opt);

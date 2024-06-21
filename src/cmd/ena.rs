@@ -1,7 +1,7 @@
 use clap::*;
 
 // Create clap subcommand arguments
-pub fn make_subcommand<'a>() -> Command<'a> {
+pub fn make_subcommand() -> Command {
     Command::new("ena")
         .about("ENA scripts")
         .after_help(
@@ -20,18 +20,17 @@ pub fn make_subcommand<'a>() -> Command<'a> {
             Arg::new("outfile")
                 .short('o')
                 .long("outfile")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("stdout")
-                .forbid_empty_values(true)
                 .help("Output filename. [stdout] for screen"),
         )
 }
 
 // command implementation
-pub fn execute(args: &ArgMatches) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let mut writer = intspan::writer(args.value_of("outfile").unwrap());
+pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
+    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
 
-    let kb = match args.value_of("infile").unwrap() {
+    let kb = match args.get_one::<String>("infile").unwrap().as_ref() {
         "info" => include_str!("../../templates/ena_info.pl"),
         "prep" => include_str!("../../templates/ena_prep.pl"),
         _ => unreachable!(),
