@@ -23,6 +23,7 @@ regex = "1.9.1"
 lazy_static = "1.4.0"
 itertools = "0.11.0"
 
+indexmap = "2.0.0"
 tera = "1.19.1"
 intspan = "0.7.5"
 
