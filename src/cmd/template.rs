@@ -304,7 +304,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     opt.insert(
         "genome",
-        if args.get_flag("genome") {
+        if args.contains_id("genome") {
             args.get_one::<String>("genome").unwrap()
         } else {
             "0"
@@ -361,7 +361,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     );
     opt.insert(
         "prefilter",
-        if args.get_flag("prefilter") {
+        if args.contains_id("prefilter") {
             args.get_one::<String>("prefilter").unwrap()
         } else {
             "0"
@@ -438,7 +438,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     gen_stat_reads(&context)?;
 
-    if args.get_flag("bwa") {
+    if args.contains_id("bwa") {
         gen_bwa(&context)?;
     }
     if args.get_flag("gatk") {
@@ -501,7 +501,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     gen_cleanup(&context)?;
     gen_real_clean(&context)?;
     gen_master(&context)?;
-    if args.get_flag("queue") {
+    if args.contains_id("queue") {
         gen_bsub(&context)?;
     }
 

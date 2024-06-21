@@ -5,40 +5,40 @@ use std::process::Command;
 use tempfile::TempDir; // Run programs
 
 #[test]
-fn command_invalid() -> Result<(), Box<dyn std::error::Error>> {
+fn command_invalid() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     cmd.arg("foobar");
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("which wasn't expected"));
+        .stderr(predicate::str::contains("recognized"));
 
     Ok(())
 }
 
 #[test]
-fn file_doesnt_be_needed() -> Result<(), Box<dyn std::error::Error>> {
+fn file_doesnt_be_needed() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     cmd.arg("test").arg("tests/SKCM/meth.tsv.gz");
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("which wasn't expected"));
+        .stderr(predicate::str::contains("recognized"));
 
     Ok(())
 }
 
 #[test]
-fn file_doesnt_provided() -> Result<(), Box<dyn std::error::Error>> {
+fn file_doesnt_provided() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     cmd.arg("dep");
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "The following required arguments were not provided",
-    ));
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("were not provided"));
 
     Ok(())
 }
 
 #[test]
-fn file_doesnt_exist() -> Result<(), Box<dyn std::error::Error>> {
+fn file_doesnt_exist() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     cmd.arg("dep").arg("tests/file/doesnt/exist");
     cmd.assert().failure();
@@ -47,7 +47,7 @@ fn file_doesnt_exist() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn command_dep() -> Result<(), Box<dyn std::error::Error>> {
+fn command_dep() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd.arg("dep").arg("check").output().unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
@@ -59,7 +59,7 @@ fn command_dep() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn command_ena() -> Result<(), Box<dyn std::error::Error>> {
+fn command_ena() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd.arg("ena").arg("info").output().unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
@@ -71,7 +71,7 @@ fn command_ena() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn command_quorum() -> Result<(), Box<dyn std::error::Error>> {
+fn command_quorum() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("quorum")
@@ -90,7 +90,7 @@ fn command_quorum() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn command_trim() -> Result<(), Box<dyn std::error::Error>> {
+fn command_trim() -> anyhow::Result<()> {
     let curdir = env::current_dir().unwrap();
 
     let tempdir = TempDir::new().unwrap();
@@ -120,7 +120,7 @@ fn command_trim() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn command_merge() -> Result<(), Box<dyn std::error::Error>> {
+fn command_merge() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("merge")
@@ -139,7 +139,7 @@ fn command_merge() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn command_unitigs() -> Result<(), Box<dyn std::error::Error>> {
+fn command_unitigs() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("unitigs")
@@ -175,7 +175,7 @@ fn command_unitigs() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn command_anchors() -> Result<(), Box<dyn std::error::Error>> {
+fn command_anchors() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("anchors")

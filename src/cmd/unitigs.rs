@@ -53,6 +53,7 @@ Fasta files can't be gzipped
         .arg(
             Arg::new("merge")
                 .long("merge")
+                .action(ArgAction::SetTrue)
                 .help("Merge unitigs from all k-mers"),
         )
         .arg(

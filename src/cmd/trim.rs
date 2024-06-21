@@ -169,7 +169,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     );
     opt.insert(
         "tile",
-        if args.contains_id("tile") {
+        if args.get_flag("tile") {
             &binding_1
         } else {
             &binding_0
@@ -206,7 +206,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     opt.insert("parallel", args.get_one::<String>("parallel").unwrap());
 
     // Default adapter and artifact files
-    let path = if args.get_flag("adapter") {
+    let path = if args.contains_id("adapter") {
         PathBuf::from(args.get_one::<String>("adapter").unwrap())
             .canonicalize()
             .unwrap()
@@ -219,7 +219,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let binding = path.to_str().unwrap().to_string();
     opt.insert("adapter", &binding);
 
-    let path = if args.get_flag("artifact") {
+    let path = if args.contains_id("artifact") {
         PathBuf::from(args.get_one::<String>("artifact").unwrap())
             .canonicalize()
             .unwrap()

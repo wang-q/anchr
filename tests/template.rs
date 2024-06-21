@@ -4,7 +4,7 @@ use std::process::Command;
 use tempfile::TempDir; // Run programs
 
 #[test]
-fn command_template() -> Result<(), Box<dyn std::error::Error>> {
+fn command_template() -> anyhow::Result<()> {
     let curdir = env::current_dir().unwrap();
 
     let tempdir = TempDir::new().unwrap();

@@ -17,6 +17,8 @@ cargo install --path . --force --offline
 
 cargo install --git https://github.com/wang-q/anchr --branch main
 
+cargo run --bin anchr help
+
 # Static binary for Linux
 mkdir -p ${HOME}/bin
 curl -fsSL $(
