@@ -1,7 +1,7 @@
 use clap::*;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs;
-use itertools::Itertools;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
@@ -508,7 +508,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn gen_fastqc(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_fastqc(context: &Context) -> anyhow::Result<()> {
     let outname = "2_fastqc.sh";
     eprintln!("Create {}", outname);
 
@@ -525,7 +525,7 @@ fn gen_fastqc(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_insert_size(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_insert_size(context: &Context) -> anyhow::Result<()> {
     let outname = "2_insert_size.sh";
     eprintln!("Create {}", outname);
 
@@ -542,7 +542,7 @@ fn gen_insert_size(context: &Context) -> std::result::Result<(), std::io::Error>
     Ok(())
 }
 
-fn gen_kat(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_kat(context: &Context) -> anyhow::Result<()> {
     let outname = "2_kat.sh";
     eprintln!("Create {}", outname);
 
@@ -559,7 +559,7 @@ fn gen_kat(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_fastk(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_fastk(context: &Context) -> anyhow::Result<()> {
     let outname = "2_fastk.sh";
     eprintln!("Create {}", outname);
 
@@ -576,7 +576,7 @@ fn gen_fastk(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_genescopefk(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_genescopefk(context: &Context) -> anyhow::Result<()> {
     let outname = "genescopefk.R";
     eprintln!("Create {}", outname);
 
@@ -590,7 +590,7 @@ fn gen_genescopefk(context: &Context) -> std::result::Result<(), std::io::Error>
     Ok(())
 }
 
-fn gen_trim(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_trim(context: &Context) -> anyhow::Result<()> {
     let outname = "2_trim.sh";
     eprintln!("Create {}", outname);
 
@@ -607,7 +607,7 @@ fn gen_trim(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_stat_reads(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_stat_reads(context: &Context) -> anyhow::Result<()> {
     let outname = "9_stat_reads.sh";
     eprintln!("Create {}", outname);
 
@@ -624,7 +624,7 @@ fn gen_stat_reads(context: &Context) -> std::result::Result<(), std::io::Error> 
     Ok(())
 }
 
-fn gen_quorum(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_quorum(context: &Context) -> anyhow::Result<()> {
     let outname = "2_quorum.sh";
     eprintln!("Create {}", outname);
 
@@ -641,7 +641,7 @@ fn gen_quorum(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_no_quorum(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_no_quorum(context: &Context) -> anyhow::Result<()> {
     let outname = "2_quorum.sh";
     eprintln!("Create {}", outname);
 
@@ -658,7 +658,7 @@ fn gen_no_quorum(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_merge(context: &Context) -> anyhow::Result<()> {
     let outname = "2_merge.sh";
     eprintln!("Create {}", outname);
 
@@ -675,7 +675,7 @@ fn gen_merge(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_bwa(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_bwa(context: &Context) -> anyhow::Result<()> {
     let outname = "3_bwa.sh";
     eprintln!("Create {}", outname);
 
@@ -692,7 +692,7 @@ fn gen_bwa(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_gatk(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_gatk(context: &Context) -> anyhow::Result<()> {
     let outname = "3_gatk.sh";
     eprintln!("Create {}", outname);
 
@@ -709,7 +709,7 @@ fn gen_gatk(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_down_sampling(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_down_sampling(context: &Context) -> anyhow::Result<()> {
     let outname = "4_down_sampling.sh";
     eprintln!("Create {}", outname);
 
@@ -726,7 +726,7 @@ fn gen_down_sampling(context: &Context) -> std::result::Result<(), std::io::Erro
     Ok(())
 }
 
-fn gen_mr_down_sampling(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_mr_down_sampling(context: &Context) -> anyhow::Result<()> {
     let outname = "6_down_sampling.sh";
     eprintln!("Create {}", outname);
 
@@ -743,7 +743,7 @@ fn gen_mr_down_sampling(context: &Context) -> std::result::Result<(), std::io::E
     Ok(())
 }
 
-fn gen_unitigs(context: &Context, unitigger: &str) -> std::result::Result<(), std::io::Error> {
+fn gen_unitigs(context: &Context, unitigger: &str) -> anyhow::Result<()> {
     let outname = format!("4_unitigs_{}.sh", unitigger);
     eprintln!("Create {}", outname);
 
@@ -765,7 +765,7 @@ fn gen_unitigs(context: &Context, unitigger: &str) -> std::result::Result<(), st
     Ok(())
 }
 
-fn gen_mr_unitigs(context: &Context, unitigger: &str) -> std::result::Result<(), std::io::Error> {
+fn gen_mr_unitigs(context: &Context, unitigger: &str) -> anyhow::Result<()> {
     let outname = format!("6_unitigs_{}.sh", unitigger);
     eprintln!("Create {}", outname);
 
@@ -787,7 +787,7 @@ fn gen_mr_unitigs(context: &Context, unitigger: &str) -> std::result::Result<(),
     Ok(())
 }
 
-fn gen_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "4_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -804,7 +804,7 @@ fn gen_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_mr_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_mr_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "6_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -821,7 +821,7 @@ fn gen_mr_anchors(context: &Context) -> std::result::Result<(), std::io::Error> 
     Ok(())
 }
 
-fn gen_stat_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_stat_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "9_stat_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -838,7 +838,7 @@ fn gen_stat_anchors(context: &Context) -> std::result::Result<(), std::io::Error
     Ok(())
 }
 
-fn gen_stat_mr_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_stat_mr_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "9_stat_mr_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -858,7 +858,7 @@ fn gen_stat_mr_anchors(context: &Context) -> std::result::Result<(), std::io::Er
     Ok(())
 }
 
-fn gen_merge_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_merge_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "7_merge_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -875,7 +875,7 @@ fn gen_merge_anchors(context: &Context) -> std::result::Result<(), std::io::Erro
     Ok(())
 }
 
-fn gen_stat_merge_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_stat_merge_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "9_stat_merge_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -895,7 +895,7 @@ fn gen_stat_merge_anchors(context: &Context) -> std::result::Result<(), std::io:
     Ok(())
 }
 
-fn gen_spades(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_spades(context: &Context) -> anyhow::Result<()> {
     let outname = "8_spades.sh";
     eprintln!("Create {}", outname);
 
@@ -912,7 +912,7 @@ fn gen_spades(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_mr_spades(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_mr_spades(context: &Context) -> anyhow::Result<()> {
     let outname = "8_mr_spades.sh";
     eprintln!("Create {}", outname);
 
@@ -929,7 +929,7 @@ fn gen_mr_spades(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_megahit(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_megahit(context: &Context) -> anyhow::Result<()> {
     let outname = "8_megahit.sh";
     eprintln!("Create {}", outname);
 
@@ -946,7 +946,7 @@ fn gen_megahit(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_mr_megahit(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_mr_megahit(context: &Context) -> anyhow::Result<()> {
     let outname = "8_mr_megahit.sh";
     eprintln!("Create {}", outname);
 
@@ -963,7 +963,7 @@ fn gen_mr_megahit(context: &Context) -> std::result::Result<(), std::io::Error> 
     Ok(())
 }
 
-fn gen_platanus(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_platanus(context: &Context) -> anyhow::Result<()> {
     let outname = "8_platanus.sh";
     eprintln!("Create {}", outname);
 
@@ -980,7 +980,7 @@ fn gen_platanus(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_stat_other_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_stat_other_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "9_stat_other_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -1000,7 +1000,7 @@ fn gen_stat_other_anchors(context: &Context) -> std::result::Result<(), std::io:
     Ok(())
 }
 
-fn gen_glue_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_glue_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "7_glue_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -1017,7 +1017,7 @@ fn gen_glue_anchors(context: &Context) -> std::result::Result<(), std::io::Error
     Ok(())
 }
 
-fn gen_fill_anchors(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_fill_anchors(context: &Context) -> anyhow::Result<()> {
     let outname = "7_fill_anchors.sh";
     eprintln!("Create {}", outname);
 
@@ -1034,7 +1034,7 @@ fn gen_fill_anchors(context: &Context) -> std::result::Result<(), std::io::Error
     Ok(())
 }
 
-fn gen_quast(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_quast(context: &Context) -> anyhow::Result<()> {
     let outname = "9_quast.sh";
     eprintln!("Create {}", outname);
 
@@ -1051,7 +1051,7 @@ fn gen_quast(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_busco(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_busco(context: &Context) -> anyhow::Result<()> {
     let outname = "9_busco.sh";
     eprintln!("Create {}", outname);
 
@@ -1068,7 +1068,7 @@ fn gen_busco(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_stat_final(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_stat_final(context: &Context) -> anyhow::Result<()> {
     let outname = "9_stat_final.sh";
     eprintln!("Create {}", outname);
 
@@ -1085,7 +1085,7 @@ fn gen_stat_final(context: &Context) -> std::result::Result<(), std::io::Error> 
     Ok(())
 }
 
-fn gen_cleanup(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_cleanup(context: &Context) -> anyhow::Result<()> {
     let outname = "0_cleanup.sh";
     eprintln!("Create {}", outname);
 
@@ -1102,7 +1102,7 @@ fn gen_cleanup(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_real_clean(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_real_clean(context: &Context) -> anyhow::Result<()> {
     let outname = "0_real_clean.sh";
     eprintln!("Create {}", outname);
 
@@ -1119,7 +1119,7 @@ fn gen_real_clean(context: &Context) -> std::result::Result<(), std::io::Error> 
     Ok(())
 }
 
-fn gen_master(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_master(context: &Context) -> anyhow::Result<()> {
     let outname = "0_master.sh";
     eprintln!("Create {}", outname);
 
@@ -1136,7 +1136,7 @@ fn gen_master(context: &Context) -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-fn gen_bsub(context: &Context) -> std::result::Result<(), std::io::Error> {
+fn gen_bsub(context: &Context) -> anyhow::Result<()> {
     let outname = "0_bsub.sh";
     eprintln!("Create {}", outname);
 
