@@ -9,3 +9,5 @@ pub mod quorum;
 pub mod template;
 pub mod trim;
 pub mod unitigs;
+pub mod restrict;
+pub mod covered;

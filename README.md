@@ -291,6 +291,35 @@ assembly evaluations.
 * Yeast
     * [*Saccharomyces cerevisiae* S288c](results/yeast.md#saccharomyces-cerevisiae-s288c)
 
+
+### Overlaps
+
+```shell
+echo "tests/ovlpr/1_4.anchor.fasta;tests/ovlpr/1_4.pac.fasta" |
+    parallel --colsep ";" -j 1 "
+        minimap2 -cx asm20 {1} {2} |
+            ovlpr paf2ovlp stdin |
+            tsv-sort
+        minimap2 -cx asm20 {2} {1} |
+            ovlpr paf2ovlp stdin |
+            tsv-sort
+    " |
+    anchr covered stdin --mean
+
+anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv
+
+anchr covered tests/ovlpr/11_2.long.paf --paf
+
+anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --base
+
+anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --mean
+
+anchr paf2ovlp tests/ovlpr/1_4.pac.paf
+
+anchr restrict tests/ovlpr/1_4.ovlp.tsv tests/ovlpr/1_4.restrict.tsv
+
+```
+
 ## AUTHOR
 
 Qiang Wang <wang-q@outlook.com>
