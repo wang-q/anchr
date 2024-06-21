@@ -3,6 +3,7 @@ extern crate clap;
 use clap::*;
 
 mod cmd;
+mod libs;
 
 fn main() -> anyhow::Result<()> {
     let app = Command::new("anchr")
@@ -15,6 +16,7 @@ fn main() -> anyhow::Result<()> {
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
         .subcommand(cmd::merge::make_subcommand())
+        .subcommand(cmd::paf2ovlp::make_subcommand())
         .subcommand(cmd::quorum::make_subcommand())
         .subcommand(cmd::template::make_subcommand())
         .subcommand(cmd::trim::make_subcommand())
@@ -57,6 +59,7 @@ Subcommand groups:
         Some(("dep", sub_matches)) => cmd::dep::execute(sub_matches),
         Some(("ena", sub_matches)) => cmd::ena::execute(sub_matches),
         Some(("merge", sub_matches)) => cmd::merge::execute(sub_matches),
+        Some(("paf2ovlp", sub_matches)) => cmd::paf2ovlp::execute(sub_matches),
         Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),
         Some(("template", sub_matches)) => cmd::template::execute(sub_matches),
         Some(("trim", sub_matches)) => cmd::trim::execute(sub_matches),
