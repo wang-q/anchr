@@ -27,23 +27,23 @@ fn main() -> anyhow::Result<()> {
             r###"
 Subcommand groups:
 
-* Standalone
-    * paf2ovlp
-    * show2ovlp
-    * covered
-    * restrict
-    * dazzname
+* Overlaps
+    * Standalone
+        * paf2ovlp
+        * show2ovlp
+        * covered
+        * restrict
+        * dazzname
+    * Daligner pipelines
+        * overlap
+        * contained
+        * merge
+        * orient
+        * group
+        * layout
+        * overlap2
 
-* Pipeline
-    * overlap
-    * contained
-    * merge
-    * orient
-    * group
-    * layout
-    * overlap2
-
-* Scripts
+* Assembling
     * anchors
     * dep
     * ena
