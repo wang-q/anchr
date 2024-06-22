@@ -292,7 +292,7 @@ assembly evaluations.
     * [*Saccharomyces cerevisiae* S288c](results/yeast.md#saccharomyces-cerevisiae-s288c)
 
 
-### Overlaps
+### Overlaps - Standalone
 
 ```shell
 echo "tests/ovlpr/1_4.anchor.fasta;tests/ovlpr/1_4.pac.fasta" |
@@ -317,6 +317,15 @@ anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --mean
 anchr paf2ovlp tests/ovlpr/1_4.pac.paf
 
 anchr restrict tests/ovlpr/1_4.ovlp.tsv tests/ovlpr/1_4.restrict.tsv
+
+```
+
+### Overlaps - Daligner pipelines
+
+```shell
+
+cargo run --bin anchr overlap tests/ovlpr/1_4.pac.fasta -o stdout
+
 
 ```
 
