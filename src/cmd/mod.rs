@@ -11,3 +11,4 @@ pub mod restrict;
 pub mod template;
 pub mod trim;
 pub mod unitigs;
+pub mod overlap;
