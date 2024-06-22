@@ -5,7 +5,7 @@ use tera::{Context, Tera};
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
-    Command::new("merge")
+    Command::new("mergeread")
         .about("Merge Illumina PE reads with bbtools")
         .after_help(
             r#"

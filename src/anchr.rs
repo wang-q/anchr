@@ -17,7 +17,7 @@ fn main() -> anyhow::Result<()> {
         .subcommand(cmd::dazzname::make_subcommand())
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
-        .subcommand(cmd::merge::make_subcommand())
+        .subcommand(cmd::mergeread::make_subcommand())
         .subcommand(cmd::overlap::make_subcommand())
         .subcommand(cmd::paf2ovlp::make_subcommand())
         .subcommand(cmd::quorum::make_subcommand())
@@ -55,7 +55,7 @@ Subcommand groups:
 
 * Assembling
     * anchors
-    * merge
+    * mergeread
     * quorum
     * trim
     * unitigs
@@ -79,7 +79,7 @@ Subcommand groups:
         Some(("overlap", sub_matches)) => cmd::overlap::execute(sub_matches),
         // Assembling
         Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
-        Some(("merge", sub_matches)) => cmd::merge::execute(sub_matches),
+        Some(("mergeread", sub_matches)) => cmd::mergeread::execute(sub_matches),
         Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),
         Some(("template", sub_matches)) => cmd::template::execute(sub_matches),
         Some(("trim", sub_matches)) => cmd::trim::execute(sub_matches),
