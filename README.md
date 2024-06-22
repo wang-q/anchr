@@ -103,7 +103,6 @@ quast --test
 brew install spades
 spades.py --test
 brew install brewsci/bio/megahit
-brew install wang-q/tap/platanus
 
 ```
 

@@ -34,10 +34,9 @@ rm -fr 7_extend_anchors
 rm -fr 7_glue_anchors
 rm -fr 7_fill_anchors
 
-# spades, platanus, and megahit
+# spades, megahit
 rm -fr 8_spades*
 rm -fr 8_megahit*
-rm -fr 8_platanus*
 rm -fr 8_mr_spades*
 rm -fr 8_mr_megahit*
 

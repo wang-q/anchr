@@ -95,18 +95,4 @@ if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
         $(echo "mr_megahit.non-contained"; faops n50 -H -S -C 8_mr_megahit/megahit.non-contained.fasta;) >> statFinal.md
 fi
 
-# platanus
-if [ -e 8_platanus/out_contig.fa ]; then
-	printf "| %s | %s | %s | %s |\n" \
-	    $(echo "platanus.contig"; faops n50 -H -S -C 8_platanus/out_contig.fa;) >> statFinal.md
-fi
-if [ -e 8_platanus/out_gapClosed.fa ]; then
-	printf "| %s | %s | %s | %s |\n" \
-	    $(echo "platanus.scaffold"; faops n50 -H -S -C 8_platanus/out_gapClosed.fa;) >> statFinal.md
-fi
-if [ -e 8_platanus/platanus.non-contained.fasta ]; then
-	printf "| %s | %s | %s | %s |\n" \
-	    $(echo "platanus.non-contained"; faops n50 -H -S -C 8_platanus/platanus.non-contained.fasta;) >> statFinal.md
-fi
-
 cat statFinal.md

@@ -57,9 +57,6 @@ find . -type f -name ".anchorLong.*" -path "*7_anchor*" | parallel --no-run-if-e
 # spades
 find . -type d -path "*8_spades/*" -not -name "anchor" | parallel --no-run-if-empty -j 1 rm -fr
 
-# platanus
-find . -type f -path "*8_platanus/*" -name "[ps]e.fa" | parallel --no-run-if-empty -j 1 rm
-
 # quast
 find . -type d -name "nucmer_output" | parallel --no-run-if-empty -j 1 rm -fr
 find . -type f -path "*contigs_reports/*" -name "*.stdout*" -or -name "*.stderr*" | parallel --no-run-if-empty -j 1 rm

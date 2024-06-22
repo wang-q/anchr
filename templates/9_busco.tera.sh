@@ -55,10 +55,6 @@ if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
     ARRAY+=('mr_megahit::8_mr_megahit/megahit.non-contained.fasta')
 fi
 
-if [ -e 8_platanus/platanus.non-contained.fasta ]; then
-    ARRAY+=('platanus::8_platanus/platanus.non-contained.fasta')
-fi
-
 mkdir -p 9_busco
 
 for item in "${ARRAY[@]}" ; do

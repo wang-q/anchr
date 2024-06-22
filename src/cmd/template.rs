@@ -479,7 +479,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     gen_spades(&context)?;
     gen_megahit(&context)?;
-    gen_platanus(&context)?;
     if !args.get_flag("se") && args.get_flag("merge") {
         gen_mr_spades(&context)?;
         gen_mr_megahit(&context)?;
@@ -954,23 +953,6 @@ fn gen_mr_megahit(context: &Context) -> anyhow::Result<()> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/8_mr_megahit.tera.sh")),
-    ])
-    .unwrap();
-
-    let rendered = tera.render("t", &context).unwrap();
-    intspan::write_lines(outname, &vec![rendered.as_str()])?;
-
-    Ok(())
-}
-
-fn gen_platanus(context: &Context) -> anyhow::Result<()> {
-    let outname = "8_platanus.sh";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    tera.add_raw_templates(vec![
-        ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/8_platanus.tera.sh")),
     ])
     .unwrap();
 

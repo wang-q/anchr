@@ -130,7 +130,7 @@ bsub -w "ended(${BASE_NAME}-7_merge_anchors)" \
     "bash 9_stat_merge_anchors.sh"
 
 #----------------------------#
-# spades, megahit and platanus
+# spades, megahit
 #----------------------------#
 bsub -w "ended(${BASE_NAME}-2_quorum)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-8_spades" \
@@ -139,10 +139,6 @@ bsub -w "ended(${BASE_NAME}-2_quorum)" \
 bsub -w "ended(${BASE_NAME}-2_quorum)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-8_megahit" \
     "bash 8_megahit.sh"
-
-bsub -w "ended(${BASE_NAME}-2_quorum)" \
-    -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-8_platanus" \
-    "bash 8_platanus.sh"
 
 {% if opt.merge == "1" and opt.se == "0" -%}
 bsub -w "ended(${BASE_NAME}-2_merge)" \
@@ -153,7 +149,7 @@ bsub -w "ended(${BASE_NAME}-2_merge)" \
     "bash 8_mr_megahit.sh"
 {% endif -%}
 {# Keep a blank line #}
-bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) && ended(${BASE_NAME}-8_platanus) {% if opt.merge == "1" and opt.se == "0" %}&& ended(${BASE_NAME}-8_mr_spades) && ended(${BASE_NAME}-8_mr_megahit){% endif %}" \
+bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) {% if opt.merge == "1" and opt.se == "0" %}&& ended(${BASE_NAME}-8_mr_spades) && ended(${BASE_NAME}-8_mr_megahit){% endif %}" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_stat_other_anchors" \
     "bash 9_stat_other_anchors.sh"
 
@@ -161,7 +157,7 @@ bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) && ended(
 # extend anchors
 #----------------------------#
 {% if opt.extend == "1" -%}
-bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) && ended(${BASE_NAME}-8_platanus) {% if opt.merge == "1" and opt.se == "0" %}&& ended(${BASE_NAME}-8_mr_spades)&& ended(${BASE_NAME}-8_mr_megahit){% endif %}" \
+bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) {% if opt.merge == "1" and opt.se == "0" %}&& ended(${BASE_NAME}-8_mr_spades)&& ended(${BASE_NAME}-8_mr_megahit){% endif %}" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-contigs_2GS" \
     '
     rm -fr 7_extend_anchors
@@ -169,7 +165,6 @@ bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) && ended(
     cat \
         8_spades/spades.non-contained.fasta \
         8_megahit/megahit.non-contained.fasta \
-        8_platanus/platanus.non-contained.fasta \
 {% if opt.merge == "1" and opt.se == "0" -%}
         8_mr_spades/spades.non-contained.fasta \
         8_mr_megahit/megahit.non-contained.fasta \
@@ -190,11 +185,11 @@ bsub -w "ended(${BASE_NAME}-7_glue_anchors)" \
 #----------------------------#
 # final stats
 #----------------------------#
-bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_platanus) {% if opt.extend == "1" %}&& ended(${BASE_NAME}-7_fill_anchors){% endif %}" \
+bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-8_spades) {% if opt.extend == "1" %}&& ended(${BASE_NAME}-7_fill_anchors){% endif %}" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_stat_final" \
     "bash 9_stat_final.sh"
 
-bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_platanus) {% if opt.extend == "1" %}&& ended(${BASE_NAME}-7_fill_anchors){% endif %}" \
+bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-8_spades) {% if opt.extend == "1" %}&& ended(${BASE_NAME}-7_fill_anchors){% endif %}" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_quast" \
     "bash 9_quast.sh"
 

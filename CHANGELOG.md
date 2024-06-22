@@ -3,11 +3,15 @@
 ## Unreleased - ReleaseDate
 
 * Add `anchr dazzname`
-* Move `ovlpr` from intspan here
+* Move `ovlpr` subcommands from intspan here
+    * `anchr covered`
+    * `anchr paf2ovlp`
+    * `anchr restrict`
 * Use `mlr` instead of manual `printf` to create markdown files
 * `anchr template`
     * Place scripts to `0_script/`
     * Place markdowns to `9_markdown/`
+    * Remove platanus
 
 ## 0.3.18 - 2022-04-21
 

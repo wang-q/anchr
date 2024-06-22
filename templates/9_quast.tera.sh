@@ -59,11 +59,6 @@ if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
     QUAST_LABEL+="mr_megahit,"
 fi
 
-if [ -e 8_platanus/platanus.non-contained.fasta ]; then
-    QUAST_TARGET+=" 8_platanus/platanus.non-contained.fasta "
-    QUAST_LABEL+="platanus,"
-fi
-
 if [ -e 1_genome/paralogs.fa ]; then
     QUAST_TARGET+=" 1_genome/paralogs.fa "
     QUAST_LABEL+="paralogs,"

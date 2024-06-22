@@ -126,7 +126,7 @@ if [ -e 9_stat_merge_anchors.sh ]; then
 fi
 
 #----------------------------#
-# spades, megahit and platanus
+# spades, megahit
 #----------------------------#
 if [ -e 8_spades.sh ]; then
     bash 8_spades.sh
@@ -139,9 +139,6 @@ if [ -e 8_megahit.sh ]; then
 fi
 if [ -e 8_mr_megahit.sh ]; then
     bash 8_mr_megahit.sh
-fi
-if [ -e 8_platanus.sh ]; then
-    bash 8_platanus.sh
 fi
 
 if [ -e 9_stat_other_anchors.sh ]; then
@@ -157,7 +154,6 @@ mkdir -p 7_extend_anchors
 cat \
     8_spades/spades.non-contained.fasta \
     8_megahit/megahit.non-contained.fasta \
-    8_platanus/platanus.non-contained.fasta \
 {% if opt.merge == "1" and opt.se == "0" -%}
     8_mr_spades/spades.non-contained.fasta \
     8_mr_megahit/megahit.non-contained.fasta \
