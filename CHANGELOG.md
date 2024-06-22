@@ -2,8 +2,10 @@
 
 ## Unreleased - ReleaseDate
 
+* Move `ovlpr` from intspan here
 * Use `mlr` instead of manual `printf` to create markdown files
 * `anchr template`
+    * Place scripts to `0_script/`
     * Place markdowns to `9_markdown/`
 
 ## 0.3.18 - 2022-04-21
