@@ -1,6 +1,5 @@
 use clap::*;
 use indexmap::IndexSet;
-use intspan::*;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::BufRead;
 
@@ -81,7 +80,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
     // Loading
     //----------------------------
-    let mut writer = writer(args.get_one::<String>("outfile").unwrap());
+    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
 
     let coverage = *args.get_one::<i32>("coverage").unwrap();
     let min_len = *args.get_one::<i32>("len").unwrap();
@@ -93,17 +92,17 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let is_mean = args.get_flag("mean");
 
     // seq_name => tier_of => IntSpan
-    let mut res: HashMap<String, Coverage> = HashMap::new();
+    let mut res: HashMap<String, intspan::Coverage> = HashMap::new();
     let mut index_of: IndexSet<String> = IndexSet::new();
     let mut seen: HashSet<(usize, usize)> = HashSet::new();
 
     for infile in args.get_many::<String>("infiles").unwrap() {
-        let reader = reader(infile);
+        let reader = intspan::reader(infile);
         for line in reader.lines().map_while(Result::ok) {
             let ovlp = if is_paf {
-                Overlap::from_paf(&line)
+                anchr::Overlap::from_paf(&line)
             } else {
-                Overlap::new(&line)
+                anchr::Overlap::new(&line)
             };
             let f_id = ovlp.f_id();
             let g_id = ovlp.g_id();
@@ -133,7 +132,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
             // first
             if !res.contains_key(f_id) {
-                let tiers = Coverage::new_len(coverage, *ovlp.f_len());
+                let tiers = intspan::Coverage::new_len(coverage, *ovlp.f_len());
                 res.insert(f_id.clone(), tiers);
             }
             res.entry(f_id.to_string())
@@ -141,7 +140,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
             // second
             if !res.contains_key(g_id) {
-                let tiers = Coverage::new_len(coverage, *ovlp.g_len());
+                let tiers = intspan::Coverage::new_len(coverage, *ovlp.g_len());
                 res.insert(g_id.clone(), tiers);
             }
             res.entry(g_id.to_string())
@@ -182,7 +181,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn base_lines(key: &str, tiers: &BTreeMap<i32, IntSpan>) -> String {
+fn base_lines(key: &str, tiers: &BTreeMap<i32, intspan::IntSpan>) -> String {
     let mut basecovs: HashMap<i32, i32> = HashMap::new();
     let max_tier = tiers.keys().max().unwrap();
     for i in 0..=*max_tier {
@@ -203,7 +202,7 @@ fn base_lines(key: &str, tiers: &BTreeMap<i32, IntSpan>) -> String {
     out_lines.join("\n")
 }
 
-fn mean_line(key: &str, tiers: &BTreeMap<i32, IntSpan>) -> String {
+fn mean_line(key: &str, tiers: &BTreeMap<i32, intspan::IntSpan>) -> String {
     let total_len = tiers[&-1].cardinality();
     let max_tier = tiers.keys().max().unwrap();
     let mut sum = 0;
@@ -215,7 +214,7 @@ fn mean_line(key: &str, tiers: &BTreeMap<i32, IntSpan>) -> String {
     format!("{}\t{}\t{:.1}", key, total_len, mean_cov)
 }
 
-fn longest_line(key: &str, intspan: &IntSpan) -> String {
+fn longest_line(key: &str, intspan: &intspan::IntSpan) -> String {
     let ranges = intspan.ranges();
 
     let mut sizes: Vec<i32> = Vec::new();
@@ -232,7 +231,7 @@ fn longest_line(key: &str, intspan: &IntSpan) -> String {
         }
     }
 
-    let mut longest = IntSpan::new();
+    let mut longest = intspan::IntSpan::new();
     longest.add_pair(ranges[max_i * 2], ranges[max_i * 2 + 1]);
 
     format!("{}:{}", key, longest)

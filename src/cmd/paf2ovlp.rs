@@ -1,5 +1,4 @@
 use clap::*;
-use intspan::*;
 use std::io::BufRead;
 
 // Create clap subcommand arguments
@@ -28,12 +27,12 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
     // Loading
     //----------------------------
-    let mut writer = writer(args.get_one::<String>("outfile").unwrap());
+    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
 
     for infile in args.get_many::<String>("infiles").unwrap() {
-        let reader = reader(infile);
+        let reader = intspan::reader(infile);
         for line in reader.lines().map_while(Result::ok) {
-            let ovlp = Overlap::from_paf(&line);
+            let ovlp = anchr::Overlap::from_paf(&line);
 
             //----------------------------
             // Output
