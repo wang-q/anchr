@@ -14,6 +14,7 @@ fn main() -> anyhow::Result<()> {
         .arg_required_else_help(true)
         .subcommand(cmd::anchors::make_subcommand())
         .subcommand(cmd::covered::make_subcommand())
+        .subcommand(cmd::dazzname::make_subcommand())
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
         .subcommand(cmd::merge::make_subcommand())
@@ -59,6 +60,7 @@ Subcommand groups:
     match app.get_matches().subcommand() {
         // Overlaps - Standalone
         Some(("covered", sub_matches)) => cmd::covered::execute(sub_matches),
+        Some(("dazzname", sub_matches)) => cmd::dazzname::execute(sub_matches),
         Some(("paf2ovlp", sub_matches)) => cmd::paf2ovlp::execute(sub_matches),
         Some(("restrict", sub_matches)) => cmd::restrict::execute(sub_matches),
         // Assembling

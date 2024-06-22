@@ -3,6 +3,27 @@ use predicates::prelude::*; // Used for writing assertions
 use std::process::Command; // Run programs
 
 #[test]
+fn command_dazzname() -> anyhow::Result<()> {
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("dazzname")
+        .arg("--start")
+        .arg("11")
+        .arg("--prefix")
+        .arg("seq")
+        .arg("tests/ovlpr/1_4.anchor.fasta")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert_eq!(stdout.lines().count(), 8);
+    assert!(!stdout.contains("anchor148_9124"), "original names");
+    assert!(stdout.contains("seq/14/0_9124"), "new names");
+
+    Ok(())
+}
+
+#[test]
 fn command_covered() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd

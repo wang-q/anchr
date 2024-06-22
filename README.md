@@ -295,6 +295,8 @@ assembly evaluations.
 ### Overlaps - Standalone
 
 ```shell
+cargo run --bin anchr dazzname tests/ovlpr/1_4.anchor.fasta -o stdout
+
 echo "tests/ovlpr/1_4.anchor.fasta;tests/ovlpr/1_4.pac.fasta" |
     parallel --colsep ";" -j 1 "
         minimap2 -cx asm20 {1} {2} |

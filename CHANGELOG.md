@@ -2,6 +2,7 @@
 
 ## Unreleased - ReleaseDate
 
+* Add `anchr dazzname`
 * Move `ovlpr` from intspan here
 * Use `mlr` instead of manual `printf` to create markdown files
 * `anchr template`
