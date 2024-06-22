@@ -57,14 +57,16 @@ Subcommand groups:
 
     // Check which subcomamnd the user ran...
     match app.get_matches().subcommand() {
-        Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
+        // Overlaps - Standalone
         Some(("covered", sub_matches)) => cmd::covered::execute(sub_matches),
+        Some(("paf2ovlp", sub_matches)) => cmd::paf2ovlp::execute(sub_matches),
+        Some(("restrict", sub_matches)) => cmd::restrict::execute(sub_matches),
+        // Assembling
+        Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
         Some(("dep", sub_matches)) => cmd::dep::execute(sub_matches),
         Some(("ena", sub_matches)) => cmd::ena::execute(sub_matches),
         Some(("merge", sub_matches)) => cmd::merge::execute(sub_matches),
-        Some(("paf2ovlp", sub_matches)) => cmd::paf2ovlp::execute(sub_matches),
         Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),
-        Some(("restrict", sub_matches)) => cmd::restrict::execute(sub_matches),
         Some(("template", sub_matches)) => cmd::template::execute(sub_matches),
         Some(("trim", sub_matches)) => cmd::trim::execute(sub_matches),
         Some(("unitigs", sub_matches)) => cmd::unitigs::execute(sub_matches),
