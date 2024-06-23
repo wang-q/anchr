@@ -569,7 +569,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  98.39% |    148466 | 4.55M |  71 |      1029 | 23.15K | 146 |  372.0 | 36.0 |  88.0 | 960.0 |   0:00:49 |
 | 8_megahit    |  98.18% |     65379 | 4.53M | 125 |       960 | 18.07K | 230 |  285.0 | 35.0 |  60.0 | 780.0 |   0:00:47 |
 | 8_mr_megahit |  98.81% |    132772 | 4.57M |  70 |       781 | 19.29K | 138 |  372.0 | 36.0 |  88.0 | 960.0 |   0:01:03 |
-| 8_platanus   |  97.87% |     96792 | 4.06M |  81 |       254 |  9.36K | 138 |  285.0 | 35.0 |  60.0 | 780.0 |   0:00:43 |
 
 Table: statFinal
 
@@ -592,9 +591,6 @@ Table: statFinal
 | megahit.non-contained    |   82825 | 4551522 |  105 |
 | mr_megahit.contig        |  132896 | 4609378 |  128 |
 | mr_megahit.non-contained |  132896 | 4584972 |   68 |
-| platanus.contig          |   14890 | 4712258 | 1171 |
-| platanus.scaffold        |  148483 | 4577638 |  142 |
-| platanus.non-contained   |  176491 | 4559854 |   64 |
 
 Table: statBusco run_bacteria_odb10
 
@@ -614,7 +610,6 @@ Table: statBusco run_bacteria_odb10
 | mr_spades           | 124 | 124 |   0 |   0 |   0 |   124 |
 | megahit             | 124 | 124 |   0 |   0 |   0 |   124 |
 | mr_megahit          | 124 | 124 |   0 |   0 |   0 |   124 |
-| platanus            | 124 | 124 |   0 |   0 |   0 |   124 |
 
 Table: statBusco run_enterobacterales_odb10
 
@@ -634,7 +629,6 @@ Table: statBusco run_enterobacterales_odb10
 | mr_spades           | 440 | 438 |   2 |   0 |   0 |   440 |
 | megahit             | 440 | 438 |   2 |   0 |   0 |   440 |
 | mr_megahit          | 440 | 438 |   2 |   0 |   0 |   440 |
-| platanus            | 440 | 438 |   2 |   0 |   0 |   440 |
 
 ## *E. coli* str. K-12 substr. DH5alpha
 
@@ -983,7 +977,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  98.93% |    132590 | 4.22M |  64 |       682 |  18.9K | 123 |  376.0 | 28.0 |  97.3 | 920.0 |   0:00:46 |
 | 8_megahit    |  98.47% |     73665 | 4.46M | 116 |      1031 | 25.17K | 231 |  263.0 | 22.0 |  65.7 | 658.0 |   0:00:41 |
 | 8_mr_megahit |  99.22% |    132754 |  4.5M |  75 |       673 | 22.14K | 147 |  376.0 | 28.0 |  97.3 | 920.0 |   0:00:46 |
-| 8_platanus   |  97.80% |    114608 | 4.48M |  72 |       374 | 10.89K | 137 |  263.0 | 22.0 |  65.7 | 658.0 |   0:00:42 |
 
 Table: statFinal
 
@@ -1006,9 +999,6 @@ Table: statFinal
 | megahit.non-contained    |   82955 | 4488852 | 115 |
 | mr_megahit.contig        |  133730 | 4557477 | 156 |
 | mr_megahit.non-contained |  133730 | 4522636 |  72 |
-| platanus.contig          |  108571 | 4558622 | 408 |
-| platanus.scaffold        |  125790 | 4514164 | 168 |
-| platanus.non-contained   |  132296 | 4492200 |  65 |
 
 Table: statBusco run_bacteria_odb10
 
@@ -1028,7 +1018,6 @@ Table: statBusco run_bacteria_odb10
 | mr_spades           | 124 | 124 |   0 |   0 |   0 |   124 |
 | megahit             | 124 | 124 |   0 |   0 |   0 |   124 |
 | mr_megahit          | 124 | 124 |   0 |   0 |   0 |   124 |
-| platanus            | 124 | 124 |   0 |   0 |   0 |   124 |
 
 Table: statBusco run_enterobacterales_odb10
 
@@ -1048,5 +1037,3 @@ Table: statBusco run_enterobacterales_odb10
 | mr_spades           | 440 | 438 |   2 |   0 |   0 |   440 |
 | megahit             | 440 | 438 |   2 |   0 |   0 |   440 |
 | mr_megahit          | 440 | 438 |   2 |   0 |   0 |   440 |
-| platanus            | 440 | 438 |   2 |   0 |   0 |   440 |
-

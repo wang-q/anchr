@@ -165,7 +165,7 @@ BASE_NAME=Bcer_100x
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 # BASE_NAME=Bcer_100x bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -427,7 +427,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  98.81% |     78041 | 5.35M | 130 |       217 | 10.11K | 212 |   85.0 | 15.0 |  13.3 | 260.0 |   0:00:36 |
 | 8_megahit    |  98.69% |     37648 | 4.85M | 218 |       125 | 21.73K | 356 |   64.0 | 13.0 |   8.3 | 206.0 |   0:00:40 |
 | 8_mr_megahit |  98.85% |     65403 | 5.36M | 153 |       451 | 13.53K | 265 |   85.0 | 15.0 |  13.3 | 260.0 |   0:00:36 |
-| 8_platanus   |  97.38% |     43046 | 1.03M |  49 |        61 |  2.73K |  66 |   64.0 | 13.0 |   8.3 | 206.0 |   0:00:35 |
 
 
 Table: statFinal
@@ -451,9 +450,6 @@ Table: statFinal
 | megahit.non-contained    |   59732 | 5341409 | 158 |
 | mr_megahit.contig        |   75019 | 5388594 | 186 |
 | mr_megahit.non-contained |   75019 | 5369027 | 141 |
-| platanus.contig          |   18988 | 5420878 | 665 |
-| platanus.scaffold        |  284635 | 5398027 | 263 |
-| platanus.non-contained   |  284635 | 5346865 |  39 |
 
 
 # *Mycobacterium abscessus* 6G-0125-R
@@ -567,7 +563,7 @@ BASE_NAME=Mabs_100x
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 # BASE_NAME=Mabs_100x bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -802,7 +798,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  99.36% |    103525 | 5.11M |  93 |        64 |  7.19K | 178 |   36.0 | 6.0 |   6.0 | 108.0 |   0:00:33 |
 | 8_megahit    |  99.20% |     76765 | 4.61M | 123 |        90 | 10.58K | 201 |   43.0 | 9.0 |   5.3 | 140.0 |   0:00:34 |
 | 8_mr_megahit |  99.62% |     95731 | 5.13M |  96 |        62 |  5.85K | 185 |   36.0 | 6.0 |   6.0 | 108.0 |   0:00:30 |
-| 8_platanus   |  98.28% |     23229 | 5.07M | 328 |        46 | 24.23K | 632 |   43.0 | 9.0 |   5.3 | 140.0 |   0:00:32 |
 
 
 Table: statFinal
@@ -826,9 +821,6 @@ Table: statFinal
 | megahit.non-contained    |  107304 | 5118130 |  90 |
 | mr_megahit.contig        |   95831 | 5139653 | 105 |
 | mr_megahit.non-contained |   95831 | 5133034 |  92 |
-| platanus.contig          |   16541 | 5191584 | 890 |
-| platanus.scaffold        |   25324 | 5129772 | 407 |
-| platanus.non-contained   |   25593 | 5097323 | 304 |
 
 
 # *Rhodobacter sphaeroides* 2.4.1
@@ -943,7 +935,7 @@ BASE_NAME=Rsph_100x
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 # BASE_NAME=Rsph_100x bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -1175,7 +1167,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  99.13% |     30528 | 3.93M | 216 |     16123 |  151.9K | 304 |   55.0 | 8.0 |  10.3 | 158.0 |   0:00:31 |
 | 8_megahit    |  98.54% |     37964 |  4.1M | 230 |      5525 | 153.99K | 387 |   35.0 | 7.0 |   5.0 | 112.0 |   0:00:28 |
 | 8_mr_megahit |  99.34% |     26589 | 4.38M | 287 |     16123 | 164.89K | 523 |   55.0 | 8.0 |  10.3 | 158.0 |   0:00:31 |
-| 8_platanus   |  96.34% |     28637 |  2.7M | 170 |      4785 | 157.09K | 241 |   35.0 | 7.0 |   5.0 | 112.0 |   0:00:29 |
 
 
 Table: statFinal
@@ -1199,9 +1190,6 @@ Table: statFinal
 | megahit.non-contained    |   52830 | 4541309 |  182 |
 | mr_megahit.contig        |   31157 | 4576803 |  282 |
 | mr_megahit.non-contained |   31157 | 4563775 |  255 |
-| platanus.contig          |   15555 | 4617410 | 1657 |
-| platanus.scaffold        |   85196 | 4561389 |  574 |
-| platanus.non-contained   |   89576 | 4473094 |  135 |
 
 
 # *Vibrio cholerae* CP1032(5)
@@ -1323,7 +1311,7 @@ BASE_NAME=Vcho_100x
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 #bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -1569,7 +1557,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  98.43% |     90099 | 3.87M | 139 |      1051 | 38.18K | 268 |   39.0 |  7.0 |   6.0 | 120.0 |   0:00:35 |
 | 8_megahit    |  97.91% |     47116 | 3.73M | 162 |      1034 | 45.26K | 254 |   54.0 | 11.0 |   7.0 | 174.0 |   0:00:28 |
 | 8_mr_megahit |  99.06% |     90226 | 3.89M | 123 |      1075 | 38.51K | 232 |   39.0 |  7.0 |   6.0 | 120.0 |   0:00:28 |
-| 8_platanus   |  96.53% |     47050 | 3.84M | 177 |      1034 | 36.85K | 347 |   54.0 | 11.0 |   7.0 | 174.0 |   0:00:30 |
 
 
 Table: statFinal
@@ -1593,9 +1580,6 @@ Table: statFinal
 | megahit.non-contained    |   82706 | 3907965 | 123 |
 | mr_megahit.contig        |   92352 | 3959784 | 166 |
 | mr_megahit.non-contained |   92352 | 3931854 | 111 |
-| platanus.contig          |   47235 | 3985037 | 565 |
-| platanus.scaffold        |   55299 | 3930954 | 332 |
-| platanus.non-contained   |   58949 | 3873293 | 175 |
 
 
 # *Mycobacterium abscessus* 6G-0125-R Full
@@ -1704,7 +1688,7 @@ BASE_NAME=Mabs_full
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
 
 # BASE_NAME=Mabs_full bash 0_bsub.sh
@@ -2007,7 +1991,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  99.20% |    127450 | 5.12M |   71 |        92 |   8.24K |  119 |  139.0 | 18.0 |  28.3 | 386.0 |   0:00:39 |
 | 8_megahit    |  98.24% |     73343 | 3.17M |   90 |       116 |   9.23K |  146 |  193.0 | 33.0 |  31.3 | 584.0 |   0:00:42 |
 | 8_mr_megahit |  99.39% |    142388 | 4.94M |   61 |       109 |   7.48K |  108 |  139.0 | 18.0 |  28.3 | 386.0 |   0:00:37 |
-| 8_platanus   |  98.21% |     43191 |  5.1M |  208 |        55 |  18.47K |  386 |  193.0 | 33.0 |  31.3 | 584.0 |   0:00:41 |
 
 
 Table: statFinal
@@ -2031,9 +2014,6 @@ Table: statFinal
 | megahit.non-contained    |  149440 | 5119438 |   68 |
 | mr_megahit.contig        |  215357 | 5146723 |   70 |
 | mr_megahit.non-contained |  215357 | 5137091 |   48 |
-| platanus.contig          |   20365 | 5199284 |  627 |
-| platanus.scaffold        |   46922 | 5133169 |  223 |
-| platanus.non-contained   |   46922 | 5116849 |  183 |
 
 
 # *Rhodobacter sphaeroides* 2.4.1 Full
@@ -2143,7 +2123,7 @@ BASE_NAME=Rsph_full
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
 
 # BASE_NAME=Rsph_full bash 0_bsub.sh
@@ -2463,7 +2443,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  99.23% |     71110 |    1.6M |  53 |      9161 |  56.39K |  62 |  470.0 | 68.0 |  88.7 | 1348.0 |   0:00:48 |
 | 8_megahit    |  98.11% |     26501 |   1.81M | 130 |      8309 | 122.33K | 212 |  297.0 | 55.0 |  44.0 |  924.0 |   0:00:44 |
 | 8_mr_megahit |  99.45% |     45159 |    1.8M |  79 |      8353 |  65.14K | 104 |  469.0 | 68.0 |  88.3 | 1346.0 |   0:00:49 |
-| 8_platanus   |  97.70% |     30534 |   2.77M | 161 |      3068 |  168.2K | 254 |  298.0 | 54.0 |  45.3 |  920.0 |   0:00:42 |
 
 
 Table: statFinal
@@ -2487,9 +2466,6 @@ Table: statFinal
 | megahit.non-contained    |  151747 | 4544657 |  110 |
 | mr_megahit.contig        |  156942 | 4590155 |   86 |
 | mr_megahit.non-contained |  156942 | 4579130 |   63 |
-| platanus.contig          |    4196 | 4934729 | 3533 |
-| platanus.scaffold        |   73363 | 4795432 | 1916 |
-| platanus.non-contained   |   97244 | 4529145 |  138 |
 
 
 # *Vibrio cholerae* CP1032(5) Full
@@ -2599,7 +2575,7 @@ BASE_NAME=Vcho_full
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
 
 # BASE_NAME=Vcho_full bash 0_bsub.sh
@@ -2914,7 +2890,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  98.52% |     71096 | 3.12M | 125 |       911 |  49.7K | 226 |  134.0 | 20.0 |  24.7 | 388.0 |   0:00:33 |
 | 8_megahit    |  97.19% |     47647 | 3.29M | 151 |       958 | 45.72K | 233 |  247.0 | 42.0 |  40.3 | 746.0 |   0:00:38 |
 | 8_mr_megahit |  98.92% |     92324 | 2.88M | 103 |      1084 | 52.68K | 189 |  134.0 | 20.0 |  24.7 | 388.0 |   0:00:32 |
-| 8_platanus   |  96.56% |     52703 | 3.85M | 166 |       162 | 40.15K | 326 |  248.0 | 41.0 |  41.7 | 742.0 |   0:00:35 |
 
 
 Table: statFinal
@@ -2938,7 +2913,4 @@ Table: statFinal
 | megahit.non-contained    |   87668 | 3907337 |  111 |
 | mr_megahit.contig        |  203715 | 3978805 |  178 |
 | mr_megahit.non-contained |  203715 | 3939555 |   91 |
-| platanus.contig          |   45170 | 3985546 |  406 |
-| platanus.scaffold        |   59030 | 3934384 |  284 |
-| platanus.non-contained   |   59043 | 3891546 |  165 |
 

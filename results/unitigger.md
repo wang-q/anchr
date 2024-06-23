@@ -37,7 +37,7 @@ create_k_unitigs_large_k \
     <(gzip -dcf 2_illumina/Q25L60/pe.cor.fa.gz) \
     > superreads-31.fasta
 
-reate_k_unitigs_large_k \
+create_k_unitigs_large_k \
     -c 80 -t 4 \
     -m 81 -n 4641652 -l 81 -f 0.000001 \
     <(gzip -dcf 2_illumina/Q25L60/pe.cor.fa.gz) \

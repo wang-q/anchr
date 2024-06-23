@@ -85,7 +85,7 @@ BASE_NAME=se
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 #bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -162,7 +162,7 @@ BASE_NAME=se2
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 #bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -282,12 +282,10 @@ Table: statOtherAnchors.md
 | Name       | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper | RunTimeAN |
 |:-----------|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|----:|------:|------:|----------:|
 | 8_megahit  |  98.52% |     56469 | 4.31M | 150 |      1133 | 34.82K | 271 |  127.0 | 4.0 |  38.3 | 208.5 |   0:00:37 |
-| 8_platanus |  98.08% |     26990 | 4.53M | 258 |        59 | 28.41K | 516 |  127.0 | 4.0 |  38.3 | 208.5 |   0:00:39 |
 
 | Name       | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median | MAD | lower | upper | RunTimeAN |
 |:-----------|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|----:|------:|------:|----------:|
 | 8_megahit  |  98.62% |     48888 | 4.25M | 172 |      1054 | 35.85K | 290 |  122.0 | 4.0 |  36.7 | 201.0 |   0:00:36 |
-| 8_platanus |  97.78% |     21800 | 4.51M | 353 |        57 |  38.5K | 708 |  122.0 | 5.0 |  35.7 | 205.5 |   0:00:37 |
 
 ## Comparison
 
@@ -302,8 +300,6 @@ Table: statOtherAnchors.md
 | spades.non-contained    |       0 |       0 |   0 |
 | megahit.contig          |   67336 | 4562142 | 149 |
 | megahit.non-contained   |   67336 | 4549720 | 122 |
-| platanus.contig         |   27038 | 4642481 | 653 |
-| platanus.non-contained  |   27762 | 4555356 | 258 |
 
 | Name                    |     N50 |     Sum |   # |
 |:------------------------|--------:|--------:|----:|
@@ -316,6 +312,4 @@ Table: statOtherAnchors.md
 | spades.non-contained    |       0 |       0 |   0 |
 | megahit.contig          |   63432 | 4562785 | 157 |
 | megahit.non-contained   |   63432 | 4550225 | 125 |
-| platanus.contig         |   21710 | 4658040 | 879 |
-| platanus.non-contained  |   21925 | 4553224 | 355 |
 

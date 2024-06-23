@@ -106,7 +106,7 @@ cat cross.tsv |
     perl ~/Scripts/withncbi/taxon/abbr_name.pl -c "1,2,3" -s '\t' -m 3 --shortsub |
     (echo -e '#name\tftp_path\torganism\tassembly_level' && cat ) |
     perl -nl -a -F"," -e '
-        BEGIN{my %seen}; 
+        BEGIN{my %seen};
         /^#/ and print and next;
         /^organism_name/i and next;
         $seen{$F[5]}++;
@@ -194,7 +194,7 @@ SAMN11056472,Mycobacteri_tub_H37Rv,Mycobacterium tuberculosis H37Rv
 SAMN11056394,Mycol_sme_MC2_155,Mycolicibacterium smegmatis MC2 155
 SAMN04875544,N_gon_FA_1090,Neisseria gonorrhoeae FA 1090
 SAMN04875545,N_men_FAM18,Neisseria meningitidis FAM18
-SAMN04875546,N_men_MC58,Neisseria meningitidis MC58 
+SAMN04875546,N_men_MC58,Neisseria meningitidis MC58
 SAMN16357208,O_anthro_ATCC_49188,Ochrobactrum anthropi ATCC 49188
 #SAMN16357376,Par_dis_ATCC_8503,Parabacteroides distasonis ATCC 8503
 #SAMN16357375,Par_dis_ATCC_8503,Parabacteroides distasonis ATCC 8503
@@ -294,7 +294,7 @@ for STRAIN in \
             grep -v "^#" |
             cut -d, -f 2 |
             sort -u
-            
+
     ) \
     ; do
     echo >&2 ${STRAIN};
@@ -328,7 +328,7 @@ for STRAIN in \
             grep -v "^#" |
             cut -d, -f 2 |
             sort -u
-            
+
     ) \
     ; do
     if [ -d ${STRAIN} ]; then
@@ -376,7 +376,7 @@ for STRAIN in \
             grep -v "^#" |
             cut -d, -f 2 |
             sort -u
-            
+
     ) \
     ; do
     cat ./Results/${STRAIN}/${STRAIN}.multi.fas |
@@ -391,7 +391,7 @@ for STRAIN in \
             grep -v "^#" |
             cut -d, -f 2 |
             sort -u
-            
+
     ) \
     ; do
     cat ./Results/${STRAIN}/${STRAIN}.cover.csv |
@@ -474,7 +474,7 @@ for STRAIN in \
     echo >&2 ${STRAIN};
 
     kat sect -t 4 -o ${STRAIN} -F ../ref/${STRAIN}/genome.fa ../ref/${STRAIN}/genome.fa
-    
+
     cat ${STRAIN}-repetitive.fa |
         faops filter -N -d -a 100 stdin stdout \
         > ../ref/${STRAIN}/repetitives.fa
@@ -494,11 +494,11 @@ for STRAIN in \
             grep -v "^#" |
             cut -d, -f 2 |
             sort -u
-            
+
     ) \
     ; do
     mkdir -p ${STRAIN}/1_genome
-    
+
     cp ref/${STRAIN}/genome.fa ${STRAIN}/1_genome
     cp ref/${STRAIN}/paralogs.fa ${STRAIN}/1_genome
     cp ref/${STRAIN}/repetitives.fa ${STRAIN}/1_genome
@@ -519,7 +519,7 @@ cat ena/ena_info.csv |
     parallel -j 1 -k --colsep "," '
         mkdir -p {1}/2_illumina
         cd {1}/2_illumina
-        
+
         if [[ -L R1.fq.gz ]]; then
             if [[ -L S1.fq.gz ]]; then
                 if [[ -L T1.fq.gz ]]; then
@@ -835,7 +835,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  99.51% |    189337 | 1.61M | 12 |      6071 | 10.58K | 27 |  449.0 | 30.0 | 119.7 | 1078.0 |   0:00:30 |
 | 8_megahit    |  98.70% |    115645 |  1.6M | 22 |      5957 | 10.52K | 44 |  272.0 | 20.0 |  70.7 |  664.0 |   0:00:26 |
 | 8_mr_megahit |  99.31% |    154046 | 1.61M | 24 |      5850 |  9.82K | 46 |  449.0 | 30.0 | 119.7 | 1078.0 |   0:00:28 |
-| 8_platanus   |  98.95% |    153839 |  1.6M | 23 |      5981 |  9.93K | 39 |  272.0 | 20.0 |  70.7 |  664.0 |   0:00:26 |
 
 
 Table: statFinal
@@ -859,9 +858,6 @@ Table: statFinal
 | megahit.non-contained    |  115696 | 1607271 |  22 |
 | mr_megahit.contig        |  174583 | 1631360 |  40 |
 | mr_megahit.non-contained |  174583 | 1622195 |  22 |
-| platanus.contig          |  112552 | 1628933 | 110 |
-| platanus.scaffold        |  153893 | 1622488 |  62 |
-| platanus.non-contained   |  153893 | 1613189 |  21 |
 
 
 # Clostridio_dif_630
@@ -1158,7 +1154,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  98.72% |    225840 | 4.19M | 38 |      2925 | 16.03K |  79 |  445.0 | 45.0 | 103.3 | 1160.0 |   0:00:48 |
 | 8_megahit    |  98.61% |    108264 | 4.17M | 89 |      3049 | 17.69K | 179 |  261.0 | 28.0 |  59.0 |  690.0 |   0:00:47 |
 | 8_mr_megahit |  99.29% |    225939 |  4.2M | 51 |      4720 | 22.05K | 104 |  445.0 | 45.0 | 103.3 | 1160.0 |   0:00:50 |
-| 8_platanus   |  97.85% |    224882 | 3.93M | 46 |      7970 | 13.29K |  93 |  261.0 | 28.0 |  59.0 |  690.0 |   0:00:41 |
 
 
 Table: statFinal
@@ -1182,9 +1177,6 @@ Table: statFinal
 | megahit.non-contained    |  108291 | 4184464 |  90 |
 | mr_megahit.contig        |  226020 | 4274703 | 177 |
 | mr_megahit.non-contained |  226020 | 4226796 |  53 |
-| platanus.contig          |  122109 | 4271876 | 622 |
-| platanus.scaffold        |  225740 | 4239618 | 412 |
-| platanus.non-contained   |  225740 | 4184639 |  48 |
 
 
 # Co_dip_NCTC_13129
@@ -1471,7 +1463,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  99.43% |    168252 | 2.45M | 20 |      5258 |  9.59K | 39 |  418.0 | 39.0 | 100.3 | 1070.0 |   0:00:33 |
 | 8_megahit    |  98.80% |    115908 | 2.44M | 47 |      5490 | 10.98K | 91 |  232.0 | 25.0 |  52.3 |  614.0 |   0:00:29 |
 | 8_mr_megahit |  99.61% |    177840 | 2.45M | 22 |      5615 |  9.97K | 43 |  418.0 | 39.0 | 100.3 | 1070.0 |   0:00:33 |
-| 8_platanus   |  98.28% |    168184 | 2.44M | 26 |      2468 |  6.37K | 50 |  232.0 | 25.0 |  52.3 |  614.0 |   0:00:30 |
 
 
 Table: statFinal
@@ -1495,9 +1486,6 @@ Table: statFinal
 | megahit.non-contained    |  115950 | 2451627 |  44 |
 | mr_megahit.contig        |  309887 | 2468408 |  42 |
 | mr_megahit.non-contained |  309887 | 2459257 |  21 |
-| platanus.contig          |   97966 | 2469937 | 177 |
-| platanus.scaffold        |  177052 | 2464721 | 125 |
-| platanus.non-contained   |  177052 | 2446462 |  24 |
 
 
 # Fr_tul_tularensis_SCHU_S4
@@ -1795,7 +1783,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  97.16% |     38196 | 1.79M | 63 |      2176 | 13.85K | 127 |  462.0 | 21.0 | 133.0 | 1050.0 |   0:00:32 |
 | 8_megahit    |  97.20% |     35198 | 1.79M | 69 |      1714 | 10.17K | 139 |  278.0 | 16.0 |  76.7 |  652.0 |   0:00:30 |
 | 8_mr_megahit |  97.44% |     35527 | 1.79M | 66 |       159 | 24.75K | 135 |  462.0 | 22.0 | 132.0 | 1056.0 |   0:00:29 |
-| 8_platanus   |  96.95% |     38193 | 1.79M | 64 |      1688 |  9.08K | 129 |  278.0 | 16.0 |  76.7 |  652.0 |   0:00:26 |
 
 
 Table: statFinal
@@ -1819,9 +1806,6 @@ Table: statFinal
 | megahit.non-contained    |   35250 | 1798804 |  70 |
 | mr_megahit.contig        |   35781 | 1823752 |  94 |
 | mr_megahit.non-contained |   35781 | 1815182 |  69 |
-| platanus.contig          |   35268 | 1808411 | 120 |
-| platanus.scaffold        |   37808 | 1805558 |  99 |
-| platanus.non-contained   |   37808 | 1798706 |  65 |
 
 
 # All strains
@@ -1835,9 +1819,9 @@ cat paralogs/cover.csv |
     parallel -j 1 -k --colsep "," '
         WORKING_DIR=${HOME}/data/anchr/fda_argos
         BASE_NAME={1}
-        
+
         cd ${WORKING_DIR}/${BASE_NAME}
-        
+
         rm *.sh
         anchr template \
             --genome {2} \

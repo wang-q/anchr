@@ -155,7 +155,7 @@ BASE_NAME=s288c_mi150
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 #BASE_NAME=s288c_mi150 bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -390,7 +390,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  94.66% |     82189 |  9.35M | 235 |      1678 | 117.87K |  406 |   84.0 | 3.0 |  26.0 | 180.0 |   0:01:05 |
 | 8_megahit    |  93.82% |     33293 | 11.13M | 594 |      2508 | 226.97K | 1020 |   62.0 | 2.0 |  19.3 | 132.0 |   0:01:06 |
 | 8_mr_megahit |  94.12% |     78734 | 11.31M | 310 |      2041 | 178.72K |  542 |   84.0 | 3.0 |  26.0 | 180.0 |   0:01:06 |
-| 8_platanus   |  83.49% |     46514 |  5.17M | 205 |      3326 | 142.44K |  309 |   62.0 | 2.0 |  19.3 | 132.0 |   0:01:03 |
 
 
 Table: statFinal
@@ -414,9 +413,6 @@ Table: statFinal
 | megahit.non-contained    |  49598 | 11488606 |  459 |
 | mr_megahit.contig        |  96851 | 12110595 | 1460 |
 | mr_megahit.non-contained | 102855 | 11681959 |  255 |
-| platanus.contig          |  39177 | 12113100 | 4267 |
-| platanus.scaffold        | 153178 | 11959970 | 3270 |
-| platanus.non-contained   | 155016 | 11514827 |  172 |
 
 
 # s288c_mi300
@@ -489,7 +485,7 @@ BASE_NAME=s288c_mi300
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 #BASE_NAME=s288c_mi300 bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -571,7 +567,7 @@ BASE_NAME=s288c_hi
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 
 #BASE_NAME=s288c_hi bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
@@ -827,7 +823,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  92.99% |      6015 | 651.78K | 169 |      2067 | 240.28K | 265 |  223.0 | 15.0 |  59.3 | 402.0 |   0:01:18 |
 | 8_megahit    |  93.41% |      4305 |   1.52M | 463 |      1576 | 405.34K | 613 |  185.0 | 13.0 |  48.7 | 336.0 |   0:01:22 |
 | 8_mr_megahit |  94.09% |      6539 |   1.21M | 271 |      1958 | 297.34K | 346 |  223.0 | 15.0 |  59.3 | 402.0 |   0:01:26 |
-| 8_platanus   |  89.47% |      4177 |   1.84M | 554 |      1220 |  290.1K | 722 |  186.0 | 12.0 |  50.0 | 333.0 |   0:01:12 |
 
 
 Table: statFinal
@@ -850,9 +845,6 @@ Table: statFinal
 | megahit.non-contained    |  40169 | 11443995 |  518 |
 | mr_megahit.contig        |  58850 | 12103333 | 1686 |
 | mr_megahit.non-contained |  60479 | 11628490 |  361 |
-| platanus.contig          |   4797 | 12319264 | 6820 |
-| platanus.scaffold        |  38953 | 11885689 | 3638 |
-| platanus.non-contained   |  40719 | 11339961 |  523 |
 
 
 # s288c_hi125
@@ -925,7 +917,7 @@ BASE_NAME=s288c_hi125
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md 
+# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
 
 # BASE_NAME=s288c_hi125 bash 0_bsub.sh
@@ -1162,7 +1154,6 @@ Table: statOtherAnchors.md
 | 8_mr_spades  |  94.18% |     27765 | 11.24M | 690 |      1005 | 138.32K | 1170 |   80.0 | 8.0 |  18.7 | 208.0 |   0:01:04 |
 | 8_megahit    |  94.10% |     19659 | 10.92M | 936 |      1022 | 187.55K | 1547 |   74.0 | 8.0 |  16.7 | 196.0 |   0:01:10 |
 | 8_mr_megahit |  94.73% |     27626 |  11.4M | 714 |      1050 | 158.15K | 1304 |   80.0 | 8.0 |  18.7 | 208.0 |   0:01:10 |
-| 8_platanus   |  88.56% |     23058 |  9.76M | 715 |       711 | 122.57K | 1084 |   74.0 | 8.0 |  16.7 | 196.0 |   0:01:03 |
 
 
 Table: statFinal
@@ -1186,7 +1177,4 @@ Table: statFinal
 | megahit.non-contained    |  28008 | 11410372 |  721 |
 | mr_megahit.contig        |  34513 | 11712933 |  918 |
 | mr_megahit.non-contained |  34962 | 11573847 |  621 |
-| platanus.contig          |  14538 | 11987456 | 4994 |
-| platanus.scaffold        |  39421 | 11569146 | 1061 |
-| platanus.non-contained   |  39920 | 11403617 |  478 |
 
