@@ -4,6 +4,7 @@
 
 * Add `anchr dazzname`
 * Add `anchr show2ovlp`
+* Add `anchr overlap`
 * Move `ovlpr` subcommands from intspan here
     * `anchr covered`
     * `anchr paf2ovlp`
