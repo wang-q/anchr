@@ -76,11 +76,6 @@ brew install datamash miller prettier
 brew tap wang-q/tap
 brew install wang-q/tap/tsv-utils wang-q/tap/intspan
 
-# Myer's dazzler wrapper
-cpanm --installdeps App::Dazz
-cpanm -nq App::Dazz
-cpanm --verbose App::Dazz
-
 anchr dep install | bash
 anchr dep check | bash
 
@@ -319,7 +314,6 @@ anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --base
 
 anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --mean
 
-
 anchr restrict tests/ovlpr/1_4.ovlp.tsv tests/ovlpr/1_4.restrict.tsv
 
 ```
@@ -327,8 +321,8 @@ anchr restrict tests/ovlpr/1_4.ovlp.tsv tests/ovlpr/1_4.restrict.tsv
 ### Overlaps - Daligner pipelines
 
 ```shell
-
 cargo run --bin anchr overlap tests/ovlpr/1_4.pac.fasta
+
 cargo run --bin anchr overlap tests/ovlpr/1_4.pac.fasta --idt 0.8 --len 2500 --serial
 
 
