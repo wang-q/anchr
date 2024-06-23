@@ -3,6 +3,7 @@
 ## Unreleased - ReleaseDate
 
 * Add `anchr dazzname`
+* Add `anchr show2ovlp`
 * Move `ovlpr` subcommands from intspan here
     * `anchr covered`
     * `anchr paf2ovlp`

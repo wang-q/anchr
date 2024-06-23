@@ -35,7 +35,8 @@ Subcommand groups:
     * dep install
 
 * Download
-    * ena
+    * ena info
+    * ena prep
 
 * Overlaps
     * Standalone

@@ -24,6 +24,40 @@ fn command_dazzname() -> anyhow::Result<()> {
 }
 
 #[test]
+fn command_show2ovlp() -> anyhow::Result<()> {
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("show2ovlp")
+        .arg("tests/ovlpr/1_4.show.txt")
+        .arg("tests/ovlpr/1_4.replace.tsv")
+        .arg("--orig")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert_eq!(stdout.lines().count(), 50);
+    assert!(stdout.contains("pac7556_20928"), "original names");
+
+    Ok(())
+}
+
+#[test]
+fn command_paf2ovlp() -> anyhow::Result<()> {
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("paf2ovlp")
+        .arg("tests/ovlpr/1_4.pac.paf")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert_eq!(stdout.lines().count(), 28);
+    assert!(stdout.contains("overlap"), "overlaps");
+
+    Ok(())
+}
+
+#[test]
 fn command_covered() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
@@ -112,22 +146,6 @@ fn command_covered_mean() -> anyhow::Result<()> {
         stdout.contains("pac1461_9030\t9030\t2.8"),
         "avoid duplicates"
     );
-
-    Ok(())
-}
-
-#[test]
-fn command_paf2ovlp() -> anyhow::Result<()> {
-    let mut cmd = Command::cargo_bin("anchr")?;
-    let output = cmd
-        .arg("paf2ovlp")
-        .arg("tests/ovlpr/1_4.pac.paf")
-        .output()
-        .unwrap();
-    let stdout = String::from_utf8(output.stdout).unwrap();
-
-    assert_eq!(stdout.lines().count(), 28);
-    assert!(stdout.contains("overlap"), "overlaps");
 
     Ok(())
 }

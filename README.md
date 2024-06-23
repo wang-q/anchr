@@ -131,11 +131,11 @@ anchr trim \
     bash
 popd
 
-# merge
+# mergeread
 mkdir -p merge
 pushd merge
 
-anchr merge \
+anchr mergeread \
     ../trim/R1.fq.gz ../trim/R2.fq.gz ../trim/Rs.fq.gz \
     --ecphase "1 2 3" \
     --parallel 4 \
@@ -296,6 +296,10 @@ assembly evaluations.
 ```shell
 cargo run --bin anchr dazzname tests/ovlpr/1_4.anchor.fasta -o stdout
 
+cargo run --bin anchr show2ovlp tests/ovlpr/1_4.show.txt tests/ovlpr/1_4.replace.tsv --orig
+
+anchr paf2ovlp tests/ovlpr/1_4.pac.paf
+
 echo "tests/ovlpr/1_4.anchor.fasta;tests/ovlpr/1_4.pac.fasta" |
     parallel --colsep ";" -j 1 "
         minimap2 -cx asm20 {1} {2} |
@@ -315,7 +319,6 @@ anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --base
 
 anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --mean
 
-anchr paf2ovlp tests/ovlpr/1_4.pac.paf
 
 anchr restrict tests/ovlpr/1_4.ovlp.tsv tests/ovlpr/1_4.restrict.tsv
 

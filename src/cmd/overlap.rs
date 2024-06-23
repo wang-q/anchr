@@ -35,7 +35,6 @@ All operations are running in a tempdir and no intermediate files are kept.
         )
 }
 
-
 // command implementation
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------

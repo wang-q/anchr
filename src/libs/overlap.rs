@@ -2,22 +2,22 @@ use std::fmt;
 
 #[derive(Default, Clone)]
 pub struct Overlap {
-    f_id: String,
-    g_id: String,
-    len: i32,
-    idt: f32,
+    pub f_id: String,
+    pub g_id: String,
+    pub len: i32,
+    pub idt: f32,
 
-    f_strand: i32,
-    f_begin: i32,
-    f_end: i32,
-    f_len: i32,
+    pub f_strand: i32,
+    pub f_begin: i32,
+    pub f_end: i32,
+    pub f_len: i32,
 
-    g_strand: i32,
-    g_begin: i32,
-    g_end: i32,
-    g_len: i32,
+    pub g_strand: i32,
+    pub g_begin: i32,
+    pub g_end: i32,
+    pub g_len: i32,
 
-    contained: String,
+    pub contained: String,
 }
 
 impl Overlap {
