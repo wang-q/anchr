@@ -91,7 +91,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     let curdir = env::current_dir()?;
     let anchr = env::current_exe().unwrap().display().to_string();
-    let tempdir = Builder::new().prefix("ovlp_").tempdir()?;
+    let tempdir = Builder::new().prefix("anchr_ovlp_").tempdir()?;
     let tempdir_str = tempdir.path().to_str().unwrap();
 
     run_cmd!(info "==> Paths")?;
@@ -117,7 +117,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             abs_infiles.push(absolute.to_string());
         }
     }
-    let basename = "ovlp";
+    let basename = "anchr_ovlp";
 
     run_cmd!(info "==> Switch to tempdir")?;
     env::set_current_dir(tempdir_str)?;
