@@ -16,30 +16,30 @@ pub fn make_subcommand() -> Command {
         )
         .arg(
             Arg::new("coverage")
-                .help("minimal coverage")
                 .long("coverage")
                 .short('c')
                 .num_args(1)
                 .default_value("3")
-                .value_parser(value_parser!(i32)),
+                .value_parser(value_parser!(i32))
+                .help("minimal coverage"),
         )
         .arg(
             Arg::new("len")
-                .help("minimal length of overlaps")
                 .long("len")
                 .short('l')
                 .num_args(1)
                 .default_value("1000")
-                .value_parser(value_parser!(i32)),
+                .value_parser(value_parser!(i32))
+                .help("minimal length of overlaps"),
         )
         .arg(
             Arg::new("idt")
-                .help("minimal identities of overlaps")
                 .long("idt")
                 .short('i')
                 .num_args(1)
                 .default_value("0.0")
-                .value_parser(value_parser!(f32)),
+                .value_parser(value_parser!(f32))
+                .help("minimal identities of overlaps"),
         )
         .arg(
             Arg::new("paf")

@@ -294,9 +294,9 @@ assembly evaluations.
 ### Overlaps - Standalone
 
 ```shell
-cargo run --bin anchr dazzname tests/ovlpr/1_4.anchor.fasta -o stdout
+anchr dazzname tests/ovlpr/1_4.anchor.fasta -o stdout
 
-cargo run --bin anchr show2ovlp tests/ovlpr/1_4.show.txt tests/ovlpr/1_4.replace.tsv --orig
+anchr show2ovlp tests/ovlpr/1_4.show.txt tests/ovlpr/1_4.replace.tsv --orig
 
 anchr paf2ovlp tests/ovlpr/1_4.pac.paf
 
