@@ -120,10 +120,10 @@ fn command_trim() -> anyhow::Result<()> {
 }
 
 #[test]
-fn command_merge() -> anyhow::Result<()> {
+fn command_mergeread() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
-        .arg("merge")
+        .arg("mergeread")
         .arg("tests/Lambda/R1.fq.gz")
         .arg("tests/Lambda/R2.fq.gz")
         .arg("-o")
