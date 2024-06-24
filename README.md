@@ -321,10 +321,13 @@ anchr restrict tests/ovlpr/1_4.ovlp.tsv tests/ovlpr/1_4.restrict.tsv
 ### Overlaps - Daligner pipelines
 
 ```shell
-cargo run --bin anchr overlap tests/ovlpr/1_4.pac.fasta
+anchr overlap tests/ovlpr/1_4.pac.fasta
 
-cargo run --bin anchr overlap tests/ovlpr/1_4.pac.fasta --idt 0.8 --len 2500 --serial
+anchr overlap tests/ovlpr/1_4.pac.fasta --idt 0.8 --len 2500 --serial
 
+cargo run --bin anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta
+
+cargo run --bin anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta -r tests/ovlpr/1_4.restrict.tsv
 
 ```
 

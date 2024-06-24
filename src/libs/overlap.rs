@@ -65,8 +65,15 @@ impl Overlap {
         &self.contained
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.f_id.is_empty()
+    }
+
     pub fn new(line: &str) -> Self {
         let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() != 13 {
+            return Self::default();
+        }
 
         Self {
             f_id: parts[0].to_string(),

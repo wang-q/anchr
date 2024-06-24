@@ -18,6 +18,7 @@ fn main() -> anyhow::Result<()> {
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
         .subcommand(cmd::mergeread::make_subcommand())
+        .subcommand(cmd::orient::make_subcommand())
         .subcommand(cmd::overlap::make_subcommand())
         .subcommand(cmd::paf2ovlp::make_subcommand())
         .subcommand(cmd::quorum::make_subcommand())
@@ -47,9 +48,9 @@ Subcommand groups:
         * restrict
     * Daligner pipelines
         * overlap
+        * orient
         * contained
         * merge
-        * orient
         * group
         * layout
         * overlap2
@@ -78,6 +79,7 @@ Subcommand groups:
         Some(("restrict", sub_matches)) => cmd::restrict::execute(sub_matches),
         // Overlaps - Daligner pipelines
         Some(("overlap", sub_matches)) => cmd::overlap::execute(sub_matches),
+        Some(("orient", sub_matches)) => cmd::orient::execute(sub_matches),
         // Assembling
         Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
         Some(("mergeread", sub_matches)) => cmd::mergeread::execute(sub_matches),

@@ -6,6 +6,7 @@ pub mod dazzname;
 pub mod dep;
 pub mod ena;
 pub mod mergeread;
+pub mod orient;
 pub mod overlap;
 pub mod paf2ovlp;
 pub mod quorum;
