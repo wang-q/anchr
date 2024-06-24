@@ -3,11 +3,8 @@ use cmd_lib::*;
 use petgraph::prelude::NodeIndex;
 use petgraph::*;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::File;
-use std::io::{BufRead, Write};
-use std::path::Path;
-use std::{env, fs};
-use tempfile::{Builder, TempDir};
+use std::env;
+use tempfile::Builder;
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -177,6 +174,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // cache node indices
     // petgraph use NodeIndex to store and identify nodes
     let mut idx_of_id: BTreeMap<String, NodeIndex> = BTreeMap::new();
+    let mut id_of_idx: BTreeMap<NodeIndex, String> = BTreeMap::new();
 
     let lines = if !abs_restrict.is_empty() {
         intspan::read_lines("restrict.ovlp.tsv")
@@ -190,32 +188,43 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         }
 
         // ignore self overlapping
-        if ovlp.f_id() == ovlp.g_id() {
+        if ovlp.f_id == ovlp.g_id {
             continue;
         }
 
         // ignore poor overlaps
-        if *ovlp.len() < min_len {
+        if ovlp.len < min_len {
             continue;
         }
-        if *ovlp.idt() < min_idt {
+        if ovlp.idt < min_idt {
             continue;
         }
 
-        let f_idx = graph.add_node(ovlp.f_id().to_string());
-        idx_of_id.insert(ovlp.f_id().to_string(), f_idx);
+        if !idx_of_id.contains_key(&ovlp.f_id) {
+            let f_idx = graph.add_node(ovlp.f_id.to_string());
+            idx_of_id.insert(ovlp.f_id.to_string(), f_idx);
+            id_of_idx.insert(f_idx, ovlp.f_id.to_string());
+        }
+        if !idx_of_id.contains_key(&ovlp.g_id) {
+            let g_idx = graph.add_node(ovlp.g_id.to_string());
+            idx_of_id.insert(ovlp.g_id.to_string(), g_idx);
+            id_of_idx.insert(g_idx, ovlp.g_id.to_string());
+        }
 
-        let g_idx = graph.add_node(ovlp.g_id().to_string());
-        idx_of_id.insert(ovlp.g_id().to_string(), g_idx);
-
-        if graph.find_edge(f_idx, g_idx).is_none() {
-            graph.add_edge(f_idx, g_idx, *ovlp.g_strand());
+        if graph
+            .find_edge(idx_of_id[&ovlp.f_id], idx_of_id[&ovlp.g_id])
+            .is_none()
+            && graph
+                .find_edge(idx_of_id[&ovlp.g_id], idx_of_id[&ovlp.f_id])
+                .is_none()
+        {
+            graph.add_edge(idx_of_id[&ovlp.f_id], idx_of_id[&ovlp.g_id], ovlp.g_strand);
         }
     }
     // eprintln!("graph = {:#?}", graph);
+
     run_cmd!(info "==> To positive strands in each SCC")?;
-    // no edge weights
-    let mut new_graph: Graph<String, (), Undirected> = Graph::new_undirected();
+    let mut strand_of: BTreeMap<NodeIndex, i32> = BTreeMap::new(); // stores
     let scc: Vec<Vec<NodeIndex>> = petgraph::algo::tarjan_scc(&graph);
     for cc_indices in &scc {
         let count = cc_indices.len();
@@ -225,29 +234,73 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         }
 
         // set first sequence to positive strand
-
-
-        // assign strands to other nodes
         let mut assigned: BTreeSet<usize> = BTreeSet::new();
         assigned.insert(0);
+        strand_of.insert(cc_indices[0], 0);
+
+        // need to be handled
         let mut unhandled: BTreeSet<usize> = (1..count).collect();
 
-        let mut edges = vec![];
+        // assign strands to other nodes
+        let mut prev_size = assigned.len();
+        let mut cur_loop = 0; // existing point
         while assigned.len() < count {
+            if prev_size == assigned.len() {
+                cur_loop += 1;
+                if cur_loop > 10 {
+                    break;
+                }
+            } else {
+                cur_loop = 0;
+            }
+            prev_size = assigned.len();
+
             for i in assigned.iter().cloned().collect::<Vec<usize>>() {
                 for j in unhandled.iter().cloned().collect::<Vec<usize>>() {
                     // not connected in old graph
-                    let edge = graph.find_edge(idx_of_part[&parts[i]], idx_of_part[&parts[j]]);
+                    let edge = graph.find_edge(cc_indices[i], cc_indices[j]);
                     if edge.is_none() {
                         continue;
                     }
+
+                    // assign strand
+                    let i_strand = *strand_of.get(&cc_indices[i]).unwrap();
+                    let hit_strand = *graph.edge_weight(edge.unwrap()).unwrap();
+                    if hit_strand == 0 {
+                        strand_of.insert(cc_indices[j], i_strand);
+                    } else {
+                        if i_strand == 0 {
+                            strand_of.insert(cc_indices[j], 1);
+                        } else {
+                            strand_of.insert(cc_indices[j], 0);
+                        }
+                    }
+                    let j_copy = unhandled.take(&j).unwrap();
+                    assigned.insert(j_copy);
                 }
             }
         } // end of assigning
-    }
+    } // each cc
+      // eprintln!("strand_of = {:#?}", strand_of);
 
+    run_cmd!(info "==> RC")?;
+    let negatives = strand_of
+        .iter()
+        .filter(|(_, v)| **v == 1)
+        .map(|(k, _)| id_of_idx.get(k).unwrap().to_string())
+        .collect::<Vec<String>>();
+    intspan::write_lines("rc.list", &negatives.iter().map(AsRef::as_ref).collect())?;
+    run_cmd!(
+        faops rc -l 0 -n -f rc.list renamed.fasta renamed.rc.fasta
+    )?;
+    // eprintln!("negatives = {:#?}", negatives);
 
-    pause();
+    run_cmd!(info "==> Outputs")?;
+    run_cmd!(
+        faops replace -l 0 renamed.rc.fasta renamed.fasta.replace.tsv ${abs_outfile}
+    )?;
+
+    // pause();
 
     //----------------------------
     // Done
@@ -257,16 +310,16 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     Ok(())
 }
 
-use std::io::Read;
-
-fn pause() {
-    let mut stdin = std::io::stdin();
-    let mut stdout = std::io::stdout();
-
-    // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
-    write!(stdout, "Press any key to continue...").unwrap();
-    stdout.flush().unwrap();
-
-    // Read a single byte and discard
-    let _ = stdin.read(&mut [0u8]).unwrap();
-}
+// use std::io::Read;
+//
+// fn pause() {
+//     let mut stdin = std::io::stdin();
+//     let mut stdout = std::io::stdout();
+//
+//     // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
+//     write!(stdout, "Press any key to continue...").unwrap();
+//     stdout.flush().unwrap();
+//
+//     // Read a single byte and discard
+//     let _ = stdin.read(&mut [0u8]).unwrap();
+// }

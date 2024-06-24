@@ -327,7 +327,7 @@ anchr overlap tests/ovlpr/1_4.pac.fasta --idt 0.8 --len 2500 --serial
 
 cargo run --bin anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta
 
-cargo run --bin anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta -r tests/ovlpr/1_4.restrict.tsv
+cargo run --bin anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta -r tests/ovlpr/1_4.2.restrict.tsv
 
 ```
 

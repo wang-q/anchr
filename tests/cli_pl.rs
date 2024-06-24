@@ -62,3 +62,36 @@ fn command_overlap() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+
+#[test]
+fn command_orient() -> anyhow::Result<()> {
+    let mut bin = String::new();
+    for e in &["LAshow"] {
+        if let Ok(pth) = which::which(e) {
+            bin = pth.to_string_lossy().to_string();
+            break;
+        }
+    }
+    if bin.is_empty() {
+        return Ok(());
+    } else {
+        eprintln!("bin = {:#?}", bin);
+    }
+
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("orient")
+        .arg("tests/ovlpr/1_4.anchor.fasta")
+        .arg("tests/ovlpr/1_4.pac.fasta")
+        .arg("-r")
+        .arg("tests/ovlpr/1_4.2.restrict.tsv")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert_eq!(stdout.lines().count(), 24);
+    assert!(stdout.contains("pac4745_7148"), "original names");
+
+    Ok(())
+}
