@@ -104,8 +104,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             } else {
                 anchr::Overlap::new(&line)
             };
-            let f_id = ovlp.f_id();
-            let g_id = ovlp.g_id();
+            let f_id = ovlp.f_id.to_string();
+            let g_id = ovlp.g_id.to_string();
 
             // ignore self overlapping
             if f_id == g_id {
@@ -113,10 +113,10 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             }
 
             // ignore poor overlaps
-            if *ovlp.len() < min_len {
+            if ovlp.len < min_len {
                 continue;
             }
-            if *ovlp.idt() < min_idt {
+            if ovlp.idt < min_idt {
                 continue;
             }
 
@@ -131,20 +131,20 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             }
 
             // first
-            if !res.contains_key(f_id) {
-                let tiers = intspan::Coverage::new_len(coverage, *ovlp.f_len());
+            if !res.contains_key(&f_id) {
+                let tiers = intspan::Coverage::new_len(coverage, ovlp.f_len);
                 res.insert(f_id.clone(), tiers);
             }
             res.entry(f_id.to_string())
-                .and_modify(|e| e.bump(*ovlp.f_begin(), *ovlp.f_end()));
+                .and_modify(|e| e.bump(ovlp.f_begin, ovlp.f_end));
 
             // second
-            if !res.contains_key(g_id) {
-                let tiers = intspan::Coverage::new_len(coverage, *ovlp.g_len());
+            if !res.contains_key(&g_id) {
+                let tiers = intspan::Coverage::new_len(coverage, ovlp.g_len);
                 res.insert(g_id.clone(), tiers);
             }
             res.entry(g_id.to_string())
-                .and_modify(|e| e.bump(*ovlp.g_begin(), *ovlp.g_end()));
+                .and_modify(|e| e.bump(ovlp.g_begin, ovlp.g_end));
         }
     }
 

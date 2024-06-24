@@ -1,11 +1,7 @@
 use clap::*;
 use cmd_lib::*;
-use std::collections::BTreeSet;
-use std::fs::File;
-use std::io::{BufRead, Write};
-use std::path::Path;
-use std::{env, fs};
-use tempfile::{Builder, TempDir};
+use std::env;
+use tempfile::Builder;
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {

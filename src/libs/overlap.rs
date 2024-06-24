@@ -21,50 +21,6 @@ pub struct Overlap {
 }
 
 impl Overlap {
-    // Immutable accessors
-    pub fn f_id(&self) -> &String {
-        &self.f_id
-    }
-    pub fn g_id(&self) -> &String {
-        &self.g_id
-    }
-    pub fn len(&self) -> &i32 {
-        &self.len
-    }
-    pub fn idt(&self) -> &f32 {
-        &self.idt
-    }
-
-    pub fn f_strand(&self) -> &i32 {
-        &self.f_strand
-    }
-    pub fn f_begin(&self) -> &i32 {
-        &self.f_begin
-    }
-    pub fn f_end(&self) -> &i32 {
-        &self.f_end
-    }
-    pub fn f_len(&self) -> &i32 {
-        &self.f_len
-    }
-
-    pub fn g_strand(&self) -> &i32 {
-        &self.g_strand
-    }
-    pub fn g_begin(&self) -> &i32 {
-        &self.g_begin
-    }
-    pub fn g_end(&self) -> &i32 {
-        &self.g_end
-    }
-    pub fn g_len(&self) -> &i32 {
-        &self.g_len
-    }
-
-    pub fn contained(&self) -> &String {
-        &self.contained
-    }
-
     pub fn is_empty(&self) -> bool {
         self.f_id.is_empty()
     }
@@ -218,19 +174,19 @@ fn ovlp_line() {
     for (line, expected) in tests {
         let ovlp = Overlap::new(line);
         assert_eq!(ovlp.to_string(), line);
-        assert_eq!(ovlp.f_id(), expected.0);
-        assert_eq!(ovlp.g_id(), expected.1);
-        assert_eq!(*ovlp.len(), expected.2);
-        assert!((*ovlp.idt() - expected.3).abs() < 0.001);
-        assert_eq!(*ovlp.f_strand(), expected.4);
-        assert_eq!(*ovlp.f_begin(), expected.5);
-        assert_eq!(*ovlp.f_end(), expected.6);
-        assert_eq!(*ovlp.f_len(), expected.7);
-        assert_eq!(*ovlp.g_strand(), expected.8);
-        assert_eq!(*ovlp.g_begin(), expected.9);
-        assert_eq!(*ovlp.g_end(), expected.10);
-        assert_eq!(*ovlp.g_len(), expected.11);
-        assert_eq!(ovlp.contained(), expected.12);
+        assert_eq!(ovlp.f_id, expected.0);
+        assert_eq!(ovlp.g_id, expected.1);
+        assert_eq!(ovlp.len, expected.2);
+        assert!((ovlp.idt - expected.3).abs() < 0.001);
+        assert_eq!(ovlp.f_strand, expected.4);
+        assert_eq!(ovlp.f_begin, expected.5);
+        assert_eq!(ovlp.f_end, expected.6);
+        assert_eq!(ovlp.f_len, expected.7);
+        assert_eq!(ovlp.g_strand, expected.8);
+        assert_eq!(ovlp.g_begin, expected.9);
+        assert_eq!(ovlp.g_end, expected.10);
+        assert_eq!(ovlp.g_len, expected.11);
+        assert_eq!(ovlp.contained, expected.12);
     }
 }
 
@@ -258,18 +214,18 @@ fn paf_line() {
     for (line, expected) in tests {
         let ovlp = Overlap::from_paf(line);
         //        assert_eq!(ovlp.to_string(), line);
-        assert_eq!(ovlp.f_id(), expected.0);
-        assert_eq!(ovlp.g_id(), expected.1);
-        assert_eq!(*ovlp.len(), expected.2);
-        assert!((*ovlp.idt() - expected.3).abs() < 0.001);
-        assert_eq!(*ovlp.f_strand(), expected.4);
-        assert_eq!(*ovlp.f_begin(), expected.5);
-        assert_eq!(*ovlp.f_end(), expected.6);
-        assert_eq!(*ovlp.f_len(), expected.7);
-        assert_eq!(*ovlp.g_strand(), expected.8);
-        assert_eq!(*ovlp.g_begin(), expected.9);
-        assert_eq!(*ovlp.g_end(), expected.10);
-        assert_eq!(*ovlp.g_len(), expected.11);
-        assert_eq!(ovlp.contained(), expected.12);
+        assert_eq!(ovlp.f_id, expected.0);
+        assert_eq!(ovlp.g_id, expected.1);
+        assert_eq!(ovlp.len, expected.2);
+        assert!((ovlp.idt - expected.3).abs() < 0.001);
+        assert_eq!(ovlp.f_strand, expected.4);
+        assert_eq!(ovlp.f_begin, expected.5);
+        assert_eq!(ovlp.f_end, expected.6);
+        assert_eq!(ovlp.f_len, expected.7);
+        assert_eq!(ovlp.g_strand, expected.8);
+        assert_eq!(ovlp.g_begin, expected.9);
+        assert_eq!(ovlp.g_end, expected.10);
+        assert_eq!(ovlp.g_len, expected.11);
+        assert_eq!(ovlp.contained, expected.12);
     }
 }
