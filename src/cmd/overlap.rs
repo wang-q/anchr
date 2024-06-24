@@ -100,7 +100,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     run_cmd!(info "    \"tempdir\" = ${tempdir_str}")?;
 
     //----------------------------
-    // Operating
+    // Paths
     //----------------------------
     run_cmd!(info "==> Absolute paths")?;
     // basename => abs_path
@@ -117,6 +117,18 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             abs_infiles.push(absolute.to_string());
         }
     }
+    let abs_outfile = if outfile == "stdout" {
+        outfile.to_string()
+    } else {
+        intspan::absolute_path(outfile)
+            .unwrap()
+            .display()
+            .to_string()
+    };
+
+    //----------------------------
+    // Operating
+    //----------------------------
     let basename = "anchr_ovlp";
 
     run_cmd!(info "==> Switch to tempdir")?;
@@ -168,11 +180,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     if is_serial {
         run_cmd!(
-            ${anchr} show2ovlp show.txt renamed.fasta.replace.tsv -o ${outfile}
+            ${anchr} show2ovlp show.txt renamed.fasta.replace.tsv -o ${abs_outfile}
         )?;
     } else {
         run_cmd!(
-            ${anchr} show2ovlp show.txt renamed.fasta.replace.tsv --orig -o ${outfile}
+            ${anchr} show2ovlp show.txt renamed.fasta.replace.tsv --orig -o ${abs_outfile}
         )?;
     }
 
