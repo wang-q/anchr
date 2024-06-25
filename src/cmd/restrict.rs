@@ -61,7 +61,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         }
 
         // f_id and g_id
-        let mut pair = vec![fields[0].to_string(), fields[1].to_string()];
+        let mut pair = [fields[0].to_string(), fields[1].to_string()];
         pair.sort();
 
         if restricts.contains(pair.join("\t").as_str()) {

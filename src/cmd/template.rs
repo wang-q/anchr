@@ -518,7 +518,7 @@ fn gen_fastqc(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -535,7 +535,7 @@ fn gen_insert_size(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -552,7 +552,7 @@ fn gen_kat(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -569,7 +569,7 @@ fn gen_fastk(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -583,7 +583,7 @@ fn gen_genescopefk(context: &Context) -> anyhow::Result<()> {
     tera.add_raw_templates(vec![("t", include_str!("../../templates/genescopefk.R"))])
         .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -600,7 +600,7 @@ fn gen_trim(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -617,7 +617,7 @@ fn gen_stat_reads(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -634,7 +634,7 @@ fn gen_quorum(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -651,7 +651,7 @@ fn gen_no_quorum(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -668,7 +668,7 @@ fn gen_merge(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -685,7 +685,7 @@ fn gen_bwa(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -702,7 +702,7 @@ fn gen_gatk(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -719,7 +719,7 @@ fn gen_down_sampling(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -736,7 +736,7 @@ fn gen_mr_down_sampling(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -797,7 +797,7 @@ fn gen_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -814,7 +814,7 @@ fn gen_mr_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -831,7 +831,7 @@ fn gen_stat_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -851,7 +851,7 @@ fn gen_stat_mr_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -868,7 +868,7 @@ fn gen_merge_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -888,7 +888,7 @@ fn gen_stat_merge_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -905,7 +905,7 @@ fn gen_spades(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -922,7 +922,7 @@ fn gen_mr_spades(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -939,7 +939,7 @@ fn gen_megahit(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -956,7 +956,7 @@ fn gen_mr_megahit(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -976,7 +976,7 @@ fn gen_stat_other_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -993,7 +993,7 @@ fn gen_glue_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -1010,7 +1010,7 @@ fn gen_fill_anchors(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -1027,7 +1027,7 @@ fn gen_quast(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -1044,7 +1044,7 @@ fn gen_busco(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -1061,7 +1061,7 @@ fn gen_stat_final(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -1078,7 +1078,7 @@ fn gen_cleanup(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -1095,7 +1095,7 @@ fn gen_real_clean(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -1112,7 +1112,7 @@ fn gen_master(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
@@ -1129,7 +1129,7 @@ fn gen_bsub(context: &Context) -> anyhow::Result<()> {
     ])
     .unwrap();
 
-    let rendered = tera.render("t", &context).unwrap();
+    let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;
 
     Ok(())
