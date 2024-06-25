@@ -13,6 +13,7 @@ fn main() -> anyhow::Result<()> {
         .propagate_version(true)
         .arg_required_else_help(true)
         .subcommand(cmd::anchors::make_subcommand())
+        .subcommand(cmd::contained::make_subcommand())
         .subcommand(cmd::covered::make_subcommand())
         .subcommand(cmd::dazzname::make_subcommand())
         .subcommand(cmd::dep::make_subcommand())
@@ -80,6 +81,7 @@ Subcommand groups:
         // Overlaps - Daligner pipelines
         Some(("overlap", sub_matches)) => cmd::overlap::execute(sub_matches),
         Some(("orient", sub_matches)) => cmd::orient::execute(sub_matches),
+        Some(("contained", sub_matches)) => cmd::contained::execute(sub_matches),
         // Assembling
         Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
         Some(("mergeread", sub_matches)) => cmd::mergeread::execute(sub_matches),

@@ -307,11 +307,8 @@ echo "tests/ovlpr/1_4.anchor.fasta;tests/ovlpr/1_4.pac.fasta" |
     anchr covered stdin --mean
 
 anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv
-
 anchr covered tests/ovlpr/11_2.long.paf --paf
-
 anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --base
-
 anchr covered tests/ovlpr/1_4.pac.paf.ovlp.tsv --mean
 
 anchr restrict tests/ovlpr/1_4.ovlp.tsv tests/ovlpr/1_4.restrict.tsv
@@ -322,12 +319,12 @@ anchr restrict tests/ovlpr/1_4.ovlp.tsv tests/ovlpr/1_4.restrict.tsv
 
 ```shell
 anchr overlap tests/ovlpr/1_4.pac.fasta
-
 anchr overlap tests/ovlpr/1_4.pac.fasta --idt 0.8 --len 2500 --serial
 
-cargo run --bin anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta
+anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta
+anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta -r tests/ovlpr/1_4.2.restrict.tsv
 
-cargo run --bin anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta -r tests/ovlpr/1_4.2.restrict.tsv
+cargo run --bin anchr contained tests/ovlpr/contained.fasta
 
 ```
 

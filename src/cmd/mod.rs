@@ -1,6 +1,7 @@
 //! Subcommand modules for the `anchr` binary.
 
 pub mod anchors;
+pub mod contained;
 pub mod covered;
 pub mod dazzname;
 pub mod dep;
