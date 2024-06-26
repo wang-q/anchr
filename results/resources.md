@@ -166,7 +166,7 @@ for STRAIN in \
 
     egaz prepseq \
         ../../ref/${STRAIN}/genome.fa -o ${STRAIN} \
-        --repeatmasker '--parallel 4' -v
+        --repeatmasker '--parallel 8' -v
 done
 
 ```
@@ -180,12 +180,10 @@ egaz template \
     genomes/g37 \
     genomes/mg1655 genomes/dh5alpha \
     --self -o e_coli/ \
-    --circos \
     --length 1000 --parallel 4 -v
 
 bash e_coli/1_self.sh
 bash e_coli/3_proc.sh
-bash e_coli/4_circos.sh
 
 for STRAIN in \
     g37 mg1655 dh5alpha \
@@ -203,12 +201,10 @@ cd ~/data/anchr/paralogs
 egaz template \
     genomes/Bcer genomes/Mabs genomes/Rsph genomes/Vcho \
     --self -o gage_b/ \
-    --circos \
     --length 1000 --parallel 4 -v
 
 bash gage_b/1_self.sh
 bash gage_b/3_proc.sh
-bash gage_b/4_circos.sh
 
 for STRAIN in \
     Bcer Mabs Rsph Vcho \
@@ -226,12 +222,10 @@ cd ~/data/anchr/paralogs
 egaz template \
     genomes/s288c \
     --self -o yeast/ \
-    --circos \
     --length 1000 --parallel 4 -v
 
 bash yeast/1_self.sh
 bash yeast/3_proc.sh
-bash yeast/4_circos.sh
 
 for STRAIN in \
     s288c \
