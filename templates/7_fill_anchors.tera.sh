@@ -59,17 +59,17 @@ log_info "Processing each groups"
 cat group/groups.txt |
     parallel --no-run-if-empty --linebuffer -k -j {{ parallel2 }} '
         echo {};
-        dazz orient \
+        anchr orient \
             --len 1000 --idt 0.999 \
             group/{}.anchor.fasta \
             group/{}.long.fasta \
             -r group/{}.restrict.tsv \
             -o group/{}.strand.fasta;
 
-        dazz overlap --len 1000 --idt 0.9999 --all \
+        anchr overlap --len 1000 --idt 0.9999 --all \
             group/{}.strand.fasta \
             -o stdout |
-            ovlpr restrict \
+            anchr restrict \
                 stdin group/{}.restrict.tsv \
                 -o group/{}.ovlp.tsv;
 

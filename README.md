@@ -35,33 +35,39 @@ rm -fr target
 
 ```text
 $ anchr help
-anchr 0.3.16-alpha.1
-wang-q <wang-q@outlook.com>
 Anchr - the Assembler of N-free CHRomosomes
 
-USAGE:
-    anchr [SUBCOMMAND]
+Usage: anchr [COMMAND]
 
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+Commands:
+  anchors    Select anchors (proper covered regions) from contigs
+  contained  Discard contained unitigs
+  covered    Covered regions from .ovlp.tsv files
+  dazzname   Rename FASTA records for dazz_db
+  dep        Dependencies
+  ena        ENA scripts
+  merge      Merge overlapped unitigs
+  mergeread  Merge Illumina PE reads with bbtools
+  orient     Orient overlapped sequences to the same strand
+  overlap    Detect overlaps by daligner
+  paf2ovlp   Convert minimap .paf to overlaps
+  quorum     Run quorum to discard bad reads
+  restrict   Restrict overlaps to known pairs
+  show2ovlp  Convert LAshow outputs to overlaps
+  template   Creates Bash scripts
+  trim       Trim Illumina PE/SE fastq files
+  unitigs    Create unitigs from trimmed/merged reads
+  help       Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    anchors     Select anchors (proper covered regions) from contigs
-    dep         Dependencies
-    ena         ENA scripts
-    help        Prints this message or the help of the given subcommand(s)
-    merge       Merge Illumina PE reads with bbtools
-    quorum      Run quorum to discard bad reads
-    template    Creates Bash scripts
-    trim        Trim Illumina PE/SE fastq files
-    unitigs     Create unitigs from trimmed/merged reads
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
 
 ```
 
 ## RUNTIME DEPENDENCIES
 
-* Command line tools managed by `Linuxbrew`
+* Command line tools managed by `Homebrew`
 
 ```bash
 brew install perl cpanminus
@@ -298,10 +304,10 @@ anchr paf2ovlp tests/ovlpr/1_4.pac.paf
 echo "tests/ovlpr/1_4.anchor.fasta;tests/ovlpr/1_4.pac.fasta" |
     parallel --colsep ";" -j 1 "
         minimap2 -cx asm20 {1} {2} |
-            ovlpr paf2ovlp stdin |
+            anchr paf2ovlp stdin |
             tsv-sort
         minimap2 -cx asm20 {2} {1} |
-            ovlpr paf2ovlp stdin |
+            anchr paf2ovlp stdin |
             tsv-sort
     " |
     anchr covered stdin --mean

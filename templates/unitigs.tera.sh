@@ -72,20 +72,20 @@ log_info Creating unitigs
 {% endfor -%}
 {# Keep a blank line #}
 log_info Creating non-contained unitigs
-    dazz contained \
+    anchr contained \
 {% for kmer in kmers -%}
         unitigs_K{{ kmer }}.fasta \
 {% endfor -%}
-        --len {{ opt.min }} --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
+        --len {{ opt.min }} --idt 0.9999 --ratio 0.99999 --parallel {{ opt.parallel }} \
         -o unitigs.non-contained.fasta
 
 if [ -s unitigs.non-contained.fasta ]; then
 {% if opt.merge == "1" -%}
     log_info Merging unitigs
-    dazz orient unitigs.non-contained.fasta \
+    anchr orient unitigs.non-contained.fasta \
         --len {{ opt.min }} --idt 0.999 --parallel {{ opt.parallel }} \
         -o unitigs.orient.fasta
-    dazz merge unitigs.orient.fasta \
+    anchr merge unitigs.orient.fasta \
         --len {{ opt.min }} --idt 0.9999 --parallel {{ opt.parallel }} \
         -o unitigs.fasta
 {% else -%}

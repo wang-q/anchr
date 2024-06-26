@@ -41,7 +41,7 @@ dazz overlap2 \
 cd 7_glue_anchors
 
 log_info "overlap: within anhcors"
-dazz overlap \
+anchr overlap \
     anchor.fasta \
     --serial --len {{ opt.gluemin }} --idt 0.9999 \
     -o stdout |
@@ -90,21 +90,21 @@ log_info "Processing each groups"
 cat group/groups.txt |
     parallel --no-run-if-empty --linebuffer -k -j {{ parallel2 }} '
         echo {};
-        dazz orient \
+        anchr orient \
             --len 1000 --idt 0.999 \
             group/{}.anchor.fasta \
             group/{}.long.fasta \
             -r group/{}.restrict.tsv \
             -o group/{}.strand.fasta;
 
-        dazz overlap --len 1000 --idt 0.9999 \
+        anchr overlap --len 1000 --idt 0.9999 \
             group/{}.strand.fasta \
             -o stdout |
-            ovlpr restrict \
+            anchr restrict \
                 stdin group/{}.restrict.tsv \
                 -o group/{}.ovlp.tsv;
 
-        dazz overlap --len {{ opt.gluemin }} --idt 0.9999 \
+        anchr overlap --len {{ opt.gluemin }} --idt 0.9999 \
             group/{}.strand.fasta \
             -o stdout |
             perl -nla -e '\''

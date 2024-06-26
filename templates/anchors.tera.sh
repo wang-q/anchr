@@ -327,22 +327,22 @@ faops region -l 0 UT.fasta others.regions.txt pe.others.fa
 # Merging anchors
 #----------------------------#
 log_info "Merging anchors"
-dazz contained \
+anchr contained \
     pe.anchor.fa \
-    --len {{ opt.min }} --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len {{ opt.min }} --idt 0.9999 --ratio 0.99999 --parallel {{ opt.parallel }} \
     -o anchor.non-contained.fasta
-dazz orient \
+anchr orient \
     anchor.non-contained.fasta \
     --len {{ opt.min }} --idt 0.999 --parallel {{ opt.parallel }} \
     -o anchor.orient.fasta
-dazz merge \
+anchr merge \
     anchor.orient.fasta --len {{ opt.min }} --idt 0.9999 --parallel {{ opt.parallel }} \
     -o anchor.merge0.fasta
 
 # loss idt to remove duplicates
-dazz contained \
+anchr contained \
     anchor.merge0.fasta \
-    --len {{ opt.min }} --idt 0.98 --proportion 0.99 --parallel {{ opt.parallel }} \
+    --len {{ opt.min }} --idt 0.98 --ratio 0.99 --parallel {{ opt.parallel }} \
     -o anchor.fasta
 
 #----------------------------#

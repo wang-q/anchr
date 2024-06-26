@@ -26,24 +26,24 @@ log_info "anchor.non-contained"
 mkdir -p ${DIR_MERGE}
 
 # reversely sorted files, so that Q30L60X80 will be infile_0
-dazz contained \
+anchr contained \
     $( find . -path "*${DIR_PREFIX}*" -name "anchor.fasta" -or -path "*${DIR_PREFIX}*" -name "anchor.merge.fasta" | sort -r ) \
-    --len 1000 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len 1000 --idt 0.9999 --ratio 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.non-contained.fasta
 
 {% if opt.redo == "0" -%}
-dazz orient \
+anchr orient \
     ${DIR_MERGE}/anchor.non-contained.fasta \
     --len 1000 --idt 0.999 --parallel {{ opt.parallel }} \
     -o ${DIR_MERGE}/anchor.intermediate_0.fasta
-dazz merge \
+anchr merge \
     ${DIR_MERGE}/anchor.intermediate_0.fasta \
     --len 1000 --idt 0.9999 --parallel {{ opt.parallel }} \
     -o ${DIR_MERGE}/anchor.intermediate_1.fasta
-dazz contained \
+anchr contained \
     ${DIR_MERGE}/anchor.intermediate_1.fasta \
-    --len 1000 --idt 0.98 --proportion 0.99 --parallel {{ opt.parallel }} \
+    --len 1000 --idt 0.98 --ratio 0.99 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.merge.fasta
 {% else -%}
@@ -78,19 +78,19 @@ log_info "others"
 
 cd ${BASH_DIR}
 
-dazz contained \
+anchr contained \
     $( find . -path "*${DIR_PREFIX}*" -name "pe.others.fa" -or -path "*${DIR_PREFIX}*" -name "others.non-contained.fasta" | sort -r ) \
 {% if opt.redo == "1" -%}
     ${DIR_MERGE}/anchor/pe.others.fa \
 {% endif -%}
-    --len 500 --idt 0.9999 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len 500 --idt 0.9999 --ratio 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_0.fasta
 
-dazz contained \
+anchr contained \
     ${DIR_MERGE}/anchor.merge.fasta \
     ${DIR_MERGE}/others.intermediate_0.fasta \
-    --len 500 --idt 0.98 --proportion 0.99999 --parallel {{ opt.parallel }} \
+    --len 500 --idt 0.98 --ratio 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
     faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_1.fasta
 
