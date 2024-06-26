@@ -37,7 +37,7 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    anchr merge \
+    anchr mergeread \
         ../trim/${PREFIX}1.fq.gz ../trim/${PREFIX}2.fq.gz ../trim/${PREFIX}s.fq.gz \
 {% if opt.prefilter != "0" -%}
         --prefilter {{ opt.prefilter }} \
@@ -46,8 +46,8 @@ for PREFIX in R S T; do
         --parallel {{ opt.parallel }}{% if opt.xmx != "0" %} --xmx {{ opt.xmx }}{% endif %} \
         --prefixm ${PREFIXM} \
         --prefixu ${PREFIXU} \
-        -o merge.sh
-    bash merge.sh
+        -o mergeread.sh
+    bash mergeread.sh
 
     # Create .cor.fa.gz
     faops interleave \

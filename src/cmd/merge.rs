@@ -240,8 +240,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         let mut sorted = pieces.clone();
         sorted.sort_by_cached_key(|k| idx_of.get(k).unwrap());
 
-        eprintln!("sorted = {:#?}", sorted);
-
         for i in 0..(sorted.len() - 1) {
             let p0 = sorted[i];
             let p1 = sorted[i + 1];
