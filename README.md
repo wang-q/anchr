@@ -326,6 +326,8 @@ anchr orient tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta -r tests/ovl
 
 cargo run --bin anchr contained tests/ovlpr/contained.fasta
 
+cargo run --bin anchr merge tests/ovlpr/merge.fasta -o test.fasta
+
 ```
 
 ## AUTHOR

@@ -18,6 +18,7 @@ fn main() -> anyhow::Result<()> {
         .subcommand(cmd::dazzname::make_subcommand())
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
+        .subcommand(cmd::merge::make_subcommand())
         .subcommand(cmd::mergeread::make_subcommand())
         .subcommand(cmd::orient::make_subcommand())
         .subcommand(cmd::overlap::make_subcommand())
@@ -82,6 +83,7 @@ Subcommand groups:
         Some(("overlap", sub_matches)) => cmd::overlap::execute(sub_matches),
         Some(("orient", sub_matches)) => cmd::orient::execute(sub_matches),
         Some(("contained", sub_matches)) => cmd::contained::execute(sub_matches),
+        Some(("merge", sub_matches)) => cmd::merge::execute(sub_matches),
         // Assembling
         Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
         Some(("mergeread", sub_matches)) => cmd::mergeread::execute(sub_matches),

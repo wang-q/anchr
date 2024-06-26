@@ -6,6 +6,7 @@ pub mod covered;
 pub mod dazzname;
 pub mod dep;
 pub mod ena;
+pub mod merge;
 pub mod mergeread;
 pub mod orient;
 pub mod overlap;

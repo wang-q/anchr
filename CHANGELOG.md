@@ -7,6 +7,7 @@
 * Add `anchr overlap`
 * Add `anchr orient`
 * Add `anchr contained`
+* Add `anchr merge`
 * Move `ovlpr` subcommands from intspan here
     * `anchr covered`
     * `anchr paf2ovlp`
