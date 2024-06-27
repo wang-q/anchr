@@ -48,7 +48,6 @@ else
         -k 21,33,55,77 \
         -1 re-pair/R1.fa \
         -2 re-pair/R2.fa \
-        -s re-pair/Rs.fa \
         -o .
 
     anchr contained \

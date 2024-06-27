@@ -89,6 +89,8 @@ anchr dep check | bash
 brew install --HEAD wang-q/tap/fastk
 brew install --HEAD wang-q/tap/merquryfk
 
+brew install binutils
+brew link binutils --force
 parallel -j 1 -k --line-buffer '
     Rscript -e '\'' if (!requireNamespace("{}", quietly = FALSE)) { install.packages("{}", repos="https://mirrors.tuna.tsinghua.edu.cn/CRAN") } '\''
     ' ::: \
@@ -96,9 +98,13 @@ parallel -j 1 -k --line-buffer '
         ggplot2 scales viridis
 
 # Optional
-# assembly quality assessment. https://github.com/ablab/quast/issues/140
-brew install brewsci/bio/quast --HEAD
-quast --test
+# quast - assembly quality assessment
+curl -LO https://github.com/ablab/quast/releases/download/quast_5.2.0/quast-5.2.0.tar.gz
+tar xvfz quast-5.2.0.tar.gz
+cd quast-5.2.0
+python3 ./setup.py install
+
+quast.py --test
 
 # Optional: leading assemblers
 brew install spades

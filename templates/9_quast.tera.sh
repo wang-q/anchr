@@ -72,7 +72,7 @@ fi
 QUAST_LABEL=$( echo "${QUAST_LABEL}" | sed 's/,$//' )
 
 rm -fr 9_quast
-quast --threads {{ opt.parallel }} \
+quast.py --threads {{ opt.parallel }} \
     ${QUAST_TARGET} \
     --label ${QUAST_LABEL} \
     -o 9_quast
