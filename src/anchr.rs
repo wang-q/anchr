@@ -34,35 +34,20 @@ fn main() -> anyhow::Result<()> {
 Subcommand groups:
 
 * Dependence
-    * dep check
-    * dep install
-
+    * dep check / dep install
 * Download
-    * ena info
-    * ena prep
-
+    * ena info /  ena prep
 * Overlaps
     * Standalone
-        * dazzname
-        * show2ovlp
-        * paf2ovlp
-        * covered
-        * restrict
+        * dazzname / show2ovlp / paf2ovlp / covered / restrict
     * Daligner pipelines
-        * overlap
-        * orient
-        * contained
-        * merge
+        * overlap / orient / contained / merge
+        * overlap2
         * group
         * layout
-        * overlap2
-
 * Assembling
-    * anchors
-    * mergeread
-    * quorum
-    * trim
-    * unitigs
+    * trim / quorum / mergeread / unitigs / anchors
+    * template
 
 "###,
         );
@@ -85,12 +70,12 @@ Subcommand groups:
         Some(("contained", sub_matches)) => cmd::contained::execute(sub_matches),
         Some(("merge", sub_matches)) => cmd::merge::execute(sub_matches),
         // Assembling
-        Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
-        Some(("mergeread", sub_matches)) => cmd::mergeread::execute(sub_matches),
-        Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),
-        Some(("template", sub_matches)) => cmd::template::execute(sub_matches),
         Some(("trim", sub_matches)) => cmd::trim::execute(sub_matches),
+        Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),
+        Some(("mergeread", sub_matches)) => cmd::mergeread::execute(sub_matches),
         Some(("unitigs", sub_matches)) => cmd::unitigs::execute(sub_matches),
+        Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
+        Some(("template", sub_matches)) => cmd::template::execute(sub_matches),
         _ => unreachable!(),
     }
     .unwrap();

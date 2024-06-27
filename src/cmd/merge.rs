@@ -1,7 +1,6 @@
 use clap::*;
 use cmd_lib::*;
 use petgraph::prelude::*;
-use petgraph::visit::{IntoEdgeReferences, NodeIndexable};
 use petgraph::*;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
