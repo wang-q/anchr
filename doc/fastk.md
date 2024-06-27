@@ -168,6 +168,13 @@ cat chr.sizes |
     spanr combine stdin \
     > repetitive.yml
 
+Fastrm genome
+
+spanr convert repetitive.yml > region.txt
+samtools faidx -r region.txt genome.fa |
+    faops filter -N -d -a 100 stdin stdout \
+    > repetitive.fa
+
 spanr stat chr.sizes repetitive.yml
 #chr,chrLength,size,coverage
 #NC_000913,4641652,91989,0.0198
