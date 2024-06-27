@@ -47,7 +47,7 @@ cd ~/data/anchr/s288c/1_genome
 
 cp ~/data/anchr/ref/s288c/genome.fa .
 cp ~/data/anchr/ref/s288c/paralogs.fa .
-cp ~/data/anchr/ref/s288c/repetitives.fa .
+cp ~/data/anchr/ref/s288c/repetitive.fa .
 
 ```
 
@@ -95,7 +95,7 @@ cd ~/data/anchr/s288c_mi150/1_genome
 
 ln -fs ../../s288c/1_genome/genome.fa genome.fa
 ln -fs ../../s288c/1_genome/paralogs.fa paralogs.fa
-ln -fs ../../s288c/1_genome/repetitives.fa repetitives.fa
+ln -fs ../../s288c/1_genome/repetitive.fa repetitive.fa
 
 mkdir -p ~/data/anchr/s288c_mi150/2_illumina
 cd ~/data/anchr/s288c_mi150/2_illumina
@@ -196,7 +196,7 @@ Table: statReads
 |:------------|-------:|---------:|--------:|
 | Genome      | 924431 | 12157105 |      17 |
 | Paralogs    |   4583 |  1524899 |     492 |
-| Repetitives |   1985 |   740864 |    1263 |
+| repetitive |   1985 |   740864 |    1263 |
 | Illumina.R  |    150 |  995.54M | 6636934 |
 | trim.R      |    150 |  987.61M | 6592820 |
 | Q20L60      |    150 |  977.17M | 6550318 |
@@ -398,7 +398,7 @@ Table: statFinal
 |:-------------------------|-------:|---------:|-----:|
 | Genome                   | 924431 | 12157105 |   17 |
 | Paralogs                 |   4583 |  1524899 |  492 |
-| Repetitives              |   1985 |   740864 | 1263 |
+| repetitive              |   1985 |   740864 | 1263 |
 | 7_merge_anchors.anchors  |  32151 | 11255344 |  602 |
 | 7_merge_anchors.others   |   3213 |   351094 |  187 |
 | glue_anchors             |  45505 | 11246889 |  423 |
@@ -425,7 +425,7 @@ cd ~/data/anchr/s288c_mi300/1_genome
 
 ln -fs ../../s288c/1_genome/genome.fa genome.fa
 ln -fs ../../s288c/1_genome/paralogs.fa paralogs.fa
-ln -fs ../../s288c/1_genome/repetitives.fa repetitives.fa
+ln -fs ../../s288c/1_genome/repetitive.fa repetitive.fa
 
 mkdir -p ~/data/anchr/s288c_mi300/2_illumina
 cd ~/data/anchr/s288c_mi300/2_illumina
@@ -507,7 +507,7 @@ cd ~/data/anchr/s288c_hi/1_genome
 
 ln -fs ../../s288c/1_genome/genome.fa genome.fa
 ln -fs ../../s288c/1_genome/paralogs.fa paralogs.fa
-ln -fs ../../s288c/1_genome/repetitives.fa repetitives.fa
+ln -fs ../../s288c/1_genome/repetitive.fa repetitive.fa
 
 mkdir -p ~/data/anchr/s288c_hi/2_illumina
 cd ~/data/anchr/s288c_hi/2_illumina
@@ -857,7 +857,7 @@ cd ~/data/anchr/s288c_hi125/1_genome
 
 ln -fs ../../s288c/1_genome/genome.fa genome.fa
 ln -fs ../../s288c/1_genome/paralogs.fa paralogs.fa
-ln -fs ../../s288c/1_genome/repetitives.fa repetitives.fa
+ln -fs ../../s288c/1_genome/repetitive.fa repetitive.fa
 
 mkdir -p ~/data/anchr/s288c_hi125/2_illumina
 cd ~/data/anchr/s288c_hi125/2_illumina
@@ -958,7 +958,7 @@ Table: statReads
 |:------------|-------:|---------:|--------:|
 | Genome      | 924431 | 12157105 |      17 |
 | Paralogs    |   4583 |  1524899 |     492 |
-| Repetitives |   1985 |   740864 |    1263 |
+| repetitive |   1985 |   740864 |    1263 |
 | Illumina.R  |    126 |    1.08G | 8657830 |
 | trim.R      |    125 |    1.02G | 8208202 |
 | Q25L60      |    125 |  977.37M | 7924389 |
@@ -1162,7 +1162,7 @@ Table: statFinal
 |:-------------------------|-------:|---------:|-----:|
 | Genome                   | 924431 | 12157105 |   17 |
 | Paralogs                 |   4583 |  1524899 |  492 |
-| Repetitives              |   1985 |   740864 | 1263 |
+| repetitive              |   1985 |   740864 | 1263 |
 | 7_merge_anchors.anchors  |  18770 | 11141804 |  987 |
 | 7_merge_anchors.others   |   2069 |   393531 |  226 |
 | glue_anchors             |  19868 | 11136725 |  943 |

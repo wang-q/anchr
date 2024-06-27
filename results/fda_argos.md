@@ -9,7 +9,7 @@
   - [Illumina Reads](#illumina-reads)
   - [Reference Genomes](#reference-genomes)
   - [Paralogs](#paralogs)
-  - [Repetitives](#repetitives)
+  - [repetitive](#repetitive)
   - [Copy/link files](#copylink-files)
 - [Ca_jej_jejuni_NCTC_11168_ATCC_700819](#ca_jej_jejuni_nctc_11168_atcc_700819)
 - [Clostridio_dif_630](#clostridio_dif_630)
@@ -457,11 +457,11 @@ mlr --icsv --omd cat cover.csv
 | Y_pseudot_YPIII                            | 4689441   | 114669 | 0.0245   |
 
 
-## Repetitives
+## repetitive
 
 ```shell script
-mkdir -p ~/data/anchr/fda_argos/repetitives
-cd ~/data/anchr/fda_argos/repetitives
+mkdir -p ~/data/anchr/fda_argos/repetitive
+cd ~/data/anchr/fda_argos/repetitive
 
 for STRAIN in \
     $(
@@ -477,7 +477,7 @@ for STRAIN in \
 
     cat ${STRAIN}-repetitive.fa |
         faops filter -N -d -a 100 stdin stdout \
-        > ../ref/${STRAIN}/repetitives.fa
+        > ../ref/${STRAIN}/repetitive.fa
 
 done
 
@@ -501,7 +501,7 @@ for STRAIN in \
 
     cp ref/${STRAIN}/genome.fa ${STRAIN}/1_genome
     cp ref/${STRAIN}/paralogs.fa ${STRAIN}/1_genome
-    cp ref/${STRAIN}/repetitives.fa ${STRAIN}/1_genome
+    cp ref/${STRAIN}/repetitive.fa ${STRAIN}/1_genome
 
 done
 
@@ -620,7 +620,7 @@ Table: statReads
 |:------------|--------:|--------:|---------:|
 | Genome      | 1641481 | 1641481 |        1 |
 | Paralogs    |    6079 |   33258 |       13 |
-| Repetitives |    2339 |   41610 |       55 |
+| repetitive |    2339 |   41610 |       55 |
 | Illumina.R  |     101 |   1.55G | 15393600 |
 | trim.R      |     100 | 475.32M |  4775662 |
 | Q25L60      |     100 | 462.82M |  4660316 |
@@ -843,7 +843,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|----:|
 | Genome                   | 1641481 | 1641481 |   1 |
 | Paralogs                 |    6079 |   33258 |  13 |
-| Repetitives              |    2339 |   41610 |  55 |
+| repetitive              |    2339 |   41610 |  55 |
 | 7_merge_anchors.anchors  |  104866 | 1602430 |  28 |
 | 7_merge_anchors.others   |    2433 |   48765 |  27 |
 | glue_anchors             |  112521 | 1601571 |  25 |
@@ -940,7 +940,7 @@ Table: statReads
 |:------------|--------:|--------:|---------:|
 | Genome      | 4274782 | 4274782 |        1 |
 | Paralogs    |    3253 |  381668 |      135 |
-| Repetitives |    2524 |  165378 |      216 |
+| repetitive |    2524 |  165378 |      216 |
 | Illumina.R  |     101 |   1.33G | 13190786 |
 | trim.R      |     100 |   1.22G | 12274774 |
 | Q25L60      |     100 |   1.19G | 11965165 |
@@ -1162,7 +1162,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|----:|
 | Genome                   | 4274782 | 4274782 |   1 |
 | Paralogs                 |    3253 |  381668 | 135 |
-| Repetitives              |    2524 |  165378 | 216 |
+| repetitive              |    2524 |  165378 | 216 |
 | 7_merge_anchors.anchors  |  108213 | 4170223 |  95 |
 | 7_merge_anchors.others   |    7942 | 3023532 | 415 |
 | glue_anchors             |  211988 | 4168349 |  71 |
@@ -1258,7 +1258,7 @@ Table: statReads
 |:------------|--------:|--------:|---------:|
 | Genome      | 2488635 | 2488635 |        1 |
 | Paralogs    |    5627 |   56034 |       18 |
-| Repetitives |    2784 |   51421 |       70 |
+| repetitive |    2784 |   51421 |       70 |
 | Illumina.R  |     101 |   1.12G | 11128812 |
 | trim.R      |     100 |  655.6M |  6697056 |
 | Q25L60      |     100 | 576.46M |  5975527 |
@@ -1471,7 +1471,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|----:|
 | Genome                   | 2488635 | 2488635 |   1 |
 | Paralogs                 |    5627 |   56034 |  18 |
-| Repetitives              |    2784 |   51421 |  70 |
+| repetitive              |    2784 |   51421 |  70 |
 | 7_merge_anchors.anchors  |  115935 | 2441270 |  46 |
 | 7_merge_anchors.others   |   15531 |   89571 |  23 |
 | glue_anchors             |  130277 | 2440700 |  35 |
@@ -1568,7 +1568,7 @@ Table: statReads
 |:------------|--------:|--------:|---------:|
 | Genome      | 1892775 | 1892775 |        1 |
 | Paralogs    |   33912 |   93528 |       10 |
-| Repetitives |    5357 |  139352 |       72 |
+| repetitive |    5357 |  139352 |       72 |
 | Illumina.R  |     101 |   2.14G | 21230270 |
 | trim.R      |     100 | 549.71M |  5517640 |
 | Q25L60      |     100 |  538.7M |  5416004 |
@@ -1791,7 +1791,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|----:|
 | Genome                   | 1892775 | 1892775 |   1 |
 | Paralogs                 |   33912 |   93528 |  10 |
-| Repetitives              |    5357 |  139352 |  72 |
+| repetitive              |    5357 |  139352 |  72 |
 | 7_merge_anchors.anchors  |   35228 | 1791016 |  70 |
 | 7_merge_anchors.others   |   14504 |  140280 |  59 |
 | glue_anchors             |   35228 | 1790942 |  68 |

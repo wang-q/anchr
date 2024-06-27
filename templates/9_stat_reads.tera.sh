@@ -15,7 +15,7 @@ printf "%s\t%s\t%s\t%s\n" \
     "Name" "N50" "Sum" "#" \
     > statReads.tsv
 
-for NAME in genome paralogs repetitives; do
+for NAME in genome paralogs repetitive; do
     if [ -e ../1_genome/${NAME}.fa ]; then
         printf "%s\t%s\t%s\t%s\n" \
             $(echo "${NAME}"; stat_format ../1_genome/${NAME}.fa;)

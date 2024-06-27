@@ -243,7 +243,7 @@ cd ~/data/anchr/mg1655/1_genome
 
 cp ~/data/anchr/ref/mg1655/genome.fa .
 cp ~/data/anchr/ref/mg1655/paralogs.fa .
-cp ~/data/anchr/ref/mg1655/repetitives.fa .
+cp ~/data/anchr/ref/mg1655/repetitive.fa .
 
 ```
 
@@ -370,7 +370,7 @@ Table: statReads
 |:------------|--------:|--------:|---------:|
 | Genome      | 4641652 | 4641652 |        1 |
 | Paralogs    |    1937 |  187300 |      106 |
-| Repetitives |    1205 |  110138 |      206 |
+| repetitive |    1205 |  110138 |      206 |
 | Illumina.R  |     151 |   1.73G | 11458940 |
 | trim.R      |     149 |   1.43G | 10370832 |
 | Q25L60      |     148 |   1.32G |  9945743 |
@@ -576,7 +576,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|-----:|
 | Genome                   | 4641652 | 4641652 |    1 |
 | Paralogs                 |    1937 |  187300 |  106 |
-| Repetitives              |    1205 |  110138 |  206 |
+| repetitive              |    1205 |  110138 |  206 |
 | 7_merge_anchors.anchors  |   65406 | 4539016 |  129 |
 | 7_merge_anchors.others   |   36465 |  337798 |   77 |
 | glue_anchors             |   78838 | 4538271 |  121 |
@@ -642,7 +642,7 @@ cd ~/data/anchr/dh5alpha/1_genome
 
 cp ~/data/anchr/ref/dh5alpha/genome.fa .
 cp ~/data/anchr/ref/dh5alpha/paralogs.fa .
-cp ~/data/anchr/ref/dh5alpha/repetitives.fa .
+cp ~/data/anchr/ref/dh5alpha/repetitive.fa .
 
 ```
 
@@ -778,7 +778,7 @@ Table: statReads
 |:------------|--------:|--------:|---------:|
 | Genome      | 4583637 | 4583637 |        1 |
 | Paralogs    |    1737 |  188158 |      111 |
-| Repetitives |    1200 |  115795 |      213 |
+| repetitive |    1200 |  115795 |      213 |
 | Illumina.R  |     125 |   1.47G | 11763308 |
 | trim.R      |     125 |   1.37G | 10962262 |
 | Q25L60      |     125 |   1.25G | 10280938 |
@@ -984,7 +984,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|----:|
 | Genome                   | 4583637 | 4583637 |   1 |
 | Paralogs                 |    1737 |  188158 | 111 |
-| Repetitives              |    1200 |  115795 | 213 |
+| repetitive              |    1200 |  115795 | 213 |
 | 7_merge_anchors.anchors  |   67358 | 4463149 | 112 |
 | 7_merge_anchors.others   |   24692 |  203783 |  42 |
 | glue_anchors             |   85589 | 4462785 | 104 |

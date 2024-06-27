@@ -237,11 +237,11 @@ done
 
 ```
 
-## Repetitives
+## repetitive
 
 ```shell script
-mkdir -p ~/data/anchr/repetitives
-cd ~/data/anchr/repetitives
+mkdir -p ~/data/anchr/repetitive
+cd ~/data/anchr/repetitive
 
 for STRAIN in \
     g37 mg1655 dh5alpha \
@@ -254,7 +254,7 @@ for STRAIN in \
 
     cat ${STRAIN}-repetitive.fa |
         faops filter -N -d -a 100 stdin stdout \
-        > ../ref/${STRAIN}/repetitives.fa
+        > ../ref/${STRAIN}/repetitive.fa
 
 done
 

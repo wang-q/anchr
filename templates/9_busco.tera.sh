@@ -14,8 +14,8 @@ fi
 if [ -e 1_genome/paralogs.fa ]; then
     ARRAY+=('Paralogs::1_genome/paralogs.fa')
 fi
-if [ -e 1_genome/repetitives.fa ]; then
-    ARRAY+=('Repetitives::1_genome/repetitives.fa')
+if [ -e 1_genome/repetitive.fa ]; then
+    ARRAY+=('repetitive::1_genome/repetitive.fa')
 fi
 
 {% for u in unitiggers -%}

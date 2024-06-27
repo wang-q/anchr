@@ -173,7 +173,7 @@ spanr stat chr.sizes repetitive.yml
 #NC_000913,4641652,91989,0.0198
 #all,4641652,91989,0.0198
 
-faops size repetitives.fa | tsv-summarize --sum 2
+faops size repetitive.fa | tsv-summarize --sum 2
 #110138
 
 faops size paralogs.fa | tsv-summarize --sum 2

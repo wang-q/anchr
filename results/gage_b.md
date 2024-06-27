@@ -66,7 +66,7 @@ cd ~/data/anchr/Bcer_100x/1_genome
 
 cp ~/data/anchr/ref/Bcer/genome.fa .
 cp ~/data/anchr/ref/Bcer/paralogs.fa .
-cp ~/data/anchr/ref/Bcer/repetitives.fa .
+cp ~/data/anchr/ref/Bcer/repetitive.fa .
 
 ```
 
@@ -223,7 +223,7 @@ Table: statReads
 |:------------|--------:|--------:|--------:|
 | Genome      | 5224283 | 5432652 |       2 |
 | Paralogs    |    2295 |  220468 |     101 |
-| Repetitives |    2461 |  113050 |     173 |
+| repetitive |    2461 |  113050 |     173 |
 | Illumina.R  |     251 | 481.02M | 2080000 |
 | trim.R      |     250 | 404.36M | 1807384 |
 | Q20L60      |     250 | 396.79M | 1758525 |
@@ -435,7 +435,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|----:|
 | Genome                   | 5224283 | 5432652 |   2 |
 | Paralogs                 |    2295 |  220468 | 101 |
-| Repetitives              |    2461 |  113050 | 173 |
+| repetitive              |    2461 |  113050 | 173 |
 | 7_merge_anchors.anchors  |   36737 | 5304696 | 254 |
 | 7_merge_anchors.others   |   41729 |  291138 |  43 |
 | glue_anchors             |   36737 | 5304175 | 253 |
@@ -464,7 +464,7 @@ cd ~/data/anchr/Mabs_100x/1_genome
 
 cp ~/data/anchr/ref/Mabs/genome.fa .
 cp ~/data/anchr/ref/Mabs/paralogs.fa .
-cp ~/data/anchr/ref/Mabs/repetitives.fa .
+cp ~/data/anchr/ref/Mabs/repetitive.fa .
 
 ```
 
@@ -622,7 +622,7 @@ Table: statReads
 |:------------|--------:|--------:|--------:|
 | Genome      | 5067172 | 5090491 |       2 |
 | Paralogs    |    1693 |   83291 |      53 |
-| Repetitives |     192 |   15322 |      82 |
+| repetitive |     192 |   15322 |      82 |
 | Illumina.R  |     251 |    512M | 2039840 |
 | trim.R      |     177 | 280.98M | 1707706 |
 | Q20L60      |     177 | 272.37M | 1643445 |
@@ -806,7 +806,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|----:|
 | Genome                   | 5067172 | 5090491 |   2 |
 | Paralogs                 |    1693 |   83291 |  53 |
-| Repetitives              |     192 |   15322 |  82 |
+| repetitive              |     192 |   15322 |  82 |
 | 7_merge_anchors.anchors  |   77345 | 5113714 | 133 |
 | 7_merge_anchors.others   |    6262 |   72521 |  36 |
 | glue_anchors             |   87935 | 5112668 | 131 |
@@ -835,7 +835,7 @@ cd ~/data/anchr/Rsph_100x/1_genome
 
 cp ~/data/anchr/ref/Rsph/genome.fa .
 cp ~/data/anchr/ref/Rsph/paralogs.fa .
-cp ~/data/anchr/ref/Rsph/repetitives.fa .
+cp ~/data/anchr/ref/Rsph/repetitive.fa .
 
 ```
 
@@ -992,7 +992,7 @@ Table: statReads
 |:------------|--------:|--------:|--------:|
 | Genome      | 3188524 | 4602977 |       7 |
 | Paralogs    |    2337 |  146789 |      66 |
-| Repetitives |     572 |   57281 |     165 |
+| repetitive |     572 |   57281 |     165 |
 | Illumina.R  |     251 |  451.8M | 1800000 |
 | trim.R      |     148 |  200.1M | 1452706 |
 | Q20L60      |     148 | 193.66M | 1401466 |
@@ -1175,7 +1175,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|-----:|
 | Genome                   | 3188524 | 4602977 |    7 |
 | Paralogs                 |    2337 |  146789 |   66 |
-| Repetitives              |     572 |   57281 |  165 |
+| repetitive              |     572 |   57281 |  165 |
 | 7_merge_anchors.anchors  |   36740 | 4407623 |  246 |
 | 7_merge_anchors.others   |    4689 |  360250 |  133 |
 | glue_anchors             |   37591 | 4404044 |  240 |
@@ -1211,7 +1211,7 @@ cd ~/data/anchr/Vcho_100x/1_genome
 
 cp ~/data/anchr/ref/Vcho/genome.fa .
 cp ~/data/anchr/ref/Vcho/paralogs.fa .
-cp ~/data/anchr/ref/Vcho/repetitives.fa .
+cp ~/data/anchr/ref/Vcho/repetitive.fa .
 
 ```
 
@@ -1370,7 +1370,7 @@ Table: statReads
 |:------------|--------:|--------:|--------:|
 | Genome      | 2961149 | 4033464 |       2 |
 | Paralogs    |    3424 |  119270 |      49 |
-| Repetitives |    1070 |  120471 |     244 |
+| repetitive |    1070 |  120471 |     244 |
 | Illumina.R  |     251 |    400M | 1593624 |
 | trim.R      |     189 | 258.49M | 1426392 |
 | Q20L60      |     189 | 254.11M | 1398505 |
@@ -1565,7 +1565,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|----:|
 | Genome                   | 2961149 | 4033464 |   2 |
 | Paralogs                 |    3424 |  119270 |  49 |
-| Repetitives              |    1070 |  120471 | 244 |
+| repetitive              |    1070 |  120471 | 244 |
 | 7_merge_anchors.anchors  |   47140 | 3834259 | 167 |
 | 7_merge_anchors.others   |    1118 |  102972 |  92 |
 | glue_anchors             |   47606 | 3834197 | 165 |
@@ -1594,7 +1594,7 @@ cd ~/data/anchr/Mabs_full/1_genome
 
 cp ~/data/anchr/ref/Mabs/genome.fa .
 cp ~/data/anchr/ref/Mabs/paralogs.fa .
-cp ~/data/anchr/ref/Mabs/repetitives.fa .
+cp ~/data/anchr/ref/Mabs/repetitive.fa .
 
 ```
 
@@ -1731,7 +1731,7 @@ Table: statReads
 |:------------|--------:|--------:|--------:|
 | Genome      | 5067172 | 5090491 |       2 |
 | Paralogs    |    1693 |   83291 |      53 |
-| Repetitives |     192 |   15322 |      82 |
+| repetitive |     192 |   15322 |      82 |
 | Illumina.R  |     251 |   2.19G | 8741140 |
 | trim.R      |     176 |   1.25G | 7610016 |
 | Q20L60      |     177 |   1.21G | 7305465 |
@@ -1999,7 +1999,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|-----:|
 | Genome                   | 5067172 | 5090491 |    2 |
 | Paralogs                 |    1693 |   83291 |   53 |
-| Repetitives              |     192 |   15322 |   82 |
+| repetitive              |     192 |   15322 |   82 |
 | 7_merge_anchors.anchors  |   79692 | 5107054 |  119 |
 | 7_merge_anchors.others   |   14396 |  938021 |  214 |
 | glue_anchors             |   82779 | 5106943 |  116 |
@@ -2028,7 +2028,7 @@ cd ~/data/anchr/Rsph_full/1_genome
 
 cp ~/data/anchr/ref/Rsph/genome.fa .
 cp ~/data/anchr/ref/Rsph/paralogs.fa .
-cp ~/data/anchr/ref/Rsph/repetitives.fa .
+cp ~/data/anchr/ref/Rsph/repetitive.fa .
 
 ```
 
@@ -2164,7 +2164,7 @@ Table: statReads
 |:------------|--------:|--------:|---------:|
 | Genome      | 3188524 | 4602977 |        7 |
 | Paralogs    |    2337 |  146789 |       66 |
-| Repetitives |     572 |   57281 |      165 |
+| repetitive |     572 |   57281 |      165 |
 | Illumina.R  |     251 |   4.24G | 16881336 |
 | trim.R      |     150 |   1.64G | 11594652 |
 | Q20L60      |     150 |    1.6G | 11350230 |
@@ -2451,7 +2451,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|-----:|
 | Genome                   | 3188524 | 4602977 |    7 |
 | Paralogs                 |    2337 |  146789 |   66 |
-| Repetitives              |     572 |   57281 |  165 |
+| repetitive              |     572 |   57281 |  165 |
 | 7_merge_anchors.anchors  |   31611 | 4370419 |  274 |
 | 7_merge_anchors.others   |    6869 | 1402167 |  423 |
 | glue_anchors             |   31612 | 4367142 |  263 |
@@ -2480,7 +2480,7 @@ cd ~/data/anchr/Vcho_full/1_genome
 
 cp ~/data/anchr/ref/Vcho/genome.fa .
 cp ~/data/anchr/ref/Vcho/paralogs.fa .
-cp ~/data/anchr/ref/Vcho/repetitives.fa .
+cp ~/data/anchr/ref/Vcho/repetitive.fa .
 
 ```
 
@@ -2619,7 +2619,7 @@ Table: statReads
 |:------------|--------:|--------:|--------:|
 | Genome      | 2961149 | 4033464 |       2 |
 | Paralogs    |    3424 |  119270 |      49 |
-| Repetitives |    1070 |  120471 |     244 |
+| repetitive |    1070 |  120471 |     244 |
 | Illumina.R  |     251 |   1.76G | 7020550 |
 | trim.R      |     188 |   1.18G | 6551416 |
 | Q20L60      |     188 |   1.16G | 6412990 |
@@ -2898,7 +2898,7 @@ Table: statFinal
 |:-------------------------|--------:|--------:|-----:|
 | Genome                   | 2961149 | 4033464 |    2 |
 | Paralogs                 |    3424 |  119270 |   49 |
-| Repetitives              |    1070 |  120471 |  244 |
+| repetitive              |    1070 |  120471 |  244 |
 | 7_merge_anchors.anchors  |   46530 | 3834139 |  170 |
 | 7_merge_anchors.others   |    1929 |  648626 |  344 |
 | glue_anchors             |   53312 | 3833735 |  161 |
