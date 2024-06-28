@@ -508,7 +508,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 }
 
 fn gen_fastqc(context: &Context) -> anyhow::Result<()> {
-    let outname = "2_fastqc.sh";
+    let outname = "0_script/2_fastqc.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -525,7 +525,7 @@ fn gen_fastqc(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_insert_size(context: &Context) -> anyhow::Result<()> {
-    let outname = "2_insert_size.sh";
+    let outname = "0_script/2_insert_size.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -542,7 +542,7 @@ fn gen_insert_size(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_kat(context: &Context) -> anyhow::Result<()> {
-    let outname = "2_kat.sh";
+    let outname = "0_script/2_kat.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -559,7 +559,7 @@ fn gen_kat(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_fastk(context: &Context) -> anyhow::Result<()> {
-    let outname = "2_fastk.sh";
+    let outname = "0_script/2_fastk.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -576,7 +576,7 @@ fn gen_fastk(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_genescopefk(context: &Context) -> anyhow::Result<()> {
-    let outname = "genescopefk.R";
+    let outname = "0_script/genescopefk.R";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -590,7 +590,7 @@ fn gen_genescopefk(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_trim(context: &Context) -> anyhow::Result<()> {
-    let outname = "2_trim.sh";
+    let outname = "0_script/2_trim.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -607,7 +607,7 @@ fn gen_trim(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_stat_reads(context: &Context) -> anyhow::Result<()> {
-    let outname = "9_stat_reads.sh";
+    let outname = "0_script/9_stat_reads.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -624,7 +624,7 @@ fn gen_stat_reads(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_quorum(context: &Context) -> anyhow::Result<()> {
-    let outname = "2_quorum.sh";
+    let outname = "0_script/2_quorum.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -641,7 +641,7 @@ fn gen_quorum(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_no_quorum(context: &Context) -> anyhow::Result<()> {
-    let outname = "2_quorum.sh";
+    let outname = "0_script/2_quorum.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -658,7 +658,7 @@ fn gen_no_quorum(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_merge(context: &Context) -> anyhow::Result<()> {
-    let outname = "2_merge.sh";
+    let outname = "0_script/2_merge.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -675,7 +675,7 @@ fn gen_merge(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_bwa(context: &Context) -> anyhow::Result<()> {
-    let outname = "3_bwa.sh";
+    let outname = "0_script/3_bwa.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -692,7 +692,7 @@ fn gen_bwa(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_gatk(context: &Context) -> anyhow::Result<()> {
-    let outname = "3_gatk.sh";
+    let outname = "0_script/3_gatk.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -709,7 +709,7 @@ fn gen_gatk(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_down_sampling(context: &Context) -> anyhow::Result<()> {
-    let outname = "4_down_sampling.sh";
+    let outname = "0_script/4_down_sampling.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -726,7 +726,7 @@ fn gen_down_sampling(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_mr_down_sampling(context: &Context) -> anyhow::Result<()> {
-    let outname = "6_down_sampling.sh";
+    let outname = "0_script/6_down_sampling.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -787,7 +787,7 @@ fn gen_mr_unitigs(context: &Context, unitigger: &str) -> anyhow::Result<()> {
 }
 
 fn gen_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "4_anchors.sh";
+    let outname = "0_script/4_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -804,7 +804,7 @@ fn gen_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_mr_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "6_anchors.sh";
+    let outname = "0_script/6_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -821,7 +821,7 @@ fn gen_mr_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_stat_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "9_stat_anchors.sh";
+    let outname = "0_script/9_stat_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -838,7 +838,7 @@ fn gen_stat_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_stat_mr_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "9_stat_mr_anchors.sh";
+    let outname = "0_script/9_stat_mr_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -858,7 +858,7 @@ fn gen_stat_mr_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_merge_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "7_merge_anchors.sh";
+    let outname = "0_script/7_merge_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -875,7 +875,7 @@ fn gen_merge_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_stat_merge_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "9_stat_merge_anchors.sh";
+    let outname = "0_script/9_stat_merge_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -895,7 +895,7 @@ fn gen_stat_merge_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_spades(context: &Context) -> anyhow::Result<()> {
-    let outname = "8_spades.sh";
+    let outname = "0_script/8_spades.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -912,7 +912,7 @@ fn gen_spades(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_mr_spades(context: &Context) -> anyhow::Result<()> {
-    let outname = "8_mr_spades.sh";
+    let outname = "0_script/8_mr_spades.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -929,7 +929,7 @@ fn gen_mr_spades(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_megahit(context: &Context) -> anyhow::Result<()> {
-    let outname = "8_megahit.sh";
+    let outname = "0_script/8_megahit.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -946,7 +946,7 @@ fn gen_megahit(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_mr_megahit(context: &Context) -> anyhow::Result<()> {
-    let outname = "8_mr_megahit.sh";
+    let outname = "0_script/8_mr_megahit.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -963,7 +963,7 @@ fn gen_mr_megahit(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_stat_other_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "9_stat_other_anchors.sh";
+    let outname = "0_script/9_stat_other_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -983,7 +983,7 @@ fn gen_stat_other_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_glue_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "7_glue_anchors.sh";
+    let outname = "0_script/7_glue_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -1000,7 +1000,7 @@ fn gen_glue_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_fill_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "7_fill_anchors.sh";
+    let outname = "0_script/7_fill_anchors.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -1017,7 +1017,7 @@ fn gen_fill_anchors(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_quast(context: &Context) -> anyhow::Result<()> {
-    let outname = "9_quast.sh";
+    let outname = "0_script/9_quast.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -1034,7 +1034,7 @@ fn gen_quast(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_busco(context: &Context) -> anyhow::Result<()> {
-    let outname = "9_busco.sh";
+    let outname = "0_script/9_busco.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -1051,7 +1051,7 @@ fn gen_busco(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_stat_final(context: &Context) -> anyhow::Result<()> {
-    let outname = "9_stat_final.sh";
+    let outname = "0_script/9_stat_final.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -1068,7 +1068,7 @@ fn gen_stat_final(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_cleanup(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_cleanup.sh";
+    let outname = "0_script/0_cleanup.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -1085,7 +1085,7 @@ fn gen_cleanup(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_real_clean(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_real_clean.sh";
+    let outname = "0_script/0_real_clean.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -1102,7 +1102,7 @@ fn gen_real_clean(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_master(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_master.sh";
+    let outname = "0_script/0_master.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
@@ -1119,7 +1119,7 @@ fn gen_master(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_bsub(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_bsub.sh";
+    let outname = "0_script/0_script/0_bsub.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
