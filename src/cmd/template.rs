@@ -1120,7 +1120,7 @@ fn gen_master(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_bsub(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_script/0_script/0_bsub.sh";
+    let outname = "0_script/0_bsub.sh";
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
