@@ -96,3 +96,4 @@ if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
 fi
 
 cat statFinal.md
+mv statFinal.md ${BASH_DIR}/9_markdown
