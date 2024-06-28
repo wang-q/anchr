@@ -172,9 +172,9 @@ fi
 #----------------------------#
 # final stats
 #----------------------------#
-if [ -e 9_stat_final.sh ]; then
+if [ -e 0_script/9_stat_final.sh ]; then
     bash 0_script/9_stat_final.sh
 fi
-if [ -e 9_quast.sh ]; then
+if [ -e 0_script/9_quast.sh ]; then
     bash 0_script/9_quast.sh
 fi
