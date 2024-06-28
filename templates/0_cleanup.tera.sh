@@ -90,29 +90,29 @@ if [ -e statAnchors.md ]; then
     echo;
 fi
 {% for u in unitiggers -%}
-if [ -e statUnitigs{{ u | title }}.md ]; then
+if [ -e 9_markdown/statUnitigs{{ u | title }}.md ]; then
     echo;
-    cat statUnitigs{{ u | title }}.md
+    cat 9_markdown/statUnitigs{{ u | title }}.md
     echo;
 fi
-if [ -e statMRUnitigs{{ u | title }}.md ]; then
+if [ -e 9_markdown/statMRUnitigs{{ u | title }}.md ]; then
     echo;
-    cat statMRUnitigs{{ u | title }}.md;
+    cat 9_markdown/statMRUnitigs{{ u | title }}.md;
     echo;
 fi
 {% endfor -%}
-if [ -e statMergeAnchors.md ]; then
+if [ -e 9_markdown/statMergeAnchors.md ]; then
     echo;
-    cat statMergeAnchors.md;
-    echo;
-fi
-if [ -e statOtherAnchors.md ]; then
-    echo;
-    cat statOtherAnchors.md;
+    cat 9_markdown/statMergeAnchors.md;
     echo;
 fi
-if [ -e statFinal.md ]; then
+if [ -e 9_markdown/statOtherAnchors.md ]; then
     echo;
-    cat statFinal.md;
+    cat 9_markdown/statOtherAnchors.md;
+    echo;
+fi
+if [ -e 9_markdown/statFinal.md ]; then
+    echo;
+    cat 9_markdown/statFinal.md;
     echo;
 fi

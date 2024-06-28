@@ -54,4 +54,5 @@ find . -type f -name "core.*"   | parallel --no-run-if-empty -j 1 rm
 rm -fr 9_markdown
 
 # bash
+rm -fr 0_script
 rm *.sh

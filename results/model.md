@@ -27,6 +27,8 @@ mkdir -p ~/data/anchr/g37/1_genome
 cd ~/data/anchr/g37/1_genome
 
 cp ~/data/anchr/ref/g37/genome.fa .
+cp ~/data/anchr/ref/g37/paralogs.fa .
+cp ~/data/anchr/ref/g37/repetitive.fa .
 
 ```
 
