@@ -7,7 +7,7 @@ log_warn 2_quorum.sh
 
 for Q in 0 {{ opt.qual }}; do
     for L in 0 {{ opt.len }}; do
-        cd ${BASH_DIR}
+        cd ${BASH_DIR}/..
 
         if [ ! -d 2_illumina/Q${Q}L${L} ]; then
             continue;
@@ -106,7 +106,7 @@ for Q in 0 {{ opt.qual }}; do
     done
 done
 
-cd ${BASH_DIR}/2_illumina
+cd ${BASH_DIR}/../2_illumina
 
 if [ -e Q0L0/statQuorum.R.tsv ]; then
     for PREFIX in R S T; do
@@ -130,7 +130,7 @@ if [ -e Q0L0/statQuorum.R.tsv ]; then
     echo -e "\nTable: statQuorum\n" >> statQuorum.md
 
     cat statQuorum.md
-    mv statQuorum.md ${BASH_DIR}/9_markdown
+    mv statQuorum.md ${BASH_DIR}/../9_markdown
 fi
 
 log_info Done.

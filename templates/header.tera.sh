@@ -4,6 +4,10 @@ BASH_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 cd "${BASH_DIR}"
 
+if [[ "$PWD" == *0_script* ]]; then
+    cd ..
+fi
+
 #----------------------------#
 # Colors in term
 #----------------------------#

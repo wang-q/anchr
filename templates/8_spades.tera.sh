@@ -65,7 +65,7 @@ fi
 #----------------------------#
 log_info "Create anchors"
 
-cd ${BASH_DIR}
+cd ${BASH_DIR}/..
 mkdir -p 8_spades/anchor
 cd 8_spades/anchor
 

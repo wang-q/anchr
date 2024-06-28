@@ -70,4 +70,4 @@ cat statReads.tsv |
 echo -e "\nTable: statReads\n" >> statReads.md
 
 cat statReads.md
-mv statReads.md ${BASH_DIR}/9_markdown
+mv statReads.md ${BASH_DIR}/../9_markdown

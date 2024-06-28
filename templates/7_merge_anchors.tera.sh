@@ -57,7 +57,7 @@ cd ${DIR_MERGE}/anchor
 
 anchr anchors \
     ../anchor.non-contained.fasta \
-    ${BASH_DIR}/2_illumina/trim/pe.cor.fa.gz \
+    ${BASH_DIR}/../2_illumina/trim/pe.cor.fa.gz \
     --readl {{ opt.readl }} \
     --uscale {{ opt.uscale }} \
     --lscale {{ opt.lscale }} \
@@ -76,7 +76,7 @@ mv anchor.fasta ../anchor.merge.fasta
 #----------------------------#
 log_info "others"
 
-cd ${BASH_DIR}
+cd ${BASH_DIR}/..
 
 anchr contained \
     $( find . -path "*${DIR_PREFIX}*" -name "pe.others.fa" -or -path "*${DIR_PREFIX}*" -name "others.non-contained.fasta" | sort -r ) \

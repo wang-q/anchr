@@ -60,4 +60,4 @@ done |
     >> statKAT.md
 
 cat statKAT.md
-mv statKAT.md ${BASH_DIR}/9_markdown
+mv statKAT.md ${BASH_DIR}/../9_markdown

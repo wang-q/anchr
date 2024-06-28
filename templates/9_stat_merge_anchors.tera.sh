@@ -50,4 +50,4 @@ done \
 >> ${FILENAME_MD}
 
 cat ${FILENAME_MD}
-mv ${FILENAME_MD} ${BASH_DIR}/9_markdown
+mv ${FILENAME_MD} ${BASH_DIR}/../9_markdown

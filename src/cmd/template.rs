@@ -418,6 +418,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
     // create scripts
     //----------------------------
+    fs::create_dir_all("0_script")?;
     fs::create_dir_all("9_markdown")?;
 
     if args.get_flag("fastqc") {
@@ -743,7 +744,7 @@ fn gen_mr_down_sampling(context: &Context) -> anyhow::Result<()> {
 }
 
 fn gen_unitigs(context: &Context, unitigger: &str) -> anyhow::Result<()> {
-    let outname = format!("4_unitigs_{}.sh", unitigger);
+    let outname = format!("0_script/4_unitigs_{}.sh", unitigger);
     eprintln!("Create {}", outname);
 
     let mut con = Context::new();
@@ -765,7 +766,7 @@ fn gen_unitigs(context: &Context, unitigger: &str) -> anyhow::Result<()> {
 }
 
 fn gen_mr_unitigs(context: &Context, unitigger: &str) -> anyhow::Result<()> {
-    let outname = format!("6_unitigs_{}.sh", unitigger);
+    let outname = format!("0_script/6_unitigs_{}.sh", unitigger);
     eprintln!("Create {}", outname);
 
     let mut con = Context::new();

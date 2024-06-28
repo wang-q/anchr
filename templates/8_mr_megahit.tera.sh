@@ -26,7 +26,7 @@ else
     megahit \
         -t {{ opt.parallel }} \
         --k-min 45 --k-max 225 --k-step 26 \
-        --12 ${BASH_DIR}/2_illumina/merge/pe.cor.fa.gz \
+        --12 ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz \
         --min-count 3 \
         -o 8_mr_megahit
 
@@ -50,7 +50,7 @@ cd 8_mr_megahit/anchor
 
 anchr anchors \
     ../megahit.non-contained.fasta \
-    ${BASH_DIR}/2_illumina/merge/pe.cor.fa.gz \
+    ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz \
     --readl {{ opt.readl }} \
     --uscale {{ opt.uscale }} \
     --lscale {{ opt.lscale }} \

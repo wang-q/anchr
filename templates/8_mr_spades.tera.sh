@@ -27,7 +27,7 @@ else
     cd 8_mr_spades
 
     mkdir -p re-pair
-    faops filter -l 0 -a 60 ${BASH_DIR}/2_illumina/merge/pe.cor.fa.gz stdout |
+    faops filter -l 0 -a 60 ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz stdout |
         repair.sh \
             in=stdin.fa \
             out=re-pair/R1.fa \
@@ -61,13 +61,13 @@ fi
 #----------------------------#
 log_info "Create anchors"
 
-cd ${BASH_DIR}
+cd ${BASH_DIR}/..
 mkdir -p 8_mr_spades/anchor
 cd 8_mr_spades/anchor
 
 anchr anchors \
     ../spades.non-contained.fasta \
-    ${BASH_DIR}/2_illumina/merge/pe.cor.fa.gz \
+    ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz \
     --readl {{ opt.readl }} \
     --uscale {{ opt.uscale }} \
     --lscale {{ opt.lscale }} \

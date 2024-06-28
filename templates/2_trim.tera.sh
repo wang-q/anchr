@@ -114,10 +114,10 @@ done
 
 if [ -s statTrimReads.md ]; then
     cat statTrimReads.md
-    mv statTrimReads.md ${BASH_DIR}/9_markdown
+    mv statTrimReads.md ${BASH_DIR}/../9_markdown
 fi
 
-cd ${BASH_DIR}
+cd ${BASH_DIR}/..
 cd 2_illumina
 
 parallel --no-run-if-empty --linebuffer -k -j 2 "

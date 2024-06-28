@@ -7,7 +7,7 @@ log_warn 2_quorum.sh
 
 for Q in 0 {{ opt.qual }}; do
     for L in 0 {{ opt.len }}; do
-        cd ${BASH_DIR}
+        cd ${BASH_DIR}/..
 
         if [ ! -d 2_illumina/Q${Q}L${L} ]; then
             continue;

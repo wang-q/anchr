@@ -122,11 +122,11 @@ cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 2_illumina/trim 2_illumina/merge statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
 
-bash 0_master.sh
+bash 0_script/0_master.sh
 
 prettier -w 9_markdown/*.md
 
-# bash 0_cleanup.sh
+# bash 0_script/0_cleanup.sh
 
 ```
 
