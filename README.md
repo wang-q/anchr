@@ -29,6 +29,11 @@ curl -fsSL $(
 cp target/x86_64-unknown-linux-musl/release/anchr ${HOME}/bin
 rm -fr target
 
+# build under WSL 2
+export CARGO_TARGET_DIR=/tmp
+cargo build
+
+
 ```
 
 ## SYNOPSIS
@@ -107,9 +112,10 @@ python3 ./setup.py install
 quast.py --test
 
 # Optional: leading assemblers
+brew install brewsci/bio/megahit
+
 brew install spades
 spades.py --test
-brew install brewsci/bio/megahit
 
 ```
 
