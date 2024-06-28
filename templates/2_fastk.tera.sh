@@ -27,7 +27,7 @@ for PREFIX in R S T; do
 
         log_info "GeneScope"
         Histex -G Table-${KMER} |
-            Rscript ../../genescopefk.R -k ${KMER} -p 1 -o ${PREFIX}-GeneScope-${KMER}
+            Rscript ../../0_script/genescopefk.R -k ${KMER} -p 1 -o ${PREFIX}-GeneScope-${KMER}
 
         KatGC -T{{ opt.parallel }} -x1.9 -s Table-${KMER} ${PREFIX}-Merqury-KatGC-${KMER}
 
