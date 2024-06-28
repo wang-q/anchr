@@ -414,6 +414,15 @@ cp ~/data/anchr/ref/mg1655/repetitive.fa .
 
 ### mg1655: download
 
+```shell
+mkdir -p ~/data/anchr/mg1655/ena
+cd ~/data/anchr/mg1655/ena
+
+aria2c -x 9 -s 3 -c ftp://webdata:webdata@ussd-ftp.illumina.com/Data/SequencingRuns/MG1655/MiSeq_Ecoli_MG1655_110721_PF_R1.fastq.gz
+aria2c -x 9 -s 3 -c ftp://webdata:webdata@ussd-ftp.illumina.com/Data/SequencingRuns/MG1655/MiSeq_Ecoli_MG1655_110721_PF_R2.fastq.gz
+
+```
+
 * Illumina
 
 ```shell
@@ -422,11 +431,8 @@ cd ~/data/anchr/mg1655
 mkdir -p 2_illumina
 cd 2_illumina
 
-aria2c -x 9 -s 3 -c ftp://webdata:webdata@ussd-ftp.illumina.com/Data/SequencingRuns/MG1655/MiSeq_Ecoli_MG1655_110721_PF_R1.fastq.gz
-aria2c -x 9 -s 3 -c ftp://webdata:webdata@ussd-ftp.illumina.com/Data/SequencingRuns/MG1655/MiSeq_Ecoli_MG1655_110721_PF_R2.fastq.gz
-
-ln -s MiSeq_Ecoli_MG1655_110721_PF_R1.fastq.gz R1.fq.gz
-ln -s MiSeq_Ecoli_MG1655_110721_PF_R2.fastq.gz R2.fq.gz
+ln -s ../ena/MiSeq_Ecoli_MG1655_110721_PF_R1.fastq.gz R1.fq.gz
+ln -s ../ena/MiSeq_Ecoli_MG1655_110721_PF_R2.fastq.gz R2.fq.gz
 
 ```
 
@@ -460,7 +466,7 @@ anchr template \
     \
     --fastqc \
     --insertsize \
-    --kat \
+    --fastk \
     \
     --trim "--dedupe --tile --cutoff 30 --cutk 31" \
     --qual "25 30" \
@@ -475,12 +481,11 @@ anchr template \
     --gatk \
     \
     --cov "40 80" \
-    --unitigger "superreads bcalm tadpole" \
+    --unitigger "bcalm bifrost superreads tadpole" \
     --statp 2 \
     --readl 151 \
     --uscale 2 \
     --lscale 3 \
-    --redo \
     \
     --extend \
     \
