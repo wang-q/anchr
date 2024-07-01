@@ -505,7 +505,7 @@ cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_down_sampling 6_down_sampling
 
 # BASE_NAME=mg1655 bash 0_bsub.sh
-bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
+bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_script/0_master.sh"
 # bkill -J "${BASE_NAME}-*"
 
 # bash 0_master.sh

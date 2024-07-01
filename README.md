@@ -33,7 +33,6 @@ rm -fr target
 export CARGO_TARGET_DIR=/tmp
 cargo build
 
-
 ```
 
 ## SYNOPSIS
