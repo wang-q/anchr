@@ -1,5 +1,13 @@
 # FastK, GENESCOPE.FK, and MERQURY.FK
 
+<!-- TOC -->
+* [FastK, GENESCOPE.FK, and MERQURY.FK](#fastk-genescopefk-and-merquryfk)
+  * [Installation](#installation)
+  * [GeneScope](#genescope)
+  * [Merqury](#merqury)
+  * [Find repetitive regions](#find-repetitive-regions)
+<!-- TOC -->
+
 [FastK](https://github.com/thegenemyers/FASTK)
 
 [GENESCOPE.FK](https://github.com/thegenemyers/GENESCOPE.FK)
@@ -28,18 +36,18 @@ parallel -j 1 -k --line-buffer '
 cd ~/data/anchr/g37/ena/
 
 time FastK -v -t1 -k21 *.fastq.gz -NTable-21
-#real	0m50.853s
-#user	1m27.788s
-#sys	0m4.377s
+#real    0m1.984s
+#user    0m3.318s
+#sys     0m0.341s
 
-time FastK -v -t1 -k51 R1.fq.gz R2.fq.gz -NTable-51
-#real	1m3.061s
-#user	1m36.951s
-#sys	0m6.808s
+time FastK -v -t1 -k51 *.fastq.gz -NTable-51
+#real    0m2.082s
+#user    0m3.555s
+#sys     0m0.507s
 
-Histex -G Table-21 | Rscript ~/Scripts/rust/anchr/templates/genescopefk.R -k 21 -p 1 -o GeneScope-21
+Histex -G Table-21 | Rscript ~/Scripts/anchr/templates/genescopefk.R -k 21 -p 1 -o GeneScope-21
 
-Histex -G Table-51 | Rscript ~/Scripts/rust/anchr/templates/genescopefk.R -k 51 -p 1 -o GeneScope-51
+Histex -G Table-51 | Rscript ~/Scripts/anchr/templates/genescopefk.R -k 51 -p 1 -o GeneScope-51
 
 # disk usages
 ll |
@@ -48,7 +56,7 @@ ll |
     cut -f 5,9 |
     sed 's/\*$//' |
     ( echo -e 'Size\tName' && cat ) |
-    mlr --itsv --omd cat
+    rgr md stdin --fmt
 
 Fastrm Table-21 Table-51
 
@@ -77,41 +85,41 @@ for K in 21 51; do
     printf "\tKmer Cov\t\t${COV}\n"
 done |
     keep-header -- grep -v '^K' |
-    mlr --itsv --omd cat
+    rgr md stdin --right 3-4
 
 ```
 
-| Size      | Name             |
-|-----------|------------------|
-| 145354802 | .Table-21.ktab.1 |
-| 128966832 | .Table-21.ktab.2 |
-| 138372242 | .Table-21.ktab.3 |
-| 133722077 | .Table-21.ktab.4 |
-| 403680936 | .Table-51.ktab.1 |
-| 383925912 | .Table-51.ktab.2 |
-| 424657164 | .Table-51.ktab.3 |
-| 394298388 | .Table-51.ktab.4 |
-| 262164    | Table-21.hist    |
-| 134217744 | Table-21.ktab    |
-| 262164    | Table-51.hist    |
-| 134217744 | Table-51.ktab    |
+|       Size | Name             |
+|-----------:|------------------|
+|    262,164 | Table-21.hist    |
+|    524,304 | Table-21.ktab    |
+|  4,382,748 | .Table-21.ktab.1 |
+|  4,457,262 | .Table-21.ktab.2 |
+|  4,480,296 | .Table-21.ktab.3 |
+|  4,378,950 | .Table-21.ktab.4 |
+|    262,164 | Table-51.hist    |
+|    524,304 | Table-51.ktab    |
+| 12,613,366 | .Table-51.ktab.1 |
+| 10,755,393 | .Table-51.ktab.2 |
+| 11,851,397 | .Table-51.ktab.3 |
+| 11,481,742 | .Table-51.ktab.4 |
 
-| K   | property              | min          | max          |
-|-----|-----------------------|--------------|--------------|
-| 21  | Homozygous (a)        |              | 100%         |
-|     | Genome Haploid Length |              | 4,478,083 bp |
-|     | Genome Repeat Length  | 136,755 bp   | 136,883 bp   |
-|     | Genome Unique Length  | 4,339,242 bp | 4,343,288 bp |
-|     | Model Fit             | 97.2749%     | 97.3934%     |
-|     | Read Error Rate       |              | 0.531821%    |
-|     | Kmer Cov              |              | 299.7        |
-| 51  | Homozygous (a)        |              | 100%         |
-|     | Genome Haploid Length |              | 4,385,263 bp |
-|     | Genome Repeat Length  | 91,444 bp    | 91,569 bp    |
-|     | Genome Unique Length  | 4,290,813 bp | 4,296,704 bp |
-|     | Model Fit             | 97.3222%     | 97.6265%     |
-|     | Read Error Rate       |              | 0.326106%    |
-|     | Kmer Cov              |              | 223.4        |
+| K  | property              |        min |        max |
+|----|-----------------------|-----------:|-----------:|
+| 21 | Homozygous (a)        |            |       100% |
+|    | Genome Haploid Length |            | 577,872 bp |
+|    | Genome Repeat Length  |   3,638 bp |   3,643 bp |
+|    | Genome Unique Length  | 573,811 bp | 574,653 bp |
+|    | Model Fit             |   92.6091% |   93.3366% |
+|    | Read Error Rate       |            |  0.137192% |
+|    | Kmer Cov              |            |      148.8 |
+| 51 | Homozygous (a)        |            |       100% |
+|    | Genome Haploid Length |            | 578,025 bp |
+|    | Genome Repeat Length  |            |       0 bp |
+|    | Genome Unique Length  |            | 578,025 bp |
+|    | Model Fit             |   95.6385% |   95.7255% |
+|    | Read Error Rate       |            | 0.0942288% |
+|    | Kmer Cov              |            |      112.2 |
 
 ## Merqury
 
@@ -123,9 +131,15 @@ cd ~/data/anchr/mg1655/2_illumina
 mkdir "Merqury"
 
 # KatGC
-FastK -v -t1 -k21 R*.fq.gz -NTable-21
+time FastK -v -t1 -k21 R*.fq.gz -NTable-21
+#real    0m37.733s
+#user    1m7.119s
+#sys     0m7.661s
 
-FastK -v -t1 -k51 R*.fq.gz -NTable-51
+time FastK -v -t1 -k51 R*.fq.gz -NTable-51
+#real    0m40.730s
+#user    1m17.317s
+#sys     0m12.324s
 
 KatGC -T4 -x1.9 -s Table-21 Merqury/KatGC-21
 KatGC -T4 -x1.9 -s Table-51 Merqury/KatGC-51
@@ -147,7 +161,7 @@ Fastrm R1-21 R2-21
 ```shell
 cd ~/data/anchr/mg1655/1_genome/
 
-faops size genome.fa > chr.sizes
+hnsm size genome.fa > chr.sizes
 
 FastK -v -p -k21 genome
 
@@ -166,24 +180,24 @@ cat chr.sizes |
             spanr span --op fill -n 10 stdin
     ' |
     spanr combine stdin \
-    > repetitive.yml
+    > repetitive.json
 
 Fastrm genome
 
-spanr convert repetitive.yml > region.txt
-samtools faidx -r region.txt genome.fa |
-    faops filter -N -d -a 100 stdin stdout \
+spanr convert repetitive.json > region.txt
+hnsm range genome.fa -r region.txt |
+    hnsm filter -N -d -a 100 stdin \
     > repetitive.fa
 
-spanr stat chr.sizes repetitive.yml
+spanr stat chr.sizes repetitive.json
 #chr,chrLength,size,coverage
 #NC_000913,4641652,91989,0.0198
 #all,4641652,91989,0.0198
 
-faops size repetitive.fa | tsv-summarize --sum 2
-#110138
+hnsm size repetitive.fa | tsv-summarize --sum 2
+#91989
 
-faops size paralogs.fa | tsv-summarize --sum 2
+hnsm size paralogs.fa | tsv-summarize --sum 2
 #187300
 
 ```
