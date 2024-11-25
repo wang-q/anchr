@@ -84,8 +84,7 @@ Options:
 ```bash
 brew install perl cpanminus
 brew install r
-brew install parallel wget pigz
-brew install miller prettier
+brew install parallel pigz
 
 # cite parallel
 # parallel --citation
