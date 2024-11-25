@@ -67,7 +67,7 @@ my $basename = Path::Tiny::path( $ARGV[0] )->basename( ".yml", ".yaml" );
 my $csv = Text::CSV_XS->new( { binary => 1, sep_char => "\t" } )
   or die "Cannot use CSV: " . Text::CSV_XS->error_diag;
 $csv->eol("\n");
-open my $csv_fh, ">", "$basename.csv";
+open my $csv_fh, ">", "$basename.tsv";
 
 my $ftp_fn  = "$basename.ftp.txt";
 my $md5_fn  = "$basename.md5.txt";

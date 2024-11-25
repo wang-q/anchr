@@ -71,7 +71,7 @@ else {
     open $csv_fh, "<", $ARGV[0];
 }
 
-my $csv = Text::CSV_XS->new( { binary => 1, sep_char => "\t" } )
+my $csv = Text::CSV_XS->new( { binary => 1, } )
   or die "Cannot use CSV: " . Text::CSV_XS->error_diag;
 while ( my $row = $csv->getline($csv_fh) ) {
     next if $row->[0]     =~ /^#/;
