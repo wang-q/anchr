@@ -13,25 +13,33 @@ Current release: 0.3.18
 
 ```shell
 # Via cargo
-cargo install --path . --force --offline
+cargo install --path . --force #--offline
 
 cargo install --git https://github.com/wang-q/anchr --branch main
 
-cargo run --bin anchr help
+# test
+cargo test -- --test-threads=1
 
-# Static binary for Linux
-mkdir -p ${HOME}/bin
-curl -fsSL $(
-    curl -fsSL https://api.github.com/repos/wang-q/anchr/releases/latest |
-        jq -r '.assets[] | select(.name == "anchr-x86_64-unknown-linux-musl.tar.gz").browser_download_url'
-    ) |
-    tar xvz
-cp target/x86_64-unknown-linux-musl/release/anchr ${HOME}/bin
-rm -fr target
+## Static binary for Linux
+#mkdir -p ${HOME}/bin
+#curl -fsSL $(
+#    curl -fsSL https://api.github.com/repos/wang-q/anchr/releases/latest |
+#        jq -r '.assets[] | select(.name == "anchr-x86_64-unknown-linux-musl.tar.gz").browser_download_url'
+#    ) |
+#    tar xvz
+#cp target/x86_64-unknown-linux-musl/release/anchr ${HOME}/bin
+#rm -fr target
 
 # build under WSL 2
-export CARGO_TARGET_DIR=/tmp
+mkdir -p /tmp/cargo
+export CARGO_TARGET_DIR=/tmp/cargo
 cargo build
+
+# build for CentOS 7
+# rustup target add x86_64-unknown-linux-gnu
+# pip3 install cargo-zigbuild
+cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --release
+ll $CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/
 
 ```
 
@@ -77,7 +85,7 @@ Options:
 brew install perl cpanminus
 brew install r
 brew install parallel wget pigz
-brew install datamash miller
+brew install miller
 
 # cite parallel
 # parallel --citation
@@ -86,12 +94,16 @@ brew install datamash miller
 brew tap wang-q/tap
 brew install wang-q/tap/tsv-utils wang-q/tap/intspan
 
+brew install --HEAD wang-q/tap/dazz_db
+brew install --HEAD wang-q/tap/daligner
+
 anchr dep install | bash
 anchr dep check | bash
 
 # Optional: fastk
 brew install --HEAD wang-q/tap/fastk
 brew install --HEAD wang-q/tap/merquryfk
+brew install --HEAD wang-q/tap/fastga
 
 brew install binutils
 brew link binutils --force
