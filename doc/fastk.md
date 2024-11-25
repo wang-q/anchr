@@ -1,11 +1,13 @@
-# FastK, GENESCOPE.FK, and MERQURY.FK
+# FastK, GENESCOPE.FK, MERQURY.FK, and FastGA
 
 <!-- TOC -->
-* [FastK, GENESCOPE.FK, and MERQURY.FK](#fastk-genescopefk-and-merquryfk)
+* [FastK, GENESCOPE.FK, MERQURY.FK, and FastGA](#fastk-genescopefk-merquryfk-and-fastga)
   * [Installation](#installation)
   * [GeneScope](#genescope)
   * [Merqury](#merqury)
   * [Find repetitive regions](#find-repetitive-regions)
+  * [FastGA](#fastga)
+  * [Paralogs](#paralogs)
 <!-- TOC -->
 
 [FastK](https://github.com/thegenemyers/FASTK)
@@ -199,5 +201,93 @@ hnsm size repetitive.fa | tsv-summarize --sum 2
 
 hnsm size paralogs.fa | tsv-summarize --sum 2
 #187300
+
+```
+
+## FastGA
+
+```shell
+mkdir -p ~/data/anchr/test
+cd ~/data/anchr/test
+
+curl -LO https://raw.githubusercontent.com/thegenemyers/FASTGA/refs/heads/main/EXAMPLE/HAP1.fasta.gz
+curl -LO https://raw.githubusercontent.com/thegenemyers/FASTGA/refs/heads/main/EXAMPLE/HAP2.fasta.gz
+
+FastGA -vk -1:H1vH2 HAP1 HAP2
+
+ALNshow H1vH2 | more
+
+ALNtoPAF H1vH2 | more
+
+ALNtoPSL H1vH2 | more
+
+ALNshow -a H1vH2 | more
+
+ALNplot H1vH2 -p -W300 -l5000 -i.8 -n0
+
+```
+
+## Paralogs
+
+```shell
+cd ~/data/anchr/mg1655/1_genome/
+
+FastGA -v -l100 -i0.7 -1:self genome.fa
+
+ALNchain -v -s1000 -z100 -g20 self
+
+ALNtoPAF self |
+    anchr paf2ovlp stdin |
+    tsv-summarize --sum 3
+
+ALNtoPAF self.chain |
+    anchr paf2ovlp stdin |
+    tsv-summarize --sum 3
+
+ALNplot self.chain -p -W500 -n0
+
+ALNtoPAF self.chain |
+    anchr paf2ovlp stdin |
+    tsv-filter --ge 3:1000 |
+    perl -nla -F"\t" -e '
+        # f
+        if ($F[4] == 0) {
+            printf qq(%s(+):%d-%d\t), $F[0], $F[5], $F[6]
+        } else {
+            printf qq(%s(-):%d-%d\t), $F[0], $F[6], $F[5]
+        }
+
+        # g
+        if ($F[8] == 0) {
+            printf qq(%s(+):%d-%d\n), $F[1], $F[9], $F[10]
+        } else {
+            printf qq(%s(-):%d-%d\n), $F[1], $F[10], $F[9]
+        }
+    ' |
+    linkr sort stdin |
+    linkr clean stdin \
+    > self.link.tsv
+
+rgr merge self.link.tsv -c 0.95 -o self.merge.tsv
+
+linkr clean self.link.tsv -r self.merge.tsv --bundle 500 |
+    linkr connect stdin |
+    linkr filter stdin -r 0.8 -o self.filter.tsv
+
+cat self.filter.tsv |
+    tr '\t' '\n' |
+    spanr cover stdin -o paralogs.json
+
+rm self.*.tsv
+
+spanr convert paralogs.json > region.txt
+hnsm range genome.fa -r region.txt |
+    hnsm filter -N -d -a 100 stdin \
+    > paralogs.fa
+
+spanr stat chr.sizes paralogs.json
+#chr,chrLength,size,coverage
+#NC_000913,4641652,260353,0.0561
+#all,4641652,260353,0.0561
 
 ```
