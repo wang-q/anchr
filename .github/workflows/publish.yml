@@ -5,24 +5,22 @@ on:
     tags:
       - '*'
 
+# We need this to be able to create releases.
+permissions:
+  contents: write
+
 jobs:
   linux-gnu:
     runs-on: ubuntu-latest
-    # Use a container with GLIBC 2.17
-    container: quay.io/pypa/manylinux2014_x86_64
     steps:
       - name: Show GLIBC
         run: ldd --version
-
       - name: Checkout sources
-        uses: actions/checkout@v2
-
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions/checkout@v4
+      - name: Setup Rust Toolchain for GitHub CI
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
+          rustflags: ""
 
       - name: Build
         run: cargo build --verbose --release
@@ -30,39 +28,22 @@ jobs:
         run: tar cvfz anchr.tar.gz target/release/anchr
         shell: bash
       - name: Upload binaries to releases
-        uses: svenstaro/upload-release-action@v1-release
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: anchr.tar.gz
           asset_name: anchr-x86_64-unknown-linux-gnu.tar.gz
           tag: ${{ github.ref }}
-  linux-musl:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: stable
-          targets: x86_64-unknown-linux-musl
-      - uses: actions/checkout@v1
-      - name: Build
-        run: cargo build --verbose --release --target x86_64-unknown-linux-musl
-      - name: Create tarball
-        run: tar cvfz anchr.tar.gz target/x86_64-unknown-linux-musl/release/anchr
-        shell: bash
-      - name: Upload binaries to releases
-        uses: svenstaro/upload-release-action@v1-release
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: anchr.tar.gz
-          asset_name: anchr-x86_64-unknown-linux-musl.tar.gz
-          tag: ${{ github.ref }}
   macos:
     runs-on: macOS-latest
     steps:
-      - uses: hecrj/setup-rust-action@v1
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - name: Setup Rust Toolchain for GitHub CI
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          rust-version: stable
-      - uses: actions/checkout@v1
+          rustflags: ""
+
       - name: Build
         env:
           MACOSX_DEPLOYMENT_TARGET: 10.12
@@ -71,7 +52,7 @@ jobs:
         run: tar cvfz anchr.tar.gz target/release/anchr
         shell: bash
       - name: Upload binaries to releases
-        uses: svenstaro/upload-release-action@v1-release
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: anchr.tar.gz
@@ -80,10 +61,13 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: hecrj/setup-rust-action@v1
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - name: Setup Rust Toolchain for GitHub CI
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          rust-version: stable
-      - uses: actions/checkout@v1
+          rustflags: ""
+
       - name: Enable static CRT linkage
         run: |
           mkdir .cargo
@@ -95,7 +79,7 @@ jobs:
         run: Compress-Archive -DestinationPath ./anchr.zip -Path ./target/release/anchr.exe
         shell: powershell
       - name: Upload binaries to releases
-        uses: svenstaro/upload-release-action@v1-release
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: anchr.zip

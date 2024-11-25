@@ -77,7 +77,7 @@ Options:
 brew install perl cpanminus
 brew install r
 brew install parallel wget pigz
-brew install datamash miller prettier
+brew install datamash miller
 
 # cite parallel
 # parallel --citation

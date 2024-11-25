@@ -2,14 +2,14 @@
 name = "anchr"
 version = "0.3.18"
 authors = ["wang-q <wang-q@outlook.com>"]
-edition = "2018"
+edition = "2021"
 description = "Assembler of N-free CHRomosomes"
 documentation = "https://github.com/wang-q/anchr"
 readme = "README.md"
 homepage = "https://github.com/wang-q/anchr"
 repository = "https://github.com/wang-q/anchr"
-license = "None"
-categories = ["command-line-utilities", "bioinformatics"]
+license = "MIT"
+categories = ["command-line-utilities", "science"]
 publish = false
 
 [[bin]]
@@ -17,22 +17,24 @@ name = "anchr"
 path = "src/anchr.rs"
 
 [dependencies]
-clap = { version = "4.3.12", features = ["cargo"] }
-anyhow = "1.0.72"
-regex = "1.9.1"
-lazy_static = "1.4.0"
-itertools = "0.11.0"
+clap = { version = "4.5.21", features = ["cargo"] }
+anyhow = "1.0.93"
+regex = "1.11.1"
+lazy_static = "1.5.0"
+itertools = "0.13.0"
 
-petgraph = "0.6.3"
+tera = "1.20.0"
+intspan = "0.7.9"
+
+# data structure
+petgraph = "0.6.5"
 layout-rs = "0.1.2"
 rustworkx-core = "0.14.2"
 indexmap = "2.0.0"
-tera = "1.19.1"
-intspan = "0.7.5"
 
-which = "4.4.0"
+which = "7.0.0"
+tempfile = "3.14.0"
 cmd_lib = "1.9.4"
-tempfile = "3.6.0"
 path-clean = "1.0.1"
 
 bio = "0.30.1"

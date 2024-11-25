@@ -20,7 +20,7 @@
 
 ## 0.3.18 - 2022-04-21
 
-* Update Github actions
+* Update GitHub actions
     * Use a container with GLIBC 2.17 to build linux-gnu binary
     * Codecov with cargo-tarpaulin
 * Simplify `quorum.sh`
