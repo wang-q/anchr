@@ -12,11 +12,17 @@
     * `anchr covered`
     * `anchr paf2ovlp`
     * `anchr restrict`
-* Use `mlr` instead of manual `printf` to create markdown files
 * `anchr template`
     * Place scripts to `0_script/`
     * Place markdowns to `9_markdown/`
     * Remove platanus
+    * Replace manual `printf` with `rgr md` to create markdown files
+
+* Unfinished
+    * `dazz cover`
+    * `dazz group`
+    * `dazz layout`
+    * `dazz overlap2`
 
 ## 0.3.18 - 2022-04-21
 

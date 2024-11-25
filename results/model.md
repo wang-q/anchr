@@ -1,20 +1,23 @@
-# Assemble genomes of model organisms by Anchr
+# Assemble genomes of model organisms by `anchr`
 
-- [Assemble genomes of model organisms by Anchr](#assemble-genomes-of-model-organisms-by-anchr)
-    * [*Mycoplasma genitalium* G37](#mycoplasma-genitalium-g37)
-        + [g37: download](#g37-download)
-        + [g37: template](#g37-template)
-        + [g37: run](#g37-run)
-    * [*E. coli* str. K-12 substr. MG1655](#e-coli-str-k-12-substr-mg1655)
-        + [mg1655: reference](#mg1655-reference)
-        + [mg1655: download](#mg1655-download)
-        + [mg1655: template](#mg1655-template)
-        + [mg1655: run](#mg1655-run)
-    * [*E. coli* str. K-12 substr. DH5alpha](#e-coli-str-k-12-substr-dh5alpha)
-        + [dh5alpha: reference](#dh5alpha-reference)
-        + [dh5alpha: download](#dh5alpha-download)
-        + [dh5alpha: template](#dh5alpha-template)
-        + [dh5alpha: run](#dh5alpha-run)
+<!-- TOC -->
+* [Assemble genomes of model organisms by `anchr`](#assemble-genomes-of-model-organisms-by-anchr)
+  * [*Mycoplasma genitalium* G37](#mycoplasma-genitalium-g37)
+    * [g37: reference](#g37-reference)
+    * [g37: download](#g37-download)
+    * [g37: template](#g37-template)
+    * [g37: run](#g37-run)
+  * [*E. coli* str. K-12 substr. MG1655](#e-coli-str-k-12-substr-mg1655)
+    * [mg1655: reference](#mg1655-reference)
+    * [mg1655: download](#mg1655-download)
+    * [mg1655: template](#mg1655-template)
+    * [mg1655: run](#mg1655-run)
+  * [*E. coli* str. K-12 substr. DH5alpha](#e-coli-str-k-12-substr-dh5alpha)
+    * [dh5alpha: reference](#dh5alpha-reference)
+    * [dh5alpha: download](#dh5alpha-download)
+    * [dh5alpha: template](#dh5alpha-template)
+    * [dh5alpha: run](#dh5alpha-run)
+<!-- TOC -->
 
 ## *Mycoplasma genitalium* G37
 
@@ -45,7 +48,7 @@ EOF
 anchr ena info | perl - -v source.csv > ena_info.yml
 anchr ena prep | perl - ena_info.yml
 
-mlr --icsv --omd cat ena_info.csv
+rgr md ena_info.tsv --fmt
 
 aria2c -j 4 -x 4 -s 2 -c --file-allocation=none -i ena_info.ftp.txt
 
@@ -53,9 +56,9 @@ md5sum --check ena_info.md5.txt
 
 ```
 
-| name | srx       | platform | layout | ilength | srr       | spots  | bases  |
-|------|-----------|----------|--------|---------|-----------|--------|--------|
-| G37  | ERX452667 | ILLUMINA | PAIRED | 447     | ERR486835 | 680644 | 97.37M |
+| name | srx       | platform | layout | ilength | srr       |   spots | bases  |
+|------|-----------|----------|--------|--------:|-----------|--------:|--------|
+| G37  | ERX452667 | ILLUMINA | PAIRED |     447 | ERR486835 | 680,644 | 97.37M |
 
 * Illumina
 

@@ -85,7 +85,7 @@ Options:
 brew install perl cpanminus
 brew install r
 brew install parallel wget pigz
-brew install miller
+brew install miller prettier
 
 # cite parallel
 # parallel --citation
