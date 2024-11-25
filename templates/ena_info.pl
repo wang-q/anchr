@@ -7,7 +7,7 @@ use Getopt::Long::Descriptive;
 use YAML::Syck qw();
 
 use LWP::Simple qw();
-use JSON::PP qw();
+use JSON::PP    qw();
 use Number::Format;
 use List::MoreUtils::PP;
 use Path::Tiny qw();
@@ -22,8 +22,8 @@ use Text::CSV_XS;
 
     #@type Getopt::Long::Descriptive::Usage
     my $usage,
-    )
-    = Getopt::Long::Descriptive::describe_options(
+  )
+  = Getopt::Long::Descriptive::describe_options(
     <<'MARKDOWN',
 Grab information from ENA.
 
@@ -41,7 +41,7 @@ MARKDOWN
     [ 'help|h',    'display this message' ],
     [ 'verbose|v', 'verbose mode' ],
     { show_defaults => 1, }
-    );
+  );
 
 $usage->die if $opt->{help};
 
@@ -71,8 +71,8 @@ else {
     open $csv_fh, "<", $ARGV[0];
 }
 
-my $csv = Text::CSV_XS->new( { binary => 1 } )
-    or die "Cannot use CSV: " . Text::CSV_XS->error_diag;
+my $csv = Text::CSV_XS->new( { binary => 1, sep_char => "\t" } )
+  or die "Cannot use CSV: " . Text::CSV_XS->error_diag;
 while ( my $row = $csv->getline($csv_fh) ) {
     next if $row->[0]     =~ /^#/;
     next unless $row->[0] =~ /(?:[DES]R\w|SAMN|PRJNA)\d+/;
@@ -86,10 +86,10 @@ while ( my $row = $csv->getline($csv_fh) ) {
     my @srx = erp_worker( $key, $opt->{verbose} );
     warn "@srx\n";
 
-    my $sample
-        = exists $master->{$name}
-        ? $master->{$name}
-        : {};
+    my $sample =
+      exists $master->{$name}
+      ? $master->{$name}
+      : {};
     for (@srx) {
         $sample->{$_} = erx_worker( $_, $opt->{sra}, $opt->{verbose} );
     }
@@ -109,10 +109,11 @@ sub erp_worker {
     my $verbose = shift;
 
     my $url_part1 = "http://www.ebi.ac.uk/ena/portal/api/filereport?accession=";
-    my $url_part2
-        = "&result=read_run&fields=secondary_study_accession,experiment_accession" . "&format=tsv";
+    my $url_part2 =
+        "&result=read_run&fields=secondary_study_accession,experiment_accession"
+      . "&format=tsv";
     my $url = $url_part1 . $term . $url_part2;
-    warn "$url\n" if $verbose;
+    warn "$url\n" if defined $verbose;
 
     my @lines = split /\n/, LWP::Simple::get($url);
 
@@ -133,16 +134,16 @@ sub erx_worker {
     my $verbose = shift;
 
     my $url_part1 = "http://www.ebi.ac.uk/ena/portal/api/filereport?accession=";
-    my $url_part2
-        = "&result=read_run&fields=secondary_study_accession,secondary_sample_accession,"
-        . "experiment_accession,run_accession,scientific_name,"
-        . "instrument_platform,instrument_model,"
-        . "library_name,nominal_length,library_layout,library_source,library_selection,"
-        . "read_count,base_count,"
-        . ( $use_sra ? "sra_md5,sra_ftp" : "fastq_md5,fastq_ftp" )
-        . "&format=json";
+    my $url_part2 =
+"&result=read_run&fields=secondary_study_accession,secondary_sample_accession,"
+      . "experiment_accession,run_accession,scientific_name,"
+      . "instrument_platform,instrument_model,"
+      . "library_name,nominal_length,library_layout,library_source,library_selection,"
+      . "read_count,base_count,"
+      . ( $use_sra ? "sra_md5,sra_ftp" : "fastq_md5,fastq_ftp" )
+      . "&format=json";
     my $url = $url_part1 . $term . $url_part2;
-    warn "$url\n" if $verbose;
+    warn "$url\n" if defined $verbose;
 
     my $content = LWP::Simple::get($url);
     if ( !scalar $content ) {
@@ -171,12 +172,13 @@ sub erx_worker {
         push @srrs, $srr;
 
         # ftp path and md5
-        my @parts_ftp = map { "ftp://" . $_ } grep {defined} split ";",
-            $elem->{ $use_sra ? "sra_ftp" : "fastq_ftp" };
+        my @parts_ftp = map { "ftp://" . $_ } grep { defined } split ";",
+          $elem->{ $use_sra ? "sra_ftp" : "fastq_ftp" };
         push @downloads, @parts_ftp;
 
         my @basenames = map  { ( split "/", $_ )[-1] } @parts_ftp;
-        my @parts_md5 = grep {defined} split ";", $elem->{ $use_sra ? "sra_md5" : "fastq_md5" };
+        my @parts_md5 = grep { defined } split ";",
+          $elem->{ $use_sra ? "sra_md5" : "fastq_md5" };
         for my $i ( 0 .. $#basenames ) {
             push @md5s, ( sprintf "%s %s", $parts_md5[$i], $basenames[$i] );
         }
