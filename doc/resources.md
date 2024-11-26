@@ -28,7 +28,7 @@ Paralogs detected here **may** overlap with transposons/retrotransposons.
     * Assembly: [GCF_001723515.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_001723515.1)
     * Proportion of paralogs (> 1000 bp): 0.0342
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/assembly
 cd ~/data/anchr/assembly
 
@@ -80,7 +80,7 @@ rsync -avP \
     * *Vibrio cholerae* CP1032(5)
         * Assembly: [GCF_000279305.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000279305.1)
 
-```shell script
+```shell
 cd ~/data/anchr/assembly
 
 rsync -avP \
@@ -108,7 +108,7 @@ rsync -avP \
     * Assembly: [GCF_000146045.2](https://www.ncbi.nlm.nih.gov/assembly/GCF_000146045.2)
     * Proportion of paralogs (> 1000 bp): 0.058
 
-```shell script
+```shell
 cd ~/data/anchr/assembly
 
 rsync -avP \
@@ -117,7 +117,7 @@ rsync -avP \
 
 ```
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/ref
 cd ~/data/anchr/ref
 
@@ -145,7 +145,7 @@ done
 
 ## Prepare
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/paralogs/genomes
 cd ~/data/anchr/paralogs/genomes
 
@@ -173,7 +173,7 @@ done
 
 ## Self-alignments
 
-```shell script
+```shell
 cd ~/data/anchr/paralogs
 
 egaz template \
@@ -195,7 +195,7 @@ done
 
 ```
 
-```shell script
+```shell
 cd ~/data/anchr/paralogs
 
 egaz template \
@@ -216,7 +216,7 @@ done
 
 ```
 
-```shell script
+```shell
 cd ~/data/anchr/paralogs
 
 egaz template \
@@ -239,7 +239,7 @@ done
 
 ## repetitive
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/repetitive
 cd ~/data/anchr/repetitive
 
