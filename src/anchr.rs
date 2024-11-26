@@ -36,7 +36,7 @@ Subcommand groups:
 * Dependence
     * dep check / dep install
 * Download
-    * ena info /  ena prep
+    * ena info / ena prep
 * Overlaps
     * Standalone
         * dazzname / show2ovlp / paf2ovlp / covered / restrict
@@ -82,3 +82,6 @@ Subcommand groups:
 
     Ok(())
 }
+
+// TODO:
+//  Replace `tsv-utils` with `rgr`

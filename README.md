@@ -99,7 +99,7 @@ brew install --HEAD wang-q/tap/daligner
 anchr dep install | bash
 anchr dep check | bash
 
-# Optional: fastk
+# Optional: fastk and fastga
 brew install --HEAD wang-q/tap/fastk
 brew install --HEAD wang-q/tap/merquryfk
 brew install --HEAD wang-q/tap/fastga
