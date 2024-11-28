@@ -172,7 +172,7 @@ cat chr.sizes |
     parallel --col-sep "\t" --no-run-if-empty --linebuffer -k -j 4 '
         Profex genome {1} |
             sed "1,2 d" |
-            perl -nl -e '\''/(\d+).+(\d+)/ and print qq{$1\t$2}'\'' |
+            perl -nl -e '\''/(\d+).+(\d+)/ and printf qq(%s\t%s\n), $1 + 1, $2'\'' |
             tsv-filter --ge 2:2 |
             cut -f 1 |
             sed "s/^/{2}:/" |
