@@ -232,7 +232,7 @@ ALNplot H1vH2 -p -W300 -l5000 -i.8 -n0
 ```shell
 cd ~/data/anchr/mg1655/1_genome/
 
-FastGA -v -l100 -i0.7 -1:self genome.fa
+time FastGA -v -l100 -i0.7 -1:self genome.fa
 
 ALNchain -v -s1000 -z100 -g20 self
 
