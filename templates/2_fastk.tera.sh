@@ -68,8 +68,7 @@ done |
     > statFastK.tsv
 
 cat statFastK.tsv |
-    mlr --itsv --omd cat |
-    perl -nlp -e '$. == 2 and $_ = q(|:---|:---|---:|---:|)' \
+    rgr md stdin --right 2 \
     > statFastK.md
 
 echo -e "\nTable: statFastK\n" >> statFastK.md

@@ -21,7 +21,6 @@ pub fn make_subcommand() -> Command {
 * Quality check
 
     * --fastqc
-    * --kat
     * --fastk
     * --insertsize
     * --reads 1000000
@@ -104,12 +103,6 @@ pub fn make_subcommand() -> Command {
                 .long("fastqc")
                 .action(ArgAction::SetTrue)
                 .help("Run FastQC"),
-        )
-        .arg(
-            Arg::new("kat")
-                .long("kat")
-                .action(ArgAction::SetTrue)
-                .help("Run KAT"),
         )
         .arg(
             Arg::new("fastk")
@@ -427,9 +420,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     if args.get_flag("insertsize") {
         gen_insert_size(&context)?;
     }
-    if args.get_flag("kat") {
-        gen_kat(&context)?;
-    }
     if args.get_flag("fastk") {
         gen_fastk(&context)?;
         gen_genescopefk(&context)?;
@@ -533,23 +523,6 @@ fn gen_insert_size(context: &Context) -> anyhow::Result<()> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_insert_size.tera.sh")),
-    ])
-    .unwrap();
-
-    let rendered = tera.render("t", context).unwrap();
-    intspan::write_lines(outname, &vec![rendered.as_str()])?;
-
-    Ok(())
-}
-
-fn gen_kat(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_script/2_kat.sh";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    tera.add_raw_templates(vec![
-        ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/2_kat.tera.sh")),
     ])
     .unwrap();
 

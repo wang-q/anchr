@@ -21,10 +21,6 @@ if [ -e 0_script/2_fastk.sh ]; then
     bash 0_script/2_fastk.sh
 fi
 
-if [ -e 0_script/2_kat.sh ]; then
-    bash 0_script/2_kat.sh
-fi
-
 #----------------------------#
 # trim reads
 #----------------------------#

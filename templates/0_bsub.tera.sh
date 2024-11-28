@@ -24,11 +24,6 @@ if [ -e 0_script/2_fastk.sh ]; then
         "bash 0_script/2_fastk.sh"
 fi
 
-if [ -e 0_script/2_kat.sh ]; then
-    bsub -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-2_kat" \
-        "bash 0_script/2_kat.sh"
-fi
-
 #----------------------------#
 # trim reads
 #----------------------------#
