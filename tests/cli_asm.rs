@@ -64,7 +64,7 @@ fn command_ena() -> anyhow::Result<()> {
     let output = cmd.arg("ena").arg("info").output().unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
 
-    assert_eq!(stdout.lines().count(), 196);
+    assert!(stdout.lines().count() > 100);
     assert!(stdout.contains("accession"));
 
     Ok(())

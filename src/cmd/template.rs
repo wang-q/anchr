@@ -8,26 +8,26 @@ use tera::{Context, Tera};
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
     Command::new("template")
-        .about("Creates Bash scripts")
+        .about("Creates scripts")
         .after_help(
             r#"
 * Info
-
     * --genome
     * --se
     * --xmx
     * --parallel 8
     * --queue mpi
 
-* Quality check
+* Resources
+    * --repetitive
 
+* Quality check
     * --fastqc
     * --fastk
     * --insertsize
     * --reads 1000000
 
 * Trimming
-
     * --trim "--dedupe"
     * --sample "300"
     * --qual "25 30"
@@ -35,7 +35,6 @@ pub fn make_subcommand() -> Command {
     * --filter "adapter"
 
 * Post-trimming
-
     * --quorum
     * --merge
     * --prefilter
@@ -46,7 +45,6 @@ pub fn make_subcommand() -> Command {
     * --gatk
 
 * Down sampling, unitigs, and anchors
-
     * --cov "40 80"
     * --unitigger "bcalm"
     * --splitp 20
@@ -57,7 +55,6 @@ pub fn make_subcommand() -> Command {
     * --redo
 
 * Extend anchors
-
     * --extend
     * --gluemin 30
     * --fillmax 100
@@ -97,6 +94,13 @@ pub fn make_subcommand() -> Command {
                 .long("queue")
                 .help("Queue name of the LSF cluster")
                 .num_args(1),
+        )
+        // Resources
+        .arg(
+            Arg::new("repetitive")
+                .long("repetitive")
+                .action(ArgAction::SetTrue)
+                .help("Find repetitive regions"),
         )
         // Quality check
         .arg(
@@ -415,6 +419,10 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     fs::create_dir_all("0_script")?;
     fs::create_dir_all("9_markdown")?;
 
+    if args.get_flag("repetitive") {
+        gen_repetitive(&context)?;
+    }
+
     if args.get_flag("fastqc") {
         gen_fastqc(&context)?;
     }
@@ -504,6 +512,23 @@ fn decode_gz(bytes: &[u8]) -> anyhow::Result<String> {
     let mut s = String::new();
     gz.read_to_string(&mut s)?;
     Ok(s)
+}
+
+fn gen_repetitive(context: &Context) -> anyhow::Result<()> {
+    let outname = "0_script/1_repetitive.sh";
+    eprintln!("Create {}", outname);
+
+    let mut tera = Tera::default();
+    tera.add_raw_templates(vec![
+        ("header", include_str!("../../templates/header.tera.sh")),
+        ("t", include_str!("../../templates/1_repetitive.tera.sh")),
+    ])
+    .unwrap();
+
+    let rendered = tera.render("t", context).unwrap();
+    intspan::write_lines(outname, &vec![rendered.as_str()])?;
+
+    Ok(())
 }
 
 fn gen_fastqc(context: &Context) -> anyhow::Result<()> {

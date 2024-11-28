@@ -18,7 +18,8 @@
     * Place markdowns to `9_markdown/`
     * Remove platanus
     * Replace manual `printf` with `rgr md` to create markdown files
-    * Remove 2_kat.sh
+    * Add `1_repetitive.sh`
+    * Remove `2_kat.sh`
 
 * Unfinished
     * `dazz cover`

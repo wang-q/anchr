@@ -31,7 +31,6 @@ cd ~/data/anchr/g37/1_genome
 
 cp ~/data/anchr/ref/g37/genome.fa .
 cp ~/data/anchr/ref/g37/paralogs.fa .
-cp ~/data/anchr/ref/g37/repetitive.fa .
 
 ```
 
@@ -83,11 +82,13 @@ BASE_NAME=g37
 
 cd ${WORKING_DIR}/${BASE_NAME}
 
-rm *.sh
+rm 0_script/*
 anchr template \
     --genome 580076 \
     --parallel 8 \
     --xmx 12g \
+    \
+    --repetitive \
     \
     --fastqc \
     --insertsize \
