@@ -47,9 +47,9 @@ time FastK -v -t1 -k51 *.fastq.gz -NTable-51
 #user    0m3.555s
 #sys     0m0.507s
 
-Histex -G Table-21 | Rscript ~/Scripts/anchr/templates/genescopefk.R -k 21 -p 1 -o GeneScope-21
+Histex -G Table-21 | Rscript <(gzip -dcf ~/Scripts/anchr/templates/genescopefk.R.gz) -k 21 -p 1 -o GeneScope-21
 
-Histex -G Table-51 | Rscript ~/Scripts/anchr/templates/genescopefk.R -k 51 -p 1 -o GeneScope-51
+Histex -G Table-51 | Rscript <(gzip -dcf ~/Scripts/anchr/templates/genescopefk.R.gz) -k 51 -p 1 -o GeneScope-51
 
 # disk usages
 ll |
