@@ -123,8 +123,7 @@ if [ -e Q0L0/statQuorum.R.tsv ]; then
                  "Kmer" "RealG" "EstG" "Est/Real" \
                  "RunTime" \
             && cat) |
-        mlr --itsv --omd cat |
-        perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|---:|---:|---:|---:|---:|)' \
+        rgr md stdin --right 2-9 \
         > statQuorum.md
 
     echo -e "\nTable: statQuorum\n" >> statQuorum.md
