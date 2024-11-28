@@ -23,9 +23,9 @@ for NAME in genome paralogs; do
 done \
     >> statReads.tsv
 
-if [ -e ../1_genome/repetitive.fa ]; then
+if [ -e ../1_genome/repetitive/repetitive.fa ]; then
     printf "%s\t%s\t%s\t%s\n" \
-        $(echo "${NAME}"; stat_format ../1_genome/repetitive/repetitive.fa;)
+        $(echo "repetitive"; stat_format ../1_genome/repetitive/repetitive.fa;)
 fi \
     >> statReads.tsv
 
