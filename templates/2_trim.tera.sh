@@ -62,8 +62,7 @@ for PREFIX in R S T; do
 done
 
 cat statTrimReads.tsv |
-    mlr --itsv --omd cat |
-    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|)' \
+    rgr md stdin --right 2-4 \
     > statTrimReads.md
 
 echo -e "\nTable: statTrimReads\n" >> statTrimReads.md

@@ -15,12 +15,18 @@ printf "%s\t%s\t%s\t%s\n" \
     "Name" "N50" "Sum" "#" \
     > statReads.tsv
 
-for NAME in genome paralogs repetitive; do
+for NAME in genome paralogs; do
     if [ -e ../1_genome/${NAME}.fa ]; then
         printf "%s\t%s\t%s\t%s\n" \
             $(echo "${NAME}"; stat_format ../1_genome/${NAME}.fa;)
     fi
 done \
+    >> statReads.tsv
+
+if [ -e ../1_genome/repetitive.fa ]; then
+    printf "%s\t%s\t%s\t%s\n" \
+        $(echo "${NAME}"; stat_format ../1_genome/repetitive/repetitive.fa;)
+fi \
     >> statReads.tsv
 
 for PREFIX in R S T; do
@@ -63,8 +69,7 @@ done \
 fi # end of statReads
 
 cat statReads.tsv |
-    mlr --itsv --omd cat |
-    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|)' \
+    rgr md stdin --right 2-4 \
     > statReads.md
 
 echo -e "\nTable: statReads\n" >> statReads.md

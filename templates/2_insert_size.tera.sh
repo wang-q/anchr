@@ -146,8 +146,7 @@ done \
     >> statInsertSize.tsv
 
 cat statInsertSize.tsv |
-    mlr --itsv --omd cat |
-    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|---:|)' \
+    rgr md stdin --right 2-5 \
     > statInsertSize.md
 
 echo -e "\nTable: statInsertSize\n" >> statInsertSize.md

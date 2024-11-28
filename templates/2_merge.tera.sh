@@ -164,8 +164,7 @@ SUM_OUT=$( faops n50 -H -N 0 -S pe.cor.fa.gz )
 save SUM_OUT
 
 cat statMergeReads.tsv |
-    mlr --itsv --omd cat |
-    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|)' \
+    rgr md stdin --right 2-4 \
     > statMergeReads.md
 
 echo -e "\nTable: statMergeReads\n" >> statMergeReads.md
@@ -174,8 +173,7 @@ cat statMergeReads.md
 mv statMergeReads.md ${BASH_DIR}/../9_markdown
 
 cat statMergeInsert.tsv |
-    mlr --itsv --omd cat |
-    perl -nlp -e '$. == 2 and $_ = q(|:---|---:|---:|---:|---:|)' \
+    rgr md stdin --right 2-5 \
     > statMergeInsert.md
 
 echo -e "\nTable: statMergeInsert\n" >> statMergeInsert.md
