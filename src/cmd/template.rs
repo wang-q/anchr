@@ -2,6 +2,7 @@ use clap::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Read;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
@@ -498,6 +499,13 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn decode_gz(bytes: &[u8]) -> anyhow::Result<String> {
+    let mut gz = flate2::read::MultiGzDecoder::new(&bytes[..]);
+    let mut s = String::new();
+    gz.read_to_string(&mut s)?;
+    Ok(s)
+}
+
 fn gen_fastqc(context: &Context) -> anyhow::Result<()> {
     let outname = "0_script/2_fastqc.sh";
     eprintln!("Create {}", outname);
@@ -554,7 +562,10 @@ fn gen_genescopefk(context: &Context) -> anyhow::Result<()> {
     eprintln!("Create {}", outname);
 
     let mut tera = Tera::default();
-    tera.add_raw_templates(vec![("t", include_str!("../../templates/genescopefk.R"))])
+    static FILE_GS: &[u8] = include_bytes!("../../templates/genescopefk.R.gz");
+    let file_gs = decode_gz(FILE_GS).unwrap();
+
+    tera.add_raw_templates(vec![("t", file_gs)])
         .unwrap();
 
     let rendered = tera.render("t", context).unwrap();
