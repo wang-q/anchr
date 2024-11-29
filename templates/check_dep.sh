@@ -10,11 +10,6 @@ hash parallel 2>/dev/null || {
     echo >&2 "    Install with homebrew: brew install parallel"
 }
 
-hash mlr 2>/dev/null || {
-    echo >&2 "miller is required but it's not installed."
-    echo >&2 "    Install with homebrew: brew install miller"
-}
-
 hash jq 2>/dev/null || {
     echo >&2 "jq is required but it's not installed."
     echo >&2 "    Install with homebrew: brew install jq"
@@ -48,7 +43,7 @@ hash picard 2>/dev/null || {
 #----------------------------#
 hash bbduk.sh 2>/dev/null || {
     echo >&2 "bbtools is required but it's not installed."
-    echo >&2 "  Install with homebrew: brew install wang-q/tap/bbtools@37.77"
+    echo >&2 "  Install with homebrew: brew install bbtools"
 }
 
 hash sickle 2>/dev/null || {
