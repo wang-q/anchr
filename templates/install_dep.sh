@@ -16,11 +16,11 @@ for package in openjdk jq parallel pigz; do
     check_install ${package}
 done
 
-for package in fastqc sickle bwa samtools picard-tools jellyfish; do
+for package in fastqc bbtools sickle bwa samtools picard-tools jellyfish; do
     check_install ${package}
 done
 
-for package in bcalm gatk; do
+for package in bcalm bifrost gatk; do
     check_install brewsci/bio/${package}
 done
 
@@ -29,7 +29,7 @@ for package in poa; do
     check_install brewsci/science/${package}
 done
 
-for package in tsv-utils faops sparsemem bbtools@37.77 intspan; do
+for package in tsv-utils faops sparsemem intspan; do
     check_install wang-q/tap/${package}
 done
 

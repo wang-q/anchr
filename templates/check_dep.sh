@@ -110,6 +110,11 @@ hash bcalm 2>/dev/null || {
     echo >&2 "Install with homebrew: brew install brewsci/bio/bcalm"
 }
 
+hash bifrost 2>/dev/null || {
+    echo >&2 "bifrost is required but it's not installed."
+    echo >&2 "Install with homebrew: brew install brewsci/bio/bifrost"
+}
+
 hash fasta2DB 2>/dev/null || {
     echo >&2 "DAZZ_DB is required but it's not installed."
     echo >&2 "Install with homebrew: brew install --HEAD wang-q/tap/dazz_db"
