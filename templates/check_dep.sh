@@ -110,7 +110,7 @@ hash bcalm 2>/dev/null || {
     echo >&2 "Install with homebrew: brew install brewsci/bio/bcalm"
 }
 
-hash bifrost 2>/dev/null || {
+hash Bifrost 2>/dev/null || {
     echo >&2 "bifrost is required but it's not installed."
     echo >&2 "Install with homebrew: brew install brewsci/bio/bifrost"
 }

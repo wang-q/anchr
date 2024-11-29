@@ -123,8 +123,10 @@ BASE_NAME=g37
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
+# rm -fr 2_illumina/trim 2_illumina/merge 9_markdown/statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
+
+bash 0_script/1_repetitive.sh
 
 bash 0_script/0_master.sh
 
