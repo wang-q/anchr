@@ -52,7 +52,7 @@ done \
 >> ${tempfile}
 
 rgr md ${tempfile} --right 2-10 -o ${FILENAME_MD}
-echo -e "\nTable: ${FILENAME_MD}\n" > ${FILENAME_MD}
+echo -e "\nTable: ${FILENAME_MD}\n" >> ${FILENAME_MD}
 
 cat ${FILENAME_MD}
 mv ${FILENAME_MD} ${BASH_DIR}/../9_markdown
