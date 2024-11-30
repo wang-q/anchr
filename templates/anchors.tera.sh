@@ -13,7 +13,7 @@ fi
 
 log_debug "UT sizes"
 faops size UT.fasta > ut.chr.sizes
-spanr genome ut.chr.sizes -o ut.chr.yml
+spanr genome ut.chr.sizes -o ut.chr.json
 
 #----------------------------#
 # Mapping reads
@@ -59,8 +59,8 @@ cat basecov.txt |
     grep -v '^#' |
     tsv-filter --ne 3:0 | # Non-covered regions should be ignored
     tsv-summarize --median 3 --mad 3 --quantile 3:0.25,0.75 |
-    perl -MPath::Tiny -MJSON -e '
-        my $json = JSON->new->decode( Path::Tiny::path( q(env.json) )->slurp );
+    perl -MPath::Tiny -MJSON::PP -e '
+        my $json = JSON::PP::decode_json( Path::Tiny::path( q(env.json) )->slurp );
 
         my $line = <>;
         my @fields = split qq(\t), $line;
@@ -79,7 +79,7 @@ cat basecov.txt |
         $json->{lower} = $lower;
         $json->{upper} = $upper;
 
-        Path::Tiny::path(q(env.json))->spew( JSON->new->encode($json) );
+        Path::Tiny::path(q(env.json))->spew( JSON::PP::encode_json($json) );
     '
 
 #----------------------------#
@@ -90,7 +90,7 @@ log_debug "covered"
 cat basecov.txt |
     grep -v '^#' |
     tsv-filter --ne 3:0 | # Non-covered regions should be ignored
-    perl -nla -MPath::Tiny -MJSON -MApp::RL::Common -e '
+    perl -nla -MPath::Tiny -MJSON::PP -e '
         BEGIN {
             our $name;
             our @list;
@@ -98,7 +98,11 @@ cat basecov.txt |
             our $limit = JSON->new->decode(
                 Path::Tiny::path( q(env.json) )->slurp
             );
-            our $length_of = App::RL::Common::read_sizes( q(ut.chr.sizes) );
+            our $length_of;
+            for my $line ( Path::Tiny::path( q(ut.chr.sizes) )->lines({ chomp => 1 }) ) {
+                my ( $key, $value ) = split /\t/, $line;
+                $length_of{$key} = $value;
+            }
         }
 
         sub list_to_ranges {
@@ -208,8 +212,8 @@ save OPT_FILL
 save OPT_MIN
 
 # covered region
-spanr cover contig.covered.txt -o contig.covered.yml
-spanr stat ut.chr.sizes contig.covered.yml -o contig.covered.csv
+spanr cover contig.covered.txt -o contig.covered.json
+spanr stat ut.chr.sizes contig.covered.json -o contig.covered.csv
 
 # fill all holes of {{ opt.ratio }} covered contigs
 cat contig.covered.csv |
@@ -223,15 +227,15 @@ cat contig.covered.csv |
     sort -n \
     > fill_all.txt
 
-spanr some contig.covered.yml fill_all.txt -o contig.fill_all.yml
-rm -f contig.fill_all.temp.yml; ln -s contig.fill_all.yml contig.fill_all.temp.yml
+spanr some contig.covered.json fill_all.txt -o contig.fill_all.json
+rm -f contig.fill_all.temp.json; ln -s contig.fill_all.json contig.fill_all.temp.json
 
 if [ -s fill_all.txt ]; then
-    spanr span contig.fill_all.temp.yml --op fill -n {{ opt.fill | int * 10 }} -o contig.fill_all.1.yml
-    rm contig.fill_all.temp.yml; ln -s contig.fill_all.1.yml contig.fill_all.temp.yml
+    spanr span contig.fill_all.temp.json --op fill -n {{ opt.fill | int * 10 }} -o contig.fill_all.1.json
+    rm contig.fill_all.temp.json; ln -s contig.fill_all.1.json contig.fill_all.temp.json
 
-    spanr span contig.fill_all.temp.yml --op excise -n {{ opt.min }} -o contig.fill_all.2.yml
-    rm contig.fill_all.temp.yml; ln -s contig.fill_all.2.yml contig.fill_all.temp.yml
+    spanr span contig.fill_all.temp.json --op excise -n {{ opt.min }} -o contig.fill_all.2.json
+    rm contig.fill_all.temp.json; ln -s contig.fill_all.2.json contig.fill_all.temp.json
 fi
 
 # fill small holes
@@ -240,88 +244,43 @@ cat ut.chr.sizes |
     grep -Fx -f fill_all.txt -v \
     > fill_hole.txt
 
-spanr some contig.covered.yml fill_hole.txt -o contig.fill_hole.yml
-rm -f contig.fill_hole.temp.yml; ln -s contig.fill_hole.yml contig.fill_hole.temp.yml
+spanr some contig.covered.json fill_hole.txt -o contig.fill_hole.json
+rm -f contig.fill_hole.temp.json; ln -s contig.fill_hole.json contig.fill_hole.temp.json
 
 if [ -s fill_hole.txt ]; then
-    spanr span contig.fill_hole.yml --op fill -n {{ opt.fill }} -o contig.fill_hole.1.yml
-    rm contig.fill_hole.temp.yml; ln -s contig.fill_hole.1.yml contig.fill_hole.temp.yml
+    spanr span contig.fill_hole.json --op fill -n {{ opt.fill }} -o contig.fill_hole.1.json
+    rm contig.fill_hole.temp.json; ln -s contig.fill_hole.1.json contig.fill_hole.temp.json
 
-    spanr span contig.fill_hole.1.yml --op excise -n {{ opt.min }} -o contig.fill_hole.2.yml
-    rm contig.fill_hole.temp.yml; ln -s contig.fill_hole.2.yml contig.fill_hole.temp.yml
+    spanr span contig.fill_hole.1.json --op excise -n {{ opt.min }} -o contig.fill_hole.2.json
+    rm contig.fill_hole.temp.json; ln -s contig.fill_hole.2.json contig.fill_hole.temp.json
 fi
 
 # get proper regions
-perl -MYAML::Syck -MAlignDB::IntSpan -e '
-    my $yml1 = YAML::Syck::LoadFile( q{contig.fill_all.temp.yml} );
-    my $yml2 = YAML::Syck::LoadFile( q{contig.fill_hole.temp.yml} );
-
-    my $yml_chr = YAML::Syck::LoadFile( q{ut.chr.yml} );
-
-    my $yml = {};
-
-    for my $key ( sort keys %{$yml1} ) {
-        $yml->{$key} = $yml1->{$key};
-    }
-    for my $key ( sort keys %{$yml2} ) {
-        $yml->{$key} = $yml2->{$key};
-    }
-
-    YAML::Syck::DumpFile( q{contig.proper.yml}, $yml );
-    '
-spanr stat ut.chr.sizes contig.proper.yml -o contig.proper.csv
+spanr compare --op union contig.fill_all.temp.json contig.fill_hole.temp.json -o contig.proper.json
+spanr stat ut.chr.sizes contig.proper.json -o contig.proper.csv
 
 {% if opt.longest == "1" -%}
-perl -MYAML::Syck -MAlignDB::IntSpan -e '
-    my $yml = YAML::Syck::LoadFile( q{contig.proper.yml} );
-
-    for my $key ( sort keys %{$yml} ) {
-        my $runlist = $yml->{$key};
-        my $intspan = AlignDB::IntSpan->new($runlist);
-        my @sets = sort { $b->size <=> $a->size } $intspan->sets;
-        printf "%s:%s\n", $key, $sets[0]->runlist;
-    }
-    ' \
-    > longest.regions.txt
-
-spanr cover longest.regions.txt -o anchor.yml
+spanr convert contig.proper.json --longest |
+    spanr cover stdin -o anchor.json
 {% else -%}
-perl -MYAML::Syck -MAlignDB::IntSpan -e '
-    my $yml = YAML::Syck::LoadFile( q{contig.proper.yml} );
-
-    for my $key ( sort keys %{$yml} ) {
-        my $runlist = $yml->{$key};
-        printf "%s:%s\n", $key, $runlist;
-    }
-    ' \
-    > anchor.regions.txt
-
-ln -s contig.proper.yml anchor.yml
+ln -s contig.proper.json anchor.json
 {% endif -%}
+spanr convert anchor.json -o anchor.regions.txt
 {# Keep a blank line #}
 
 #----------------------------#
 # others
 #----------------------------#
-spanr compare ut.chr.yml anchor.yml --op diff -o others.yml
-
-perl -MYAML::Syck -MAlignDB::IntSpan -e '
-    my $yml = YAML::Syck::LoadFile( q{others.yml} );
-
-    for my $key ( sort keys %{$yml} ) {
-        my $runlist = $yml->{$key};
-        printf "%s:%s\n", $key, $runlist;
-    }
-    ' \
-    > others.regions.txt
+spanr compare ut.chr.json anchor.json --op diff -o others.json
+spanr convert others.json -o others.regions.txt
 
 #----------------------------#
 # Split UT.fasta to anchor and others
 #----------------------------#
 log_info "pe.anchor.fa & pe.others.fa"
 
-faops region -l 0 UT.fasta anchor.regions.txt pe.anchor.fa
-faops region -l 0 UT.fasta others.regions.txt pe.others.fa
+hnsm range UT.fasta -r anchor.regions.txt -o pe.anchor.fa
+hnsm range UT.fasta -r others.regions.txt -o pe.others.fa
 
 #----------------------------#
 # Merging anchors
@@ -351,10 +310,10 @@ anchr contained \
 find . -type f -name "pe.anchor.fa"   | parallel --no-run-if-empty -j 1 rm
 find . -type f -name "anchor.*.fasta" | parallel --no-run-if-empty -j 1 rm
 
-find . -type f -name "contig.fill_hole.*.yml" | parallel --no-run-if-empty -j 1 rm
-find . -type l -name "contig.fill_hole.*.yml" | parallel --no-run-if-empty -j 1 rm
-find . -type f -name "contig.fill_all.*.yml"  | parallel --no-run-if-empty -j 1 rm
-find . -type l -name "contig.fill_all.*.yml"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -name "contig.fill_hole.*.json" | parallel --no-run-if-empty -j 1 rm
+find . -type l -name "contig.fill_hole.*.json" | parallel --no-run-if-empty -j 1 rm
+find . -type f -name "contig.fill_all.*.json"  | parallel --no-run-if-empty -j 1 rm
+find . -type l -name "contig.fill_all.*.json"  | parallel --no-run-if-empty -j 1 rm
 
 save START_TIME
 
