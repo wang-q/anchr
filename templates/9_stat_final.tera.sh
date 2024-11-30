@@ -114,7 +114,7 @@ if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
         >> ${tempfile}
 fi
 
-rgr md ${tempfile} --right 2-4 -o ${tempfile}
+rgr md ${tempfile} --right 2-4 -o statFinal.md
 echo -e "Table: statFinal\n" >> statFinal.md
 
 cat statFinal.md
