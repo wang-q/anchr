@@ -10,7 +10,7 @@ log_warn 9_stat_anchors.sh
 #----------------------------#
 USAGE="Usage: $0 [DIR_PREFIX] [FILENAME_MD]"
 
-DIR_PREFIX=${1:-"4_unitigs_superreads"}
+DIR_PREFIX=${1:-"4_unitigs"}
 FILENAME_MD=${2:-"statAnchors.md"}
 
 tempfile=$(mktemp /tmp/stat_anchor_XXXXXXXX)
@@ -24,7 +24,7 @@ printf "%s\t" \
     "SumOthers" \
     "median" "MAD" "lower" "upper" |
     sed 's/\t$/\n/' \
-    > tempfile
+    > ${tempfile}
 
 for Q in 0 {{ opt.qual }}; do
     for L in 0 {{ opt.len }}; do
@@ -55,8 +55,8 @@ for Q in 0 {{ opt.qual }}; do
 	    done
     done
 done \
->> tempfile
+>> ${tempfile}
 
-rgr md tempfile --right 2-13 -o ${FILENAME_MD}
+rgr md ${tempfile} --right 2-10 -o ${FILENAME_MD}
 cat ${FILENAME_MD}
 mv ${FILENAME_MD} ${BASH_DIR}/../9_markdown

@@ -12,16 +12,16 @@ USAGE="Usage: $0 [FILENAME_MD]"
 
 FILENAME_MD=${1:-"statOtherAnchors.md"}
 
-echo -e "Table: ${FILENAME_MD}\n" > ${FILENAME_MD}
-printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
-    "Name" "Mapped%" \
+tempfile=$(mktemp /tmp/stat_merge_anchor_XXXXXXXX)
+trap 'rm -f "$tempfile"' EXIT
+
+printf "%s\t" \
+    "Name" "Mapped" \
     "N50Anchor" "Sum" "#" \
-    "N50Others" "Sum" "#" \
-    "median" "MAD" "lower" "upper" \
-    "RunTimeAN" \
-    >> ${FILENAME_MD}
-printf "|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|\n" \
-    >> ${FILENAME_MD}
+    "SumOthers" \
+    "median" "MAD" "lower" "upper" |
+    sed 's/\t$/\n/' \
+    > ${tempfile}
 
 for D in 8_spades 8_mr_spades 8_megahit 8_mr_megahit; do
 	if [ ! -e ${D}/anchor/anchor.fasta ]; then
@@ -30,23 +30,23 @@ for D in 8_spades 8_mr_spades 8_megahit 8_mr_megahit; do
 
 	pushd ${D}/ > /dev/null
 
-	MAPPED_RATIO=$( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber' )
-    SECS_AN=$( cat anchor/env.json | jq '.RUNTIME | tonumber' )
-
-	printf "| %s | %s | %s | %s | %s | %s | %s | %s | %.1f | %.1f | %.1f | %.1f | %s |\n" \
+    printf "%s\t" \
 		$(basename "${D}") \
-		$( perl -e "printf qq(%.2f%%), ${MAPPED_RATIO} * 100;" ) \
+        $( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber | (. * 1000 | round) / 1000' ) \
 		$( stat_format anchor/anchor.fasta ) \
-		$( stat_format anchor/pe.others.fa ) \
-		$( cat anchor/env.json | jq '.median | tonumber' ) \
-		$( cat anchor/env.json | jq '.MAD | tonumber' ) \
-		$( cat anchor/env.json | jq '.lower | tonumber' ) \
-		$( cat anchor/env.json | jq '.upper | tonumber' ) \
-        $( time_format ${SECS_AN} )
+		$( stat_format anchor/pe.others.fa | cut -f 2  ) \
+        $( cat anchor/env.json | jq '.median | tonumber | (. * 10 | round) / 10' ) \
+        $( cat anchor/env.json | jq '.MAD    | tonumber | (. * 10 | round) / 10' ) \
+        $( cat anchor/env.json | jq '.lower  | tonumber | (. * 10 | round) / 10' ) \
+        $( cat anchor/env.json | jq '.upper  | tonumber | (. * 10 | round) / 10' ) |
+        sed 's/\t$/\n/'
 
 	popd > /dev/null
 done \
->> ${FILENAME_MD}
+>> ${tempfile}
+
+rgr md ${tempfile} --right 2-10 -o ${FILENAME_MD}
+echo -e "\nTable: ${FILENAME_MD}\n" > ${FILENAME_MD}
 
 cat ${FILENAME_MD}
 mv ${FILENAME_MD} ${BASH_DIR}/../9_markdown
