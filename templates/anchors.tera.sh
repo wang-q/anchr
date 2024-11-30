@@ -95,7 +95,7 @@ cat basecov.txt |
             our $name;
             our @list;
             our @edges;
-            our $limit = JSON->new->decode(
+            our $limit = JSON::PP::decode_json(
                 Path::Tiny::path( q(env.json) )->slurp
             );
             our $length_of;

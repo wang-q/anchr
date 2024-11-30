@@ -134,8 +134,8 @@ spades.py --test
 ### Individual subcommands
 
 ```shell
-mkdir -p ~/data/anchr_test
-cd ~/data/anchr_test
+mkdir -p ~/data/anchr/test
+cd ~/data/anchr/test
 
 # Lambda
 for F in R1.fq.gz R2.fq.gz; do
@@ -181,7 +181,7 @@ anchr quorum \
     bash
 popd
 
-# unitigs
+# unitigs - superreads
 gzip -dcf trim/pe.cor.fa.gz > trim/pe.cor.fa
 
 mkdir -p superreads
