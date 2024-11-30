@@ -55,4 +55,3 @@ rm -fr 9_markdown
 
 # bash
 rm -fr 0_script
-rm *.sh
