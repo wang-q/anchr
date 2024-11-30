@@ -181,33 +181,6 @@ anchr quorum \
     bash
 popd
 
-# unitigs - superreads
-gzip -dcf trim/pe.cor.fa.gz > trim/pe.cor.fa
-
-mkdir -p superreads
-pushd superreads
-
-anchr unitigs \
-    ../trim/pe.cor.fa ../trim/env.json \
-    --kmer "31 41 51 61 71 81" \
-    --parallel 4 \
-    -o unitigs.sh
-bash unitigs.sh
-popd
-
-# unitigs - tadpole
-mkdir -p tadpole
-pushd tadpole
-
-anchr unitigs \
-    ../trim/pe.cor.fa ../trim/env.json \
-    -u tadpole \
-    --kmer "31 41 51 61 71 81" \
-    --parallel 4 \
-    -o unitigs.sh
-bash unitigs.sh
-popd
-
 # unitigs - bcalm
 mkdir -p bcalm
 pushd bcalm
@@ -233,6 +206,33 @@ anchr anchors \
     -p 4 \
     -o anchors.sh
 bash anchors.sh
+popd
+
+# unitigs - superreads
+gzip -dcf trim/pe.cor.fa.gz > trim/pe.cor.fa
+
+mkdir -p superreads
+pushd superreads
+
+anchr unitigs \
+    ../trim/pe.cor.fa ../trim/env.json \
+    --kmer "31 41 51 61 71 81" \
+    --parallel 4 \
+    -o unitigs.sh
+bash unitigs.sh
+popd
+
+# unitigs - tadpole
+mkdir -p tadpole
+pushd tadpole
+
+anchr unitigs \
+    ../trim/pe.cor.fa ../trim/env.json \
+    -u tadpole \
+    --kmer "31 41 51 61 71 81" \
+    --parallel 4 \
+    -o unitigs.sh
+bash unitigs.sh
 popd
 
 ```
