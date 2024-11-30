@@ -18,11 +18,11 @@ tempfile=$(mktemp)
 echo -e "Table: ${FILENAME_MD}\n" > ${FILENAME_MD}
 
 printf "%s\t" \
-    "Name" "CovCor" "Mapped%" \
+    "Name" "CovCor" "Mapped" \
     "N50Anchor" "Sum" "#" \
-    "N50Others" "Sum" "#" \
+    "SumOthers" \
     "median" "MAD" "lower" "upper" |
-    sed 's/\t$//' \
+    sed 's/\t$/\n/' \
     > tempfile
 
 for Q in 0 {{ opt.qual }}; do
@@ -36,19 +36,18 @@ for Q in 0 {{ opt.qual }}; do
 		        pushd ${DIR_PREFIX}/Q${Q}L${L}X${X}P${P}/ > /dev/null
 
 		        SUM_COR=$( cat env.json | jq '.SUM_COR | tonumber' )
-		        MAPPED_RATIO=$( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber' )
 
                 printf "%s\t" \
 		            "Q${Q}L${L}X${X}P${P}" \
 		            $( perl -e "printf qq(%.1f), ${SUM_COR} / {{ opt.genome }};" ) \
-                    $( perl -e "printf qq(%.2f%%), ${MAPPED_RATIO} * 100;" ) \
+		            $( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber | (. * 1000 | round) / 1000' ) \
 		            $( stat_format anchor/anchor.fasta ) \
-		            $( stat_format anchor/pe.others.fa ) \
-		            $( cat anchor/env.json | jq '.median | tonumber | map((. * 10 | round) / 10)' ) \
-		            $( cat anchor/env.json | jq '.MAD | tonumber | map((. * 10 | round) / 10)' ) \
-		            $( cat anchor/env.json | jq '.lower | tonumber | map((. * 10 | round) / 10)' ) \
-		            $( cat anchor/env.json | jq '.upper | tonumber | map((. * 10 | round) / 10)' ) |
-                    sed 's/\t$//'
+		            $( stat_format anchor/pe.others.fa | head -n 2 | tail -n 1) \
+		            $( cat anchor/env.json | jq '.median | tonumber | (. * 10 | round) / 10' ) \
+		            $( cat anchor/env.json | jq '.MAD    | tonumber | (. * 10 | round) / 10' ) \
+		            $( cat anchor/env.json | jq '.lower  | tonumber | (. * 10 | round) / 10' ) \
+		            $( cat anchor/env.json | jq '.upper  | tonumber | (. * 10 | round) / 10' ) |
+                    sed 's/\t$/\n/'
 
 		        popd > /dev/null
 		    done
@@ -57,6 +56,6 @@ for Q in 0 {{ opt.qual }}; do
 done \
 >> tempfile
 
-rgr md tempfile -o ${FILENAME_MD}
+rgr md tempfile --right 2-13 -o ${FILENAME_MD}
 cat ${FILENAME_MD}
 mv ${FILENAME_MD} ${BASH_DIR}/../9_markdown
