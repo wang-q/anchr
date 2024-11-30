@@ -13,16 +13,17 @@ USAGE="Usage: $0 [DIR_PREFIX] [FILENAME_MD]"
 DIR_PREFIX=${1:-"4_unitigs_superreads"}
 FILENAME_MD=${2:-"statAnchors.md"}
 
+tempfile=$(mktemp)
+
 echo -e "Table: ${FILENAME_MD}\n" > ${FILENAME_MD}
-printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
+
+printf "%s\t" \
     "Name" "CovCor" "Mapped%" \
     "N50Anchor" "Sum" "#" \
     "N50Others" "Sum" "#" \
-    "median" "MAD" "lower" "upper" \
-    "Kmer" "RunTimeUT" "RunTimeAN" \
-    >> ${FILENAME_MD}
-printf "|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|\n" \
-    >> ${FILENAME_MD}
+    "median" "MAD" "lower" "upper" |
+    sed 's/\t$//' \
+    > tempfile
 
 for Q in 0 {{ opt.qual }}; do
     for L in 0 {{ opt.len }}; do
@@ -36,29 +37,26 @@ for Q in 0 {{ opt.qual }}; do
 
 		        SUM_COR=$( cat env.json | jq '.SUM_COR | tonumber' )
 		        MAPPED_RATIO=$( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber' )
-		        SECS_UT=$( cat env.json | jq '.RUNTIME | tonumber' )
-		        SECS_AN=$( cat anchor/env.json | jq '.RUNTIME | tonumber' )
 
-		        printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %.1f | %.1f | %.1f | %.1f | %s | %s | %s |\n" \
+                printf "%s\t" \
 		            "Q${Q}L${L}X${X}P${P}" \
 		            $( perl -e "printf qq(%.1f), ${SUM_COR} / {{ opt.genome }};" ) \
                     $( perl -e "printf qq(%.2f%%), ${MAPPED_RATIO} * 100;" ) \
 		            $( stat_format anchor/anchor.fasta ) \
 		            $( stat_format anchor/pe.others.fa ) \
-		            $( cat anchor/env.json | jq '.median | tonumber' ) \
-		            $( cat anchor/env.json | jq '.MAD | tonumber' ) \
-		            $( cat anchor/env.json | jq '.lower | tonumber' ) \
-		            $( cat anchor/env.json | jq '.upper | tonumber' ) \
-		            $( cat env.json | jq '.KMER' ) \
-		            $( time_format ${SECS_UT} ) \
-		            $( time_format ${SECS_AN} )
+		            $( cat anchor/env.json | jq '.median | tonumber | map((. * 10 | round) / 10)' ) \
+		            $( cat anchor/env.json | jq '.MAD | tonumber | map((. * 10 | round) / 10)' ) \
+		            $( cat anchor/env.json | jq '.lower | tonumber | map((. * 10 | round) / 10)' ) \
+		            $( cat anchor/env.json | jq '.upper | tonumber | map((. * 10 | round) / 10)' ) |
+                    sed 's/\t$//'
 
 		        popd > /dev/null
 		    done
 	    done
     done
 done \
->> ${FILENAME_MD}
+>> tempfile
 
+rgr md tempfile -o ${FILENAME_MD}
 cat ${FILENAME_MD}
 mv ${FILENAME_MD} ${BASH_DIR}/../9_markdown
