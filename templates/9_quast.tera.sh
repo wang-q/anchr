@@ -64,7 +64,7 @@ if [ -e 1_genome/paralogs.fa ]; then
     QUAST_LABEL+="paralogs,"
 fi
 
-if [ -e 1_genome/repetitive.fa ]; then
+if [ -e 1_genome/repetitive/repetitive.fa ]; then
     QUAST_TARGET+=" 1_genome/repetitive/repetitive.fa "
     QUAST_LABEL+="repetitive,"
 fi
