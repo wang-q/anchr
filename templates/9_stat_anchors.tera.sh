@@ -55,7 +55,7 @@ for Q in 0 {{ opt.qual }}; do
 done \
 >> ${tempfile}
 
-rgr md ${tempfile} --right 2-10 -o ${FILENAME_MD}
+rgr md ${tempfile} --right 2-11 -o ${FILENAME_MD}
 echo -e "\nTable: ${FILENAME_MD}\n" >> ${FILENAME_MD}
 
 cat ${FILENAME_MD}

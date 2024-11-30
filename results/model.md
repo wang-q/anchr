@@ -109,9 +109,7 @@ anchr template \
     --readl 125 \
     --uscale 2 \
     --lscale 3 \
-    --redo \
-    \
-    --extend
+    --redo
 
 ```
 
@@ -129,8 +127,6 @@ cd ${WORKING_DIR}/${BASE_NAME}
 bash 0_script/1_repetitive.sh
 
 bash 0_script/0_master.sh
-
-prettier -w 9_markdown/*.md
 
 # bash 0_script/0_cleanup.sh
 
