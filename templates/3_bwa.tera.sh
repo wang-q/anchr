@@ -89,6 +89,8 @@ if [ ! -e R.sort.bai ]; then
         --REFERENCE_SEQUENCE genome.fa \
         --OUTPUT R.wgs.metrics \
         --VALIDATION_STRINGENCY SILENT
+
+    rm -f R.mate.bam
 fi
 
 #----------------------------#
@@ -112,9 +114,9 @@ if [ ! -f R.mosdepth.summary.txt ]; then
                     print qq($F[0]:$start-$end);
                 }
             ' |
-            spanr cover stdin -o covered.yml
+            spanr cover stdin -o covered.json
 
-        spanr stat chr.sizes covered.yml -o stdout |
+        spanr stat chr.sizes covered.json -o stdout |
             grep -v "^all" |
             sed 's/^chr/chrom/' |
             sed 's/,size/,covLength/' |

@@ -92,6 +92,10 @@ brew install parallel pigz
 cargo install intspan
 cargo install fd-find
 
+curl -LO https://github.com/brentp/mosdepth/releases/download/v0.3.10/mosdepth
+chmod +x mosdepth
+mv mosdepth ~/bin/
+
 brew tap wang-q/tap
 brew install wang-q/tap/tsv-utils
 
@@ -128,6 +132,8 @@ brew install brewsci/bio/megahit
 
 brew install spades
 spades.py --test
+
+brew install brewsci/bio/busco
 
 ```
 
