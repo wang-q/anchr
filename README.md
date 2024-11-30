@@ -341,4 +341,4 @@ Copyright by Qiang Wang.
 
 MIT
 
-Written by Qiang Wang <wang-q@outlook.com>, 2020.
+Written by Qiang Wang <wang-q@outlook.com>, 2020-.

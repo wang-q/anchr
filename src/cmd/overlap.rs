@@ -139,7 +139,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     run_cmd!(
         fasta2DB ${basename} renamed.fasta;
         DBdust ${basename};
-        DBsplit -s50 ${basename};
+        DBsplit -f -s50 ${basename};
     )?;
 
     run_cmd!(info "==> Run daligner")?;
@@ -192,7 +192,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     Ok(())
 }
 
-// use std::io::Read;
+// use std::io::{Read, Write};
 // fn pause() {
 //     let mut stdin = std::io::stdin();
 //     let mut stdout = std::io::stdout();
