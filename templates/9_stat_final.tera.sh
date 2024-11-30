@@ -115,7 +115,7 @@ if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
 fi
 
 rgr md ${tempfile} --right 2-4 -o statFinal.md
-echo -e "Table: statFinal\n" >> statFinal.md
+echo -e "\nTable: statFinal\n" >> statFinal.md
 
 cat statFinal.md
 mv statFinal.md ${BASH_DIR}/../9_markdown
