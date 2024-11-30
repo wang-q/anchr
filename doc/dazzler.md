@@ -152,13 +152,13 @@ cd ~/data/dazz/dazzler2
 
 cat ~/data/dazz/e_coli/4_kunitigs/Q20L60X80P000/anchor/anchor.fasta |
     dazz dazzname --prefix first stdin -o stdout |
-    faops filter -l 0 stdin first.fasta
+    hnsm filter stdin -o first.fasta
 mv stdout.replace.tsv first.replace.tsv
 
 gzip -dcf ~/data/dazz/e_coli/3_long/L.X80.trim.fasta.gz |
     head -n 20000 |
     dazz dazzname --prefix second stdin -o stdout |
-    faops filter -l 0 -a 1000 stdin second.fasta
+    hnsm filter -a 1000 stdin -o second.fasta
 mv stdout.replace.tsv second.replace.tsv
 
 echo "Make the dazzler DB"

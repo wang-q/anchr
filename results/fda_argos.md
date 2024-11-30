@@ -308,7 +308,7 @@ for STRAIN in \
     find ../ASSEMBLY/${STRAIN}/ -name "*_genomic.fna.gz" |
         grep -v "_from_" |
         xargs gzip -dcf |
-        faops filter -N -s stdin ${STRAIN}/genome.fa
+        hnsm filter -N -s stdin -o ${STRAIN}/genome.fa
 
 done
 
@@ -380,7 +380,7 @@ for STRAIN in \
     ) \
     ; do
     cat ./Results/${STRAIN}/${STRAIN}.multi.fas |
-        faops filter -N -d stdin stdout \
+        hnsm filter -N -d stdin \
         > ../ref/${STRAIN}/paralogs.fa
 done
 
@@ -476,7 +476,7 @@ for STRAIN in \
     kat sect -t 4 -o ${STRAIN} -F ../ref/${STRAIN}/genome.fa ../ref/${STRAIN}/genome.fa
 
     cat ${STRAIN}-repetitive.fa |
-        faops filter -N -d -a 100 stdin stdout \
+        hnsm filter -N -d -a 100 stdin \
         > ../ref/${STRAIN}/repetitive.fa
 
 done

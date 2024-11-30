@@ -125,7 +125,7 @@ fn command_contained() -> anyhow::Result<()> {
 }
 
 #[test]
-fn command_merged() -> anyhow::Result<()> {
+fn command_merge() -> anyhow::Result<()> {
     let mut bin = String::new();
     for e in &["LAshow"] {
         if let Ok(pth) = which::which(e) {
