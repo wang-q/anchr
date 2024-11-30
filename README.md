@@ -90,8 +90,11 @@ brew install parallel pigz
 # parallel --citation
 # will cite
 
+cargo install intspan
+cargo install fd-find
+
 brew tap wang-q/tap
-brew install wang-q/tap/tsv-utils wang-q/tap/intspan
+brew install wang-q/tap/tsv-utils
 
 brew install --HEAD wang-q/tap/dazz_db
 brew install --HEAD wang-q/tap/daligner

@@ -307,13 +307,9 @@ anchr contained \
 #----------------------------#
 # Done.
 #----------------------------#
-find . -type f -name "pe.anchor.fa"   | parallel --no-run-if-empty -j 1 rm
-find . -type f -name "anchor.*.fasta" | parallel --no-run-if-empty -j 1 rm
-
-find . -type f -name "contig.fill_hole.*.json" | parallel --no-run-if-empty -j 1 rm
-find . -type l -name "contig.fill_hole.*.json" | parallel --no-run-if-empty -j 1 rm
-find . -type f -name "contig.fill_all.*.json"  | parallel --no-run-if-empty -j 1 rm
-find . -type l -name "contig.fill_all.*.json"  | parallel --no-run-if-empty -j 1 rm
+rm -f "pe.anchor.fa"
+rm -f "anchor.*.fasta"
+rm -f "contig.fill*.json"
 
 save START_TIME
 
