@@ -308,7 +308,7 @@ anchr contained \
 # Done.
 #----------------------------#
 
-rm -f "pe.anchor.fa"
+fd "pe.anchor.fa" -X rm
 fd -g "anchor.*.fasta" -X rm
 fd -g "contig.fill*.json" -X rm
 fd -g "fill_*.txt" -X rm

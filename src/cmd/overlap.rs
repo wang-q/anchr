@@ -75,13 +75,13 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
     // Args
     //----------------------------
-    let min_len = *args.get_one::<i32>("len").unwrap();
-    let min_idt = *args.get_one::<f32>("idt").unwrap();
+    let opt_min_len = *args.get_one::<i32>("len").unwrap();
+    let opt_min_idt = *args.get_one::<f32>("idt").unwrap();
 
     let is_serial = args.get_flag("serial");
     let is_all = args.get_flag("all");
 
-    let parallel = *args.get_one::<i32>("parallel").unwrap();
+    let opt_parallel = *args.get_one::<i32>("parallel").unwrap();
 
     let outfile = args.get_one::<String>("outfile").unwrap();
 
@@ -153,7 +153,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // eprintln!("block_number = {:#?}", block_number);
 
     run_cmd!(
-        HPC.daligner ${basename} -M16 -T${parallel} -e${min_idt} -l${min_len} -s${min_len} -mdust |
+        HPC.daligner ${basename} -M16 -T${opt_parallel} -e${opt_min_idt} -l${opt_min_len} -s${opt_min_len} -mdust |
             sed "s/ -vS / -S /" |
             bash
     )?;
