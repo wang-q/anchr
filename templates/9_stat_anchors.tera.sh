@@ -42,7 +42,7 @@ for Q in 0 {{ opt.qual }}; do
 		            $( perl -e "printf qq(%.1f), ${SUM_COR} / {{ opt.genome }};" ) \
 		            $( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber | (. * 1000 | round) / 1000' ) \
 		            $( stat_format anchor/anchor.fasta ) \
-		            $( stat_format anchor/pe.others.fa | head -n 2 | tail -n 1) \
+		            $( stat_format anchor/pe.others.fa | cut -f 2 ) \
 		            $( cat anchor/env.json | jq '.median | tonumber | (. * 10 | round) / 10' ) \
 		            $( cat anchor/env.json | jq '.MAD    | tonumber | (. * 10 | round) / 10' ) \
 		            $( cat anchor/env.json | jq '.lower  | tonumber | (. * 10 | round) / 10' ) \
