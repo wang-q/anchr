@@ -117,9 +117,9 @@ parallel -j 1 -k --line-buffer '
 
 # Optional
 # quast - assembly quality assessment
-curl -LO https://github.com/ablab/quast/releases/download/quast_5.2.0/quast-5.2.0.tar.gz
-tar xvfz quast-5.2.0.tar.gz
-cd quast-5.2.0
+curl -LO https://github.com/ablab/quast/releases/download/quast_5.3.0/quast-5.3.0.tar.gz
+tar xvfz quast-5.3.0.tar.gz
+cd quast-5.3.0
 python3 ./setup.py install
 
 quast.py --test
