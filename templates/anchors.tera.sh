@@ -307,9 +307,12 @@ anchr contained \
 #----------------------------#
 # Done.
 #----------------------------#
+
 rm -f "pe.anchor.fa"
-rm -f "anchor.*.fasta"
-rm -f "contig.fill*.json"
+fd -g "anchor.*.fasta" -X rm
+fd -g "contig.fill*.json" -X rm
+fd -g "fill_*.txt" -X rm
+fd -g "*.regions.txt" -X rm
 
 save START_TIME
 

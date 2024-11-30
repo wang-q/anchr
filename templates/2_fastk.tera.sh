@@ -68,7 +68,7 @@ done |
     > statFastK.tsv
 
 cat statFastK.tsv |
-    rgr md stdin --right 2 \
+    rgr md stdin --right 3-4 \
     > statFastK.md
 
 echo -e "\nTable: statFastK\n" >> statFastK.md
