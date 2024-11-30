@@ -13,7 +13,8 @@ USAGE="Usage: $0 [DIR_PREFIX] [FILENAME_MD]"
 DIR_PREFIX=${1:-"4_unitigs_superreads"}
 FILENAME_MD=${2:-"statAnchors.md"}
 
-tempfile=$(mktemp)
+tempfile=$(mktemp /tmp/stat_anchor_XXXXXXXX)
+trap 'rm -f "$tempfile"' EXIT
 
 echo -e "Table: ${FILENAME_MD}\n" > ${FILENAME_MD}
 

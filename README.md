@@ -154,7 +154,7 @@ anchr trim \
     bash
 popd
 
-# mergeread
+# merge read
 mkdir -p merge
 pushd merge
 

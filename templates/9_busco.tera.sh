@@ -103,7 +103,7 @@ for L in $(cat 9_busco/lineages.txt); do
 
         if [ -f 9_busco/${NAME}/${L}/short_summary.txt ]; then
             cat 9_busco/${NAME}/${L}/short_summary.txt |
-                NAME=${NAME} perl -n -MJSON -e '
+                NAME=${NAME} perl -n -MJSON::PP -e '
                     if (m/(\d+)\s*Complete BUSCOs/){
                         $C = $1;
                     }
