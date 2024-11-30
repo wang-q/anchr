@@ -590,8 +590,7 @@ fn gen_genescopefk(context: &Context) -> anyhow::Result<()> {
     static FILE_GS: &[u8] = include_bytes!("../../templates/genescopefk.R.gz");
     let file_gs = decode_gz(FILE_GS).unwrap();
 
-    tera.add_raw_templates(vec![("t", file_gs)])
-        .unwrap();
+    tera.add_raw_templates(vec![("t", file_gs)]).unwrap();
 
     let rendered = tera.render("t", context).unwrap();
     intspan::write_lines(outname, &vec![rendered.as_str()])?;

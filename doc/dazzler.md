@@ -26,7 +26,7 @@ cd ~/data/dazz/dazzler
 
 gzip -dcf ../ref/iso_1/GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna.gz |
     dazz dazzname stdin -o stdout |
-    faops filter -l 0 stdin renamed.fasta
+    hnsm filter stdin -o renamed.fasta
 
 ```
 
@@ -42,7 +42,7 @@ DBrm myDB
 fasta2DB myDB renamed.fasta
 DBdust myDB
 # each block is of size 50 MB
-DBsplit -s50 myDB
+DBsplit -f -s50 myDB
 
 BLOCK_NUMBER=$(cat myDB.db | perl -nl -e '/^blocks\s+=\s+(\d+)/ and print $1')
 echo ${BLOCK_NUMBER}
@@ -60,7 +60,7 @@ cd ~/data/dazz/dazzler
 DBshow -n myDB 5-10 102 100-101
 
 # sequences from the original file
-faops some -l 0 renamed.fasta <(DBshow -n myDB 5-10 102 100-101 | sed 's/^>//') stdout
+hnsm some renamed.fasta <(DBshow -n myDB 5-10 102 100-101 | sed 's/^>//')
 
 ```
 

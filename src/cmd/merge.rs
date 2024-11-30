@@ -1,10 +1,10 @@
+use bio::io::fasta;
 use clap::*;
 use cmd_lib::*;
 use petgraph::prelude::*;
 use petgraph::*;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use bio::io::fasta;
 use tempfile::Builder;
 
 // Create clap subcommand arguments
@@ -225,7 +225,10 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         if pieces.len() < 2 {
             merge_of.insert(
                 format!("merge_{}", serial),
-                seq_of.get(&String::from(*pieces.first().unwrap())).unwrap().clone(),
+                seq_of
+                    .get(&String::from(*pieces.first().unwrap()))
+                    .unwrap()
+                    .clone(),
             );
             serial += 1;
             continue;
