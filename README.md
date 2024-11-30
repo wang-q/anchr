@@ -87,8 +87,7 @@ brew install r
 brew install parallel pigz
 
 # cite parallel
-# parallel --citation
-# will cite
+# echo "will cite" | parallel --citation
 
 cargo install intspan
 cargo install fd-find
