@@ -8,7 +8,7 @@
 * Add `anchr orient`
 * Add `anchr contained`
 * Add `anchr merge`
-* Move `ovlpr` subcommands from intspan here
+* Move the `ovlpr` subcommands from `intspan` to this crate
     * `anchr covered`
     * `anchr paf2ovlp`
     * `anchr restrict`
@@ -16,9 +16,9 @@
 * `anchr template`
     * Place scripts to `0_script/`
     * Place markdowns to `9_markdown/`
-    * Remove platanus
     * Replace manual `printf` with `rgr md` to create markdown files
     * Add `1_repetitive.sh`
+    * Remove platanus
     * Remove `2_kat.sh`
 
 * Unfinished
