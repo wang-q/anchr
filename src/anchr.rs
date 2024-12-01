@@ -22,6 +22,7 @@ fn main() -> anyhow::Result<()> {
         .subcommand(cmd::mergeread::make_subcommand())
         .subcommand(cmd::orient::make_subcommand())
         .subcommand(cmd::overlap::make_subcommand())
+        .subcommand(cmd::overlap2::make_subcommand())
         .subcommand(cmd::paf2ovlp::make_subcommand())
         .subcommand(cmd::quorum::make_subcommand())
         .subcommand(cmd::restrict::make_subcommand())
@@ -69,6 +70,7 @@ Subcommand groups:
         Some(("orient", sub_matches)) => cmd::orient::execute(sub_matches),
         Some(("contained", sub_matches)) => cmd::contained::execute(sub_matches),
         Some(("merge", sub_matches)) => cmd::merge::execute(sub_matches),
+        Some(("overlap2", sub_matches)) => cmd::overlap2::execute(sub_matches),
         // Assembling
         Some(("trim", sub_matches)) => cmd::trim::execute(sub_matches),
         Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),

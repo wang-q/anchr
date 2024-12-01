@@ -10,6 +10,7 @@ pub mod merge;
 pub mod mergeread;
 pub mod orient;
 pub mod overlap;
+pub mod overlap2;
 pub mod paf2ovlp;
 pub mod quorum;
 pub mod restrict;

@@ -64,6 +64,46 @@ fn command_overlap() -> anyhow::Result<()> {
 }
 
 #[test]
+fn command_overlap2() -> anyhow::Result<()> {
+    let mut bin = String::new();
+    for e in &["LAshow"] {
+        if let Ok(pth) = which::which(e) {
+            bin = pth.to_string_lossy().to_string();
+            break;
+        }
+    }
+    if bin.is_empty() {
+        return Ok(());
+    } else {
+        eprintln!("bin = {:#?}", bin);
+    }
+
+    let curdir = std::env::current_dir().unwrap();
+
+    let tempdir = tempfile::TempDir::new().unwrap();
+    assert!(std::env::set_current_dir(&tempdir).is_ok());
+
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("overlap2")
+        .arg("tests/ovlpr/1_4.anchor.fasta")
+        .arg("tests/ovlpr/1_4.pac.fasta")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert_eq!(stdout.lines().count(), 0);
+
+    assert!(&tempdir.path().join("anchorLong.db").is_file());
+    assert!(&tempdir.path().join("anchorLong.ovlp.tsv").is_file());
+
+    assert!(std::env::set_current_dir(&curdir).is_ok());
+    assert!(tempdir.close().is_ok());
+
+    Ok(())
+}
+
+#[test]
 fn command_orient() -> anyhow::Result<()> {
     let mut bin = String::new();
     for e in &["LAshow"] {

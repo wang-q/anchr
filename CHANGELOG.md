@@ -5,6 +5,7 @@
 * Add `anchr dazzname`
 * Add `anchr show2ovlp`
 * Add `anchr overlap`
+* Add `anchr overlap2`
 * Add `anchr orient`
 * Add `anchr contained`
 * Add `anchr merge`
@@ -25,7 +26,6 @@
     * `dazz cover`
     * `dazz group`
     * `dazz layout`
-    * `dazz overlap2`
 
 ## 0.3.18 - 2022-04-21
 

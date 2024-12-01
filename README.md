@@ -337,6 +337,8 @@ anchr contained tests/ovlpr/contained.fasta
 
 cargo run --bin anchr merge tests/ovlpr/merge.fasta -o test.fasta
 
+cargo run --bin anchr overlap2 tests/ovlpr/1_4.anchor.fasta tests/ovlpr/1_4.pac.fasta -d tmp
+
 ```
 
 ## AUTHOR

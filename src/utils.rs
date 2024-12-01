@@ -1,5 +1,6 @@
 use bio::io::fasta;
 use std::collections::BTreeMap;
+use std::io::{Read, Write};
 
 pub fn read_fasta(input: &str) -> BTreeMap<String, String> {
     let mut reader = intspan::reader(input);
@@ -36,6 +37,18 @@ pub fn file_exists(dir: &std::path::PathBuf, filename: &str) -> bool {
 
     // Check if the file exists
     path.exists()
+}
+
+pub fn pause() {
+    let mut stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+
+    // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
+    write!(stdout, "Press any key to continue...").unwrap();
+    stdout.flush().unwrap();
+
+    // Read a single byte and discard
+    let _ = stdin.read(&mut [0u8]).unwrap();
 }
 
 #[cfg(test)]
