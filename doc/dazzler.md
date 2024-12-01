@@ -141,11 +141,6 @@ LAshow -co myDB.db myDB.las
 
 ## Between two files
 
-`daligner` *不能* 对两个数据库之间做 overlap 比较. 现在的策略是将两个 fasta 文件放到一个数据库里, 再将数据库 split
-成多个子库, 将包含有第一个序列的子库对其它子库做比较. 还是可以减少很多计算量的.
-
-Only between other than all-vs-all to reduce computational tasks.
-
 ```shell script
 mkdir -p ~/data/dazz/dazzler2
 cd ~/data/dazz/dazzler2

@@ -1,7 +1,6 @@
 use clap::*;
 use cmd_lib::*;
 use std::env;
-use tempfile::Builder;
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -87,7 +86,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     let curdir = env::current_dir()?;
     let anchr = env::current_exe().unwrap().display().to_string();
-    let tempdir = Builder::new().prefix("anchr_ovlp_").tempdir()?;
+    let tempdir = tempfile::Builder::new().prefix("anchr_ovlp_").tempdir()?;
     let tempdir_str = tempdir.path().to_str().unwrap();
 
     run_cmd!(info "==> Paths")?;

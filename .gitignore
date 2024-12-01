@@ -108,3 +108,5 @@ tests/merge
 tests/bcalm
 tests/tadpole
 tests/Q*
+
+/tmp/
