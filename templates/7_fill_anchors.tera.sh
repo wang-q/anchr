@@ -31,7 +31,7 @@ mkdir -p 7_fill_anchors
 
 log_info "overlap: between anchor-long"
 
-dazz overlap2 \
+anchr overlap2 \
     --parallel {{ opt.parallel }} \
     ${FILE_ANCHOR} \
     ${FILE_LONG} \
@@ -40,7 +40,7 @@ dazz overlap2 \
 
 cd 7_fill_anchors
 
-CONTIG_COUNT=$(faops n50 -H -N 0 -C anchor.fasta)
+CONTIG_COUNT=$(hnsm n50 -H -N 0 -C anchor.fasta)
 log_debug "contigs: ${CONTIG_COUNT}"
 
 log_info "group: anchor-long"
@@ -84,7 +84,7 @@ log_info "Build contigs"
 cat \
    group/non_grouped.fasta \
    group/*.contig.fasta |
-   faops filter -l 0 -a 1000 stdin contig.fasta
+   hnsm filter -a 1000 stdin -o contig.fasta
 
 log_info Done.
 

@@ -78,16 +78,15 @@ fn command_overlap2() -> anyhow::Result<()> {
         eprintln!("bin = {:#?}", bin);
     }
 
-    let curdir = std::env::current_dir().unwrap();
-
     let tempdir = tempfile::TempDir::new().unwrap();
-    assert!(std::env::set_current_dir(&tempdir).is_ok());
 
     let mut cmd = Command::cargo_bin("anchr")?;
     let output = cmd
         .arg("overlap2")
         .arg("tests/ovlpr/1_4.anchor.fasta")
         .arg("tests/ovlpr/1_4.pac.fasta")
+        .arg("-d")
+        .arg(tempdir.path().display().to_string())
         .output()
         .unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
@@ -97,7 +96,6 @@ fn command_overlap2() -> anyhow::Result<()> {
     assert!(&tempdir.path().join("anchorLong.db").is_file());
     assert!(&tempdir.path().join("anchorLong.ovlp.tsv").is_file());
 
-    assert!(std::env::set_current_dir(&curdir).is_ok());
     assert!(tempdir.close().is_ok());
 
     Ok(())
