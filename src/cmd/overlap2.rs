@@ -18,6 +18,8 @@ pub fn make_subcommand() -> Command {
 * All intermediate files (.fasta, .replace.tsv, .db, .las, .show.txt, .ovlp.tsv)
   are kept in the working directory.
 
+* .ovlp.tsv records the serials
+
 "###,
         )
         .arg(
@@ -274,7 +276,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     run_cmd!(
         cat ${opt_p1}.fasta.replace.tsv ${opt_p2}.fasta.replace.tsv |
-            ${anchr} show2ovlp ${opt_pd}.show.txt stdin --orig -o ${opt_pd}.ovlp.tsv
+            ${anchr} show2ovlp ${opt_pd}.show.txt stdin -o ${opt_pd}.ovlp.tsv
     )?;
     // anchr::pause();
 
