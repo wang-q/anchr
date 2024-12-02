@@ -89,8 +89,8 @@ for Q in 0 {{ opt.qual }}; do
         fi
 
         rm env.json
-        log_debug "Reads stats with faops"
-        SUM_OUT=$( faops n50 -H -N 0 -S pe.cor.fa.gz )
+        log_debug "Reads stats"
+        SUM_OUT=$( hnsm n50 -H -N 0 -S pe.cor.fa.gz )
         save SUM_OUT
 
         save START_TIME

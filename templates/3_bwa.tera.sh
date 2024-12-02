@@ -32,7 +32,7 @@ fi
 
 # chr.sizes
 if [ ! -e chr.sizes ]; then
-    faops size genome.fa > chr.sizes
+    hnsm size genome.fa > chr.sizes
 fi
 
 #----------------------------#

@@ -12,7 +12,7 @@ if [ ! -e UT.fasta ]; then
 fi
 
 log_debug "UT sizes"
-faops size UT.fasta > ut.chr.sizes
+hnsm size UT.fasta > ut.chr.sizes
 spanr genome ut.chr.sizes -o ut.chr.json
 
 #----------------------------#

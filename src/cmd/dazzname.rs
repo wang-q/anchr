@@ -29,6 +29,12 @@ pub fn make_subcommand() -> Command {
                 .help("Starting index"),
         )
         .arg(
+            Arg::new("no-replace")
+                .long("no-replace")
+                .action(ArgAction::SetTrue)
+                .help("Do not write a .replace.tsv"),
+        )
+        .arg(
             Arg::new("outfile")
                 .long("outfile")
                 .short('o')
@@ -41,15 +47,20 @@ pub fn make_subcommand() -> Command {
 // command implementation
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
-    // Loading
+    // Args
     //----------------------------
+    let is_no_replace = args.get_flag("no-replace");
+
     let outfile = args.get_one::<String>("outfile").unwrap();
     let mut fa_out = fasta::Writer::new(intspan::writer(outfile));
     let mut writer_rplc = intspan::writer(&format!("{}.replace.tsv", outfile));
 
-    let prefix = args.get_one::<String>("prefix").unwrap();
-    let mut start = *args.get_one::<usize>("start").unwrap();
+    let opt_prefix = args.get_one::<String>("prefix").unwrap();
+    let mut opt_start = *args.get_one::<usize>("start").unwrap();
 
+    //----------------------------
+    // Ops
+    //----------------------------
     for infile in args.get_many::<String>("infiles").unwrap() {
         let reader = intspan::reader(infile);
 
@@ -64,18 +75,20 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
             let name = record.id().to_string();
             let length = record.seq().len();
-            let serial = start;
+            let serial = opt_start;
 
-            let name_new = format!("{}/{}/0_{}", prefix, serial, length);
+            let name_new = format!("{}/{}/0_{}", opt_prefix, serial, length);
             let record_new = fasta::Record::with_attrs(&name_new, None, record.seq());
 
             fa_out
                 .write_record(&record_new)
                 .expect("Write fasta file failed");
 
-            writer_rplc.write_fmt(format_args!("{}\t{}\n", name_new, name))?;
+            if !is_no_replace {
+                writer_rplc.write_fmt(format_args!("{}\t{}\n", name_new, name))?;
+            }
 
-            start += 1;
+            opt_start += 1;
         }
     }
 

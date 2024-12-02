@@ -23,7 +23,7 @@ cp {{ args.1 }} env.json
 
 log_info Read stats of PE reads
 
-SUM_COR=$( faops n50 -H -N 0 -S pe.cor.fa )
+SUM_COR=$( hnsm n50 -H -N 0 -S pe.cor.fa )
 save SUM_COR
 
 KMER='{{ opt.kmer | replace(from=" ", to=",") }}'

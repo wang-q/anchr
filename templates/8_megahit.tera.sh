@@ -39,7 +39,7 @@ else
         8_megahit/final.contigs.fa \
         --len 1000 --idt 0.98 --ratio 0.99999 --parallel 16 \
         -o stdout |
-        faops filter -a 1000 -l 0 stdin 8_megahit/megahit.non-contained.fasta
+        hnsm filter -a 1000 stdin -o 8_megahit/megahit.non-contained.fasta
 
     log_info "Clear intermediate files"
     find . -type d -path "*8_megahit/*" -not -name "anchor" | parallel --no-run-if-empty -j 1 rm -fr

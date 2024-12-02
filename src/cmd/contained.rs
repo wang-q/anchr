@@ -136,8 +136,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let mut infiles = vec![];
     for (i, infile) in abs_infiles.iter().enumerate() {
         run_cmd!(
-            faops filter -a ${min_len} -l 0 ${infile} stdout |
-                faops dazz -p ${prefix}_${i} stdin infile.${i}.fasta
+            hnsm filter -a ${min_len} ${infile} |
+                ${anchr} dazzname --no-replace -p ${prefix}_${i} stdin -o infile.${i}.fasta
         )?;
         infiles.push(format!("infile.{}.fasta", i));
     }
@@ -224,7 +224,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let files = infiles.clone();
     run_cmd!(
         cat $[files] |
-            faops some -i -l 0 stdin discard.list ${abs_outfile}
+            hnsm some -i stdin discard.list -o ${abs_outfile}
     )?;
 
     //----------------------------
@@ -234,16 +234,3 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     Ok(())
 }
-
-// use std::io::{Read, Write};
-// fn pause() {
-//     let mut stdin = std::io::stdin();
-//     let mut stdout = std::io::stdout();
-//
-//     // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
-//     write!(stdout, "Press any key to continue...").unwrap();
-//     stdout.flush().unwrap();
-//
-//     // Read a single byte and discard
-//     let _ = stdin.read(&mut [0u8]).unwrap();
-// }
