@@ -53,10 +53,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     let outfile = args.get_one::<String>("outfile").unwrap();
     let mut fa_out = fasta::Writer::new(intspan::writer(outfile));
-    let mut writer_rplc = intspan::writer(&format!("{}.replace.tsv", outfile));
 
     let opt_prefix = args.get_one::<String>("prefix").unwrap();
     let mut opt_start = *args.get_one::<usize>("start").unwrap();
+
+    let mut rplc_lines = vec![];
 
     //----------------------------
     // Ops
@@ -85,11 +86,18 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
                 .expect("Write fasta file failed");
 
             if !is_no_replace {
-                writer_rplc.write_fmt(format_args!("{}\t{}\n", name_new, name))?;
+                rplc_lines.push(format!("{}\t{}", name_new, name));
             }
 
             opt_start += 1;
         }
+    }
+
+    if !is_no_replace {
+        intspan::write_lines(
+            &format!("{}.replace.tsv", outfile),
+            &rplc_lines.iter().map(AsRef::as_ref).collect(),
+        )?;
     }
 
     Ok(())
