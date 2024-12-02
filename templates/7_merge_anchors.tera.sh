@@ -30,7 +30,7 @@ anchr contained \
     $( find . -path "*${DIR_PREFIX}*" -name "anchor.fasta" -or -path "*${DIR_PREFIX}*" -name "anchor.merge.fasta" | sort -r ) \
     --len 1000 --idt 0.9999 --ratio 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
-    faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.non-contained.fasta
+    hnsm filter -a 1000 stdin -o ${DIR_MERGE}/anchor.non-contained.fasta
 
 {% if opt.redo == "0" -%}
 anchr orient \
@@ -45,7 +45,7 @@ anchr contained \
     ${DIR_MERGE}/anchor.intermediate_1.fasta \
     --len 1000 --idt 0.98 --ratio 0.99 --parallel {{ opt.parallel }} \
     -o stdout |
-    faops filter -a 1000 -l 0 stdin ${DIR_MERGE}/anchor.merge.fasta
+    hnsm filter -a 1000 stdin -o ${DIR_MERGE}/anchor.merge.fasta
 {% else -%}
 #----------------------------#
 # anchors with Q0L0 reads
@@ -85,24 +85,24 @@ anchr contained \
 {% endif -%}
     --len 500 --idt 0.9999 --ratio 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
-    faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_0.fasta
+    hnsm filter -a 500 stdin -o ${DIR_MERGE}/others.intermediate_0.fasta
 
 anchr contained \
     ${DIR_MERGE}/anchor.merge.fasta \
     ${DIR_MERGE}/others.intermediate_0.fasta \
     --len 500 --idt 0.98 --ratio 0.99999 --parallel {{ opt.parallel }} \
     -o stdout |
-    faops filter -a 500 -l 0 stdin ${DIR_MERGE}/others.intermediate_1.fasta
+    hnsm filter -a 500 stdin -o ${DIR_MERGE}/others.intermediate_1.fasta
 
 cat ${DIR_MERGE}/others.intermediate_1.fasta |
     grep '>infile_1/' |
     sed 's/>//' \
     > ${DIR_MERGE}/others.txt
 
-faops some -l 0 \
+hnsm some -l 0 \
     ${DIR_MERGE}/others.intermediate_1.fasta \
     ${DIR_MERGE}/others.txt \
-    ${DIR_MERGE}/others.non-contained.fasta
+    -o ${DIR_MERGE}/others.non-contained.fasta
 
 {% if opt.redo == "1" -%}
 find ${DIR_MERGE}/anchor -name "*.fasta" -or -name "*.fa" | parallel --no-run-if-empty -j 1 rm
