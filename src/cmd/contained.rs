@@ -137,7 +137,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     for (i, infile) in abs_infiles.iter().enumerate() {
         run_cmd!(
             hnsm filter -a ${min_len} ${infile} |
-                ${anchr} dazzname --no-replace -p ${prefix}_${i} stdin -o infile.${i}.fasta
+                ${anchr} dazzname --no-replace --prefix ${prefix}_${i} stdin -o infile.${i}.fasta
         )?;
         infiles.push(format!("infile.{}.fasta", i));
     }

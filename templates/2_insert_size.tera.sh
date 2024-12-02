@@ -25,7 +25,7 @@ for PREFIX in R S T; do
         overwrite {% if opt.prefilter != "0" %}prefilter={{ opt.prefilter }}{% endif %}
 
     cat ${PREFIX}.tadpole.contig.fasta |
-        anchr dazzname --no-replace -p T stdin \
+        anchr dazzname --no-replace --prefix T stdin \
         > ${PREFIX}.tadpole.contig.fa
 
     bbmap.sh \
