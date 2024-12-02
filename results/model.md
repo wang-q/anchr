@@ -524,29 +524,29 @@ bash 0_script/0_master.sh
 
 Table: statInsertSize
 
-| K    |              property | min          | max          |
-|------|----------------------:|--------------|--------------|
-| R.21 |        Homozygous (a) |              | 100%         |
+| K    | property              |          min |          max |
+|------|-----------------------|-------------:|-------------:|
+| R.21 | Homozygous (a)        |              |         100% |
 |      | Genome Haploid Length |              | 4,478,083 bp |
-|      |  Genome Repeat Length | 136,755 bp   | 136,883 bp   |
-|      |  Genome Unique Length | 4,339,242 bp | 4,343,288 bp |
-|      |             Model Fit | 97.2749%     | 97.3934%     |
-|      |       Read Error Rate |              | 0.531821%    |
-|      |              Kmer Cov |              | 299.7        |
-| R.51 |        Homozygous (a) |              | 100%         |
+|      | Genome Repeat Length  |   136,755 bp |   136,883 bp |
+|      | Genome Unique Length  | 4,339,242 bp | 4,343,288 bp |
+|      | Model Fit             |     97.2749% |     97.3934% |
+|      | Read Error Rate       |              |    0.531821% |
+|      | Kmer Cov              |              |        299.7 |
+| R.51 | Homozygous (a)        |              |         100% |
 |      | Genome Haploid Length |              | 4,385,263 bp |
-|      |  Genome Repeat Length | 91,444 bp    | 91,569 bp    |
-|      |  Genome Unique Length | 4,290,813 bp | 4,296,704 bp |
-|      |             Model Fit | 97.3222%     | 97.6265%     |
-|      |       Read Error Rate |              | 0.326106%    |
-|      |              Kmer Cov |              | 223.4        |
-| R.81 |        Homozygous (a) |              | 100%         |
+|      | Genome Repeat Length  |    91,444 bp |    91,569 bp |
+|      | Genome Unique Length  | 4,290,813 bp | 4,296,704 bp |
+|      | Model Fit             |     97.3222% |     97.6265% |
+|      | Read Error Rate       |              |    0.326106% |
+|      | Kmer Cov              |              |        223.4 |
+| R.81 | Homozygous (a)        |              |         100% |
 |      | Genome Haploid Length |              | 4,304,378 bp |
-|      |  Genome Repeat Length | 60,194 bp    | 60,313 bp    |
-|      |  Genome Unique Length | 4,239,931 bp | 4,248,326 bp |
-|      |             Model Fit | 96.7883%     | 97.4791%     |
-|      |       Read Error Rate |              | 0.272491%    |
-|      |              Kmer Cov |              | 151.5        |
+|      | Genome Repeat Length  |    60,194 bp |    60,313 bp |
+|      | Genome Unique Length  | 4,239,931 bp | 4,248,326 bp |
+|      | Model Fit             |     96.7883% |     97.4791% |
+|      | Read Error Rate       |              |    0.272491% |
+|      | Kmer Cov              |              |        151.5 |
 
 Table: statFastK
 
@@ -720,50 +720,15 @@ Table: statUnitigsSuperreads.md
 
 Table: statMRUnitigsSuperreads.md
 
-| Name          | CovCor | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
-|---------------|-------:|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
-| Q0L0X40P000   |   40.0 |  0.988 |     33273 | 4.57M | 238 |   170.27K |     39 |   6 |     7 |   114 |
-| Q0L0X40P001   |   40.0 |  0.988 |     28779 | 4.53M | 259 |   201.39K |     40 |   6 |   7.3 |   116 |
-| Q0L0X40P002   |   40.0 |  0.988 |     30071 | 4.64M | 260 |   164.17K |     39 |   7 |     6 |   120 |
-| Q0L0X80P000   |   80.0 |  0.986 |     17506 |  4.5M | 422 |   325.46K |     79 |  11 |  15.3 |   224 |
-| Q0L0X80P001   |   80.0 |  0.985 |     14470 |  4.5M | 463 |   341.13K |     79 |  11 |  15.3 |   224 |
-| Q0L0X80P002   |   80.0 |  0.985 |     15397 | 4.51M | 435 |      302K |     79 |  12 |  14.3 |   230 |
-| Q25L60X40P000 |   40.0 |  0.989 |     32007 | 4.53M | 240 |    129.1K |     40 |   7 |   6.3 |   122 |
-| Q25L60X40P001 |   40.0 |  0.989 |     30801 | 4.56M | 235 |   150.98K |     40 |   7 |   6.3 |   122 |
-| Q25L60X40P002 |   40.0 |  0.989 |     29647 | 4.59M | 253 |   150.28K |     40 |   7 |   6.3 |   122 |
-| Q25L60X80P000 |   80.0 |   0.99 |     21998 | 4.52M | 335 |   197.18K |     79 |  12 |  14.3 |   230 |
-| Q25L60X80P001 |   80.0 |   0.99 |     24337 | 4.51M | 317 |   256.08K |     79 |  12 |  14.3 |   230 |
-| Q25L60X80P002 |   80.0 |   0.99 |     22977 | 4.53M | 330 |   290.55K |     80 |  12 |  14.7 |   232 |
-| Q30L60X40P000 |   40.0 |  0.987 |     29689 | 4.54M | 252 |    99.35K |     40 |   8 |   5.3 |   128 |
-| Q30L60X40P001 |   40.0 |  0.987 |     28714 | 4.55M | 261 |    96.91K |     40 |   8 |   5.3 |   128 |
-| Q30L60X40P002 |   40.0 |  0.986 |     30868 | 4.54M | 259 |    79.09K |     40 |   8 |   5.3 |   128 |
-| Q30L60X80P000 |   80.0 |  0.988 |     34031 | 4.55M | 223 |    97.39K |     80 |  14 |  12.7 |   244 |
-| Q30L60X80P001 |   80.0 |  0.988 |     34330 | 4.53M | 220 |    93.71K |     80 |  14 |  12.7 |   244 |
-
-Table: statUnitigsTadpole.md
-
-| Name      | CovCor | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
-|-----------|-------:|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
-| MRX40P000 |   40.0 |  0.973 |     66625 | 4.52M | 117 |    51.05K |     39 |   6 |     7 |   114 |
-| MRX40P001 |   40.0 |  0.973 |     60759 | 4.52M | 123 |     55.8K |     39 |   6 |     7 |   114 |
-| MRX40P002 |   40.0 |  0.974 |     73590 | 4.52M | 117 |    54.86K |     40 |   6 |   7.3 |   116 |
-| MRX80P000 |   80.0 |  0.973 |     53662 | 4.51M | 143 |    71.55K |     79 |  10 |  16.3 |   218 |
-| MRX80P001 |   80.0 |  0.972 |     55069 | 4.51M | 152 |    71.62K |     79 |  10 |  16.3 |   218 |
-| MRX80P002 |   80.0 |  0.974 |     54812 | 4.51M | 146 |    64.84K |     79 |   9 |  17.3 |   212 |
-
-Table: statMRUnitigsTadpole.md
-
-| Name                          | Mapped | N50Anchor | Sum |       # | SumOthers | median | MAD | lower | upper |
-|-------------------------------|-------:|----------:|----:|--------:|----------:|-------:|----:|------:|------:|
-| 7_merge_anchors               |  78639 |     6.45M | 160 | 672.98K |
-| 7_merge_mr_unitigs_bcalm      |  78592 |     4.52M | 101 |   5.96K |
-| 7_merge_mr_unitigs_bifrost    |  78601 |     4.53M | 107 |   7.09K |
-| 7_merge_mr_unitigs_superreads |  67346 |     4.52M | 111 |   6.81K |
-| 7_merge_mr_unitigs_tadpole    |  82766 |     4.52M | 100 |  45.75K |
-| 7_merge_unitigs_bcalm         |  63414 |     4.52M | 125 |  61.14K |
-| 7_merge_unitigs_bifrost       |  78639 |     4.52M | 111 |  58.34K |
-| 7_merge_unitigs_superreads    |  63418 |     4.54M | 124 |  21.15K |
-| 7_merge_unitigs_tadpole       |  59738 |     6.31M | 183 | 684.15K |
+| Name                          | Mapped | N50Anchor | Sum |      # | SumOthers | median | MAD | lower | upper |
+|-------------------------------|-------:|----------:|----:|-------:|----------:|-------:|----:|------:|------:|
+| 7_merge_anchors               |  97548 |     4.54M | 101 |      0 |
+| 7_merge_mr_unitigs_bcalm      |  78592 |     4.52M | 101 |  5.96K |
+| 7_merge_mr_unitigs_bifrost    |  78601 |     4.53M | 107 |  7.09K |
+| 7_merge_mr_unitigs_superreads |  67346 |     4.52M | 111 |  6.81K |
+| 7_merge_unitigs_bcalm         |  63414 |     4.52M | 125 | 61.14K |
+| 7_merge_unitigs_bifrost       |  78639 |     4.52M | 111 | 58.34K |
+| 7_merge_unitigs_superreads    |  63418 |     4.54M | 124 | 21.15K |
 
 Table: statMergeAnchors.md
 
@@ -781,8 +746,9 @@ Table: statOtherAnchors.md
 | Genome                   | 4641652 |   4.64M |   1 |
 | Paralogs                 |    2003 | 260.35K | 131 |
 | repetitive               |    1235 |  91.99K | 169 |
-| 7_merge_anchors.anchors  |   78639 |   6.45M | 160 |
-| 7_merge_anchors.others   |    6032 | 672.98K | 294 |
+| 7_merge_anchors.anchors  |   97548 |   4.54M | 101 |
+| glue_anchors             |  105670 |   4.53M |  91 |
+| fill_anchors             |  110256 |   4.53M |  85 |
 | spades.contig            |  125607 |   4.58M | 140 |
 | spades.scaffold          |  132608 |   4.58M | 136 |
 | spades.non-contained     |  125607 |   4.56M |  75 |
