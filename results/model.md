@@ -479,11 +479,13 @@ anchr template \
     --gatk \
     \
     --cov "40 80" \
-    --unitigger "bcalm bifrost superreads tadpole" \
+    --unitigger "bcalm bifrost superreads" \
     --statp 2 \
     --readl 151 \
     --uscale 2 \
     --lscale 3 \
+    \
+    --extend \
     \
     --busco
 
