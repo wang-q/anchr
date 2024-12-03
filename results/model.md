@@ -873,9 +873,11 @@ anchr template \
     --xmx 80g \
     --queue mpi \
     \
+    --repetitive \
+    \
     --fastqc \
     --insertsize \
-    --kat \
+    --fastk \
     \
     --trim "--dedupe --cutoff 30 --cutk 31" \
     --qual "25 30" \
@@ -887,7 +889,7 @@ anchr template \
     --ecphase "1 2 3" \
     \
     --cov "40 80" \
-    --unitigger "superreads bcalm tadpole" \
+    --unitigger "bcalm bifrost superreads" \
     --statp 2 \
     --readl 125 \
     --uscale 2 \
@@ -908,8 +910,10 @@ BASE_NAME=dh5alpha
 
 cd ${WORKING_DIR}/${BASE_NAME}
 # rm -fr 4_*/ 6_*/ 7_*/ 8_*/
-# rm -fr 2_illumina/trim 2_illumina/merge statReads.md
+# rm -fr 2_illumina/trim 2_illumina/merge 9_markdown/statReads.md
 # rm -fr 4_down_sampling 6_down_sampling
+
+bash 0_script/1_repetitive.sh
 
 # BASE_NAME=dh5alpha bash 0_bsub.sh
 bsub -q mpi -n 24 -J "${BASE_NAME}-0_master" "bash 0_master.sh"
