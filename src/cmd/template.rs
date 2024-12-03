@@ -59,6 +59,9 @@ pub fn make_subcommand() -> Command {
     * --gluemin 30
     * --fillmax 100
 
+* Validate assemblies
+    * --busco
+
 "#,
         )
         // Info
@@ -281,7 +284,7 @@ pub fn make_subcommand() -> Command {
                 .num_args(1)
                 .default_value("100"),
         )
-        // Extend anchors
+        // Validate assemblies
         .arg(
             Arg::new("busco")
                 .long("busco")
