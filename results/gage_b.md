@@ -41,7 +41,7 @@
 
 * Rsync to hpcc
 
-```shell script
+```shell
 for D in \
     Bcer_100x Mabs_100x Rsph_100x Vcho_100x \
     Mabs_full Rsph_full Vcho_full \
@@ -60,7 +60,7 @@ done
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/Bcer_100x/1_genome
 cd ~/data/anchr/Bcer_100x/1_genome
 
@@ -74,13 +74,13 @@ cp ~/data/anchr/ref/Bcer/repetitive.fa .
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/Bcer_100x
 
 mkdir -p 2_illumina
 cd 2_illumina
 
-aria2c -x 4 -s 2 -c http://ccb.jhu.edu/gage_b/datasets/B_cereus_MiSeq.tar.gz
+aria2c -x 4 -s 2 -c https://ccb.jhu.edu/gage_b/datasets/B_cereus_MiSeq.tar.gz
 
 # NOT gzipped tar
 tar xvf B_cereus_MiSeq.tar.gz raw/frag_1__cov100x.fastq
@@ -99,7 +99,7 @@ rm -fr raw
 
 * GAGE-B assemblies
 
-```shell script
+```shell
 cd ~/data/anchr/Bcer_100x
 
 mkdir -p 8_competitor
@@ -120,7 +120,7 @@ tar xvfz B_cereus_MiSeq.tar.gz velvet_ctg.fasta
 
 ## Bcer_100x: template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Bcer_100x
 
@@ -159,7 +159,7 @@ anchr template \
 
 ## Bcer_100x: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Bcer_100x
 
@@ -458,7 +458,7 @@ Table: statFinal
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/Mabs_100x/1_genome
 cd ~/data/anchr/Mabs_100x/1_genome
 
@@ -472,7 +472,7 @@ cp ~/data/anchr/ref/Mabs/repetitive.fa .
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/Mabs_100x
 
 mkdir -p 2_illumina
@@ -497,7 +497,7 @@ rm -fr raw
 
 * GAGE-B assemblies
 
-```shell script
+```shell
 cd ~/data/anchr/Mabs_100x
 
 mkdir -p 8_competitor
@@ -518,7 +518,7 @@ tar xvfz M_abscessus_MiSeq.tar.gz velvet_ctg.fasta
 
 ## Mabs_100x: template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Mabs_100x
 
@@ -557,7 +557,7 @@ anchr template \
 
 ## Mabs_100x: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Mabs_100x
 
@@ -829,7 +829,7 @@ Table: statFinal
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/Rsph_100x/1_genome
 cd ~/data/anchr/Rsph_100x/1_genome
 
@@ -843,7 +843,7 @@ cp ~/data/anchr/ref/Rsph/repetitive.fa .
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/Rsph_100x
 
 mkdir -p 2_illumina
@@ -868,7 +868,7 @@ rm -fr raw
 
 * GAGE-B assemblies
 
-```shell script
+```shell
 cd ~/data/anchr/Rsph_100x
 
 mkdir -p 8_competitor
@@ -890,7 +890,7 @@ tar xvfz R_sphaeroides_MiSeq.tar.gz velvet_ctg.fasta
 
 ## Rsph_100x: template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Rsph_100x
 
@@ -929,7 +929,7 @@ anchr template \
 
 ## Rsph_100x: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Rsph_100x
 
@@ -1205,7 +1205,7 @@ Table: statFinal
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/Vcho_100x/1_genome
 cd ~/data/anchr/Vcho_100x/1_genome
 
@@ -1219,7 +1219,7 @@ cp ~/data/anchr/ref/Vcho/repetitive.fa .
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/Vcho_100x
 
 mkdir -p 2_illumina
@@ -1244,7 +1244,7 @@ rm -fr raw
 
 * GAGE-B assemblies
 
-```shell script
+```shell
 cd ~/data/anchr/Vcho_100x
 
 mkdir -p 8_competitor
@@ -1266,7 +1266,7 @@ tar xvfz V_cholerae_MiSeq.tar.gz velvet_ctg.fasta
 
 ## Vcho_100x: template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Vcho_100x
 
@@ -1305,7 +1305,7 @@ anchr template \
 
 ## Vcho_100x: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Vcho_100x
 
@@ -1588,7 +1588,7 @@ Table: statFinal
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/Mabs_full/1_genome
 cd ~/data/anchr/Mabs_full/1_genome
 
@@ -1600,7 +1600,7 @@ cp ~/data/anchr/ref/Mabs/repetitive.fa .
 
 ## Mabs_full: download
 
-```shell script
+```shell
 cd ~/data/anchr/Mabs_full
 
 mkdir -p ena
@@ -1627,7 +1627,7 @@ md5sum --check ena_info.md5.txt
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/Mabs_full
 
 mkdir -p 2_illumina
@@ -1643,7 +1643,7 @@ ln -s ../ena/SRR768269_2.fastq.gz R2.fq.gz
 
 * template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Mabs_full
 
@@ -1682,7 +1682,7 @@ anchr template \
 
 ## Mabs_full: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Mabs_full
 
@@ -2022,7 +2022,7 @@ Table: statFinal
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/Rsph_full/1_genome
 cd ~/data/anchr/Rsph_full/1_genome
 
@@ -2034,7 +2034,7 @@ cp ~/data/anchr/ref/Rsph/repetitive.fa .
 
 ## Rsph_full: download
 
-```shell script
+```shell
 cd ~/data/anchr/Rsph_full
 
 mkdir -p ena
@@ -2061,7 +2061,7 @@ md5sum --check ena_info.md5.txt
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/Rsph_full
 
 mkdir -p 2_illumina
@@ -2077,7 +2077,7 @@ ln -s ../ena/SRR522246_2.fastq.gz R2.fq.gz
 
 * template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Rsph_full
 
@@ -2117,7 +2117,7 @@ anchr template \
 
 ## Rsph_full: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Rsph_full
 
@@ -2474,7 +2474,7 @@ Table: statFinal
 
 * Reference genome
 
-```shell script
+```shell
 mkdir -p ~/data/anchr/Vcho_full/1_genome
 cd ~/data/anchr/Vcho_full/1_genome
 
@@ -2486,7 +2486,7 @@ cp ~/data/anchr/ref/Vcho/repetitive.fa .
 
 ## Vcho_full: download
 
-```shell script
+```shell
 cd ~/data/anchr/Vcho_full
 
 mkdir -p ena
@@ -2513,7 +2513,7 @@ md5sum --check ena_info.md5.txt
 
 * Illumina
 
-```shell script
+```shell
 cd ~/data/anchr/Vcho_full
 
 mkdir -p 2_illumina
@@ -2529,7 +2529,7 @@ ln -s ../ena/SRR769320_2.fastq.gz R2.fq.gz
 
 * template
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Vcho_full
 
@@ -2569,7 +2569,7 @@ anchr template \
 
 ## Vcho_full: run
 
-```shell script
+```shell
 WORKING_DIR=${HOME}/data/anchr
 BASE_NAME=Vcho_full
 
