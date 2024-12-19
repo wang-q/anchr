@@ -137,12 +137,12 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let mut infiles = vec![];
     for (i, infile) in abs_infiles.iter().enumerate() {
         run_cmd!(
-            faops size ${infile} |
+            hnsm size ${infile} |
                 sort -n -r -k2,2 |
                 cut -f 1 > infile.${i}.order.txt
         )?;
         run_cmd!(
-            faops order ${infile} infile.${i}.order.txt infile.${i}.fasta
+            hnsm order ${infile} infile.${i}.order.txt -o infile.${i}.fasta
         )?;
         infiles.push(format!("infile.{}.fasta", i));
     }
@@ -291,13 +291,13 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         .collect::<Vec<String>>();
     intspan::write_lines("rc.list", &negatives.iter().map(AsRef::as_ref).collect())?;
     run_cmd!(
-        faops rc -l 0 -n -f rc.list renamed.fasta renamed.rc.fasta
+        hnsm rc -c renamed.fasta rc.list -o renamed.rc.fasta
     )?;
     // eprintln!("negatives = {:#?}", negatives);
 
     run_cmd!(info "==> Outputs")?;
     run_cmd!(
-        faops replace -l 0 renamed.rc.fasta renamed.fasta.replace.tsv ${abs_outfile}
+        hnsm replace renamed.rc.fasta renamed.fasta.replace.tsv -o ${abs_outfile}
     )?;
 
     // pause();

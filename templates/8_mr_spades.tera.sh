@@ -27,7 +27,7 @@ else
     cd 8_mr_spades
 
     mkdir -p re-pair
-    faops filter -l 0 -a 60 ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz stdout |
+    hnsm filter -a 60 ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz |
         repair.sh \
             in=stdin.fa \
             out=re-pair/R1.fa \
@@ -50,7 +50,7 @@ else
         contigs.fasta \
         --len 1000 --idt 0.98 --ratio 0.99999 --parallel {{ opt.parallel }} \
         -o stdout |
-        faops filter -a 1000 -l 0 stdin spades.non-contained.fasta
+        hnsm filter -a 1000 stdin -o spades.non-contained.fasta
 
     log_info "Clear intermediate files"
     find . -type d -not -name "anchor" | parallel --no-run-if-empty -j 1 rm -fr
