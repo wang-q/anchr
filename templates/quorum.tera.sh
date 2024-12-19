@@ -164,8 +164,7 @@ cat {{ opt.prefix }}.cor.sub.fa |
     perl -nl -e '/^>([\w\/]+)/ and print $1' \
     >> {{ opt.prefix }}.discard.lst
 
-faops some -i -l 0 {{ opt.prefix }}.cor.sub.fa {{ opt.prefix }}.discard.lst stdout \
-    > {{ opt.prefix }}.cor.fa
+hnsm some -i {{ opt.prefix }}.cor.sub.fa {{ opt.prefix }}.discard.lst -o {{ opt.prefix }}.cor.fa
 
 rm {{ opt.prefix }}.cor.sub.fa
 
@@ -189,10 +188,10 @@ save ESTIMATED_GENOME_SIZE
 log_debug "You set ESTIMATED_GENOME_SIZE of $ESTIMATED_GENOME_SIZE"
 {% endif -%}
 {# Keep a blank line #}
-log_debug "Reads stats with faops"
-SUM_IN=$( faops n50 -H -N 0 -S pe.renamed.fastq {% if args | length == 3 %}se.renamed.fastq {% endif %})
+log_debug "Reads stats with hnsm"
+SUM_IN=$( hnsm n50 -H -N 0 -S pe.renamed.fastq {% if args | length == 3 %}se.renamed.fastq {% endif %})
 save SUM_IN
-SUM_OUT=$( faops n50 -H -N 0 -S {{ opt.prefix }}.cor.fa )
+SUM_OUT=$( hnsm n50 -H -N 0 -S {{ opt.prefix }}.cor.fa )
 save SUM_OUT
 
 #----------------------------#

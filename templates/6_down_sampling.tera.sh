@@ -29,10 +29,9 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
     # actual sampling
     mkdir -p 6_down_sampling/MRX{}
-    faops split-about -l 0 -e \
+    hnsm split about -e -c \$(( {{ opt.genome }} * {} )) \
         2_illumina/merge/pe.cor.fa.gz \
-        \$(( {{ opt.genome }} * {} )) \
-        6_down_sampling/MRX{}
+        -o 6_down_sampling/MRX{}
 
     MAX_SERIAL=\$(
         cat 2_illumina/merge/env.json |

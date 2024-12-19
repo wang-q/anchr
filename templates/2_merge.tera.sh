@@ -159,8 +159,8 @@ else
     mv M.cor.fa.gz pe.cor.fa.gz
 fi
 
-log_debug "Reads stats with faops"
-SUM_OUT=$( faops n50 -H -N 0 -S pe.cor.fa.gz )
+log_debug "Reads stats with hnsm"
+SUM_OUT=$( hnsm n50 -H -N 0 -S pe.cor.fa.gz )
 save SUM_OUT
 
 cat statMergeReads.tsv |

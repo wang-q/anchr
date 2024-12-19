@@ -27,10 +27,9 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
     # actual sampling
     mkdir -p 4_down_sampling/Q{1}L{2}X{3}
-    faops split-about -l 0 -e \
+    hnsm split about -e -c \$(( {{ opt.genome }} * {3} )) \
         2_illumina/Q{1}L{2}/pe.cor.fa.gz \
-        \$(( {{ opt.genome }} * {3} )) \
-        4_down_sampling/Q{1}L{2}X{3}
+        -o 4_down_sampling/Q{1}L{2}X{3}
 
     MAX_SERIAL=\$(
         cat 2_illumina/Q{1}L{2}/env.json |

@@ -68,7 +68,7 @@ save () {
 }
 
 stat_format () {
-    echo $(faops n50 -H -N 50 -S -C $@) |
+    echo $(hnsm n50 -H -N 50 -S -C $@) |
         perl -nla -MNumber::Format -e '
             printf qq(%d\t%s\t%d\n), $F[0], Number::Format::format_bytes($F[1], base => 1000,), $F[2];
         '
