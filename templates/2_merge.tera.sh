@@ -50,19 +50,19 @@ for PREFIX in R S T; do
     bash mergeread.sh
 
     # Create .cor.fa.gz
-    faops interleave \
-        -p unmerged \
+    hnsm interleave \
+        --prefix unmerged \
         ${PREFIXU}1.fq.gz \
         ${PREFIXU}2.fq.gz \
         > ${PREFIXM}.interleave.fa
 
-    faops interleave \
-        -p single \
+    hnsm interleave \
+        --prefix single \
         ${PREFIXU}s.fq.gz \
         >> ${PREFIXM}.interleave.fa
 
-    faops interleave \
-        -p merged \
+    hnsm interleave \
+        --prefix merged \
         ${PREFIXM}1.fq.gz \
         >> ${PREFIXM}.interleave.fa
 

@@ -14,25 +14,25 @@ export PATH="$(readlinkf "$(which masurca)" | xargs dirname):$PATH"
 log_info 'Processing pe and/or se library reads'
 
 {% if args | length == 2 -%}
-faops interleave \
-    -q -p pe \
+hnsm interleave \
+    --fq --prefix pe \
     '{{ args.0 }}' \
     '{{ args.1 }}' \
     > 'pe.renamed.fastq'
 {% elif args | length == 3 -%}
-faops interleave \
-    -q -p pe \
+hnsm interleave \
+    --fq --prefix pe \
     '{{ args.0 }}' \
     '{{ args.1 }}' \
     > 'pe.renamed.fastq'
 
-faops interleave \
-    -q -p se \
+hnsm interleave \
+    --fq --prefix se \
     '{{ args.2 }}' \
     > 'se.renamed.fastq'
 {% else -%}
-faops interleave \
-    -q -p pe \
+hnsm interleave \
+    --fq --prefix pe \
     '{{ args.0 }}' \
     > 'pe.renamed.fastq'
 {% endif -%}
