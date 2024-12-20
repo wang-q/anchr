@@ -21,6 +21,8 @@
     * Add `1_repetitive.sh`
     * Remove platanus
     * Remove `2_kat.sh`
+    * Use `hnsm` instead of `faops`
+    * Use `rgr md` instead of `mlr`
 
 * Unfinished
     * `dazz cover`
