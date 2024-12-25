@@ -20,9 +20,9 @@ hash pigz 2>/dev/null || {
     echo >&2 "    Install with homebrew: brew install pigz"
 }
 
-hash faops 2>/dev/null || {
-    echo >&2 "faops is required but it's not installed."
-    echo >&2 "    Install with homebrew: brew install wang-q/tap/faops"
+hash hnsm 2>/dev/null || {
+    echo >&2 "hnsm is required but it's not installed."
+    echo >&2 "    Install with homebrew: brew install wang-q/tap/hnsm"
 }
 
 #----------------------------#
