@@ -165,7 +165,7 @@ cd ~/data/anchr/mg1655/1_genome/
 
 hnsm size genome.fa > chr.sizes
 
-FastK -v -p -k21 genome
+FastK -v -p -k17 genome
 
 cat chr.sizes |
     number-lines |
@@ -193,14 +193,39 @@ hnsm range genome.fa -r region.txt |
 
 spanr stat chr.sizes repetitive.json
 #chr,chrLength,size,coverage
-#NC_000913,4641652,91989,0.0198
-#all,4641652,91989,0.0198
+#NC_000913,4641652,92892,0.0200
+#all,4641652,92892,0.0200
 
 hnsm size repetitive.fa | tsv-summarize --sum 2
-#91989
+#92892
 
 hnsm size paralogs.fa | tsv-summarize --sum 2
 #187300
+
+```
+
+## Repeats
+
+```shell
+cd ~/data/anchr/mg1655/1_genome/
+
+# RepBase for RepeatMasker
+
+curl -LO https://github.com/wang-q/ubuntu/releases/download/20190906/repeatmaskerlibraries-20140131.tar.gz
+
+tar xvfz repeatmaskerlibraries-20140131.tar.gz Libraries/RepeatMaskerLib.embl
+
+# https://sourceforge.net/projects/readseq/
+java -jar ~/bin/readseq.jar -f fa Libraries/RepeatMaskerLib.embl
+
+mv Libraries/RepeatMaskerLib.embl.fasta repeat.fa
+
+hnsm size
+
+FastK -v -t -k21 repeat
+FastK -v -p:repeat -k21 genome
+
+Profex -z genome 1
 
 ```
 
