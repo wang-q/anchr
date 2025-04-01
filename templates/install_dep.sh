@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 brew tap brewsci/bio
-brew tap brewsci/science
 brew tap wang-q/tap
 
 check_install() {
@@ -12,33 +11,26 @@ check_install() {
     fi
 }
 
-for package in openjdk jq parallel pigz; do
+for package in bbtools jellyfish; do
     check_install ${package}
 done
 
-for package in fastqc bbtools sickle bwa samtools picard-tools jellyfish; do
-    check_install ${package}
-done
-
-for package in bcalm gatk; do
+for package in gatk; do
     check_install brewsci/bio/${package}
 done
 
-# shellcheck disable=SC2043
-for package in poa; do
-    check_install brewsci/science/${package}
-done
+cbp install openjdk jq parallel pigz
+cbp install fastqc sickle bwa samtools picard
+cbp install spoa
+cbp install bcalm bifrost
+cbp install tsv-utils faops intspan
+cbp install dazzdb daligner
 
-for package in tsv-utils faops bifrost@1.3.5 sparsemem intspan; do
-    check_install wang-q/tap/${package}
-done
-
-brew install --HEAD wang-q/tap/dazz_db
-brew install --HEAD wang-q/tap/daligner
+# linux
+cbp install mosdepth
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     check_install brewsci/bio/masurca
-    check_install brewsci/bio/mosdepth
     check_install wang-q/tap/quorum@1.1.2
 fi
 
