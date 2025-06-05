@@ -83,22 +83,6 @@ brew install parallel pigz jq
 # cite parallel
 # echo "will cite" | parallel --citation
 
-curl -fsSL \
-    https://api.github.com/repos/wang-q/builds/git/trees/master?recursive=1 |
-    jq -r '.tree[] | select( .path | startswith("tar/") ) | .path' |
-    parallel -j 1 "
-        echo >&2 '==> {}'
-        curl -fsSL https://raw.githubusercontent.com/wang-q/builds/master/{} |
-        tar xvz --directory=$HOME/bin/
-    "
-
-curl -LO https://github.com/brentp/mosdepth/releases/download/v0.3.10/mosdepth
-chmod +x mosdepth
-mv mosdepth ~/bin/
-
-brew tap wang-q/tap
-brew install wang-q/tap/tsv-utils
-
 anchr dep install | bash
 anchr dep check | bash
 
