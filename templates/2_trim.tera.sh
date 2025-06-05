@@ -50,7 +50,7 @@ for PREFIX in R S T; do
         fi
 
         printf "%s\t%s\t%s\t%s\n" \
-            $(echo ${NAME}; stat_format ${NAME}.fq.gz;) >> statTrimReads.tsv
+            $(echo ${NAME}; stat_format_fq ${NAME}.fq.gz;) >> statTrimReads.tsv
     done
 
     log_info "clear unneeded .fq.gz files"

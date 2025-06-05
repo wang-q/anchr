@@ -93,7 +93,7 @@ for PREFIX in R S T; do
             continue
         fi
         printf "%s\t%s\t%s\t%s\n" \
-            $(echo ${NAME}; stat_format ${NAME}.fq.gz;) >> statMergeReads.tsv
+            $(echo ${NAME}; stat_format_fq ${NAME}.fq.gz;) >> statMergeReads.tsv
     done
 
     printf "%s\t%s\t%s\t%s\n" \
