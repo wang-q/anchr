@@ -74,6 +74,16 @@ stat_format () {
         '
 }
 
+stat_format_fq () {
+    echo $(
+            hnsm fq2fq $@ |
+                hnsm n50 -H -N 50 -S -C stdin
+        ) |
+        perl -nla -MNumber::Format -e '
+            printf qq(%d\t%s\t%d\n), $F[0], Number::Format::format_bytes($F[1], base => 1000,), $F[2];
+        '
+}
+
 byte_format () {
     echo "$@" |
         perl -nl -MNumber::Format -e '

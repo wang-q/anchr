@@ -32,11 +32,11 @@ fi \
 for PREFIX in R S T; do
     if [ -e ${PREFIX}1.fq.gz ]; then
         printf "%s\t%s\t%s\t%s\n" \
-            $(echo "Illumina.${PREFIX}"; stat_format ${PREFIX}1.fq.gz {% if opt.se == "0" %}${PREFIX}2.fq.gz{% endif %};)
+            $(echo "Illumina.${PREFIX}"; stat_format_fq ${PREFIX}1.fq.gz {% if opt.se == "0" %}${PREFIX}2.fq.gz{% endif %};)
     fi
     if [ -e trim/${PREFIX}1.fq.gz ]; then
         printf "%s\t%s\t%s\t%s\n" \
-            $(echo "trim.${PREFIX}"; stat_format trim/${PREFIX}1.fq.gz {% if opt.se == "0" %}trim/${PREFIX}2.fq.gz trim/${PREFIX}s.fq.gz{% endif %};)
+            $(echo "trim.${PREFIX}"; stat_format_fq trim/${PREFIX}1.fq.gz {% if opt.se == "0" %}trim/${PREFIX}2.fq.gz trim/${PREFIX}s.fq.gz{% endif %};)
     fi
 done \
     >> statReads.tsv
@@ -52,12 +52,12 @@ for PREFIX in R S T; do
                 $(
                     echo Q${Q}L${L};
 {% if opt.se == "0" %}
-                    stat_format \
+                    stat_format_fq \
                         Q${Q}L${L}/${PREFIX}1.fq.gz \
                         Q${Q}L${L}/${PREFIX}2.fq.gz \
                         Q${Q}L${L}/${PREFIX}s.fq.gz;
 {% else %}
-                    stat_format \
+                    stat_format_fq \
                         Q${Q}L${L}/${PREFIX}1.fq.gz;
 {% endif %}
                 )
