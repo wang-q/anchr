@@ -78,7 +78,6 @@ Options:
 ```bash
 brew install perl cpanminus
 brew install r
-brew install parallel pigz jq
 
 # cite parallel
 # echo "will cite" | parallel --citation
@@ -86,8 +85,6 @@ brew install parallel pigz jq
 anchr dep install | bash
 anchr dep check | bash
 
-brew install binutils
-brew link binutils --force
 parallel -j 1 -k --line-buffer '
     Rscript -e '\'' if (!requireNamespace("{}", quietly = FALSE)) { install.packages("{}", repos="https://mirrors.tuna.tsinghua.edu.cn/CRAN") } '\''
     ' ::: \
