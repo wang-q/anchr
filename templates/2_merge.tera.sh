@@ -51,18 +51,18 @@ for PREFIX in R S T; do
 
     # Create .cor.fa.gz
     hnsm interleave \
-        --prefix unmerged \
+        --fq --prefix unmerged \
         ${PREFIXU}1.fq.gz \
         ${PREFIXU}2.fq.gz \
         > ${PREFIXM}.interleave.fa
 
     hnsm interleave \
-        --prefix single \
+        --fq --prefix single \
         ${PREFIXU}s.fq.gz \
         >> ${PREFIXM}.interleave.fa
 
     hnsm interleave \
-        --prefix merged \
+        --fq --prefix merged \
         ${PREFIXM}1.fq.gz \
         >> ${PREFIXM}.interleave.fa
 

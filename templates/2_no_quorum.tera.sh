@@ -35,7 +35,7 @@ for Q in 0 {{ opt.qual }}; do
 
             # Create .cor.fa.gz
             hnsm interleave \
-                --prefix pe \
+                --fq --prefix pe \
                 ${PREFIX}1.fq.gz \
 {% if opt.se == "0" -%}
                 ${PREFIX}2.fq.gz \
@@ -44,7 +44,7 @@ for Q in 0 {{ opt.qual }}; do
 
             if [ -e ${PREFIX}s.fq.gz ]; then
                 hnsm interleave \
-                    --prefix se \
+                    --fq --prefix se \
                     ${PREFIX}s.fq.gz \
                     >> ${PREFIX}.interleave.fa
             fi
