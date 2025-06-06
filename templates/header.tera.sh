@@ -76,7 +76,7 @@ stat_format () {
 
 stat_format_fq () {
     echo $(
-            hnsm fq2fq $@ |
+            hnsm fq2fa $@ |
                 hnsm n50 -H -N 50 -S -C stdin
         ) |
         perl -nla -MNumber::Format -e '
