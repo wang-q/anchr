@@ -99,10 +99,10 @@ cat ${DIR_MERGE}/others.intermediate_1.fasta |
     sed 's/>//' \
     > ${DIR_MERGE}/others.txt
 
-hnsm some -l 0 \
+faops some -l 0 \
     ${DIR_MERGE}/others.intermediate_1.fasta \
     ${DIR_MERGE}/others.txt \
-    -o ${DIR_MERGE}/others.non-contained.fasta
+    ${DIR_MERGE}/others.non-contained.fasta
 
 {% if opt.redo == "1" -%}
 find ${DIR_MERGE}/anchor -name "*.fasta" -or -name "*.fa" | parallel --no-run-if-empty -j 1 rm
