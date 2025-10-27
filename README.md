@@ -73,9 +73,11 @@ Options:
 
 ## RUNTIME DEPENDENCIES
 
-* Command line tools managed by `Homebrew`
+* Command line tools managed by `cbp`
 
 ```bash
+cbp install openjdk
+
 brew install perl cpanminus
 brew install r
 
@@ -101,9 +103,9 @@ python3 ./setup.py install
 quast.py --test
 
 # Optional: leading assemblers
-brew install brewsci/bio/megahit
+cbp install megahit
 
-brew install spades
+cbp install spades
 spades.py --test
 
 brew install brewsci/bio/busco

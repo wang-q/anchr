@@ -7,22 +7,18 @@
 #----------------------------#
 hash parallel 2>/dev/null || {
     echo >&2 "parallel is required but it's not installed."
-    echo >&2 "    Install with homebrew: brew install parallel"
 }
 
 hash jq 2>/dev/null || {
     echo >&2 "jq is required but it's not installed."
-    echo >&2 "    Install with homebrew: brew install jq"
 }
 
 hash pigz 2>/dev/null || {
     echo >&2 "pigz is required but it's not installed."
-    echo >&2 "    Install with homebrew: brew install pigz"
 }
 
 hash hnsm 2>/dev/null || {
     echo >&2 "hnsm is required but it's not installed."
-    echo >&2 "    Install with homebrew: brew install wang-q/tap/hnsm"
 }
 
 #----------------------------#
@@ -30,12 +26,10 @@ hash hnsm 2>/dev/null || {
 #----------------------------#
 hash fastqc 2>/dev/null || {
     echo >&2 "fastqc is required but it's not installed."
-    echo >&2 "    Install with homebrew: brew install fastqc"
 }
 
 hash picard 2>/dev/null || {
     echo >&2 "picard is required but it's not installed."
-    echo >&2 "    Install with homebrew: brew install picard-tools"
 }
 
 #----------------------------#
@@ -43,34 +37,27 @@ hash picard 2>/dev/null || {
 #----------------------------#
 hash bbduk.sh 2>/dev/null || {
     echo >&2 "bbtools is required but it's not installed."
-    echo >&2 "  Install with homebrew: brew install bbtools"
 }
 
 hash sickle 2>/dev/null || {
     echo >&2 "sickle is required but it's not installed."
-    echo >&2 "  Install with homebrew: brew install sickle"
 }
 
 hash tsv-sample 2>/dev/null || {
     echo >&2 "tsv-sample is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install wang-q/tap/tsv-utils"
 }
 
 hash jellyfish 2>/dev/null || {
     echo >&2 "jellyfish is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install jellyfish"
 }
 
-if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    hash quorum 2>/dev/null || {
-        echo >&2 "quorum is required but it's not installed."
-        echo >&2 "Install with homebrew: brew install wang-q/tap/quorum@1.1.2"
-    }
-    hash masurca 2>/dev/null || {
-        echo >&2 "masurca is optional but it's not installed."
-        echo >&2 "Install with homebrew: brew install brewsci/bio/masurca"
-    }
-fi
+hash quorum 2>/dev/null || {
+    echo >&2 "quorum is required but it's not installed."
+}
+
+hash masurca 2>/dev/null || {
+    echo >&2 "masurca is optional but it's not installed."
+}
 
 perl -MNumber::Format -e "1" 2>/dev/null || {
     echo >&2 "Number::Format is required but it's not installed."
@@ -82,12 +69,10 @@ perl -MNumber::Format -e "1" 2>/dev/null || {
 #----------------------------#
 hash bwa 2>/dev/null || {
     echo >&2 "bwa is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install bwa"
 }
 
 hash samtools 2>/dev/null || {
     echo >&2 "samtools is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install samtools"
 }
 
 hash gatk 2>/dev/null || {
@@ -98,7 +83,6 @@ hash gatk 2>/dev/null || {
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     hash mosdepth 2>/dev/null || {
         echo >&2 "mosdepth is required but it's not installed."
-        echo >&2 "Install with homebrew: brew install brewsci/bio/mosdepth"
     }
 fi
 
@@ -107,22 +91,18 @@ fi
 #----------------------------#
 hash bcalm 2>/dev/null || {
     echo >&2 "bcalm is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install brewsci/bio/bcalm"
 }
 
 hash Bifrost 2>/dev/null || {
     echo >&2 "bifrost is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install wang-q/tap/bifrost@1.3.5"
 }
 
 hash fasta2DB 2>/dev/null || {
     echo >&2 "DAZZ_DB is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install --HEAD wang-q/tap/dazz_db"
 }
 
 hash daligner 2>/dev/null || {
     echo >&2 "daligner is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install --HEAD wang-q/tap/daligner"
 }
 
 hash dazz 2>/dev/null || {
@@ -135,7 +115,7 @@ hash dazz 2>/dev/null || {
 #----------------------------#
 hash spanr 2>/dev/null || {
     echo >&2 "spanr is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install wang-q/tap/intspan"
+    echo >&2 "Install with cbp: cbp install intspan"
 }
 
 hash fasops 2>/dev/null || {
@@ -153,7 +133,6 @@ hash fasops 2>/dev/null || {
 
 hash poa 2>/dev/null || {
     echo >&2 "poa is required but it's not installed."
-    echo >&2 "Install with homebrew: brew install homebrew/science/poa"
 }
 
 #perl -MGraphViz -e "1" 2>/dev/null || {
