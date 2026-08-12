@@ -2,12 +2,12 @@
 //! (BBMerge-compatible).
 
 use crate::libs::asm::tadpole::{extend_read_right, TadpoleOptions, TadpoleTable};
-use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use crate::libs::fq::bbnet::CellNet;
 use crate::libs::fq::overlap;
+use anyhow::Result;
+use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use pgr::libs::fq::qual::{base_to_number, from_phred, to_phred};
 use pgr::libs::nt::rev_comp;
-use anyhow::Result;
 use std::io::Write;
 
 /// Histogram capacity (BBMerge `histlen`).

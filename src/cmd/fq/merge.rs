@@ -1,7 +1,7 @@
-use anyhow::Context;
-use clap::{value_parser, Arg, ArgMatches, Command};
 use crate::libs::fq::bbnet::CellNet;
 use crate::libs::fq::merge::{merge, write_ihist, MergeOptions, Preset};
+use anyhow::Context;
+use clap::{value_parser, Arg, ArgMatches, Command};
 use std::io::Write;
 
 /// Build the clap subcommand for merge.

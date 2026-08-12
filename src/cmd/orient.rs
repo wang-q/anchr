@@ -289,7 +289,10 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         .filter(|(_, v)| **v == 1)
         .map(|(k, _)| id_of_idx.get(k).unwrap().to_string())
         .collect::<Vec<String>>();
-    anchr::utils::write_lines("rc.list", &negatives.iter().map(AsRef::as_ref).collect::<Vec<&str>>())?;
+    anchr::utils::write_lines(
+        "rc.list",
+        &negatives.iter().map(AsRef::as_ref).collect::<Vec<&str>>(),
+    )?;
     run_cmd!(
         hnsm rc -c renamed.fasta rc.list -o renamed.rc.fasta
     )?;

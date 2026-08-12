@@ -1,6 +1,6 @@
+use crate::libs::asm::tadpole::{run, TadpoleOptions};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
-use crate::libs::asm::tadpole::{run, TadpoleOptions};
 use std::io::Write;
 
 /// Build the clap subcommand for extend.

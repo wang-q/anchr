@@ -5,13 +5,13 @@
 //! decision logic but with an exact k-mer count table instead of the
 //! approximate `bits=16` hash table.
 
+use crate::libs::fq::clump::temp_dir_for;
+use anyhow::{Context, Result};
 use pgr::libs::fmt::fq::write_fq;
 use pgr::libs::fmt::seq::SeqRecord;
-use crate::libs::fq::clump::temp_dir_for;
 use pgr::libs::fq::pairs::PairReader;
 use pgr::libs::kmer::key::Kmer;
 use pgr::libs::kmer::{self, count, KmerTable};
-use anyhow::{Context, Result};
 use rayon::prelude::*;
 use std::fs::File;
 use std::io::{BufWriter, Write};

@@ -5,9 +5,9 @@
 //! sorted by the pivot k-mer of R1, which is byte-identical to
 //! `clumpify.sh` output (see tests/bbtools/Lambda/README.md).
 
+use anyhow::{Context, Result};
 use pgr::libs::fmt::fq::write_fq;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
-use anyhow::{Context, Result};
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::fs::File;

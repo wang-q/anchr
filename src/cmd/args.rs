@@ -2,7 +2,6 @@
 
 use clap::{builder, Arg, ArgMatches};
 
-
 /// Standard `-o/--outfile` argument defaulting to stdout.
 pub fn outfile_arg() -> Arg {
     Arg::new("outfile")

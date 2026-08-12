@@ -2,9 +2,9 @@
 //! on the BBTools Lambda 20k-read paired dataset: the quality-gated k-mer
 //! count-table build and the full assembly (bubbles on and off).
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use anchr::libs::asm::assemble::{assemble, assemble_unitigs, AssembleOptions};
 use anchr::libs::asm::tadpole::TadpoleTable;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use std::sync::OnceLock;
 

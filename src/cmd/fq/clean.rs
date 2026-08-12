@@ -1,6 +1,6 @@
+use crate::libs::fq::trim_adapter::{trim_adapter, AdapterTrimOptions};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
-use crate::libs::fq::trim_adapter::{trim_adapter, AdapterTrimOptions};
 use std::io::Write;
 
 /// Build the clap subcommand for clean.

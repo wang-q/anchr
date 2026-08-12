@@ -1,6 +1,6 @@
+use crate::libs::fq::clump::{clump, ClumpOptions};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
-use crate::libs::fq::clump::{clump, ClumpOptions};
 use std::io::Write;
 
 /// Build the clap subcommand for clump.

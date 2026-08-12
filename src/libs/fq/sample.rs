@@ -1,7 +1,7 @@
 //! Deterministic read subsampling to a target base count.
 
-use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use anyhow::{bail, Result};
+use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use std::io::Write;
 
 /// `2^-53`, the multiplier of BBTools `FastRandomXoshiro.nextDouble()`.

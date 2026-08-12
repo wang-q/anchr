@@ -1,6 +1,6 @@
+use crate::libs::fq::trim::{Method, QualityBase, TrimOptions};
 use anyhow::{bail, Context};
 use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
-use crate::libs::fq::trim::{Method, QualityBase, TrimOptions};
 use std::io::Write;
 
 /// Build the clap subcommand for trim-qual.

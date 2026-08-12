@@ -6,9 +6,9 @@
 //! `minlen`, `ftm`, and `tossbrokenreads`. Output is byte-identical to
 //! `bbduk.sh ... ordered=t` (see tests/bbtools/Lambda/README.md).
 
+use anyhow::{Context, Result};
 use pgr::libs::fmt::fq::write_fq;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
-use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};

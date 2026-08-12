@@ -1,9 +1,9 @@
-//! Benchmarks for `pgr asm map` (perfect-match mapping): reference index
+//! Benchmarks for `anchr asm map` (perfect-match mapping): reference index
 //! build and the full mapping of the BBTools Lambda 2k paired reads against
 //! the tadpole contig golden (the same reads assembled).
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use anchr::libs::map::{build_index, map_files, read_fasta, MapOptions, RefRecord};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::sync::OnceLock;
 
 const REF: &str = concat!(

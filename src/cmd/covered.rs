@@ -152,7 +152,10 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
     // Output
     //----------------------------
-    let mut keys = ivs_of.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+    let mut keys = ivs_of
+        .keys()
+        .map(|k| k.to_string())
+        .collect::<Vec<String>>();
     keys.sort();
 
     for key in &keys {

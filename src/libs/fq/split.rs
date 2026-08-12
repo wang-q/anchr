@@ -1,8 +1,8 @@
 //! Split an interleaved FASTQ stream into R1/R2/singles files.
 
+use anyhow::{Context, Result};
 use pgr::libs::fmt::fq::write_fq;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
-use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::io::Write;
 
