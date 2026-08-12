@@ -54,7 +54,7 @@ Examples:
             Arg::new("ref")
                 .index(1)
                 .required(true)
-                .help("Reference FASTA file(s) to map against"),
+                .help("Reference FASTA file to map against"),
         )
         .arg(
             Arg::new("infiles")

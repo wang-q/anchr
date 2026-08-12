@@ -53,8 +53,9 @@ asm 家族对照 BBTools tadpole（contig）、BCALM2/GATB `ograph.cpp graph3`
 - `make_contig`：`bb.len() == k` 守卫在种子处即拒绝 contig；扩展循环
   （`extend_to_right`/`right_counts_of`/`left_counts_of`/`calc_coverage`）与
   tadpole 移植一致；`resolved_min_contig_len` 的 `2*k` 因 k ≤ 128 不溢出。
-- `ovlp` 的 `--overlap-k 0`/`--min-overlap 0`：seed_k 经 `.max(1)` 归 1；
-  `min_overlap=0` 仅放行所有 found overlap，均无 panic。
+- `ovlp` 的 `--overlap-k 0`/`--min-overlap 0`：`--overlap-k 0` 使 `seed_k` 钳为 0，
+  `ensure!(seed_k >= 1)` 报友好错误（帮助范围是 `1..=128`，不 panic）；`min_overlap=0`
+  仅放行所有 found overlap，亦不 panic。
 - `map`：单端/配对统计、SAM FLAG/TLEN/RNEXT 计算正确；`--max-reads` 单端跨文件
   与配对成对语义均正确。
 - `common.rs`：`to_paf`/`read_unitigs`/`format_cov` 边界安全。
@@ -158,10 +159,41 @@ asm 家族对照 BBTools tadpole（contig）、BCALM2/GATB `ograph.cpp graph3`
   并把 `--overlap-k` 的帮助文本/`docs/asm.md` 注明 `1..=128`。回归
   `command_asm_ovlp_rejects_overlap_k_above_limit`。
 
+## 第七轮复核（文档一致性 + `cns` 布局解析健壮性）
+
+- **`map` 帮助文本误用复数**：`cmd/asm/map.rs` 的 `ref` 参数 help 写 "Reference
+  FASTA file(s)"，暗示可传多个引用文件，但该参数为单值（`num_args` 默认 1），且
+  `after_help` 与 `docs/asm.md`（`<ref.fa>` 单数）均明确引用是单个。改为
+  "Reference FASTA file to map against"。
+- **`contig`/`unitig` 的 `-k` 帮助未标上限**：家族内 `map`/`ovlp`/`olc` 的 `-k`/`--overlap-k`
+  帮助都注明 `1..=128`，而 `contig`/`unitig` 只写 "K-mer length"，与 `docs/asm.md`
+  明确的上限 128 不一致。补为 "K-mer length (1..=128)"。
+- **`cns::parse_layouts` 畸形超大 `contig_N` 触发巨型分配 abort**：原逻辑
+  `layouts.resize(ci + 1, ...)` 对畸形布局行（如 `contig_999999999`）会一次性扩容到
+  巨大容量，导致容量溢出/分配失败（进程 abort），违反 Zero-Panic 约定。修复：改为
+  强制 contig id 连续（首步 `si==0` 时要求 `ci == layouts.len()`，后续步要求
+  `ci < layouts.len()`），既消除了巨型分配，也移除了 `resize`。回归
+  `command_asm_cns_rejects_noncontiguous_contig_id`（同时保留 `contig_0` 与正常
+  拼接测试）。
+
+第七轮结论：`cargo fmt`/`clippy` 干净（无新增告警），`cargo test asm` 全部通过。
+
+## 第八轮复核（报告准确性自检）
+
+- 复核本报告"排除的疑点"一节对 `ovlp --overlap-k 0` 的描述时发现**报告描述与代码
+  不符**：报告称 seed_k 经 `.max(1)` 归 1，而现行 `find_overlaps` 是
+  `seed_k = opts.seed_k.min(最短长度)` 后 `ensure!(seed_k >= 1)` 报友好错误（帮助
+  范围 `1..=128`，0 属越界，报错不 panic）。已修正该条目为与代码一致的行为描述。
+- 第八轮另对 map 的单端/配对命中、`cns` 连续 id 约束、`common.rs` 标签去重与
+  `format_cov` 边界等做了复核，未发现新缺陷。
+
+第八轮结论：仅修正报告自身的一条行为描述不准确，无代码/文档缺陷，审核收敛。
+
 ## 结论
 
 `asm` 命令族审核完成（累计修复 5 类问题 + 4 处 `-o` 防护统一 + 1 处 `--keep-dir`
-文档修正 + 1 处 `--outm`/`--outu` 冲突防护 + 1 处 `--overlap-k` 上限校验），经
-纵深复核收敛；与 BBTools/BCALM
+文档修正 + 1 处 `--outm`/`--outu` 冲突防护 + 1 处 `--overlap-k` 上限校验 + 第七轮
+3 处：`map` 帮助单复数、`contig`/`unitig` 的 `-k` 上限帮助、`cns` 布局 id 连续性与
+巨型分配防护），经纵深复核收敛；与 BBTools/BCALM
 语义对拍、边界输入验证零 panic，`cargo fmt`/`clippy` 干净（asm 相关无新增告警），
 相关集成测试与 `cargo test --lib` 全部通过。

@@ -145,8 +145,23 @@ fn parse_layouts(path: &str, id: &HashMap<&str, usize>) -> anyhow::Result<Vec<La
         let unitig = *id
             .get(name)
             .with_context(|| format!("layout unitig {name} not found in unitigs"))?;
-        if layouts.len() <= ci {
-            layouts.resize(ci + 1, Layout { steps: Vec::new() });
+        if si == 0 {
+            // First step of a layout: contig ids must be contiguous (the
+            // writer emits contig_1, contig_2, ...). Requiring this also
+            // rejects a crafted huge `contig_N` that would otherwise force
+            // an oversized allocation (zero-panic policy).
+            anyhow::ensure!(
+                ci == layouts.len(),
+                "contig ids must be contiguous, got contig_{}",
+                ci + 1
+            );
+            layouts.push(Layout { steps: Vec::new() });
+        } else {
+            anyhow::ensure!(
+                ci < layouts.len(),
+                "step {si} for contig_{} before its first step",
+                ci + 1
+            );
         }
         anyhow::ensure!(
             layouts[ci].steps.len() == si,
