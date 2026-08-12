@@ -320,7 +320,7 @@ Runs the full OLC pipeline in memory: for every k in `--kmer` the reads are
 assembled into maximal unitigs (`anchr asm unitig` semantics), all unitigs are
 pooled as pseudo-reads, exact overlaps are found (`anchr asm ovlp`), layouts
 are built greedily (`anchr asm layout`), and each layout is stitched into a
-consensus contig (`anchr asm cns`). See `notes/design/olc.md`.
+consensus contig (`anchr asm cns`). See `notes/design/asm-olc.md`.
 
 Unitigs are named `k<k>:unitig_<id>` so the per-k sets stay distinguishable
 and reproducible. Overlaps are exact (error-free unitigs), layouts stop at

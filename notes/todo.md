@@ -52,11 +52,11 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
 - **`fq range` 的 BGZF `.gzi` 索引 CLI 化**：目前 BGZF 输入需要外部生成
   `.gzi`（pgr `libs/bgzf::build_gzi_index`），plain 文本输入自动建 `.loc`；
   若要在 anchr 侧支持 BGZF range，需在 pgr 补 CLI 或封装
-  （[fq-index.md](design/fq-index.md)）；
+  （[fq-range.md](design/fq-range.md)）；
 - **模板链（`templates/*.tera.sh`）端到端替换验证**：trim.tera.sh 等模板
   仍引用 BBTools/dazzler 工具，逐步切到 anchr fq/asm 命令并按
-  `anchr-trim-replace.md`/`anchr-merge-replace.md` golden 核对；
-- **`fq norm` 精确 vs 近似定稿**（pgr 移交，`anchr-trim-replace.md` §4.8
+  `fq-trim-replace.md`/`fq-merge-replace.md` golden 核对；
+- **`fq norm` 精确 vs 近似定稿**（pgr 移交，`fq-trim-replace.md` §4.8
   未定）：anchr 走精确表 + 外部桶；bbnorm `bits=16` 近似表结果依赖
   `-Xmx`。差异 = 定义差异不是 bug，需在文档中定稿并记录边界差异；
 - **`dep`/`ena`/`template` 命令的外部工具版本核对**：依赖

@@ -8,7 +8,7 @@
 > 项目），并追求与 C++ 输出字节级一致。两者共享同一算法族，是 pgr 做
 > k-mer 计数 / de Bruijn 图遍历的**首选参考**。
 > **与 OLC 的连接（2026-08-12）**：pgr 的 `asm olc`（多 k unitig 层 OLC，
-> `design/olc.md`）已落地，SKESA 的 fork 过滤 / 可逆性 / 迭代多 k 语义
+> `design/asm-olc.md`）已落地，SKESA 的 fork 过滤 / 可逆性 / 迭代多 k 语义
 > 直接映射其 v1 待决项（见 §7.1）。
 
 ## 1. 概况
@@ -231,7 +231,7 @@ de Bruijn 图遍历启发式：
 
 ### 7.1 OLC v1 借鉴映射（2026-08-12）
 
-承接 `design/olc.md` 的 v1 待决项，SKESA 提供三块直接素材：
+承接 `design/asm-olc.md` 的 v1 待决项，SKESA 提供三块直接素材：
 
 1. **覆盖度/丰度驱动的 fork 过滤 → OLC repeat breaking 参数**：
    `FilterLowAbundanceNeighbors`（`graphdigger.hpp:1770`）的

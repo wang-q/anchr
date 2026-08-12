@@ -226,11 +226,11 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 
 - **组装流程链**：`fq`（trim/ec/merge/norm）→ `asm unitig/contig` →
   `asm ovlp/layout/cns/olc` → `asm map` → `template` 编排；
-  文档：`docs/fq.md`、`docs/asm.md`、`notes/design/fq-assemble.md`、
-  `notes/design/olc.md`、`notes/design/asm-map.md`；
+  文档：`docs/fq.md`、`docs/asm.md`、`notes/design/asm-assemble.md`、
+  `notes/design/asm-olc.md`、`notes/design/asm-map.md`；
 - **BBTools 替换链**：`fq clump/split/sample/clean/filter/merge/ec-*/norm`
-  对照 39.38 golden；文档：`notes/design/anchr-trim-replace.md`、
-  `notes/design/anchr-merge-replace.md`、`notes/references/bbtools.md`；
+  对照 39.38 golden；文档：`notes/design/fq-trim-replace.md`、
+  `notes/design/fq-merge-replace.md`、`notes/references/bbtools.md`；
 - **Dazzler 流水线**：`overlap/orient/contained/merge` 外部工具编排；
   文档：`docs/dazzler.md`、`docs/dazz.md`；
 - **区间与覆盖**：`covered` 命令 → `pgr::libs::runlist`；基准
@@ -241,12 +241,12 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | 文档 | 内容 |
 | :--- | :--- |
 | `fq-asm-migrate.md` | 迁移方案档案（阶段 1-4 + 批次 + 核对清单） |
-| `anchr-trim-replace.md` | trim 流水线 BBTools 替换（8 步 + 入口映射） |
-| `anchr-merge-replace.md` | merge/ec 系列 BBTools 替换 |
-| `fq-assemble.md` | contig/unitig/olc 组装设计 |
+| `fq-trim-replace.md` | trim 流水线 BBTools 替换（8 步 + 入口映射） |
+| `fq-merge-replace.md` | merge/ec 系列 BBTools 替换 |
+| `asm-assemble.md` | contig/unitig/olc 组装设计 |
 | `asm-map.md` | perfect-mode map 移植 |
-| `fq-index.md` | FASTQ `.loc` 索引（range 命令） |
-| `olc.md` | OLC 三段设计 |
+| `fq-range.md` | FASTQ `.loc` 索引（range 命令） |
+| `asm-olc.md` | OLC 三段设计 |
 
 ## 11. 外部工具参考索引（notes/references/）
 

@@ -130,7 +130,7 @@ docs），依赖 pgr crate 的基础模块：
 对每个迁移完成的命令，核对 pgr 与 anchr 的实现一致：
 
 - 同一测试数据跑两边，输出**逐字节一致**（golden 对照，参照
-  `anchr-trim-replace.md` / `anchr-merge-replace.md` 的既有对照流程）；
+  `fq-trim-replace.md` / `fq-merge-replace.md` 的既有对照流程）；
 - 统计/统计输出一致（如覆盖量、unitig 数、PSL 行数）；
 - anchr 侧集成测试全绿 + pgr 侧对应测试仍全绿（双轨期）。
 
@@ -147,8 +147,8 @@ docs），依赖 pgr crate 的基础模块：
 - 移除随迁测试文件、docs；更新 `cli_consistency.rs`（after_help 命令集合）、
   project-understanding 索引、todo、CHANGELOG；
 - 参考笔记随迁：references 9 个（bcalm/canu/celera/cutadapt/fairy/
-  metaMDBG/quorum/sickle/skesa）+ design 6 个（anchr-trim/merge-replace、
-  fq-assemble/asm-map/fq-index/olc）从 pgr 移除；
+  metaMDBG/quorum/sickle/skesa）+ design 6 个（fq-trim/merge-replace、
+  asm-assemble/asm-map/fq-range/asm-olc）从 pgr 移除；
 - todo 条目移交：pgr `notes/todo.md` 中 anchr 侧待办已移交 anchr todo
   （anchr 模板替换、fq norm 精确 vs 近似定稿、asm olc 参数验证、OLC
   宏基因组/长读验证），pgr 保留指针条目；fq/asm 已完成记录与"明确不做"
@@ -263,7 +263,7 @@ libs 内嵌 `#[cfg(test)]`（qual.rs 的 detect 测试留 pgr，其余随 libs �
 ### 7.5 每批验证（双轨 golden）
 
 - 同一测试数据分别跑 pgr 与 anchr 的对应命令，输出 `diff` **逐字节一致**
-  （参照 `anchr-trim-replace.md` / `anchr-merge-replace.md` 的既有对照
+  （参照 `fq-trim-replace.md` / `fq-merge-replace.md` 的既有对照
   流程：golden 文件 + 统计对比）；
 - anchr 侧 `cargo test` 对应测试全绿；pgr 侧对应测试**仍全绿**（双轨期
   不删 pgr 代码）；
@@ -305,12 +305,12 @@ libs 内嵌 `#[cfg(test)]`（qual.rs 的 detect 测试留 pgr，其余随 libs �
 
 | 文档 | 服务对象 |
 | :--- | :--- |
-| `anchr-trim-replace.md` | `fq` trim 系列移植（BBTools 对照） |
-| `anchr-merge-replace.md` | `fq` merge/ec 系列移植（BBTools 对照） |
-| `fq-assemble.md` | `asm` contig/unitig/olc |
+| `fq-trim-replace.md` | `fq` trim 系列移植（BBTools 对照） |
+| `fq-merge-replace.md` | `fq` merge/ec 系列移植（BBTools 对照） |
+| `asm-assemble.md` | `asm` contig/unitig/olc |
 | `asm-map.md` | `asm map` |
-| `fq-index.md` | `fq range`（FASTQ `.loc` 索引） |
-| `olc.md` | `asm ovlp/layout/cns/olc` |
+| `fq-range.md` | `fq range`（FASTQ `.loc` 索引） |
+| `asm-olc.md` | `asm ovlp/layout/cns/olc` |
 
 ### 8.3 迁到 anchr（audit，1 个）
 
@@ -334,7 +334,7 @@ chainnet）、`biser`（SD）、`cactus`/`cactus_lastz`（泛基因组）、`fas
 - `project-understanding.md` §10/§11/§12：移除迁走的 design/references
   条目（8.1/8.2/8.3），保留 §7 本迁移方案档案；
 - `todo.md` 中引用迁走文档的条目改指向 anchr（如 anchr 模板替换的 golden
-  对照流程引用 `anchr-trim-replace.md` → 在 anchr 侧）；
+  对照流程引用 `fq-trim-replace.md` → 在 anchr 侧）；
 - 基准：`benchmarks/bbtools-vs-pgr.md`（fq 专属 CLI 对照）随迁 anchr
   （`notes/benchmarks/bbtools-vs-anchr.md`），pgr 其余基准通用
   （kmer-throughput 属 kmer 命令，留）；

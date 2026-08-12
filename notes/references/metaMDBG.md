@@ -320,7 +320,7 @@ cutoff 倒序消费（见下）。
 
 ## 9. OLC v1 借鉴映射（2026-08-12）
 
-承接 `design/olc.md` 的 v1 待决项：
+承接 `design/asm-olc.md` 的 v1 待决项：
 
 1. **渐进丰度过滤 → unitig 覆盖度驱动的布局前过滤**：
    `ProgressiveAbundanceFilter::removeAbundanceNoQueue`

@@ -3,7 +3,7 @@
 > 2026-08-11。目标：替代 anchr 中 tadpole 的**组装用途**（contigMode）：
 > 2_insert_size 流程（硬依赖）与 unitigs 流程（`--unitigger tadpole` 可选
 > 分支）。ecc/extend 已由 `fq ec-kmer`/`fq extend` 覆盖（见
-> [anchr-merge-replace.md](anchr-merge-replace.md) §6-7）。
+> [fq-merge-replace.md](fq-merge-replace.md) §6-7）。
 > 参考：BBTools-40.01 `assemble/Tadpole*.java`。
 
 ## 1. anchr 中的调用点（tadpole 组装）
@@ -239,5 +239,5 @@ unitigs 组装）影响可忽略。
   `compute_links`：边集未对齐（共同 2512）且因 anchr 存 canonical 方向、
   同一物理端在两工具中可能是前缀或后缀，**回归丢失真实边**（如
   71245 unitig → 其 rc 方向邻居），已回退。结论：`--links` 保持现有
-  简化语义（`fq-assemble.md` §8.1 方向规则），逐边对齐需 bcalm 链接
+  简化语义（`asm-assemble.md` §8.1 方向规则），逐边对齐需 bcalm 链接
   实现源码（或读取其 L: 过滤逻辑），暂不立项。

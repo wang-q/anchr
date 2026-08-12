@@ -255,7 +255,7 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
 * `references/skesa.md` §7.1 + `references/metaMDBG.md` §9（v1 素材来源：
   fork 过滤/丰度过滤/桥接 reads repeat breaking）
 * `design/kmer.md` §11/§12（k 范围、FastK 字节键唯一表示）
-* `design/fq-assemble.md` §8（`asm unitig` 语义与 L: 边）
+* `design/asm-assemble.md` §8（`asm unitig` 语义与 L: 边）
 * `todo.md` §3（多 k unitig OLC 挂账项，本项目承接）
 
 ## 12. 真实数据验证：Lambda（2026-08-12）

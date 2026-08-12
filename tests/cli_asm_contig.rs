@@ -36,7 +36,7 @@ fn read_gz(path: &str) -> Vec<u8> {
 /// `tadpole.sh threads=1` golden. The pre-pop contig set is byte-identical;
 /// bubble-popping resolutions can differ because BBTools' expand order
 /// depends on its memory-dependent hash-table layout (see
-/// notes/design/fq-assemble.md), so the popped output is compared by
+/// notes/design/asm-assemble.md), so the popped output is compared by
 /// sequence set rather than byte-for-byte.
 #[test]
 fn command_asm_contig_matches_tadpole_contig_set() {

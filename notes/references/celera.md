@@ -6,7 +6,7 @@
 > 原版 OLC（overlap → unitig → consensus → scaffold）结构，并逐组件与 Canu
 > 对照；pgr 视角沿用 canu.md §8 的设计意图（**多 k unitig 的 OLC 拼接**）。
 > **实现状态（2026-08-13）**：已落地为 `pgr asm ovlp`/`layout`/`cns`/`olc`
->  四命令（`design/olc.md`），§10 的"pgr 借鉴"列按实现结果更新。
+>  四命令（`design/asm-olc.md`），§10 的"pgr 借鉴"列按实现结果更新。
 
 ## 1. 概况
 

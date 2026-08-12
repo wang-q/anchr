@@ -7,7 +7,7 @@
 > OLC 拼接**（见 §8）。本文档记录 Canu 的 OLC 三组件源码结构，以及该设计意图
 > 对应的借鉴评估。
 > **实现状态（2026-08-12）**：设计意图已落地为 `pgr asm ovlp`/`layout`/`cns`/
-> `olc` 四命令（`design/olc.md`），§8.5 回写实现后的理解修正。
+> `olc` 四命令（`design/asm-olc.md`），§8.5 回写实现后的理解修正。
 
 ## 1. 概况
 
@@ -284,7 +284,7 @@ unitigs 当"伪 reads"，直接在 unitig 层做 OLC 拼接**。
   （canonical 索引 + 双向扩展验证，见 §8.5）；重复混淆与冗余去重留 v1。
 - **Canu EOL**：只取算法思想，不引入其代码/依赖。
 
-### 8.5 实现后的理解回写（2026-08-12，`design/olc.md`）
+### 8.5 实现后的理解回写（2026-08-12，`design/asm-olc.md`）
 
 实现四命令后，对 bogart / utgcns 的几个语义有了更具体的理解：
 
@@ -306,7 +306,7 @@ unitigs 当"伪 reads"，直接在 unitig 层做 OLC 拼接**。
   Canu 2.3 重写的 repeat breaker（`AS_BAT_MarkRepeatReads.C`，见 §5）改用
   confused-edge + `deviationRepeat=3` + `MIN_ANCHOR_HANG=500` 锚定，无固定
   覆盖度阈值。两者共性（**外部 reads 证据区分重复/唯一**）才是 pgr v1 要补
-  的方向；`design/olc.md` §10 沿引的这两常量应改指 celera.md 而非 canu.md。
+  的方向；`design/asm-olc.md` §10 沿引的这两常量应改指 celera.md 而非 canu.md。
 - **consensus：精确缝合即共识**：unitig 无错 + overlap 全精确时，overlap 已
   把坐标完全对齐，缝合即共识（`asm cns`，重叠区不一致会友好报错）；Canu 的
   template stitch + edlib 重比对 + POA-DAG bestPath 是为高噪声长读设计的。

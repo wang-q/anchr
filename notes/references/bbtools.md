@@ -31,9 +31,9 @@
 
 ## 3. 与 anchr 相关的模块映射
 
-BBTools 入口 → anchr/pgr 目标（映射出处 [anchr-trim-replace.md](../design/anchr-trim-replace.md) §4.2、
-[anchr-merge-replace.md](../design/anchr-merge-replace.md)、
-[fq-assemble.md](../design/fq-assemble.md)）：
+BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../design/fq-trim-replace.md) §4.2、
+[fq-merge-replace.md](../design/fq-merge-replace.md)、
+[asm-assemble.md](../design/asm-assemble.md)）：
 
 | BBTools 工具 | 入口类 | 源码位置 | anchr 目标 |
 | :--- | :--- | :--- | :--- |
@@ -52,13 +52,13 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [anchr-trim-replace.md](../de
 以下结论来自已随迁的 audit/design 文档，实现与 golden 核对时直接引用：
 
 1. **质量值存储**：`Read.quality` 存 phred 值（输入时减 ASCII_OFFSET），输出再加回
-   （[anchr-trim-replace.md](../design/anchr-trim-replace.md) §4.1）。
+   （[fq-trim-replace.md](../design/fq-trim-replace.md) §4.1）。
 2. **clumpify 桶序**：外部 bucket 路径输出为"按桶拼接"序，与 BBTools 大数据行为
    一致，但与内存路径不同（[audit-fq.md](../audit/audit-fq.md)）；`--dedupe
    --dupesubs 0` 整对去重，N 通配精确匹配，保留期望错误更少的一对。
 3. **tadpole 内存模型**：多字 `Kmer`（`Vec<u64>` 共 2k 位，镜像 BBTools long
    array），k 无上限；逐字节一致需复刻其 `-Xmx` 相关内存语义，已文档化偏差
-   （[fq-assemble.md](../design/fq-assemble.md)）。
+   （[asm-assemble.md](../design/asm-assemble.md)）。
 4. **bbmap perfectmode**：种子-验证、完美匹配（无错配无缺口）、`ambiguous=all`
    语义在 `current/align2/AbstractMapThread.java:1371` 确认（`maxMismatches=
    (PERFECTMODE||SEMIPERFECTMODE)?0:...`，另见 :810 门控"imperfect 不可完美映射"）
@@ -144,7 +144,7 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [anchr-trim-replace.md](../de
 | `mode` | contig | contig/extend/correct 等 |
 
 > 内存模型：多字 `Kmer`（`Vec<u64>` 共 2k 位）镜像 BBTools long array，k 无上限——
-> 逐字节一致需复刻其 `-Xmx` 内存语义（详见 `fq-assemble.md`）。
+> 逐字节一致需复刻其 `-Xmx` 内存语义（详见 `asm-assemble.md`）。
 
 ### 4.5.4 bbduk（`fq trim-adapter`/`trim` 血统）——`jgi/BBDuk`（39.38）/ `bbduk.BBDukS`（40.01）
 
@@ -205,7 +205,7 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [anchr-trim-replace.md](../de
 ## 5. 版本差异与注意事项
 
 - 39.38 → 40.01 的主要变化：`bbduk` 入口从 `jgi.BBDuk` 改为 `bbduk.BBDukS`；
-  其余 7 个 trim 流水线工具的入口类不变（[anchr-trim-replace.md](../design/anchr-trim-replace.md) §4.2）。
+  其余 7 个 trim 流水线工具的入口类不变（[fq-trim-replace.md](../design/fq-trim-replace.md) §4.2）。
 - 各 `*.sh` 在 launch 时除类名外还会硬编码默认参数，比对语义时应留意，如
   `bbnorm.sh` 追加 `bits=32`（`bbnorm.sh:152`）、`bbmap.sh` 追加
   `build=1 overwrite=true fastareadlen=500`（`bbmap.sh:341`）。脚本内的 usage

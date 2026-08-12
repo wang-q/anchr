@@ -3,7 +3,7 @@
 > 2026-08 整理。用户最终需求：anchr 的 `templates/trim.tera.sh` 用 BBTools
 > 做 read 清洗，结果满意但速度不满意，目标是用 pgr 替换 BBTools。
 > 2026-08-10 更新：BBTools-40.01 源码已本地化（见 §4.1），§4 给出具体迁移计划。
-> 配套：[本文档](anchr-trim-replace.md)（已实现，覆盖 sickle 部分）、
+> 配套：[本文档](fq-trim-replace.md)（已实现，覆盖 sickle 部分）、
 > [seq-reader.md](seq-reader.md)（FAFQ/BGZF 基础设施）。
 
 > **定位（2026-08 修正）**：`anchr fq trim-qual` 只替换流水线中的 **sickle**（第 9 步，
@@ -28,7 +28,7 @@
 
 第 9 步（sickle）已由 `anchr fq trim-qual` 覆盖（anchr 的 sickle 调用只有
 `-q/-l/-t sanger`，未用 `-n` 截断，trim-qual 均已覆盖），见
-[本文档](anchr-trim-replace.md)。注意：bbduk trim（第 5 步）里的
+[本文档](fq-trim-replace.md)。注意：bbduk trim（第 5 步）里的
 `qtrim/minlen/maxns/ftm` 是 **bbduk 的参数，不属于 trim-qual 的替换范围**。
 
 ## 2. 速度瓶颈在哪
@@ -108,7 +108,7 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
   参考，不作为移植来源。
 
 - **替换对象**：`trim.tera.sh` 第 1-8 步（第 9 步 sickle 已由 `anchr fq trim-qual`
-  覆盖，见 [本文档](anchr-trim-replace.md)）。
+  覆盖，见 [本文档](fq-trim-replace.md)）。
 - **不做**：复刻 Java 工程外壳（JVM、`-Xmx`、每步 gz 落盘、`if [ ! -e ]` 缓存）；
   `filterbytile.sh` 默认跳过。**clumpify 已确认纳入迁移范围**（2026-08-10），
   它是字节级一致（read 顺序）的前提。
@@ -769,4 +769,4 @@ anchr 的场景是"一批阈值各跑一遍"。两个可选方案：
 *参考来源: [sickle.md](../references/sickle.md) | [cutadapt.md](../references/cutadapt.md) | [anchr trim.tera.sh](https://github.com/wang-q/anchr/blob/04f827afe37d5f40f12cd0602d54086cf8b0078c/templates/trim.tera.sh)*
 
 *参考来源: [trim.tera.sh](../../../anchr/templates/trim.tera.sh)（anchr 项目，只读） |
-BBTools-40.01 源码 | [本文档](anchr-trim-replace.md) | [seq-reader.md](seq-reader.md)*
+BBTools-40.01 源码 | [本文档](fq-trim-replace.md) | [seq-reader.md](seq-reader.md)*

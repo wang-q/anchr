@@ -13,7 +13,7 @@ Finds exact suffix/prefix overlaps between unitigs by seeding a canonical
 k-mer index with the boundary k-mers of every unitig and verifying each
 candidate by extension, so overlaps are exact and error-free (unitigs come
 from the de Bruijn graph). This is the overlap stage of the OLC assembly
-pipeline (see notes/design/olc.md); the caller is expected to assemble
+pipeline (see notes/design/asm-olc.md); the caller is expected to assemble
 unitigs at several k values first and pass the FASTA files here.
 
 Overlaps are written as PAF with an `ov:A:D` (dovetail) or `ov:A:C`
