@@ -4,7 +4,7 @@
 > 做 read 清洗，结果满意但速度不满意，目标是用 pgr 替换 BBTools。
 > 2026-08-10 更新：BBTools-40.01 源码已本地化（见 §4.1），§4 给出具体迁移计划。
 > 配套：[本文档](fq-trim-replace.md)（已实现，覆盖 sickle 部分）、
-> [seq-reader.md](seq-reader.md)（FAFQ/BGZF 基础设施）。
+> `pgr: design/seq-reader.md`（FAFQ/BGZF 基础设施，留 pgr）。
 
 > **定位（2026-08 修正）**：`anchr fq trim-qual` 只替换流水线中的 **sickle**（第 9 步，
 > 多阈值质量/长度参数扫描），**不替换 BBTools 任何组件**。BBTools 8 步（第 1-8）
@@ -223,7 +223,7 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
   dupesubs=0`）。大数据下 pgr 走外部 hash 桶路径，输出为确定性桶序（与
   BBTools 大数据行为一致，非全局序）——字节 golden 只在小数据（内存路径）
   上定义。
-- **gz 流式**：pgr 已有 BGZF/FASTQ 基础设施（seq-reader），流水线内不落盘。
+- **gz 流式**：pgr 已有 BGZF/FASTQ 基础设施（`design/seq-reader.md`），流水线内不落盘。
 
 ### 4.6 内存模型与外部排序（2026-08-10 定稿）
 
@@ -769,4 +769,4 @@ anchr 的场景是"一批阈值各跑一遍"。两个可选方案：
 *参考来源: [sickle.md](../references/sickle.md) | [cutadapt.md](../references/cutadapt.md) | [anchr trim.tera.sh](https://github.com/wang-q/anchr/blob/04f827afe37d5f40f12cd0602d54086cf8b0078c/templates/trim.tera.sh)*
 
 *参考来源: [trim.tera.sh](../../../anchr/templates/trim.tera.sh)（anchr 项目，只读） |
-BBTools-40.01 源码 | [本文档](fq-trim-replace.md) | [seq-reader.md](seq-reader.md)*
+BBTools-40.01 源码 | [本文档](fq-trim-replace.md) | `pgr: design/seq-reader.md`*

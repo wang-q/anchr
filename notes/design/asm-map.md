@@ -169,8 +169,8 @@ MG1655 参考（`tests/genome/mg1655.fa.gz`）× 1M 纠错 reads（anchr
 
 ## 5. 不做
 
-- 错配/gap 比对、MAPQ 模型、paired 利用（2_insert_size 的 bbmap 是
-  完整比对需求，属另一项，暂不做）。
+- 错配/gap 比对、MAPQ 模型（完美匹配的 `--paired` 已实现，见 §2.6；
+  通用容错比对器仍属独立项，暂不做）。
 - 种子多策略（首 k-mer 已充分：完美匹配下任意 k-mer 必命中）。
 - SAM/BAM 排序、bam 输出（模板只要计数 + 派生覆盖度）。
 

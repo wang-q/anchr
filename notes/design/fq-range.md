@@ -1,9 +1,9 @@
-# anchr fq index：按 read name 的随机访问（设计稿）
+# anchr fq range：按 read name 的随机访问（设计稿）
 
 > 状态：**一期已实现（2026-08）**——单文件 `anchr fq range`（API 与
 > `pgr fa range` 对齐，含 name 归一化与交错 `#n` 消歧）；双端 S2 待二期。
 >
-> 配套：[seq-reader.md](seq-reader.md)（FAFQ 读取与 BGZF 基础设施）、
+> 配套：`pgr: design/seq-reader.md`（FAFQ 读取与 BGZF 基础设施，留 pgr）、
 > [fq-trim-replace.md](fq-trim-replace.md)（fq 命令组现状，含 trim-qual）。
 
 ## 0. 动机
@@ -180,4 +180,4 @@ FASTQ 双端数据的 name 有三种常见模式：
 ---
 
 *参考来源: pgr `fa range`（`pgr/src/cmd_pgr/fa/range.rs`）| pgr `loc.rs`
-（`pgr/src/libs/loc.rs`）| [seq-reader.md](seq-reader.md)*
+（`pgr/src/libs/loc.rs`）| `pgr: design/seq-reader.md`*

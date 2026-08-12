@@ -200,7 +200,7 @@ unitigs 组装）影响可忽略。
 - **顺序无关**：unitig 集合由（k-mer 集 + solid 阈值）唯一确定，无认领/
   种子顺序依赖（对比 contig 模式的确定性排序只是"复刻"扫描顺序）。
 - **无气泡**：平行路径各自成 unitig（测试
-  `command_fq_unitig_keeps_branches` 验证 ≥4 条、不横跨）。
+  `command_asm_unitig_keeps_branches` 验证 ≥4 条、不横跨）。
 - 输出头沿用 contig 字段（len/cov/gc/min/max/hh/caga，无 left/right
   分支码），`>unitig_<id>`。
 - 基准（Lambda 20k，release）：160 ms，与 contig 模式持平（计数占大头）；
