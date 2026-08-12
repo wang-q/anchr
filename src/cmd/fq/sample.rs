@@ -20,10 +20,10 @@ Notes:
 
 Examples:
 1. Keep about 1 million bases:
-   pgr fq sample reads.fq -o out.fq --bases 1000000
+   anchr fq sample reads.fq -o out.fq --bases 1000000
 
 2. Reproduce a BBTools run with a fixed seed:
-   pgr fq sample reads.fq.gz -o out.fq --bases 1000000 --seed 42
+   anchr fq sample reads.fq.gz -o out.fq --bases 1000000 --seed 42
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(

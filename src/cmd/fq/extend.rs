@@ -25,10 +25,10 @@ Notes:
 
 Examples:
 1. Extend by 20 bp each side with k=62 (anchr read-extension step):
-   pgr fq extend in.fq.gz -o extended.fq.gz --kmer 62 --el 20 --er 20
+   anchr fq extend in.fq.gz -o extended.fq.gz --kmer 62 --el 20 --er 20
 
 2. Extend only to the right:
-   pgr fq extend in.fq.gz -o out.fq --el 0 --er 50
+   anchr fq extend in.fq.gz -o out.fq --el 0 --er 50
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(

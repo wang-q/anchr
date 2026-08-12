@@ -24,19 +24,19 @@ Notes:
 
 Examples:
 1. Extract whole records:
-   pgr fq range in.fq read1 read2
+   anchr fq range in.fq read1 read2
 
 2. Extract a region of a read:
-   pgr fq range in.fq "read1:10-100"
+   anchr fq range in.fq "read1:10-100"
 
 3. Extract from a name list with a larger cache:
-   pgr fq range in.fq -r names.txt -c 10
+   anchr fq range in.fq -r names.txt -c 10
 
 4. Force rebuild the index:
-   pgr fq range in.fq read1 --update
+   anchr fq range in.fq read1 --update
 
 5. Paired-end extraction (mate via --mate, same ranges, separate outputs):
-   pgr fq range R1.fq --mate R2.fq read1 -o r1.out.fq --outfile-2 r2.out.fq
+   anchr fq range R1.fq --mate R2.fq read1 -o r1.out.fq --outfile-2 r2.out.fq
 "###,
         )
         .arg(crate::cmd::args::infile_arg_required_with_help(

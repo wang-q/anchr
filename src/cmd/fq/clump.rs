@@ -30,19 +30,19 @@ Notes:
 
 Examples:
 1. Sort reads with the BBTools-compatible defaults:
-   pgr fq clump in.fq.gz -o clumped.fq
+   anchr fq clump in.fq.gz -o clumped.fq
 
 2. Reproduce a BBTools run with a different seed:
-   pgr fq clump in.fq.gz -o out.fq --seed 2
+   anchr fq clump in.fq.gz -o out.fq --seed 2
 
 3. Remove exact duplicate pairs:
-   pgr fq clump R1.fq.gz R2.fq.gz -o out.fq --dedupe --dupesubs 0
+   anchr fq clump R1.fq.gz R2.fq.gz -o out.fq --dedupe --dupesubs 0
 
 4. Bound memory to 1 GiB (external bucket path for larger data):
-   pgr fq clump R1.fq.gz R2.fq.gz -o out.fq --mem 1g
+   anchr fq clump R1.fq.gz R2.fq.gz -o out.fq --mem 1g
 
 5. Force the external bucket path:
-   pgr fq clump R1.fq.gz R2.fq.gz -o out.fq --sort-mode bucket
+   anchr fq clump R1.fq.gz R2.fq.gz -o out.fq --sort-mode bucket
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(

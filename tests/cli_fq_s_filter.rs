@@ -108,3 +108,29 @@ fn command_fq_s_filter_end_to_end() -> anyhow::Result<()> {
     assert_eq!(discarded_text.matches('@').count(), 1);
     Ok(())
 }
+
+#[test]
+fn command_fq_s_filter_rejects_outfile_same_as_discard_file() -> anyhow::Result<()> {
+    // Data safety: --discard-file equal to -o would open two writers to the
+    // same path and corrupt the output; it must be rejected up front.
+    let temp = tempfile::TempDir::new()?;
+    let fq = temp.path().join("in.fq");
+    std::fs::write(
+        &fq,
+        "@r1\nACGTACGTACGTACGTACGTACGTACGT\n+\nIIIIIIIIIIIIIIIIIIIIIIIIIIII\n",
+    )?;
+    let out = temp.path().join("out.fq");
+    let (_, stderr) = common::AnchrCmd::new()
+        .args(&[
+            "fq",
+            "s-filter",
+            fq.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--discard-file",
+            out.to_str().unwrap(),
+        ])
+        .run_fail();
+    assert!(stderr.contains("must be distinct"), "stderr: {stderr}");
+    Ok(())
+}

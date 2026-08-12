@@ -27,8 +27,8 @@ Notes:
   right-trims lengths to a multiple; `--toss-broken-reads` drops pairs where
   one mate fails
 * For k-mer contaminant filtering (bbduk `kfilter`, the second bbduk call of
-  the pipeline) use `pgr fq filter` instead; for sickle-style pure quality
-  trimming use `pgr fq trim-qual`.
+  the pipeline) use `anchr fq filter` instead; for sickle-style pure quality
+  trimming use `anchr fq trim-qual`.
 * Options renamed from their bbduk counterparts show the bbduk name in
   parentheses (e.g. `--min-k` = `mink`); identical options are not annotated
 * Input is one interleaved FASTQ or two files (R1, R2)
@@ -40,11 +40,11 @@ Notes:
 
 Examples:
 1. Adapter trim with the anchr pipeline defaults:
-   pgr fq clean R1.fq.gz R2.fq.gz --ref illumina_adapters.fa \
+   anchr fq clean R1.fq.gz R2.fq.gz --ref illumina_adapters.fa \
        -o out.fq
 
 2. Mask adapter k-mers instead of trimming:
-   pgr fq clean in.fq --ref illumina_adapters.fa --mask-kmers N \
+   anchr fq clean in.fq --ref illumina_adapters.fa --mask-kmers N \
        -o out.fq
 "###,
         )
@@ -82,7 +82,7 @@ Examples:
                 .num_args(1)
                 .default_value("1")
                 .value_parser(value_parser!(usize))
-                .help("Reference hamming distance (bbduk: hdist)"),
+                .help("Reference hamming distance 0..=3 (bbduk: hdist)"),
         )
         .arg(
             Arg::new("no_trim_by_overlap")
@@ -452,7 +452,16 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     if !(2..=31).contains(&opts.k) {
         anyhow::bail!("--k must be in 2..=31, got {}", opts.k);
     }
+    if opts.hdist > 3 {
+        // add_kmer enumerates (4*k)^hdist single-substitution variants; an
+        // unbounded hdist makes reference table building exponentially slow.
+        anyhow::bail!("--hamming-distance must be in 0..=3, got {}", opts.hdist);
+    }
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(String::as_str))?;
+    if let Some(p) = args.get_one::<String>("stats") {
+        crate::cmd::args::ensure_outfile_distinct(p, infiles.iter().map(String::as_str))?;
+        crate::cmd::args::ensure_outfiles_distinct([outfile, p.as_str()])?;
+    }
     let mut out =
         pgr::writer(outfile).with_context(|| format!("Failed to open writer for {}", outfile))?;
     trim_adapter(&infiles, &mut out, &opts, parallel)?;

@@ -80,6 +80,52 @@ fn command_fq_filter_stats_match_bbtools() {
 }
 
 #[test]
+fn command_fq_filter_rejects_stats_same_as_outfile() {
+    // --stats is written after the filtered output; pointing it at the same
+    // path as -o would overwrite the result, so it must be rejected.
+    let file = write_temp("@r1\nACGTACGT\n+\nIIIIIIII\n");
+    let out = file.path().with_extension("out.fq");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "fq",
+            "filter",
+            file.path().to_str().unwrap(),
+            "--ref",
+            "tests/bbtools/Lambda/illumina_adapters.fa",
+            "--stats",
+            out.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .run_fail();
+    assert!(stderr.contains("must be distinct"), "stderr: {stderr}");
+}
+
+#[test]
+fn command_fq_filter_rejects_hamming_distance_above_limit() {
+    // add_kmer enumerates (4*k)^hdist variants; an unbounded hdist makes
+    // reference table building exponentially slow, so it is bounded to 0..=3.
+    let file = write_temp("@r1\nACGTACGT\n+\nIIIIIIII\n");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "fq",
+            "filter",
+            file.path().to_str().unwrap(),
+            "--ref",
+            "tests/bbtools/Lambda/illumina_adapters.fa",
+            "--hamming-distance",
+            "4",
+            "-o",
+            "stdout",
+        ])
+        .run_fail();
+    assert!(
+        stderr.contains("0..=3") && stderr.contains("hamming-distance"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
 fn command_fq_filter_parallel_out_of_range_is_friendly_error() {
     // Regression: an out-of-range --parallel must be rejected with a friendly
     // error before a thread pool is created.

@@ -18,17 +18,17 @@ Notes:
 * A read is discarded when more than zero k-mers match the reference
   (bbduk `minkmerhits=1`); surviving mates follow `--toss-broken-reads`
 * Defaults match the bbduk filter call: k=27, mink=0, hdist=0, minlen=10
-* For k-mer *trimming* (the first bbduk call) use `pgr fq clean`; for
-  sickle-style pure quality trimming use `pgr fq trim-qual`
+* For k-mer *trimming* (the first bbduk call) use `anchr fq clean`; for
+  sickle-style pure quality trimming use `anchr fq trim-qual`
 * Supports both plain text and gzipped (.gz) files
 * Reads from stdin if input file is 'stdin'
 
 Examples:
 1. Filter adapter/artifact matches:
-   pgr fq filter in.fq --ref adapters.fa -o out.fq
+   anchr fq filter in.fq --ref adapters.fa -o out.fq
 
 2. With per-reference match statistics:
-   pgr fq filter in.fq --ref adapters.fa -k 27 --stats R.filter.stats.txt \
+   anchr fq filter in.fq --ref adapters.fa -k 27 --stats R.filter.stats.txt \
        -o out.fq
 "###,
         )
@@ -67,7 +67,7 @@ Examples:
                 .num_args(1)
                 .default_value("0")
                 .value_parser(value_parser!(usize))
-                .help("Reference hamming distance (bbduk: hdist)"),
+                .help("Reference hamming distance 0..=3 (bbduk: hdist)"),
         )
         .arg(
             Arg::new("minlen")
@@ -166,7 +166,16 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     if !(2..=31).contains(&opts.k) {
         anyhow::bail!("--k must be in 2..=31, got {}", opts.k);
     }
+    if opts.hdist > 3 {
+        // add_kmer enumerates (4*k)^hdist single-substitution variants; an
+        // unbounded hdist makes reference table building exponentially slow.
+        anyhow::bail!("--hamming-distance must be in 0..=3, got {}", opts.hdist);
+    }
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(String::as_str))?;
+    if let Some(p) = args.get_one::<String>("stats") {
+        crate::cmd::args::ensure_outfile_distinct(p, infiles.iter().map(String::as_str))?;
+        crate::cmd::args::ensure_outfiles_distinct([outfile, p.as_str()])?;
+    }
     let mut out =
         pgr::writer(outfile).with_context(|| format!("Failed to open writer for {}", outfile))?;
     trim_adapter(&infiles, &mut out, &opts, parallel)?;

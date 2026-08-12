@@ -251,7 +251,7 @@ options show the bbduk name in parentheses.
 *   `--min-k <int>`: Minimum short k-mer size at read ends;
     default 11).
 *   `--hamming-distance <int>`: Reference hamming distance (bbduk: `hdist`;
-    default 1).
+    default 1; 0..=3).
 *   `--no-trim-by-overlap`: Disable overlap trimming (bbduk: `tbo=f`).
 *   `--no-trim-pair-evenly`: Disable even pair trimming (bbduk: `tpe=f`).
 *   `--no-qtrim`: Disable quality trimming.
@@ -346,7 +346,7 @@ anchr fq filter [OPTIONS] <infiles>...
 *   `--min-k <int>`: Minimum short k-mer size at read ends;
     default 0).
 *   `--hamming-distance <int>`: Reference hamming distance (bbduk: `hdist`;
-    default 0).
+    default 0; 0..=3).
 *   `--minlen <int>`: Minimum kept read length (default 10).
 *   `--max-ns <int>`: Maximum allowed N bases; negative disables
     (default -1).

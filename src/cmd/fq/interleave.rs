@@ -30,13 +30,13 @@ Notes:
 
 Examples:
 1. Interleave two FQ files:
-   pgr fq interleave R1.fq R2.fq -o out.fq
+   anchr fq interleave R1.fq R2.fq -o out.fq
 
 2. Generate dummy pairs:
-   pgr fq interleave R1.fa --name-prefix sample --start-index 1
+   anchr fq interleave R1.fa --name-prefix sample --start-index 1
 
 3. Convert to FQ:
-   pgr fq interleave R1.fa R2.fa --fq -o out.fq
+   anchr fq interleave R1.fa R2.fa --fq -o out.fq
 
 "###,
         )

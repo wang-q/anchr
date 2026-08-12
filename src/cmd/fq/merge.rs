@@ -14,7 +14,7 @@ This command merges overlapping paired-end reads into single reads,
 reproducing the BBTools `bbmerge.sh` / `bbmerge-auto.sh` overlap pipeline
 (anchr merge phase 4). Joining pairs are written to the output and unmerged
 pairs to `--outu`. For overlap-based error correction without joining, see
-`pgr fq ec-overlap` (anchr merge phase 1). `--extend2` with `--rem`
+`anchr fq ec-overlap` (anchr merge phase 1). `--extend2` with `--rem`
 reproduces the bbmerge-auto `extend2=N rem` mode: unmerged pairs are
 extended along a k-mer graph (k=81) and the overlap is retried, requiring
 the extended overlap to match the unextended one.
@@ -31,14 +31,14 @@ Notes:
 
 Examples:
 1. Merge overlapping pairs, unmerged to outu (anchr phase 4):
-   pgr fq merge in.fq.gz -o merged.fq.gz --outu unmerged.fq.gz \
+   anchr fq merge in.fq.gz -o merged.fq.gz --outu unmerged.fq.gz \
        --strict --no-make-vector --ihist ihist.merge.txt
 
 2. Tune the overlap parameters explicitly:
-   pgr fq merge R1.fq R2.fq -o out.fq --min-overlap 11 --max-ratio 0.075
+   anchr fq merge R1.fq R2.fq -o out.fq --min-overlap 11 --max-ratio 0.075
 
 3. Merge with tadpole extension retry (anchr merge phase 4):
-   pgr fq merge in.fq.gz -o merged.fq.gz --outu unmerged.fq.gz \
+   anchr fq merge in.fq.gz -o merged.fq.gz --outu unmerged.fq.gz \
        --strict --no-make-vector --extend2 80 --rem --ihist ihist.merge.txt
 "###,
         )
@@ -257,6 +257,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     if let Some(p) = &ihist {
         crate::cmd::args::ensure_outfile_distinct(p, infiles.iter().map(String::as_str))?;
     }
+    crate::cmd::args::ensure_outfiles_distinct(
+        [Some(outfile), outu.as_deref(), ihist.as_deref()]
+            .into_iter()
+            .flatten(),
+    )?;
 
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;

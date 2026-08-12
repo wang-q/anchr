@@ -18,13 +18,13 @@ Features:
 
 Examples:
 1. Convert a FASTQ file to FASTA:
-   pgr fq to-fa input.fq -o output.fa
+   anchr fq to-fa input.fq -o output.fa
 
 2. Convert multiple FASTQ files to a single FASTA:
-   pgr fq to-fa input1.fq input2.fq -o output.fa
+   anchr fq to-fa input1.fq input2.fq -o output.fa
 
 3. Convert and write to stdout:
-   pgr fq to-fa input.fq
+   anchr fq to-fa input.fq
 "###,
         )
         .arg(crate::cmd::args::infiles_arg("FASTQ"))

@@ -24,11 +24,11 @@ Notes:
 
 Examples:
 1. Error-correct with tadpole defaults (anchr merge phase 3):
-   pgr fq ec-kmer in.fq.gz -o ecct.fq.gz --toss-junk --toss-depth 2 \
+   anchr fq ec-kmer in.fq.gz -o ecct.fq.gz --toss-junk --toss-depth 2 \
        --toss-uncorrectable
 
 2. Only correct, keep everything:
-   pgr fq ec-kmer R1.fq R2.fq -o corrected.fq --kmer 31
+   anchr fq ec-kmer R1.fq R2.fq -o corrected.fq --kmer 31
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(

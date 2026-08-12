@@ -34,6 +34,26 @@ fn lambda(args: &[&str], out: &str, outu: Option<&str>, ihist: Option<&str>) {
 }
 
 #[test]
+fn command_fq_ec_overlap_rejects_outu_same_as_outfile() {
+    // Data safety: --outu equal to -o would open two writers to the same path
+    // and corrupt the output; it must be rejected up front.
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "fq",
+            "ec-overlap",
+            "tests/bbtools/Lambda/R1.2k.fq.gz",
+            "tests/bbtools/Lambda/R2.2k.fq.gz",
+            "-o",
+            "out.fq",
+            "--outu",
+            "out.fq",
+            "--no-make-vector",
+        ])
+        .run_fail();
+    assert!(stderr.contains("must be distinct"), "stderr: {stderr}");
+}
+
+#[test]
 fn command_fq_ec_overlap_matches_bbtools_golden() {
     // BBTools 40.01 `bbmerge.sh ... ecco mix vstrict` with the bundled
     // bbmerge.bbnet overlap filter, ordered, threads=1 (see

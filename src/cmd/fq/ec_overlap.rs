@@ -13,7 +13,7 @@ pub fn make_subcommand() -> Command {
 This command error-corrects paired-end reads using the evidence of their
 overlapping region, without joining the pair, reproducing the BBTools
 `bbmerge.sh ... ecco` mode (anchr merge phase 1). It is the overlap-based
-counterpart of `pgr fq ec-kmer` (tadpole ecc): this command needs paired
+counterpart of `anchr fq ec-kmer` (tadpole ecc): this command needs paired
 reads with a true overlap, while `ec-kmer` corrects from the k-mer graph.
 
 Notes:
@@ -31,11 +31,11 @@ Notes:
 
 Examples:
 1. Error-correct by overlap, keeping all pairs (anchr merge phase 1):
-   pgr fq ec-overlap R1.fq.gz R2.fq.gz -o ecco.fq.gz --vstrict \
+   anchr fq ec-overlap R1.fq.gz R2.fq.gz -o ecco.fq.gz --vstrict \
        --net bbmerge.bbnet --ihist ihist.merge1.txt
 
 2. Only corrected pairs to the output, the rest to outu:
-   pgr fq ec-overlap in.fq.gz -o ecco.fq.gz --outu rest.fq.gz \
+   anchr fq ec-overlap in.fq.gz -o ecco.fq.gz --outu rest.fq.gz \
        --no-mix --no-make-vector
 "###,
         )
@@ -246,6 +246,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     if let Some(p) = &ihist {
         crate::cmd::args::ensure_outfile_distinct(p, infiles.iter().map(String::as_str))?;
     }
+    crate::cmd::args::ensure_outfiles_distinct(
+        [Some(outfile), outu.as_deref(), ihist.as_deref()]
+            .into_iter()
+            .flatten(),
+    )?;
 
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;

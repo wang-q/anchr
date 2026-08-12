@@ -137,6 +137,24 @@ pub fn ensure_outfile_distinct<'a>(
     Ok(())
 }
 
+/// Reject two output paths that resolve to the same file. Commands that open
+/// several writers (R1/R2/singles, merged/outu/ihist, kept/discard) would
+/// otherwise truncate each other's output and silently corrupt it. `stdout`
+/// is the screen sentinel and never collides.
+pub fn ensure_outfiles_distinct<'a>(
+    outputs: impl IntoIterator<Item = &'a str>,
+) -> anyhow::Result<()> {
+    let outputs: Vec<&str> = outputs.into_iter().filter(|o| *o != "stdout").collect();
+    for (i, a) in outputs.iter().enumerate() {
+        for b in &outputs[i + 1..] {
+            if pgr::libs::io::same_path(a, b) {
+                anyhow::bail!("output files must be distinct: {} and {}", a, b);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Extract the `infile` value from `args` as `&str`.
 /// Collect region strings from `ranges` (positional, optional) and `rgfile`
 /// (`-r/--rgfile`) arguments. Returns the combined list.

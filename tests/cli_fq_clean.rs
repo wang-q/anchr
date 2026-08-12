@@ -736,6 +736,75 @@ fn command_fq_clean_kmask_mask_only_options_require_mask_kmers() {
 }
 
 #[test]
+fn command_fq_clean_rejects_stats_same_as_outfile() {
+    // --stats is written after the trimmed output; pointing it at the same
+    // path as -o would overwrite the result, so it must be rejected.
+    let file = write_temp("@r1\nACGTACGT\n+\nIIIIIIII\n");
+    let out = file.path().with_extension("out.fq");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "fq",
+            "clean",
+            file.path().to_str().unwrap(),
+            "--stats",
+            out.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .run_fail();
+    assert!(stderr.contains("must be distinct"), "stderr: {stderr}");
+}
+
+#[test]
+fn command_fq_clean_rejects_hamming_distance_above_limit() {
+    // add_kmer enumerates (4*k)^hdist variants; an unbounded hdist makes
+    // reference table building exponentially slow, so it is bounded to 0..=3.
+    let file = write_temp("@r1\nACGTACGT\n+\nIIIIIIII\n");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "fq",
+            "clean",
+            file.path().to_str().unwrap(),
+            "--hamming-distance",
+            "4",
+            "-o",
+            "stdout",
+        ])
+        .run_fail();
+    assert!(
+        stderr.contains("0..=3") && stderr.contains("hamming-distance"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn command_fq_clean_kmask_huge_trim_pad_no_overflow() {
+    // --trim-pad is usize with no upper bound; a value near usize::MAX used
+    // to overflow `trim_pad + 1` / `i + trim_pad + 1` in kmask (panic in
+    // debug). Saturating arithmetic must keep it a friendly no-crash run.
+    let ref_file = write_ref(">adapter\nGATCGGAAGAGCACACGTCTGAACTCCAGTCAC\n");
+    let file = write_temp("@r1\nACGTACGTGATCGGAAGAG\n+\nIIIIIIIIIIIIIIIIIII\n");
+    let out_dir = tempfile::tempdir().unwrap();
+    let out = out_dir.path().join("out.fq");
+    AnchrCmd::new()
+        .args(&[
+            "fq",
+            "clean",
+            file.path().to_str().unwrap(),
+            "--ref",
+            ref_file.path().to_str().unwrap(),
+            "--mask-kmers",
+            "N",
+            "--trim-pad",
+            "18446744073709551615",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
 fn command_fq_clean_kmask_requires_ref() {
     // --mask-kmers only does something with a reference; without one it is a
     // silent no-op, so it must be rejected as documented ("requires --ref").

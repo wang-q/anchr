@@ -9,7 +9,7 @@ pub fn make_subcommand() -> Command {
         .after_help(
             r###"
 This command splits an interleaved FASTQ file into paired-end R1/R2 outputs
-and a singles file for unpaired reads. It is the inverse of `pgr fq interleave`
+and a singles file for unpaired reads. It is the inverse of `anchr fq interleave`
 and matches BBTools `repair.sh` in `rp` mode. By default reads are paired by
 position (every two records); `--repair` instead matches mates by read name
 prefix, recovering disordered pairs and routing orphaned reads to singles.
@@ -24,10 +24,10 @@ Notes:
 
 Examples:
 1. Split into R1/R2 and singles:
-   pgr fq split interleaved.fq -o r1.fq --outfile-2 r2.fq --outfile-single s.fq
+   anchr fq split interleaved.fq -o r1.fq --outfile-2 r2.fq --outfile-single s.fq
 
 2. Split into R1/R2 only:
-   pgr fq split interleaved.fq.gz -o r1.fq --outfile-2 r2.fq
+   anchr fq split interleaved.fq.gz -o r1.fq --outfile-2 r2.fq
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
@@ -79,6 +79,15 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     {
         crate::cmd::args::ensure_outfile_distinct(out, [infile.as_str()])?;
     }
+    crate::cmd::args::ensure_outfiles_distinct(
+        [
+            Some(outfile),
+            Some(outfile_2.as_str()),
+            outfile_single.map(String::as_str),
+        ]
+        .into_iter()
+        .flatten(),
+    )?;
 
     let mut out1 =
         pgr::writer(outfile).with_context(|| format!("Failed to open writer for {}", outfile))?;

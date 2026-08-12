@@ -34,6 +34,27 @@ fn lambda(args: &[&str], out: &str, outu: Option<&str>, ihist: Option<&str>) {
 }
 
 #[test]
+fn command_fq_merge_rejects_outu_same_as_outfile() {
+    // Data safety: --outu equal to -o would open two writers to the same path
+    // and corrupt the output; it must be rejected up front (before any writer
+    // is opened). --no-make-vector avoids needing a --net file.
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "fq",
+            "merge",
+            "tests/bbtools/Lambda/R1.2k.fq.gz",
+            "tests/bbtools/Lambda/R2.2k.fq.gz",
+            "-o",
+            "out.fq",
+            "--outu",
+            "out.fq",
+            "--no-make-vector",
+        ])
+        .run_fail();
+    assert!(stderr.contains("must be distinct"), "stderr: {stderr}");
+}
+
+#[test]
 fn command_fq_merge_join_matches_bbtools_golden() {
     // `bbmerge.sh ... strict` (net filter on): merged + unmerged + ihist.
     let out_dir = tempfile::tempdir().unwrap();

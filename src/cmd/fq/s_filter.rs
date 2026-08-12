@@ -18,7 +18,7 @@ that quorum would substitute (including the Poisson collision test). No
 corrected sequence is produced — the read is kept as-is or discarded.
 
 The `s-` prefix marks this as a self/internal check, in contrast to
-`pgr fq filter`, which matches reads against an external reference.
+`anchr fq filter`, which matches reads against an external reference.
 
 The output is the kept reads as FASTQ; --discard-file additionally writes
 the flagged reads so they can be inspected.
@@ -29,9 +29,9 @@ the flagged reads so they can be inspected.
 
 Examples:
 1. Self-check and discard error-prone reads:
-   pgr fq s-filter reads.fq.gz -k 21 -o kept.fq.gz
+   anchr fq s-filter reads.fq.gz -k 21 -o kept.fq.gz
 2. Also write the discarded reads:
-   pgr fq s-filter reads.fq.gz -k 21 -o kept.fq --discard-file bad.fq
+   anchr fq s-filter reads.fq.gz -k 21 -o kept.fq --discard-file bad.fq
 "###,
         )
         .arg(crate::cmd::args::infile_arg_required_with_help(
@@ -120,6 +120,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     crate::cmd::args::ensure_outfile_distinct(outfile, [infile.as_str()])?;
     if let Some(discard) = args.get_one::<String>("discard_file") {
         crate::cmd::args::ensure_outfile_distinct(discard, [infile.as_str()])?;
+        crate::cmd::args::ensure_outfiles_distinct([outfile, discard.as_str()])?;
     }
 
     let mut reader = pgr::libs::fmt::seq::SeqReader::new(infile)

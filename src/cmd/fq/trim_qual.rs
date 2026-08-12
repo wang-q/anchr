@@ -23,13 +23,13 @@ Notes:
 
 Examples:
 1. Single-end trimming:
-   pgr fq trim-qual in.fq -o out.fq
+   anchr fq trim-qual in.fq -o out.fq
 
 2. Paired-end with separate outputs and singles:
-   pgr fq trim-qual R1.fq R2.fq -o r1.fq --outfile-2 r2.fq --outfile-single s.fq
+   anchr fq trim-qual R1.fq R2.fq -o r1.fq --outfile-2 r2.fq --outfile-single s.fq
 
 3. Paired-end interleaved output:
-   pgr fq trim-qual R1.fq R2.fq -o interleaved.fq
+   anchr fq trim-qual R1.fq R2.fq -o interleaved.fq
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(

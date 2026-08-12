@@ -234,3 +234,225 @@ overlap,bbnet}`、`libs/asm/{tadpole,assemble}`、`libs/kmer/{quality,qcheck}`�
 新缺陷。
 
 经多轮纵深复审收敛，未再发现新问题。
+
+---
+
+# 第四轮（2026-08-13）：anchr 迁移后 `fq` 全命令族复核
+
+`fq` 已迁移至 `src/cmd/fq/`（16 个子命令：to-fa / clump / interleave / merge /
+norm / range / sample / split / clean / ec-kmer / ec-overlap / extend / filter /
+s-filter / trim-qual），相关库位于 `src/libs/fq/`（trim_adapter / trim / clump /
+norm / sample / split / merge / overlap / bbnet）与 `src/libs/asm/`（tadpole /
+assemble，与 asm 共享）。本节对迁移后的现行代码做全命令族纵深复核。
+
+## 复核范围与方法
+
+- 逐行重读全部 16 个命令文件、`cmd/args.rs` 共享参数助手，以及
+  `libs/fq/`、`libs/asm/tadpole.rs`、`libs/asm/assemble.rs` 的关键路径。
+- 逐命令核对 Zero-Panic（索引/溢出/除零/unwrap）、clap 参数校验、数据安全
+  （`-o` 同输入保护 + 多输出互斥）、算法边界（k 上界、滑动窗口、桶除零、
+  质量修剪、merge/join 切片）、文档一致性（`docs/fq.md` ↔ 帮助 ↔ 行为）。
+- 对首轮此前未覆盖/未复核的边界逐项核验（见下）。
+
+## 复核确认（安全不变量，经核验无需修复）
+
+- **`trim.rs` `sliding_cut` / `mott_cut`**：`n==0` 提前返回 `(0,0)`，
+  `window_size = max(1, n/10) ≥ 1`，循环条件 `window_start + window_size <= n`
+  保证 `q(i)` 索引不越界；`mott_cut` 的 `start/stop` 满足 `start >= stop` 时返回
+  `(0,0)`，不会产生欠位切片。空序列、极短读均安全。
+- **`norm.rs` `score_cov`**：`above_limit` 递减到 -1 后循环条件 `>= 0` 短路，
+  `depth_al` 保持 -1，`cov[(-1)]` 不会被求值；`load_table` 的
+  `chunk[kb..].try_into().unwrap()` 因 `bytes.len() % (kb+4) == 0` +
+  `chunks_exact` 保证每块恰 `kb+4` 字节而不会 panic。
+- **`clump.rs` `fill_max` 的 `1 << (2k-2)`**：`k` 在 clap 层已限 `2..=31`，
+  `2k-2 ≤ 60`，i64/u128 移位安全；`clump_buckets` 的 `% buckets` 由 `--buckets`
+  `1..=4096` 校验覆盖。
+- **`merge.rs` `join_reads` / `corrected_pair`**：`vec![0; insert]` + 各处
+  `.min()`/`saturating_sub()` 保证切片终点 ≤ 长度；重叠分支的
+  `i = insert as isize - 1` 从 0 起步即 `-1` 不进入循环；`rc2.len()-c2len` 由
+  `c2len ≤ b.len()` 保证不欠位。
+- **`tadpole.rs::run`**：`k` 校验 `1..=128`（`Kmer::MAX_K`），`ec-kmer`/`extend`
+  的 `-k > 128` 会友好报错而非 panic；`extend_read` 的 rollback 用
+  `saturating_add(1)` 防 `% 0` 与 `usize::MAX+1` 溢出。
+- **`bbnet` `feed_forward` 23 维**：`debug_assert_eq!(v.len(), 23)` 为 debug 断言，
+  构造上 `v` 恒 23 元素，release 无影响；`parse` 已校验输入层 23 维。
+- **merge / ec-overlap 的 `--net` 必填**：make-vector 模式下缺 `--net` 由
+  `merge()` 库入口（`libs/fq/merge.rs`）统一友好报错；`merge` 命令额外在 CLI 层
+  复检，`ec-overlap` 依赖库层守卫，行为一致（友好错误，非 panic）。
+
+## 修复的缺陷（根因模式）
+
+### 数据安全（多输出互斥缺失）
+
+- **`split` / `merge` / `ec-overlap` / `s-filter` 的多个输出可指向同一路径**：
+  这四个命令会打开多个 writer（split 的 R1/R2/singles；merge、ec-overlap 的
+  merged/outu/ihist；s-filter 的 kept/discard），但此前只对"输出 vs 输入"做了
+  `ensure_outfile_distinct`，未校验"输出 vs 输出"。当两个输出指向同一文件时，
+  后开的 writer 会截断先写者已写内容，静默产生损坏的输出。这与 `trim-qual`、
+  `range` 已有的输出互斥守卫及 asm 审核第五轮（`--outm`/`--outu` 冲突）属同一
+  数据安全类别，但 fq 这四个命令此前遗漏。
+  修复：在 `cmd/args.rs` 新增共享助手 `ensure_outfiles_distinct`（跳过 `stdout`
+  哨兵，两两 `same_path` 校验），四个命令在打开任何 writer 之前调用；并保留
+  `trim-qual`/`range` 原有内联守卫（行为不变）。新增回归测试：
+  - `command_fq_split_rejects_same_r1_r2_outfile`
+  - `command_fq_merge_rejects_outu_same_as_outfile`
+  - `command_fq_ec_overlap_rejects_outu_same_as_outfile`
+  - `command_fq_s_filter_rejects_outfile_same_as_discard_file`
+
+## 第四轮结论
+
+迁移后的 `fq` 全命令族复核发现 1 类数据安全缺陷（多输出互斥缺失，涉及
+`split`/`merge`/`ec-overlap`/`s-filter` 四命令），已修复并含回归测试；其余
+Zero-Panic、clap 校验、算法边界、文档一致性经复核均无新问题。新增 4 个集成测试
+全部通过，`cargo clippy` 对本轮改动无新增告警。
+
+---
+
+# 第五轮（2026-08-13）：`clean`/`filter` 的 `--stats` 输出与库边界复核
+
+第四轮之后，对 `fq` 全命令族再做一轮纵深复核。本轮逐行复查了
+`libs/fq/trim_adapter.rs` 的 `kmask`/`ktrim`/`qtrim`/`trim_by_amount`/
+`detect_poly_*` 边界、`libs/fq/sample.rs`/`split.rs` 的库内部边界，以及
+`clean`/`filter`/`norm`/`clump`/`range`/`interleave`/`ec-kmer`/`extend`/
+`s-filter`/`sample`/`trim-qual` 等命令行文件的参数校验与输出互斥，并核对
+`docs/fq.md` ↔ 帮助文本 ↔ 行为的一致性。
+
+## 复核确认（安全不变量，经核验无需修复）
+
+- **`trim_adapter.rs` `kmask` 的 `marked[lo..hi]` 切片**：`lo = i.saturating_sub(k-1-
+  trim_pad)`、`hi = (i + trim_pad + 1).min(n)`，因 `i ≥ k-1` 且 `hi ≥ lo+1` 恒成立，
+  `fill` 不会越界；`maskfullycovered` 的 `fill(true)`/`fill(false)` 同界安全。
+- **`Masks::new(k)` 的 i64 移位**：`1i64 << (2k)` 与 `x2 << (2k-2)` 需 `k ≤ 31`；
+  `clean`/`filter`/`norm`/`clump` 的 clap/execute 均已限 `k ∈ 2..=31`，`ec-kmer`/
+  `extend` 由 `tadpole::run` 校验 `k ≤ 128`，均无移位越界。
+- **`trim_adapter.rs` `test_right_window`/`test_optimal`/`avg_quality` 的质量索引**：
+  phred 索引均 `min(127)` 或直接对 128 表取值；`change_quality` 的 `qual[i]` 依赖
+  `SeqReader` 强制 seq/qual 等长（与第三轮结论一致）。
+- **`sample.rs` 库**：`--bases` 负数由 execute 拒绝；`remaining==0` 提前 break 防
+  除零；`target` 为负时 `prob<0` 恒不选中，无越界。
+- **`range.rs` 区域切片**：`end < start || end > len` 时 `bail!`，`seq[start-1..end]`
+  不会越界；`--cache` 用 `NonZeroUsize` 排除 0。
+- **`interleave`/`to-fa`/`norm`/`clump`/`ec-kmer`/`extend`/`sample`/`s-filter`** 的
+  `-o` 同输入保护均已在第四轮及此前就位。
+
+## 修复的缺陷（根因模式）
+
+### 数据安全（辅助输出路径未校验）
+
+- **`clean` / `filter` 的 `--stats` 可覆盖输出或输入文件**：`trim_adapter` 在全部
+  记录写完后才调用 `write_stats` 落盘 stats 文件，但 `execute` 只对 `-o` 做了
+  `ensure_outfile_distinct`，未校验 `--stats` 路径。当 `--stats` 与 `-o` 或输入同
+  路径时，会先用 `-o` 写入修剪/过滤结果再被 stats 文本覆盖（或直接破坏输入），
+  静默产生数据损坏。这与第四轮"多输出互斥"属同一数据安全类别，但 `--stats` 这一
+  辅助输出此前遗漏。
+  修复：`clean.rs`/`filter.rs` 在打开任何 writer 前，对 `--stats` 依次做
+  `ensure_outfile_distinct`（防覆盖输入）与 `ensure_outfiles_distinct`（防与 `-o`
+  互斥）。新增回归测试：
+  - `command_fq_clean_rejects_stats_same_as_outfile`
+  - `command_fq_filter_rejects_stats_same_as_outfile`
+
+## 第五轮结论
+
+本轮纵深复核确认了 `trim_adapter` 的 `kmask`/`Masks` 移位、质量修剪索引、`sample`/
+`range` 边界等安全不变量无需修复；新发现 `clean`/`filter` 的 `--stats` 辅助输出
+路径未做互斥校验（数据安全类别），已修复并含 2 个回归测试。其余命令的 Zero-Panic、
+clap 校验、算法边界、文档一致性经复核均无新问题。新增测试全部通过，`cargo clippy`
+对本轮改动无新增告警。
+
+---
+
+# 第六轮（2026-08-13）：`clean`/`filter` 的 `--hamming-distance` 上界
+
+第五轮之后对 `fq` 全命令族再复查。重点核对了 `trim_adapter` 参考表构建
+`add_kmer` 的 hdist 递归复杂度，以及各命令参数之间的关系校验
+（`k`/`mink`/`hdist`/`trim_pad` 等）。
+
+## 复核确认（安全不变量，经核验无需修复）
+
+- **`add_kmer` 的 hdist 递归**：`k` 由 clap 限 `2..=31`；`mink > k` 时短路 short
+  k-mer 分支，`min_len = 1.max(k.min(mink))` 不会越界。
+- **`--qtrim-window 0` + `--qtrim w`**：`execute` 将 `qtrim_window=0` 视为禁用窗口
+  模式，`process_pair` 走 `test_optimal` 分支，不进入 `test_right_window`，无除零。
+- **`--trim-pad`/`--mask-fully-covered` 依赖 `--mask-kmers`**、`--mask-kmers` 依赖
+  `--ref`：第四轮已加守卫并含回归测试。
+
+## 修复的缺陷（根因模式）
+
+### 参数校验缺失（指数级资源耗尽）
+
+- **`clean` / `filter` 的 `--hamming-distance`（hdist）无上界**：`add_kmer`
+  （`libs/fq/trim_adapter.rs`）对参考序列按 `(4*k)^hdist` 枚举单碱基替换变体，
+  递归深度即 `hdist`。`hdist` 无上限时（如 `--hamming-distance 5`，k=31 约 290
+  亿次调用）参考表构建呈指数增长，导致资源耗尽/近乎死循环（非 panic 但不可接受）。
+  修复：`clean.rs`/`filter.rs` 在构建表前校验 `hdist ∈ 0..=3`，越界友好报错；
+  帮助文本与 `docs/fq.md` 标注 `0..=3`。新增回归测试：
+  - `command_fq_clean_rejects_hamming_distance_above_limit`
+  - `command_fq_filter_rejects_hamming_distance_above_limit`
+
+## 第六轮结论
+
+本轮新发现 `clean`/`filter` 的 `--hamming-distance` 无上界导致的指数级资源耗尽
+风险（参数校验缺失类别），已修复并含 2 个回归测试，帮助文本与文档同步。其余命令
+的 Zero-Panic、clap 校验、算法边界、文档一致性经复核均无新问题。新增测试全部通过，
+`cargo clippy` 对本轮改动无新增告警。
+
+---
+
+# 第七轮（2026-08-13）：`kmask` 的 `--trim-pad` 极大值溢出
+
+第六轮之后对 `fq` 全命令族再复查。重点核对了 `trim_adapter` 中 `kmask` 对
+`--trim-pad`（usize，无上界）的算术边界。
+
+## 复核确认（安全不变量，经核验无需修复）
+
+- `kmask` 的 `minus = k.saturating_sub(1).saturating_sub(trim_pad)` 与右端
+  `lo = i.saturating_sub(trim_pad)` 本就用 saturating 运算，安全。
+- `ktrim`/`qtrim`/`trim_by_amount` 的 `min`/`saturating_sub` 对极大长度阈值
+  （`minlen`/`maxlength`/`force_trim_*`/poly 阈值）均钳制，无越界。
+
+## 修复的缺陷（根因模式）
+
+### Zero-Panic（usize 溢出）
+
+- **`kmask` 对 `--trim-pad` 极大值（接近 `usize::MAX`）溢出 panic**：
+  `libs/fq/trim_adapter.rs` 的 `kmask` 用普通加法 `plus = opts.trim_pad + 1` 与
+  `i + opts.trim_pad + 1`（左端短 k-mer），`--trim-pad` 为 usize 且 clap 无上界，
+  传 `18446744073709551615` 时 `trim_pad + 1` 在 debug 下溢出 panic。修复：改为
+  `saturating_add`（`plus`、主循环 `hi`、左端 `hi` 三处），极大 `--trim-pad` 变为
+  掩码整条读的无崩溃行为。新增回归测试
+  `command_fq_clean_kmask_huge_trim_pad_no_overflow`。
+
+## 第七轮结论
+
+本轮新发现 `kmask` 对极大 `--trim-pad` 的 usize 加法溢出（Zero-Panic 类别），已
+修复并含回归测试。其余命令的 Zero-Panic、clap 校验、算法边界、文档一致性经复核
+均无新问题。新增测试全部通过，`cargo clippy` 对本轮改动无新增告警。
+
+---
+
+# 第八轮（2026-08-13）：收敛复核
+
+第七轮之后对 `fq` 全命令族做最终收敛复核：复查 `trim_adapter` 其余用户可控
+usize 参数（`minlen`/`maxlength`/`force_trim_*`/`qtrim-window`/poly 阈值）的
+算术与索引、`ktrim`/`count_set_kmers`/`qtrim` 路径，以及各命令的文档 ↔ 帮助 ↔
+行为一致性；并全量运行测试与 clippy。
+
+## 复核确认（安全不变量，经核验无需修复）
+
+- `trim_to_position`/`trim_by_amount` 的 `saturating_sub`/`min` 对极大长度阈值
+  均钳制；`process_pair` 的 forceTrim 用 `i64` 运算（`as i64` 回绕但不 panic），
+  `right = (len-b-1).max(0)` 恒非负。
+- `test_right_window` 的 `window as u32` 截断仅在 `window ≤ qual.len()`（小窗口）
+  时到达，极大 `--qtrim-window` 走 `qual.len() < window` 分支返回 0，无截断误判。
+- `ktrim`/`count_set_kmers` 不依赖 `trim_pad`，`k ∈ 2..=31` 限位下 i64 滚动安全。
+- `ec-kmer`/`extend` 的 `-k` 由 `tadpole::run` 校验 `1..=128`；`clean`/`filter`/
+  `norm`/`clump` 的 `-k` 由 execute 校验 `2..=31`。
+- 全部 16 个子命令的 `-o` 同输入保护、多输出互斥、`--stats`/`--discard-file`/
+  `--outu`/`--ihist`/`--outfile-2` 等辅助输出互斥均在第四至七轮校验并含回归测试。
+
+## 第八轮结论
+
+本轮收敛复核未发现新问题。`cargo fmt` clean；`cargo clippy --all-targets` 对本次
+改动涉及文件（`clean.rs`/`filter.rs`/`trim_adapter.rs` 及测试）无新增告警；全量
+`cargo test` 26 个测试二进制全部通过（含本轮新增回归测试）。`fq` 全命令族审核至此
+收敛，无再发现问题。

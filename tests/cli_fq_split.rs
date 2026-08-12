@@ -325,3 +325,35 @@ TGCA
         "stderr: {stderr}"
     );
 }
+
+#[test]
+fn command_fq_split_rejects_same_r1_r2_outfile() {
+    // Data safety: two writers to the same path would truncate each other's
+    // output. --outfile-2 equal to --outfile must be rejected with a friendly
+    // error instead of corrupting the file.
+    let input = "\
+@r1/1 c1
+ACGT
++
+!!!!
+@r1/2 c2
+TGCA
++
+####
+";
+    let file = write_temp(input);
+    let out_dir = tempfile::tempdir().unwrap();
+    let out = out_dir.path().join("out.fq");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "fq",
+            "split",
+            file.path().to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--outfile-2",
+            out.to_str().unwrap(),
+        ])
+        .run_fail();
+    assert!(stderr.contains("must be distinct"), "stderr: {stderr}");
+}

@@ -23,10 +23,10 @@ Notes:
 
 Examples:
 1. Keep reads with at least one k-mer at depth 3:
-   pgr fq norm reads.fq.gz -k 31 --min 3 -o out.fq
+   anchr fq norm reads.fq.gz -k 31 --min 3 -o out.fq
 
 2. Bound memory to 1 GiB (external bucket path for larger data):
-   pgr fq norm R1.fq.gz R2.fq.gz -k 31 --min 3 --mem 1g -o out.fq
+   anchr fq norm R1.fq.gz R2.fq.gz -k 31 --min 3 --mem 1g -o out.fq
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(

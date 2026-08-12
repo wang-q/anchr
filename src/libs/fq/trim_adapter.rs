@@ -612,7 +612,7 @@ fn kmask(read: &mut ReadBuf, opts: &AdapterTrimOptions, table: &HashMap<i64, u32
     let mut found = 0usize;
     let mut id0 = 0u32;
     let minus = opts.k.saturating_sub(1).saturating_sub(opts.trim_pad);
-    let plus = opts.trim_pad + 1;
+    let plus = opts.trim_pad.saturating_add(1);
     let fully = opts.kmask_fully_covered;
     if fully {
         marked.fill(true);
@@ -629,7 +629,7 @@ fn kmask(read: &mut ReadBuf, opts: &AdapterTrimOptions, table: &HashMap<i64, u32
         len += 1;
         if len >= opts.k {
             let lo = i.saturating_sub(minus);
-            let hi = (i + plus).min(n);
+            let hi = i.saturating_add(plus).min(n);
             if let Some(id) = get_value(kmer, rkmer, masks.kmask, table) {
                 if id0 == 0 {
                     id0 = id;
@@ -658,7 +658,7 @@ fn kmask(read: &mut ReadBuf, opts: &AdapterTrimOptions, table: &HashMap<i64, u32
             rkmer |= x2 << (BPB * len as u32);
             len += 1;
             if len >= opts.mink {
-                let hi = (i + opts.trim_pad + 1).min(n);
+                let hi = i.saturating_add(opts.trim_pad).saturating_add(1).min(n);
                 if let Some(id) = get_value(kmer, rkmer, masks.length_mask[len], table) {
                     if id0 == 0 {
                         id0 = id;
