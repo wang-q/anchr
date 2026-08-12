@@ -141,6 +141,13 @@ docs），依赖 pgr crate 的基础模块：
   内消费者的代码；
 - 移除随迁测试文件、docs；更新 `cli_consistency.rs`（after_help 命令集合）、
   project-understanding 索引、todo、CHANGELOG；
+- 参考笔记随迁：references 9 个（bcalm/canu/celera/cutadapt/fairy/
+  metaMDBG/quorum/sickle/skesa）+ design 6 个（anchr-trim/merge-replace、
+  fq-assemble/asm-map/fq-index/olc）从 pgr 移除；
+- todo 条目移交：pgr `notes/todo.md` 中 anchr 侧待办已移交 anchr todo
+  （anchr 模板替换、fq norm 精确 vs 近似定稿、asm olc 参数验证、OLC
+  宏基因组/长读验证），pgr 保留指针条目；fq/asm 已完成记录与"明确不做"
+  决策标注"已迁 anchr"；
 - 逐批删除、逐批 `cargo test`，保持剩余命令全绿。
 
 ### 阶段 5：收尾
@@ -323,5 +330,7 @@ chainnet）、`biser`（SD）、`cactus`/`cactus_lastz`（泛基因组）、`fas
   条目（8.1/8.2/8.3），保留 §7 本迁移方案档案；
 - `todo.md` 中引用迁走文档的条目改指向 anchr（如 anchr 模板替换的 golden
   对照流程引用 `anchr-trim-replace.md` → 在 anchr 侧）；
-- 基准（benchmarks/）均为 pgr 通用（kmer-throughput 属 kmer 命令，留）；
+- 基准：`benchmarks/bbtools-vs-pgr.md`（fq 专属 CLI 对照）随迁 anchr
+  （`notes/benchmarks/bbtools-vs-anchr.md`），pgr 其余基准通用
+  （kmer-throughput 属 kmer 命令，留）；
   `fq-asm-migrate.md` 本身作为迁移档案留在 pgr，迁移完成后归档。

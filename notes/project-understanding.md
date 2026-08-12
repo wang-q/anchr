@@ -266,4 +266,5 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 - `notes/audit/audit-asm.md`：asm 命令族审计记录；
 - `notes/benchmarks/bbtools-vs-anchr.md`：fq 命令 vs BBTools 39.38 CLI 基准
   （随迁自 pgr 并适配，`kmer hist` 行仍属 pgr）；
+- `notes/todo.md`：近期待办清单（已完成/待实现/挂账/待验证/审计/技术债）；
 - 本文档为项目理解与索引入口；`AGENTS.md` 为行为准则。

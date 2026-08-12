@@ -380,7 +380,7 @@ parameters"，39.38 与 40.01 一致），但这是**新功能**，不在 anchr 
 
 ### 4.10 reformat.sh 功能全景盘查（2026-08-10）
 
-**结论**：anchr 实际用 reformat 做两件事——① `trim.era.sh` 的
+**结论**：anchr 实际用 reformat 做两件事——① `trim.tera.sh` 的
 `samplebasestarget`（已核对 ✅，§M2）；② **`2_insert_size.era.sh` 的
 `ihist`**（SAM → 插入片段直方图，pgr 目前无对应，**这是真缺口**）。
 
@@ -445,9 +445,9 @@ BBMerge 在 overlap merge 时从 read 对重叠/缺口反推 `bestInsert`
 
 **anchr 用 bbduk 做三件事**：
 
-1. trim.era.sh trim（ktrim=r/k/mink/hdist/tbo/tpe/minlen/qtrim/trimq/ftm/
+1. trim.tera.sh trim（ktrim=r/k/mink/hdist/tbo/tpe/minlen/qtrim/trimq/ftm/
    maxns/stats/tossbrokenreads）——已移植并核对 ✅；
-2. trim.era.sh filter（k/cardinality/stats/tossbrokenreads）——已移植 ✅；
+2. trim.tera.sh filter（k/cardinality/stats/tossbrokenreads）——已移植 ✅；
 3. **merge.era.sh 纯 qtrim**（`bbduk.sh qtrim=r trimq={{opt.qual}}
    minlen={{opt.len}}`，无 ref）——**缺口**：`pgr fq trim-adapter` 的
    `--ref` 目前必填；`pgr fq trim-qual` 是 sickle 语义（sliding/Mott），
