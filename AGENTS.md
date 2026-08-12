@@ -150,6 +150,8 @@ cargo test -- --test-threads=1
 - **`notes/`** - 开发者面向笔记（中文）：`notes/design/`（设计稿/移植笔记）、
   `notes/references/`（外部工具源码分析）、`notes/audit/`（代码审核记录）、
   `notes/benchmarks/`（基准对比）。
+- **`notes/project-understanding.md`**: 项目整体理解（架构、命令模块、
+  核心库、现状评估、设计模式），含各文档的索引与定位，需要时查阅。
 
 ## 命令结构 (Command Structure)
 

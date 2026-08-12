@@ -67,7 +67,7 @@
 | M6 bbnorm cutoff | **完成（精确表语义）** | `pgr fq norm`（精确 canonical 表 + bbnorm per-read 判定逻辑：truedepth/depthAL 分位数 + toss 条件）；与 bbnorm bits=16 近似计数在 min=3 边界差 ~21 对（39846 vs 39888），属设计稿已声明的"先精确 KmerTable"路线 |
 | M8 集成 | **完成（原语路线）** | 只提供可组合原语（clump/split/sample/trim-adapter/fq norm/hist），**不内置 pl trim 流水线**——编排属于 anchr，pgr 不做"别人的活"（2026-08-10 修正，`pl trim` 已移除）；anchr 模板把 `bbduk.sh` 等调用换成 pgr 命令、用管道串联避免中间 gz |
 
-基准见 [benchmarks/bbtools-vs-pgr.md](../../benchmarks/bbtools-vs-pgr.md)
+基准见 [bbtools-vs-anchr.md](../benchmarks/bbtools-vs-anchr.md)
 （hyperfine，Lambda 40000 reads，pgr release 单线程 vs BBTools 39.38 8 线程）。
 
 移植要点记录（避免后续重复踩坑）：

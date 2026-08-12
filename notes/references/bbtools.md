@@ -70,5 +70,5 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [anchr-trim-replace.md](../de
   其余 7 个 trim 流水线工具的入口类不变（[anchr-trim-replace.md](../design/anchr-trim-replace.md) §4.2）。
 - `BBMergeOverlapper` 的 Java fallback 有 JNI 版本，anchr 侧用纯 Rust 移植，
   两版 JNI 均不采用。
-- 性能对照见 `notes/benchmarks/`（pgr 侧 `benchmarks/bbtools-vs-pgr.md`，
-  hyperfine 实测 BBTools 39.38 8 线程 vs pgr release 单线程）。
+- 性能对照见 [bbtools-vs-anchr.md](../benchmarks/bbtools-vs-anchr.md)
+  （hyperfine 实测 BBTools 39.38 8 线程 vs anchr release 单线程）。
