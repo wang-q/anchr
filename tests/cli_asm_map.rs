@@ -311,7 +311,7 @@ fn command_asm_map_paired_requires_two_files() {
         .stderr(predicates::str::contains("requires exactly 2 read files"));
 }
 
-/// Per-base coverage is derived from the mapped SAM via `pgr sam to-rg` and
+/// Per-base coverage is derived from the mapped SAM via `anchr sam to-rg` and
 /// `pgr rg coverage` (the compositional anchors pipeline).
 #[test]
 fn command_asm_map_coverage_pipeline() {
@@ -334,14 +334,9 @@ fn command_asm_map_coverage_pipeline() {
         ])
         .assert()
         .success();
-    let Some(mut pgr) = common::pgr_cmd() else {
-        return;
-    };
-    let output = pgr
+    let (rg, _) = AnchrCmd::new()
         .args(&["sam", "to-rg", outm.to_str().unwrap()])
-        .output()
-        .unwrap();
-    let rg = String::from_utf8(output.stdout).unwrap();
+        .run();
     // One range per mapped read, 1-based inclusive (ref 0-based 10..60 and
     // 20..70).
     assert_eq!(rg.lines().collect::<Vec<_>>(), ["ut:11-60", "ut:21-70"]);
@@ -481,13 +476,8 @@ fn command_asm_map_lambda_sanity() {
         .success();
     let mapped = sam_lines(&outm);
     assert!(!mapped.is_empty(), "no reads mapped");
-    let Some(mut pgr) = common::pgr_cmd() else {
-        return;
-    };
-    let output = pgr
+    let (rg, _) = AnchrCmd::new()
         .args(&["sam", "to-rg", outm.to_str().unwrap()])
-        .output()
-        .unwrap();
-    let rg = String::from_utf8(output.stdout).unwrap();
+        .run();
     assert!(!rg.trim().is_empty());
 }

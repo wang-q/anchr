@@ -26,7 +26,7 @@ flate2 = "1.1.8"
 # Pinned to the pgr commit used during migration (phase 1 libs pub-ification).
 # Local development overrides this via .cargo/config.toml -> ../pgr.
 # Bump deliberately after pgr API changes that anchr needs.
-pgr = { git = "https://github.com/wang-q/pgr", rev = "5cc61eed3711253ee09ce1c6d1fa35c5b9bf2222" }
+pgr = { git = "https://github.com/wang-q/pgr", rev = "526cec1f21350cc6be574f4db945eeb2238e5068" }
 
 tera = "1.20.0"
 # data structure
