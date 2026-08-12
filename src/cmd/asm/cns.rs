@@ -1,7 +1,7 @@
-use anyhow::Context;
-use clap::{value_parser, Arg, ArgMatches, Command};
 use crate::libs::olc::consensus::consensus;
 use crate::libs::olc::layout::{Layout, LayoutStep};
+use anyhow::Context;
+use clap::{value_parser, Arg, ArgMatches, Command};
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 
@@ -11,15 +11,15 @@ pub fn make_subcommand() -> Command {
         .about("Stitches layouts into consensus contigs (OLC stage 3)")
         .after_help(
             r###"
-Stitches the layouts produced by `pgr asm layout` into consensus contigs.
+Stitches the layouts produced by `anchr asm layout` into consensus contigs.
 Overlaps are exact, so each layout is walked in order, every unitig is
 oriented by its strand, and only the bases beyond the exact overlap with
 the previous step are appended. A layout whose overlapping bases disagree
 with the already-stitched contig is reported as an error (exact overlaps
 must agree).
 
-The unitig FASTA files must be the same files passed to `pgr asm ovlp` and
-`pgr asm layout` (the `stem:name` prefixes are re-derived here and must
+The unitig FASTA files must be the same files passed to `anchr asm ovlp` and
+`anchr asm layout` (the `stem:name` prefixes are re-derived here and must
 match). The layout TSV is the first positional argument.
 
 Output is FASTA (`>contig_<id>,len=...,cov=...`, 70-column wrap, longest
@@ -28,9 +28,9 @@ the contig length).
 
 Examples:
 1. Consensus from a layout:
-   pgr asm cns layout.tsv k21.fa k51.fa -o contigs.fa
+   anchr asm cns layout.tsv k21.fa k51.fa -o contigs.fa
 2. Drop short contigs:
-   pgr asm cns layout.tsv unitigs.fa -o contigs.fa --min-contig-len 500
+   anchr asm cns layout.tsv unitigs.fa -o contigs.fa --min-contig-len 500
 "###,
         )
         .arg(
@@ -38,7 +38,7 @@ Examples:
                 .num_args(1)
                 .index(1)
                 .required(true)
-                .help("Layout TSV file (from pgr asm layout)"),
+                .help("Layout TSV file (from anchr asm layout)"),
         )
         .arg(
             Arg::new("infiles")

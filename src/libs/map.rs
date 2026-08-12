@@ -4,12 +4,12 @@
 //! read by verifying full-length exact matches (no mismatches, no gaps) at
 //! all candidate positions. Design: `notes/design/asm-map.md`.
 
+use anyhow::{Context, Result};
 use pgr::libs::ds::radix_sort::radix_sort_bytes;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use pgr::libs::kmer::canonical_keys;
 use pgr::libs::kmer::key::Kmer;
 use pgr::libs::nt::rev_comp;
-use anyhow::Result;
 use rayon::prelude::*;
 use std::io::Write;
 
@@ -37,6 +37,8 @@ pub struct MapOptions {
     pub paired: bool,
     /// Stop after processing this many read records (pairs count as two).
     pub max_reads: Option<u64>,
+    /// Worker threads for the rayon pool used by the parallel block mapping.
+    pub parallel: usize,
 }
 
 /// The two SAM outputs (mapped / unmapped).
@@ -126,6 +128,20 @@ fn upper_bound(keys: &[u8], key_bytes: usize, key: &Kmer) -> usize {
 /// Reads are processed in parallel (rayon) and written in input order, so
 /// the output is deterministic across runs.
 pub fn map_files(refs: &[RefRecord], read_paths: &[String], opts: &MapOptions) -> Result<MapStats> {
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(opts.parallel.max(1))
+        .build()
+        .context("failed to build rayon pool")?;
+    pool.install(|| map_files_inner(refs, read_paths, opts))
+}
+
+/// The actual mapping work, run inside the `--parallel` rayon pool so the
+/// block-level `par_iter` mapping uses the requested thread count.
+fn map_files_inner(
+    refs: &[RefRecord],
+    read_paths: &[String],
+    opts: &MapOptions,
+) -> Result<MapStats> {
     let index = build_index(refs, opts.k)?;
 
     let mut stats = MapStats::default();

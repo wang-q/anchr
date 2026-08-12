@@ -1,6 +1,6 @@
+use crate::libs::asm::assemble::{assemble_unitigs, AssembleOptions};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
-use crate::libs::asm::assemble::{assemble_unitigs, AssembleOptions};
 use std::io::Write;
 
 /// Build the clap subcommand for unitig.
@@ -17,7 +17,7 @@ assembly stops at branches, junctions, coverage gaps, and loops. Parallel
 paths stay separate (no bubble popping), and the result is independent of
 the k-mer scan order.
 
-This is the strict graph-compression counterpart of `pgr asm contig`, whose
+This is the strict graph-compression counterpart of `anchr asm contig`, whose
 seeded contig mode keeps extending through weak branches (tadpole-compatible
 behavior). Unitigs are best suited to high-coverage or error-corrected input,
 such as the anchr `unitigs` step's `pe.cor.fa`.
@@ -32,13 +32,13 @@ Notes:
 
 Examples:
 1. Assemble unitigs from corrected reads (anchr unitigs step):
-   pgr asm unitig pe.cor.fa -o unitigs_K31.fasta --kmer 31
+   anchr asm unitig pe.cor.fa -o unitigs_K31.fasta --kmer 31
 
 2. Assemble from paired-end reads:
-   pgr asm unitig R1.fq.gz R2.fq.gz -o unitigs.fasta
+   anchr asm unitig R1.fq.gz R2.fq.gz -o unitigs.fasta
 
 3. Raise the solid k-mer threshold (like bcalm `-abundance-min`):
-   pgr asm unitig in.fq -o out.fasta --min-count-seed 5
+   anchr asm unitig in.fq -o out.fasta --min-count-seed 5
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(

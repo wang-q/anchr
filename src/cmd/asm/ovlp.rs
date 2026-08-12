@@ -1,6 +1,6 @@
+use crate::libs::olc::overlap::{find_overlaps, OverlapOptions};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
-use crate::libs::olc::overlap::{find_overlaps, OverlapOptions};
 use std::io::Write;
 
 /// Build the clap subcommand for ovlp.
@@ -30,9 +30,9 @@ Notes:
 
 Examples:
 1. Overlap unitigs from two k values:
-   pgr asm ovlp k21.fa k51.fa -o ovlp.paf
+   anchr asm ovlp k21.fa k51.fa -o ovlp.paf
 2. Raise the seed and minimum overlap:
-   pgr asm ovlp unitigs.fa -o ovlp.paf --overlap-k 21 --min-overlap 51
+   anchr asm ovlp unitigs.fa -o ovlp.paf --overlap-k 21 --min-overlap 51
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
@@ -46,7 +46,7 @@ Examples:
                 .num_args(1)
                 .default_value("17")
                 .value_parser(value_parser!(usize))
-                .help("Seed k-mer length (clamped to the shortest unitig)"),
+                .help("Seed k-mer length (1..=128, clamped to the shortest unitig)"),
         )
         .arg(
             Arg::new("min_overlap")

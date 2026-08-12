@@ -6,10 +6,10 @@
 //! unitigs, the boundary k-mers of each unitig are looked up, and every
 //! candidate is extended to the maximal exact overlap in both orientations.
 
+use anyhow::Result;
 use pgr::libs::ds::radix_sort::radix_sort_bytes;
 use pgr::libs::kmer::canonical_keys;
 use pgr::libs::kmer::key::Kmer;
-use anyhow::Result;
 use rayon::prelude::*;
 
 /// One pseudo-read (unitig) with its sequence.
@@ -67,6 +67,12 @@ pub fn find_overlaps(unitigs: &[Unitig], opts: &OverlapOptions) -> Result<Vec<Ov
     anyhow::ensure!(
         seed_k >= 1,
         "cannot overlap: unitigs are empty or shorter than 1 bp"
+    );
+    anyhow::ensure!(
+        seed_k <= Kmer::MAX_K,
+        "overlap seed k must be at most {} (the k-mer key limit), got {}",
+        Kmer::MAX_K,
+        opts.seed_k
     );
 
     let key_bytes = seed_k.div_ceil(4);

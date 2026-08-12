@@ -14,7 +14,7 @@ fn parse_paf(data: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
-/// `pgr asm ovlp` reports the exact 10 bp suffix/prefix overlap.
+/// `anchr asm ovlp` reports the exact 10 bp suffix/prefix overlap.
 #[test]
 fn command_asm_ovlp_finds_dovetail() {
     let out_dir = tempfile::tempdir().unwrap();
@@ -125,7 +125,32 @@ fn command_asm_ovlp_deterministic() {
     assert_eq!(fs::read(&o1).unwrap(), fs::read(&o2).unwrap());
 }
 
-/// `pgr asm layout` chains ovlp output into one layout with coordinates.
+/// A unitig longer than the k-mer key limit with `--overlap-k` above 128
+/// must fail cleanly instead of silently emitting no overlaps (zero-panic /
+/// no-silent-wrong-result policy).
+#[test]
+fn command_asm_ovlp_rejects_overlap_k_above_limit() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let a = out_dir.path().join("a.fa");
+    // A 200 bp unitig is above `Kmer::MAX_K` (128).
+    let seq = "A".repeat(200);
+    fs::write(&a, format!(">u1\n{seq}\n")).unwrap();
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "ovlp",
+            a.to_str().unwrap(),
+            "--overlap-k",
+            "200",
+            "--min-overlap",
+            "10",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("at most 128"));
+}
+
+/// `anchr asm layout` chains ovlp output into one layout with coordinates.
 #[test]
 fn command_asm_layout_chains_unitigs() {
     let out_dir = tempfile::tempdir().unwrap();
@@ -273,7 +298,7 @@ fn command_asm_olc_reconstructs_synthetic_genome() {
     );
 }
 
-/// `pgr asm cns` stitches a layout TSV into a FASTA contig.
+/// `anchr asm cns` stitches a layout TSV into a FASTA contig.
 #[test]
 fn command_asm_cns_stitches_layout() {
     let out_dir = tempfile::tempdir().unwrap();

@@ -173,8 +173,8 @@ anchr asm map [OPTIONS] <ref.fa> <reads.fq...>
     an unmapped end go to `--outu`).
 *   `--max-reads <int>`: Stop after processing this many read records
     (pairs count as two).
-*   `-p, --parallel <int|auto>`: Worker threads (real parallelism via
-    rayon; output stays deterministic and in input order).
+*   `-p, --parallel <int>`: Worker threads for the rayon mapping pool
+    (1..=1024, default 8); output stays deterministic and in input order.
 
 ### Examples
 
@@ -224,8 +224,8 @@ anchr asm ovlp [OPTIONS] <infiles>...
 ### Options
 
 *   `-o, --outfile <file>`: Output PAF filename (default: stdout).
-*   `--overlap-k <int>`: Seed k-mer length (default 17; clamped to the
-    shortest unitig).
+*   `--overlap-k <int>`: Seed k-mer length (default 17; 1..=128, clamped to
+    the shortest unitig).
 *   `--min-overlap <int>`: Minimum accepted overlap length in bases
     (default 34).
 
@@ -334,17 +334,19 @@ anchr asm olc [OPTIONS] <infiles>...
 ### Options
 
 *   `-k, --kmer <int,int,...>`: Comma-separated k-mer lengths for the unitig
-    sets (default `21,51,81`).
+    sets (default `21,51,81`; each k in 1..=128).
 *   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
 *   `--min-count-seed <int>`: Solid k-mer count threshold for unitig
     assembly (default 3).
 *   `--overlap-k <int>`: Seed k-mer length for overlap detection (default
-    17).
+    17; 1..=128).
 *   `--min-overlap <int>`: Minimum accepted overlap length in bases (default
     34).
 *   `--min-contig-len <int>`: Minimum output contig length (default 500).
 *   `--keep-dir <dir>`: Write the intermediate unitigs/ovlp/layout files
-    for debugging or re-running the stage commands separately.
+    for debugging and inspection (the names there omit the `stem:` prefix
+    the standalone ovlp/layout/cns commands derive, so the files are not
+    directly re-runnable through those commands as-is).
 
 ### Examples
 

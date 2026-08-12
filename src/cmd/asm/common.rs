@@ -1,9 +1,9 @@
 //! Shared helpers for the asm command family.
 
-use anyhow::Context;
-use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use crate::libs::olc::layout::Layout;
 use crate::libs::olc::overlap::{Overlap, OverlapType, Unitig};
+use anyhow::Context;
+use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use pgr::libs::paf::record::PafRecord;
 use std::collections::HashSet;
 use std::io::Write;

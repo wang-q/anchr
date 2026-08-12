@@ -1,6 +1,6 @@
+use crate::libs::map::{map_files, read_fasta, MapOptions};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
-use crate::libs::map::{map_files, read_fasta, MapOptions};
 
 /// Build the clap subcommand for map.
 pub fn make_subcommand() -> Command {
@@ -36,16 +36,16 @@ Notes:
 
 Examples:
 1. Map reads back to an assembly (anchr anchors step):
-   pgr asm map UT.fasta R1.fq.gz R2.fq.gz --outm mapped.sam --outu unmapped.sam
+   anchr asm map UT.fasta R1.fq.gz R2.fq.gz --outm mapped.sam --outu unmapped.sam
 
 2. Derive per-base coverage from the mapped SAM (anchr anchors step):
    pgr sam to-rg mapped.sam | pgr rg coverage stdin -m 2 -o cov.json
 
 3. Use a longer seed k-mer:
-   pgr asm map ref.fa reads.fq.gz -k 41 --outm mapped.sam
+   anchr asm map ref.fa reads.fq.gz -k 41 --outm mapped.sam
 
 4. Map paired reads and estimate the insert size (anchr 2_insert_size step):
-   pgr asm map UT.fasta R1.fq.gz R2.fq.gz --paired \
+   anchr asm map UT.fasta R1.fq.gz R2.fq.gz --paired \
        --outm mapped.sam --outu unmapped.sam --max-reads 1000000
    pgr sam ihist mapped.sam -o insert_size.ihist.txt
 "###,
@@ -114,10 +114,16 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         outu: args.get_one::<String>("outu").cloned(),
         paired: args.get_flag("paired"),
         max_reads: args.get_one::<u64>("max_reads").copied(),
+        parallel: *args.get_one::<usize>("parallel").unwrap(),
     };
     // Reject `--outm`/`--outu` that would overwrite a reference or read file
     // (the SAM writers are opened before the reads are consumed). Reads are
     // checked in `map_files` too, since the writer is opened there.
+    if let (Some(m), Some(u)) = (opts.outm.as_deref(), opts.outu.as_deref()) {
+        if pgr::libs::io::same_path(m, u) {
+            anyhow::bail!("--outm and --outu must be different files");
+        }
+    }
     for of in opts.outm.iter().chain(opts.outu.iter()) {
         crate::cmd::args::ensure_outfile_distinct(
             of,

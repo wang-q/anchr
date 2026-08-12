@@ -5,11 +5,11 @@
 //! correction by local reassembly through the k-mer graph, conservative read
 //! extension that stops at branches, and junk/low-depth read discarding.
 
+use anyhow::Result;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use pgr::libs::fq::qual::{from_phred, to_phred};
 use pgr::libs::kmer::key;
 use pgr::libs::nt::rev_comp;
-use anyhow::Result;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::io::Write;

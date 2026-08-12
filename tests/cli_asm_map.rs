@@ -402,6 +402,34 @@ fn command_asm_map_outm_not_input() {
         .stderr(predicates::str::contains("is also an input file"));
 }
 
+/// `--outm`/`--outu` must not collide with each other (the two SAM writers
+/// would open and truncate the same file, silently corrupting output).
+#[test]
+fn command_asm_map_outm_neq_outu() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let ref_file = out_dir.path().join("ut.fa");
+    let reads_file = out_dir.path().join("reads.fq");
+    std::fs::write(&ref_file, format!(">ut\n{REF}\n")).unwrap();
+    write_fastq(&reads_file, &[("a", &REF[10..60])]);
+    let same = out_dir.path().join("same.sam");
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "map",
+            ref_file.to_str().unwrap(),
+            reads_file.to_str().unwrap(),
+            "--outm",
+            same.to_str().unwrap(),
+            "--outu",
+            same.to_str().unwrap(),
+            "-k",
+            "31",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("must be different files"));
+}
+
 /// Output is deterministic across runs.
 #[test]
 fn command_asm_map_deterministic() {

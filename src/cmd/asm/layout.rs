@@ -1,7 +1,7 @@
-use anyhow::Context;
-use clap::{Arg, ArgMatches, Command};
 use crate::libs::olc::layout::build_layouts;
 use crate::libs::olc::overlap::{Overlap, OverlapType};
+use anyhow::Context;
+use clap::{Arg, ArgMatches, Command};
 use pgr::libs::paf::parser::parse_paf;
 use std::collections::HashMap;
 use std::io::{BufReader, Write};
@@ -12,14 +12,14 @@ pub fn make_subcommand() -> Command {
         .about("Chains unitigs into layouts from an overlap PAF (OLC stage 2)")
         .after_help(
             r###"
-Builds greedy layouts from the exact overlaps produced by `pgr asm ovlp`:
+Builds greedy layouts from the exact overlaps produced by `anchr asm ovlp`:
 every unitig end gets its best extension edge, unplaced unitigs are seeded
 longest-first, and chains grow in both directions through mutual-best
 junctions. Ambiguous junctions (two near-equal best partners, e.g. repeats)
 and non-reciprocal edges stop the chain, so branches stay separate and no
 heuristic picks a bubble path.
 
-The unitig FASTA files must be the same files passed to `pgr asm ovlp` (the
+The unitig FASTA files must be the same files passed to `anchr asm ovlp` (the
 `stem:name` prefixes are re-derived here and must match the PAF names).
 The PAF file is the first positional argument.
 
@@ -30,7 +30,7 @@ is the exact overlap with the previous step (0 for the first step).
 
 Examples:
 1. Layout overlaps from two k values:
-   pgr asm layout ovlp.paf k21.fa k51.fa -o layout.tsv
+   anchr asm layout ovlp.paf k21.fa k51.fa -o layout.tsv
 "###,
         )
         .arg(
@@ -38,7 +38,7 @@ Examples:
                 .num_args(1)
                 .index(1)
                 .required(true)
-                .help("Overlap PAF file (from pgr asm ovlp)"),
+                .help("Overlap PAF file (from anchr asm ovlp)"),
         )
         .arg(
             Arg::new("infiles")

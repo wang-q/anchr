@@ -262,8 +262,8 @@ fn flip_strand(s: char) -> char {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pgr::libs::nt::rev_comp;
     use crate::libs::olc::overlap::{find_overlaps, OverlapOptions};
+    use pgr::libs::nt::rev_comp;
 
     fn unitigs(names: &[&str], seqs: &[&str]) -> Vec<Unitig> {
         names

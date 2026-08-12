@@ -1,9 +1,9 @@
-use anyhow::Context;
-use clap::{value_parser, Arg, ArgMatches, Command};
 use crate::libs::asm::assemble::{assemble_unitigs_buf, AssembleOptions};
 use crate::libs::olc::consensus::consensus;
 use crate::libs::olc::layout::build_layouts;
 use crate::libs::olc::overlap::{filter_contained, find_overlaps, OverlapOptions, Unitig};
+use anyhow::Context;
+use clap::{value_parser, Arg, ArgMatches, Command};
 use std::io::Write;
 use std::path::Path;
 
@@ -14,10 +14,10 @@ pub fn make_subcommand() -> Command {
         .after_help(
             r###"
 Runs the full OLC pipeline in memory: for every k in --kmer the reads are
-assembled into maximal unitigs (`pgr asm unitig` semantics), all unitigs are
-pooled as pseudo-reads, exact overlaps are found (`pgr asm ovlp`), layouts
-are built greedily (`pgr asm layout`), and each layout is stitched into a
-consensus contig (`pgr asm cns`). See notes/design/olc.md.
+assembled into maximal unitigs (`anchr asm unitig` semantics), all unitigs are
+pooled as pseudo-reads, exact overlaps are found (`anchr asm ovlp`), layouts
+are built greedily (`anchr asm layout`), and each layout is stitched into a
+consensus contig (`anchr asm cns`). See notes/design/olc.md.
 
 Unitigs are named `k<k>:unitig_<id>` so the per-k sets stay distinguishable
 and reproducible. Overlaps are exact (error-free unitigs), layouts stop at
@@ -25,17 +25,19 @@ ambiguous junctions and non-reciprocal edges, and no bubble heuristics are
 applied.
 
 Notes:
-* Input is 1 interleaved file or 2 paired files (same as `pgr asm unitig`)
+* Input is 1 interleaved file or 2 paired files (same as `anchr asm unitig`)
 * --keep-dir writes the intermediate unitigs/overlap/layout files for
-  debugging or for re-running the stage commands separately
+  debugging and inspection; the names there omit the `stem:` prefix that
+  the standalone ovlp/layout/cns commands derive, so they are not directly
+  re-runnable through those commands as-is
 * Output contigs are written longest-first with `>contig_<id>,len=...,cov=...`
   headers, 70-column wrapped
 
 Examples:
 1. Assemble a small metagenome with three k values:
-   pgr asm olc reads.fq.gz -o contigs.fa --kmer 21,51,81
+   anchr asm olc reads.fq.gz -o contigs.fa --kmer 21,51,81
 2. Keep the intermediates and raise the minimum contig length:
-   pgr asm olc R1.fq.gz R2.fq.gz -o contigs.fa \
+   anchr asm olc R1.fq.gz R2.fq.gz -o contigs.fa \
        --kmer 21,51,81 --min-contig-len 1000 --keep-dir stage/
 "###,
         )
@@ -50,7 +52,7 @@ Examples:
                 .short('k')
                 .num_args(1)
                 .default_value("21,51,81")
-                .help("Comma-separated k-mer lengths for the unitig sets"),
+                .help("Comma-separated k-mer lengths (1..=128) for the unitig sets"),
         )
         .arg(
             Arg::new("min_count_seed")
@@ -66,7 +68,7 @@ Examples:
                 .num_args(1)
                 .default_value("17")
                 .value_parser(value_parser!(usize))
-                .help("Seed k-mer length for overlap detection"),
+                .help("Seed k-mer length for overlap detection (1..=128)"),
         )
         .arg(
             Arg::new("min_overlap")
@@ -88,7 +90,7 @@ Examples:
             Arg::new("keep_dir")
                 .long("keep-dir")
                 .num_args(1)
-                .help("Directory for intermediate unitigs/ovlp/layout files"),
+                .help("Directory for intermediate unitigs/ovlp/layout files (for inspection)"),
         )
 }
 

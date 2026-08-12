@@ -1,6 +1,6 @@
+use crate::libs::asm::assemble::{assemble, AssembleOptions};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
-use crate::libs::asm::assemble::{assemble, AssembleOptions};
 use std::io::Write;
 
 /// Build the clap subcommand for contig.
@@ -33,19 +33,19 @@ Notes:
 
 Examples:
 1. Assemble contigs from corrected reads (anchr unitigs step):
-   pgr asm contig pe.cor.fa -o unitigs_K31.fasta --kmer 31
+   anchr asm contig pe.cor.fa -o unitigs_K31.fasta --kmer 31
 
 2. Assemble from paired-end reads (anchr 2_insert_size step):
-   pgr asm contig R1.fq.gz R2.fq.gz -o contigs.fasta
+   anchr asm contig R1.fq.gz R2.fq.gz -o contigs.fasta
 
 3. Raise the minimum contig length:
-   pgr asm contig in.fq -o out.fasta --min-contig-len 500
+   anchr asm contig in.fq -o out.fasta --min-contig-len 500
 
 4. Raise the seeding depth threshold (tadpole `mincountseed`):
-   pgr asm contig in.fq -o out.fasta --min-count-seed 5
+   anchr asm contig in.fq -o out.fasta --min-count-seed 5
 
 5. Drop low-coverage contigs (tadpole `mincoverage`):
-   pgr asm contig in.fq -o out.fasta --min-coverage 5
+   anchr asm contig in.fq -o out.fasta --min-coverage 5
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(

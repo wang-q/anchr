@@ -7,8 +7,8 @@
 
 use super::layout::Layout;
 use super::overlap::Unitig;
-use pgr::libs::nt::rev_comp;
 use anyhow::Result;
+use pgr::libs::nt::rev_comp;
 
 /// One consensus contig.
 #[derive(Debug, Clone, PartialEq)]
@@ -97,8 +97,8 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pgr::libs::nt::rev_comp;
     use crate::libs::olc::layout::LayoutStep;
+    use pgr::libs::nt::rev_comp;
 
     fn unitigs(names: &[&str], seqs: &[&str]) -> Vec<Unitig> {
         names

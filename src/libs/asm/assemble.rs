@@ -3,11 +3,11 @@
 use crate::libs::asm::tadpole::{
     argmax2, base_code, base_defined, number_to_base, second_highest_position, Kmer, TadpoleTable,
 };
+use anyhow::Result;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use pgr::libs::fq::qual::{from_phred, to_phred};
 use pgr::libs::kmer::key;
 use pgr::libs::nt::rev_comp;
-use anyhow::Result;
 use std::collections::HashSet;
 use std::io::Write;
 
