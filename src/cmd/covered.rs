@@ -1,7 +1,7 @@
 use clap::*;
 use indexmap::IndexSet;
-use crate::libs::coverage::Coverage;
 use pgr::libs::ds::IntSpan;
+use pgr::libs::runlist::{depth_at_least, depth_by_level};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
 
@@ -93,8 +93,9 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let is_base = args.get_flag("base");
     let is_mean = args.get_flag("mean");
 
-    // seq_name => tier_of => IntSpan
-    let mut res: HashMap<String, Coverage> = HashMap::new();
+    // seq_name => half-open intervals; seq_name => sequence length
+    let mut ivs_of: HashMap<String, Vec<(u32, u32)>> = HashMap::new();
+    let mut len_of: HashMap<String, u32> = HashMap::new();
     let mut index_of: IndexSet<String> = IndexSet::new();
     let mut seen: HashSet<(usize, usize)> = HashSet::new();
 
@@ -132,41 +133,41 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
                 continue;
             }
 
-            // first
-            if !res.contains_key(&f_id) {
-                let tiers = Coverage::new_len(coverage, ovlp.f_len);
-                res.insert(f_id.clone(), tiers);
-            }
-            res.entry(f_id.to_string())
-                .and_modify(|e| e.bump(ovlp.f_begin, ovlp.f_end));
+            // collect 1-based inclusive overlap intervals; pgr runlist takes
+            // half-open [s, e) so the +1 conversion happens in the helpers
+            ivs_of
+                .entry(f_id.clone())
+                .or_default()
+                .push((ovlp.f_begin as u32, ovlp.f_end as u32));
+            len_of.entry(f_id.clone()).or_insert(ovlp.f_len as u32);
 
-            // second
-            if !res.contains_key(&g_id) {
-                let tiers = Coverage::new_len(coverage, ovlp.g_len);
-                res.insert(g_id.clone(), tiers);
-            }
-            res.entry(g_id.to_string())
-                .and_modify(|e| e.bump(ovlp.g_begin, ovlp.g_end));
+            ivs_of
+                .entry(g_id.clone())
+                .or_default()
+                .push((ovlp.g_begin as u32, ovlp.g_end as u32));
+            len_of.entry(g_id.clone()).or_insert(ovlp.g_len as u32);
         }
     }
 
     //----------------------------
     // Output
     //----------------------------
-    let mut keys = res.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+    let mut keys = ivs_of.keys().map(|k| k.to_string()).collect::<Vec<String>>();
     keys.sort();
 
     for key in &keys {
         let mut _out_line = String::new();
+        let ivs = &ivs_of[key];
+        let len = *len_of.get(key).unwrap();
 
         if is_base {
-            let tiers = res.get(key).unwrap().uniq_tiers();
+            let tiers = depth_tiers(ivs, len, coverage);
             _out_line = base_lines(key, &tiers);
         } else if is_mean {
-            let tiers = res.get(key).unwrap().uniq_tiers();
+            let tiers = depth_tiers(ivs, len, coverage);
             _out_line = mean_line(key, &tiers);
         } else {
-            let intspan = res.get(key).unwrap().max_tier();
+            let intspan = depth_at_least(ivs, coverage as u32);
 
             if !is_longest || intspan.span_size() <= 1 {
                 _out_line = format!("{}:{}", key, intspan);
@@ -181,6 +182,34 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Per-depth tiers over 1-based inclusive overlap intervals, using the pgr
+/// sweep-line runlist. Depth is clamped to `max` and the `-1` (full-length)
+/// / `0` (uncovered) tiers are added, matching the former vendored
+/// `Coverage` semantics used by `--base` / `--mean`.
+fn depth_tiers(ivs: &[(u32, u32)], len: u32, max: i32) -> BTreeMap<i32, IntSpan> {
+    let half_open: Vec<(u32, u32)> = ivs.iter().map(|&(s, e)| (s, e + 1)).collect();
+    let by_level = depth_by_level(&half_open, 1);
+
+    let mut out: BTreeMap<i32, IntSpan> = BTreeMap::new();
+    let mut covered = IntSpan::new();
+    for (depth, is) in &by_level {
+        let depth: i32 = depth.parse().unwrap();
+        out.entry(depth.min(max)).or_default().merge(is);
+        covered.merge(is);
+    }
+
+    let mut zero = IntSpan::from_pair(1, len as i32);
+    zero.subtract(&covered);
+    out.insert(-1, IntSpan::from_pair(1, len as i32));
+    out.insert(0, zero);
+    // the vendored `Coverage` pre-filled every tier 1..=max; consumers index
+    // all of them (e.g. `mean_line` sums over `0..=max`)
+    for i in 1..=max {
+        out.entry(i).or_default();
+    }
+    out
 }
 
 fn base_lines(key: &str, tiers: &BTreeMap<i32, IntSpan>) -> String {

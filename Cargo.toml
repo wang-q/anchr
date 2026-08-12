@@ -46,6 +46,12 @@ path-clean = "1.0.1"
 [dev-dependencies]
 assert_cmd = "2.0.14"
 predicates = "3.1.0"
+criterion = "0.5.1"
+rand = "0.9"
+
+[[bench]]
+name = "covered_benchmark"
+harness = false
 
 [profile.release]
 lto = true
