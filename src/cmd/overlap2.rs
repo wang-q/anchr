@@ -139,7 +139,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     run_cmd!(info "==> Paths")?;
     run_cmd!(info "    \"anchr\"   = ${anchr}")?;
-    run_cmd!(info "    \"curdir\"  = ${curdir}")?;
+    run_cmd!(info "    \"curdir\"  = ${curdir:?}")?;
     run_cmd!(info "    \"workdir\" = ${workdir_str}")?;
 
     //----------------------------

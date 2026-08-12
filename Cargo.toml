@@ -17,25 +17,26 @@ name = "anchr"
 path = "src/anchr.rs"
 
 [dependencies]
-clap = { version = "4.5.21", features = ["cargo"] }
+clap = { version = "4.5.28", features = ["cargo"] }
 anyhow = "1.0.93"
 regex = "1.11.1"
 lazy_static = "1.5.0"
-itertools = "0.13.0"
-flate2 = "1.0.25"
+itertools = "0.14.0"
+flate2 = "1.1.8"
 
 tera = "1.20.0"
 intspan = "0.7.9"
 
 # data structure
-petgraph = "0.6.5"
+# petgraph matches pgr's 0.7.1. rustworkx-core was dropped: merge.rs used it
+# only for connected_components, now implemented locally as `weak_components`.
+petgraph = "0.7.1"
 layout-rs = "0.1.2"
-rustworkx-core = "0.14.2"
-indexmap = "2.0.0"
+indexmap = "2.13.0"
 
 which = "7.0.0"
 tempfile = "3.14.0"
-cmd_lib = "1.9.5"
+cmd_lib = "1.9.6"
 path-clean = "1.0.1"
 
 bio = "0.30.1"
@@ -43,8 +44,8 @@ bio = "0.30.1"
 [build-dependencies]
 
 [dev-dependencies]
-assert_cmd = "2.0.12"
-predicates = "3.0.3"
+assert_cmd = "2.0.14"
+predicates = "3.1.0"
 
 [profile.release]
 lto = true

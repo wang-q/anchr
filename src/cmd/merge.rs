@@ -3,7 +3,7 @@ use clap::*;
 use cmd_lib::*;
 use petgraph::prelude::*;
 use petgraph::*;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::env;
 use tempfile::Builder;
 
@@ -88,7 +88,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     run_cmd!(info "==> Paths")?;
     run_cmd!(info "    \"anchr\"   = ${anchr}")?;
-    run_cmd!(info "    \"curdir\"  = ${curdir}")?;
+    run_cmd!(info "    \"curdir\"  = ${curdir:?}")?;
     run_cmd!(info "    \"tempdir\" = ${tempdir_str}")?;
 
     //----------------------------
@@ -219,7 +219,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let topo_sorted = algo::toposort(&graph, None).unwrap();
     let mut merge_of = BTreeMap::new();
     let mut serial = 1;
-    let wccs = rustworkx_core::connectivity::connected_components(&graph);
+    let wccs = weak_components(&graph);
     for wcc in wccs.iter() {
         let pieces: Vec<&str> = wcc.iter().copied().collect();
         if pieces.len() < 2 {
@@ -313,6 +313,42 @@ fn g2gv(g: &GraphMap<&str, i32, Directed>, file: &str) -> anyhow::Result<()> {
     layout::core::utils::save_to_file(&format!("{}.svg", file), &content)?;
 
     Ok(())
+}
+
+/// Weakly connected components of a directed graph (edges traversed both ways).
+///
+/// Replaces `rustworkx_core::connectivity::connected_components` so the
+/// rustworkx-core dependency can be dropped; petgraph only counts components
+/// without grouping nodes.
+fn weak_components<'a>(graph: &DiGraphMap<&'a str, i32>) -> Vec<HashSet<&'a str>> {
+    let mut discovered: HashSet<&str> = HashSet::new();
+    let mut components = vec![];
+
+    for start in graph.nodes() {
+        if !discovered.insert(start) {
+            continue;
+        }
+
+        let mut component = HashSet::new();
+        let mut stack = vec![start];
+        while let Some(node) = stack.pop() {
+            if !component.insert(node) {
+                continue;
+            }
+
+            let mut neighbors: Vec<&str> = graph.neighbors(node).collect();
+            neighbors.extend(graph.neighbors_directed(node, petgraph::Direction::Incoming));
+
+            for nb in neighbors {
+                if discovered.insert(nb) {
+                    stack.push(nb);
+                }
+            }
+        }
+        components.push(component);
+    }
+
+    components
 }
 
 // use std::io::{Read, Write};
