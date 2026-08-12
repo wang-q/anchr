@@ -456,3 +456,95 @@ usize 参数（`minlen`/`maxlength`/`force_trim_*`/`qtrim-window`/poly 阈值）
 改动涉及文件（`clean.rs`/`filter.rs`/`trim_adapter.rs` 及测试）无新增告警；全量
 `cargo test` 26 个测试二进制全部通过（含本轮新增回归测试）。`fq` 全命令族审核至此
 收敛，无再发现问题。
+
+---
+
+# 第九轮（2026-08-13）：`test_optimal`/`avg_quality` 质量索引越界
+
+第八轮之后对 `fq` 全命令族做下一轮纵深复核，重点复查 `clean`/`filter` 质量修剪
+路径中所有以质量值为索引访问固定长度概率表的位置，以及 `merge`/`norm`/`overlap`
+的质量索引。
+
+## 复核确认（安全不变量，经核验无需修复）
+
+- **`merge.rs` `probability` / `expected_mismatches`**：`aqual[i]`/`bqual[i]` 均
+  `.min(PROB_CORRECT4.len()-1)`（钳到 59）再索引 60 项表，越界安全；
+  `expected_tip_errors` 的 `limit` 由 `max_bases.min(quals.len())` 界定，索引
+  `bases[i]/quals[i]` 不越界。
+- **`norm.rs` `codes[b as usize]`**：`b` 为碱基字节 0..=255，`codes` 表按字节寻址，
+  安全；`cov[...]` 索引由 `covlast`/`above_limit` 边界保证。
+- **`trim_adapter.rs` `table[(kmer & 0xFF) as usize]`**：`0xFF` 掩码保证索引 0..=255，
+  不越界。
+- **`merge`/`ec-overlap` 的 `to_phred` 转换质量**：为 0..=93 的 phred 值，即便如
+  此 `probability`/`expected_mismatches` 仍钳到 59，双保险。
+
+## 修复的缺陷（根因模式）
+
+### Zero-Panic（质量索引越界）
+
+- **`test_optimal` / `avg_quality` 对 ≥128 的 phred 质量值索引越界 panic**：
+  `libs/fq/trim_adapter.rs` 中 `test_optimal`（`--qtrim rl` 的 bbduk testOptimal
+  路径）与 `avg_quality`（`--min-avg-quality` 路径）直接
+  `prob[q as usize]` / `prob[qual[i] as usize]` 索引 128 项错误概率表。`make_read_buf`
+  用 `q.saturating_sub(quality_base)` 得 phred 值，畸形/二进制输入的质量字节
+  （如 0xe1=225，减 33 后为 192）会越界 panic（debug 下崩溃），违反 Zero-Panic。
+  修复：两处改为 `q.min(127)` / `qual[i].min(127)`，与同文件 `expected_errors`
+  （line 906）及 `clump.rs:620` 的既有 `min(127)` 钳制一致；≥127 的 phred 质量
+  取表末项（约 0 错误概率），行为无崩溃。新增回归测试：
+  - `command_fq_clean_qtrim_high_quality_byte_no_panic`（`--qtrim rl` 走
+    `test_optimal`）
+  - `command_fq_clean_min_avg_quality_high_quality_byte_no_panic`（
+    `--min-avg-quality` 走 `avg_quality`）
+  两测试均以 0xe1 质量字节的原始 FASTQ 输入验证不再 panic。
+
+## 第九轮结论
+
+本轮新发现 `clean`/`filter` 质量修剪路径 `test_optimal`/`avg_quality` 对 ≥128
+phred 质量值的概率表索引越界（Zero-Panic 类别），已修复并含 2 个回归测试；其余
+`merge`/`norm`/`overlap`/`trim` 的质量索引经核验均已钳制或表寻址安全。全量 fq
+测试通过，`cargo fmt` clean，本次改动文件（`trim_adapter.rs`、`cli_fq_clean.rs`）
+在 `cargo clippy --all-targets` 下无新增告警。
+
+> 旁注（非 fq 范畴）：`tests/cli_asm_unitig.rs::command_asm_unitig_gfa_no_dangling_links`
+> 在全量串行运行下偶发失败（单独运行稳定通过），属 `asm` 命令 GFA 输出的非确定性
+> 悬空链接问题，应在 `asm` 审核中跟踪，与 `fq` 无关。
+
+---
+
+# 第十轮（2026-08-13）：独立交叉复核，收敛
+
+第九轮修复后，本轮用全新视角独立复核 `fq` 全命令族，并交叉核验外部审核提出的
+疑点。
+
+## 复核确认（疑点均排除，经核验无需修复）
+
+对独立审核提出的若干"疑似缺陷"逐条对照现行代码核验，全部为误报或已覆盖：
+
+- **`merge` 命令 `--buckets` 除零**：`merge` 命令无 `--buckets` 参数（分桶仅属
+  `clump`，其 `--buckets` 已在 execute 校验 `1..=4096`，见 `clump.rs:132-135`）。
+- **`clump` `--max-isoforms` / `sample` `--target` / `norm` `--min-count`**：这些参数
+  名在 fq 命令族中不存在（`sample` 用 `--bases` 且必填；`--min-count` 属 `s-filter`，
+  类型 u64 无除法）；grep 确认无此类参数、无 `.expect()` 调用。
+- **`ec-kmer` `-k` 无上界**：`tadpole::run` 统一校验 `1..=128`（`Kmer::MAX_K`），
+  超限友好报错，已覆盖。
+- **`bbnet::feed_forward` 索引越界 / i32→usize 溢出**：`parse` 校验 `dims.len()>=2`、
+  输入层 23、各层非空、权重维度一致；`feed_forward` 的 `values` 恒有 ≥2 层且末层非
+  空，`last()/first()` 均有保障。无 i32→usize 越界路径。
+- **`merge.rs` 库 `join_reads`/`corrected_pair` 空数组访问**：`process_pair` 对
+  `seq<2` 短读提前返回，切片均有 `.min()`/`saturating_sub()` 钳制，与第四轮结论一致。
+- **`extend` `.expect()` 非必填参数**：`el`/`er` 用 `unwrap_or(100)`，无 `expect()`。
+- **`to-fa`/`interleave` `-o` 覆盖输入**：两命令 `-o` 均有 `ensure_outfile_distinct`
+  保护（首轮/第四轮已就位）。
+
+## 结论
+
+本轮独立交叉复核未发现任何新的确定缺陷；外部审核提出的全部疑点均核实为误报或已
+被先前各轮覆盖修复。全部 fq 集成测试二进制（`cli_fq`、`cli_fq_clean`、
+`cli_fq_clump`、`cli_fq_ec_kmer`、`cli_fq_ec_overlap`、`cli_fq_extend`、
+`cli_fq_filter`、`cli_fq_merge`、`cli_fq_norm`、`cli_fq_range`、`cli_fq_sample`、
+`cli_fq_s_filter`、`cli_fq_split`、`cli_fq_trim_qual`）全部通过（含第九轮新增 2 个
+回归测试）；`cargo fmt` clean；本次改动文件（`trim_adapter.rs`、`cli_fq_clean.rs`）
+在 `cargo clippy --all-targets -- -D warnings` 下无新增告警。
+
+`fq` 全命令族审核至此收敛：第九轮修复 Zero-Panic（质量索引越界）后，第十轮未再
+发现新问题。

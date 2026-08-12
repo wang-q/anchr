@@ -18,6 +18,12 @@ fn write_temp(content: &str) -> tempfile::NamedTempFile {
     f
 }
 
+fn write_temp_bytes(content: &[u8]) -> tempfile::NamedTempFile {
+    let mut f = tempfile::Builder::new().suffix(".fq").tempfile().unwrap();
+    f.write_all(content).unwrap();
+    f
+}
+
 fn write_ref(content: &str) -> tempfile::NamedTempFile {
     let mut f = tempfile::Builder::new().suffix(".fa").tempfile().unwrap();
     f.write_all(content.as_bytes()).unwrap();
@@ -501,6 +507,67 @@ IIIIIIIIIIIIIIIIIIII
     assert!(text.contains("@r2\n"), "pair1 must survive: {text}");
     assert!(!text.contains("@r3"), "pair2 must fail mbq: {text}");
     assert!(!text.contains("@r5"), "pair3 must fail mcb: {text}");
+}
+
+#[test]
+fn command_fq_clean_qtrim_high_quality_byte_no_panic() {
+    // Zero-Panic regression: a quality byte >= 128 (here 0xe1 = 225) yields a
+    // phred value above 127 after offset subtraction, which used to index
+    // `test_optimal`'s 128-entry error-probability table out of bounds.
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"@r1\nACGTACGTACGTACGT\n+\n");
+    bytes.extend_from_slice(&[0xe1u8; 16]);
+    bytes.push(b'\n');
+    let file = write_temp_bytes(&bytes);
+    let out_dir = tempfile::tempdir().unwrap();
+    let out = out_dir.path().join("out.fq");
+    AnchrCmd::new()
+        .args(&[
+            "fq",
+            "clean",
+            file.path().to_str().unwrap(),
+            "--qtrim",
+            "rl",
+            "--trim-quality",
+            "15",
+            "--no-trim-by-overlap",
+            "--no-trim-pair-evenly",
+            "--max-ns=-1",
+            "--force-trim-mod",
+            "0",
+            "--minlen",
+            "0",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
+fn command_fq_clean_min_avg_quality_high_quality_byte_no_panic() {
+    // Zero-Panic regression: the same high quality byte must also not panic
+    // in `avg_quality` (reached via `--min-avg-quality`).
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"@r1\nACGTACGTACGTACGT\n+\n");
+    bytes.extend_from_slice(&[0xe1u8; 16]);
+    bytes.push(b'\n');
+    let file = write_temp_bytes(&bytes);
+    let out_dir = tempfile::tempdir().unwrap();
+    let out = out_dir.path().join("out.fq");
+    AnchrCmd::new()
+        .args(&[
+            "fq",
+            "clean",
+            file.path().to_str().unwrap(),
+            "--min-avg-quality",
+            "10",
+            "--max-ns=-1",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
 }
 
 #[test]

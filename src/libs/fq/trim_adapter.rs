@@ -952,7 +952,7 @@ fn test_optimal(read: &ReadBuf, trimq: f64, prob: &[f32; 128]) -> (usize, usize)
         let prob_error = if b == b'N' || q < 1 {
             nprob
         } else {
-            prob[q as usize]
+            prob[q.min(127) as usize]
         };
         let delta = avg_error_rate - prob_error;
         score += delta;
@@ -1206,7 +1206,7 @@ fn avg_quality(read: &ReadBuf, prob: &[f32; 128], max_bases: usize) -> f64 {
     let mut e = 0f32;
     for i in 0..limit {
         if is_fully_defined(read.seq[i]) {
-            e += prob[qual[i] as usize];
+            e += prob[qual[i].min(127) as usize];
         }
     }
     let p = e / limit as f32;
