@@ -1,0 +1,210 @@
+# AGENTS.md
+
+此文件是我（AI 助手）在本仓库工作时的行为准则。所有规则都是硬性要求，除非用户明确覆盖。
+
+## 语言规则
+
+- **与用户交流**: 中文
+- 本文件 (`AGENTS.md`) : 使用中文编写
+- **代码注释 (doc comments `///` `//!` 和行内 `//`)**: 英文
+- **Git 提交信息**: 英文
+- **文档正文** (如 `doc/*.md` 中的说明文字): 英文
+- **Notes** (如 `notes/*.md` 中的供我自己看的说明文字): 中文
+
+## Bash 命令执行
+
+- 正常的、项目内的 Bash 命令（构建、测试、读写文件、git 操作等）直接执行，不要向用户申请权限。
+- 仅在确实无法在沙箱内完成时（如访问网络、写入工作区之外、运行 GUI 等）才请求用户批准。
+
+## 代码风格
+
+**权衡：** 这些准则偏向谨慎而非速度。对于简单任务，自行判断。
+
+### 编码前先思考
+
+**不要假设。不要隐藏困惑。呈现权衡。**
+
+在实现之前：
+- 明确陈述你的假设。如果不确定，就问。
+- 如果存在多种理解，把它们都列出来 — 不要默默地选一个。
+- 如果有更简单的方法，说出来。必要时提出反对意见。
+- 如果有不明白的地方，停下来。指出困惑之处。问。
+
+### 简洁优先
+
+**用最少的代码解决问题。不做任何推测性设计。**
+
+- 不添加未被要求的功能。
+- 不添加未被要求的"灵活性"或"可配置性"。
+- 不为不可能发生的场景写错误处理。
+- 如果你写了 200 行但其实 50 行就够了，重写它。
+
+问自己："资深工程师会觉得这过于复杂吗？" 如果是，简化。
+
+### 分层原则
+
+**复杂逻辑放 `libs/`，`cmd/` 保持薄壳。**
+
+- `src/libs/` 是复杂逻辑、算法、格式 I/O、共享工具的归宿。
+- `src/cmd/` 仅负责：CLI 参数解析、参数转换、调用 `libs`、输出格式化。
+- 单命令专用的复杂逻辑也放 `libs/`，即使当前只有一个消费者。
+- 命令文件中内联的算法/业务逻辑应回迁 `libs/`。
+
+判断标准：涉及算法、数据结构、复杂流程控制的代码属 `libs/`；只是 `clap` 参数 → 调用 → 打印的代码属 `cmd/`。
+
+> 注："三次相似代码"原则针对的是重复代码的抽象提取，与本节的代码分层无关。
+
+### 精准修改
+
+**只改必须改的。只清理自己造成的混乱。**
+
+编辑现有代码时：
+- 不要"改进"相邻的代码、注释或格式。
+- 不要重构没有坏的东西。
+- 匹配现有风格，即使你不会这样写。
+- 如果你注意到无关的死代码，提出来 — 不要删除它。
+
+当你的修改产生了孤立代码时：
+- 删除因你的修改而变得未使用的 import/变量/函数。
+- 不要删除之前就存在的死代码，除非被要求。
+
+检验标准：每一行改动都应该能追溯到用户的请求。
+
+### 目标驱动执行
+
+**定义成功标准。循环直到验证通过。**
+
+将任务转化为可验证的目标：
+- "添加验证" → "为无效输入写测试，然后让它们通过"
+- "修复 bug" → "写一个能复现它的测试，然后让它通过"
+- "重构 X" → "确保重构前后测试都通过"
+
+对于多步骤任务，陈述简要计划：
+```
+1. [步骤] → 验证: [检查]
+2. [步骤] → 验证: [检查]
+3. [步骤] → 验证: [检查]
+```
+
+强有力的成功标准让你可以独立循环。薄弱的标准（"让它能用"）需要不断澄清。
+
+### 必须遵守
+
+- 每个 PR / commit 跑 `cargo fmt` 和 `cargo clippy -- -D warnings`，clean 之后再提交
+- 公共 API (pub fn / pub struct / pub trait) 必须写 doc comment (英文，一行即可)
+- 不写冗余注释 — 如果函数名和类型签名已经说明了行为，不要画蛇添足
+- 用 `anyhow::Result<T>` 做函数返回值，`anyhow::bail!` / `anyhow::anyhow!` 构造错误
+
+### 禁止
+
+- 不要引入新依赖，除非用户明确要求
+- 不要为了"可能"的未来需求写抽象 — 三次相似代码出现之后再考虑提取
+- 不要写半成品实现 — stub / TODO 必须有明确的后续任务链接
+- 不要用 `unsafe`，除非有充分理由且用户同意
+- 不要写超过一行的 doc comment，除非是 trait 定义或复杂不变量
+- 不要反向兼容的 shim（rename `_vars`、re-export 旧类型等）
+
+## 项目概览
+
+**当前状态**: 活跃开发中 | **主要语言**: Rust
+
+**目录约定**: 任何被 `.gitignore` 完全忽略的目录，均仅作为参考资料，**不是本项目的一部分**。
+
+`anchr` (Assembler of N-free CHRomosomes) 是染色体级组装流程编排器。它提供 reads 处理
+（`fq`，从 pgr 迁移中）、组装（`asm`，从 pgr 迁移中）以及流程编排命令（overlap/merge/
+orient/template 等），配合 pgr 基础库（格式 I/O、Phred 编码、k-mer、PAF 解析）工作。
+
+## 构建命令
+
+### 构建
+
+```bash
+# 开发构建
+cargo build
+
+# 发布构建 (高性能)
+cargo build --release
+```
+
+### 测试
+
+```bash
+# 运行所有测试
+cargo test -- --test-threads=1
+```
+
+## 架构
+
+### 源代码组织
+
+- **`src/anchr.rs`** - 主程序入口，负责命令行解析和分发。
+    - 使用 `clap` 进行参数解析。
+    - 在 `main` 函数中注册所有子命令模块。
+- **`src/lib.rs`** - 库入口，导出模块。
+- **`src/cmd/`** - 命令实现模块。当前为顶层命令（`contained`、`merge`、`orient`、
+  `overlap`、`template`、`trim`、`unitigs` 等）；fq/asm 迁移按 pgr 组织方式增加
+  `fq/`、`asm/` 子目录。
+- **`src/libs/`** - 共享工具库和核心逻辑（当前 `overlap` 等；fq/asm/olc 业务迁移目标）。
+- **`templates/`** - 流程模板文件。
+- **`doc/`** - 用户面向命令文档。
+- **`notes/`** - 开发者面向笔记（中文）：`notes/design/`（设计稿/移植笔记）、
+  `notes/references/`（外部工具源码分析）、`notes/audit/`（代码审核记录）、
+  `notes/benchmarks/`（基准对比）。
+
+## 命令结构 (Command Structure)
+
+每个命令在 `src/cmd/` 下作为一个独立的模块实现，通常包含两个公开函数：
+
+1.  **`make_subcommand`**: 定义命令行接口。
+    -   返回 `clap::Command`。
+    -   使用 `.about(...)` 设置简短描述 (第三人称单数)。
+    -   推荐使用 `.after_help(...)` 提供详细帮助信息。
+2.  **`execute`**: 命令执行逻辑。
+    -   接收 `&clap::ArgMatches`。
+    -   返回 `anyhow::Result<()>`。
+
+### 关键依赖
+
+- **`clap`**: 命令行参数解析。
+- **`anyhow`**: 错误处理。
+- **`cmd_lib`**: shell 式命令编排（`run_cmd!`）。
+- **`petgraph`**: 图结构 (overlap/merge 图)。
+- **`indexmap`**: 保序 HashMap (名称→id 映射统一模式)。
+- **`intspan`**: 范围与绝对路径等共享工具。
+- **`bio`**: 序列 I/O。
+- **`tera`**: 模板渲染。
+- **`tempfile`**: 临时目录管理（流程命令在 tempdir 中运行）。
+
+## 开发工作流
+
+### 添加新命令
+
+1.  在 `src/cmd/` 下相应的类别目录中创建新文件 (或新建目录)。
+2.  在 `src/cmd/mod.rs` (或子目录的 `mod.rs`) 中声明该模块。
+3.  在 `src/anchr.rs` 中注册该子命令。
+4.  实现 `make_subcommand` 和 `execute`。
+5.  添加测试文件 `tests/cli_<command>.rs`。
+
+### 测试约定
+
+- 集成测试位于 `tests/` 目录下，文件命名为 `cli_<command>.rs`。
+- 测试数据通常放在 `tests/<command>/` 目录下。
+- 使用 `assert_cmd::cargo_bin("anchr")` 定位二进制文件，以兼容自定义构建目录。
+- 测试函数返回 `anyhow::Result<()>`（匹配现有 `tests/cli_*.rs` 风格）。
+- **稳定性原则 (Zero Panic)**: 任何用户输入（包括畸形数据、二进制文件）都不应导致
+  Panic。必须捕获所有错误并返回友好的错误信息。
+- **基准测试**: 性能优化（SIMD 化、热路径算法替换等改动现有性能敏感代码）必须先写
+  基准确定基线（`benches/`，使用 `criterion`）；功能性新功能只需正确性测试 + 吞吐
+  sanity check，不强制 criterion。
+
+## 帮助文本规范 (Help Text Style Guide)
+
+- **`about`**: Third-person singular (e.g., "Counts...", "Calculates...").
+- **`after_help`**: Uses raw string `r###"..."###`.
+    - **Description**: Detailed explanation.
+    - **Notes**: Bullet points starting with `*`.
+    - **Examples**: Numbered list (`1.`, `2.`) with code blocks indented by 3 spaces.
+- **Arguments**:
+    - **Input**: `infile` (single) or `infiles` (multiple).
+    - **Output**: `outfile` (`-o`, `--outfile`).
+        - Help: `Output filename. [stdout] for screen`.

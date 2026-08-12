@@ -13,19 +13,20 @@ jobs:
   linux-gnu:
     runs-on: ubuntu-latest
     steps:
-      - name: Show GLIBC
-        run: ldd --version
-      - name: Checkout sources
-        uses: actions/checkout@v4
-      - name: Setup Rust Toolchain for GitHub CI
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: hecrj/setup-rust-action@v1
         with:
-          rustflags: ""
-
+          rust-version: stable
+          targets: x86_64-unknown-linux-gnu
+      - uses: goto-bus-stop/setup-zig@v2
+      - name: Install cargo-zigbuild
+        run: cargo install cargo-zigbuild
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Build
-        run: cargo build --verbose --release
+        run: cargo zigbuild --verbose --release --target x86_64-unknown-linux-gnu.2.17
       - name: Create tarball
-        run: tar cvfz anchr.tar.gz target/release/anchr
+        run: tar cvfz anchr.tar.gz --transform 's|.*/||' target/x86_64-unknown-linux-gnu/release/anchr
         shell: bash
       - name: Upload binaries to releases
         uses: svenstaro/upload-release-action@v2
@@ -34,6 +35,7 @@ jobs:
           file: anchr.tar.gz
           asset_name: anchr-x86_64-unknown-linux-gnu.tar.gz
           tag: ${{ github.ref }}
+          overwrite: true
   macos:
     runs-on: macOS-latest
     steps:
@@ -49,14 +51,16 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: 10.12
         run: cargo build --verbose --release
       - name: Create tarball
-        run: tar cvfz anchr.tar.gz target/release/anchr
+        run: |
+          cd target/release
+          tar cvfz ../../anchr.tar.gz anchr
         shell: bash
       - name: Upload binaries to releases
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: anchr.tar.gz
-          asset_name: anchr-x86_64-apple-darwin.tar.gz
+          asset_name: anchr-aarch64-apple-darwin.tar.gz
           tag: ${{ github.ref }}
   windows:
     runs-on: windows-latest

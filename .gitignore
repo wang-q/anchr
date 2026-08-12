@@ -79,6 +79,8 @@ $RECYCLE.BIN/
 # IDE
 #----------------------------#
 .idea
+.vscode
+.trae
 
 #----------------------------#
 # This project
@@ -102,6 +104,24 @@ Cargo.lock
 *.sh
 *.tsv
 !*.tera.sh
+
+# mdBook output directory
+/book/
+
+# Coverage directory
+/coverage-*/
+/coverage_*/
+
+# Temporary markdown files
+*.tmp.md
+
+# Temporary git log and diff files
+git*.txt
+
+# Plots
+*.png
+summary.txt
+model.txt
 
 tests/trim
 tests/merge
