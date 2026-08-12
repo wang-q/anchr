@@ -17,6 +17,13 @@
   断裂，换取序列质量；k 从 mate 长度一直增到 insert size，兼顾 N50。
 - **确定性**：同输入（含 read 顺序）下输出 contig 的顺序/方向**确定**——
   依赖排序 + 稳定启发式，不依赖多线程调度（这点对 pgr 做字节级一致性很关键）。
+- **版本澄清**：本地 `SKESA-master/`（C++）实际是 **SKESA 2.5.1**
+  （`skesa.cpp:397` 的 `--version` 打印 `SKESA 2.5.1`）；而 Rust 移植
+  `skesa-rs-main/` 的 README 声称基于 **SKESA v2.4.0 / SAUTE v1.3.0 快照**
+  （commit `27caba2ed...`，2024-10-11，见 `README.md:5,141`），crate 自身版本
+  `0.2.2`（`Cargo.toml`）。即：仓库内 C++ 源码比 Rust 移植所依据的快照更新一档；
+  但 Rust CLI 的 about 文本也自报 "SKESA 2.5.1"（`cli.rs:58`，与更新的 C++ 对齐）。
+  对比语义时以 **2.4.0 快照**为准（README 明示），C++ 2.5.1 仅作行为参考。
 - **语言/构建**：
   - C++：Boost + gcc，`make`（NGS 版）/ `make -f Makefile.nongs`（文件版）；
     variant（`boost::variant<LargeInt<1>..LargeInt<16>>`）做运行时多精度 k-mer。

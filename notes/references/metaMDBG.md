@@ -151,7 +151,10 @@ pgr 的 `pl` 管道若多轮组装可参考。
 - 2-bit 编码（`DnaBitset`），`KmerModel` 滚动 k-mer；`EncoderRLE` 对 HiFi 做
   homopolymer 压缩（ONT 关）。
 - `MinimizerParser(_minimizerSize, _minimizerDensity, ...)`：默认
-  `--kmer-size 15`（cap ≤ 16），assembly density 0.005、correction 0.025。
+  `--kmer-size 15`（cap ≤ 16），assembly density 0.005、correction 0.025
+  （`AssemblyPipeline.hpp:117,125`）。**约束**：`--density-correction ≥
+  --density-assembly`，违反即打印 parser 并 `exit(0)`（`AssemblyPipeline.hpp:278-284`，
+  仅在 `--read-correction` 开启时校验）。
 
 ### 5.2 采样规则（FracMinHash 式"通用 minimizer"）
 
