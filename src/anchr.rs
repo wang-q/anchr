@@ -6,6 +6,10 @@ mod cmd;
 mod libs;
 
 fn main() -> anyhow::Result<()> {
+    // Default to `info` level so fq/asm progress messages remain visible by
+    // default, matching pgr; users can override via RUST_LOG.
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     let app = Command::new("anchr")
         .version(crate_version!())
         .author(crate_authors!())
@@ -13,11 +17,13 @@ fn main() -> anyhow::Result<()> {
         .propagate_version(true)
         .arg_required_else_help(true)
         .subcommand(cmd::anchors::make_subcommand())
+        .subcommand(cmd::asm::make_subcommand())
         .subcommand(cmd::contained::make_subcommand())
         .subcommand(cmd::covered::make_subcommand())
         .subcommand(cmd::dazzname::make_subcommand())
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
+        .subcommand(cmd::fq::make_subcommand())
         .subcommand(cmd::merge::make_subcommand())
         .subcommand(cmd::mergeread::make_subcommand())
         .subcommand(cmd::orient::make_subcommand())
@@ -55,6 +61,10 @@ Subcommand groups:
 
     // Check which subcomamnd the user ran...
     match app.get_matches().subcommand() {
+        // Reads processing (migrated from pgr)
+        Some(("fq", sub_matches)) => cmd::fq::execute(sub_matches),
+        // Assembly (migrated from pgr)
+        Some(("asm", sub_matches)) => cmd::asm::execute(sub_matches),
         // Dependence
         Some(("dep", sub_matches)) => cmd::dep::execute(sub_matches),
         // Download
@@ -79,8 +89,7 @@ Subcommand groups:
         Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
         Some(("template", sub_matches)) => cmd::template::execute(sub_matches),
         _ => unreachable!(),
-    }
-    .unwrap();
+    }?;
 
     Ok(())
 }

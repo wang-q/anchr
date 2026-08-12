@@ -1,11 +1,14 @@
 //! Subcommand modules for the `anchr` binary.
 
 pub mod anchors;
+pub mod args;
+pub mod asm;
 pub mod contained;
 pub mod covered;
 pub mod dazzname;
 pub mod dep;
 pub mod ena;
+pub mod fq;
 pub mod merge;
 pub mod mergeread;
 pub mod orient;
