@@ -1,6 +1,6 @@
 # quorum-1.1.2：基于 k-mer 计数的 read 纠错（源码分析）
 
-> 2026-08 整理，纯源码分析（`quorum-1.1.2/`）。quorum 是 Guillaume Marçais
+> 2026-08-13 整理，纯源码分析（`quorum-1.1.2/`）。quorum 是 Guillaume Marçais
 > 的 read 纠错工具，依赖 Jellyfish 2.0 的 k-mer 哈希计数；项目较老（源码
 > Copyright 2012，NEWS 仅 "Initial release 0.1.0"，无后续版本记录），但
 > **算法基础扎实**，是 pgr 未来做 read 纠错的主要参考。
@@ -80,6 +80,12 @@ reads 的错误 k-mer 不会膨胀计数。这是 quorum 与朴素计数最大�
 > pgr `libs/kmer` 的 canonical 2-bit 思路一致（一条 read 及其反向互补只贡献
 > 一个计数）。非 ACGT 碱基直接清零两个长度游标、跳过该位置（`not_dna`）。
 
+> 每个位置的**高质量标记**即 `add` 的第二个参数，传的是 `high_len >= k`
+> （`create_database.cc:84-85`）：`_qual >= qual_thresh`（= quorum.in 的
+> `min_q_char + min_quality`）的连续段长度 `high_len` 达 k 才记 1，否则 0。
+> 故「高质量 k-mer」指其 **k 个构成碱基全部通过质量阈值**；低质量 stretch 内
+> 的 k-mer 一律记为低质量。
+
 > **无锁并发计数**：`add` 走 `keys_->set()`（Jellyfish `large_hash::array`
 > 的原子探针 + reprobe）与 `vals_`（`atomic_bits_array<uint64_t>`）的 CAS 循环
 > （`mer_database.hpp:94-113`），多线程对同一共享哈希做原子自增、无需互斥锁。
@@ -97,7 +103,7 @@ reads 的错误 k-mer 不会膨胀计数。这是 quorum 与朴素计数最大�
 ### 3.2 `database_query`：只读 mmap 查询
 
 纠错阶段把 `.jf` 库 mmap（或整读），`operator[](mer)` 返回
-`(count, quality)`；`get_best_alternatives(m, counts[4], ucode, level)`：把 `m` 第 0 位替换为 A/C/G/T，逐个查询 canonical 计数，返回 4 个计数、最高质量等级（level）与命中数——**纠错的核心查询原语**。
+`(count, quality)`；`get_best_alternatives(m, counts[4], ucode, level)`：把 `m` 第 0 位替换为 A/C/G/T，逐个查询 canonical 计数，返回 4 个计数、最高质量等级（level）与命中数——**纠错的核心查询原语**。`ucode` 是「当前最高等级替代」的索引（最后一次写入 `counts` 的碱基 code）；返回 `count==1` 时 `ucode` 即唯一延续碱基、`counts[ucode]` 是其计数——`extend` 的 count==1 分支靠它做替换目标与 `prev_count` 更新（`error_correct_reads.cc:420`）。
 
 > 精确语义（`mer_database.hpp:303-329`）：`counts[]` **只含最高质量等级**的替代——遍历
 > A/C/G/T 时若遇到 quality 更高的替代，会把之前记录的低质量位置的 `counts[j]`（j<i）清零、
@@ -184,8 +190,11 @@ k 与 k/2）。输出日志：`pos:sub:from-to`、`pos:3_trunc`（3' 端）、
 - `homo_trim`（`--homo-trim`）：从 corrected read 末端向前扫描，逐位累计
   homopolymer 评分（`(same<<1)-1`：同碱基 +1、异 −1），记录累计最大值
   位置；**仅当最大评分 ≥ 阈值才在该位置截断**（否则不截）。
-- `contaminant`：可选 Jellyfish 污染库（需与主库同 k），命中即丢弃
-  （或 `--trim-contaminant` 截断）。
+- `contaminant`：可选 Jellyfish 污染库（需与主库同 k；注意 EC 端用
+  `binary_reader` 加载、要求 Jellyfish 二进制 dump 格式——README 所述传入
+  "fasta or fastq" 已过时），命中即丢弃（或 `--trim-contaminant` 截断）；
+  检查发生在 `find_starting_mer` 的每个 anchor 位置（`error_correct_reads.cc:618`）
+  与 `extend` 每个有效碱基移入 k-mer 之后（`error_correct_reads.cc:400-406`）。
 
 ### 4.5 k-mer 表示与方向抽象（`kmer.hpp` / `error_correct_reads.hpp`）
 
@@ -234,7 +243,7 @@ k 与 k/2）。输出日志：`pos:sub:from-to`、`pos:3_trunc`（3' 端）、
   计数、radix sort、rayon 并行）是**精确计数**路线；quorum/Jellyfish 是
   **哈希近似**路线（内存可控、自动扩容、带质量偏置）。pgr 目前**没有
   read 纠错功能**，但已有 `pgr fq norm`（`src/libs/fq/norm.rs` +
-  `src/cmd_pgr/fq/norm.rs`）：基于精确 KmerTable + minq 高质量过滤的
+  `src/cmd/fq/norm.rs`）：基于精确 KmerTable + minq 高质量过滤的
   **低深度 read 过滤**，正是 §6.1 所述"判定器"的现成雏形。
 - **可借鉴的算法点**（若 pgr 做纠错）：
   1. **质量加权计数**（高质量 k-mer 权重 3 起步、低质量不污染）——直接

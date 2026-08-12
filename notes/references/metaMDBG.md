@@ -1,6 +1,6 @@
 # metaMDBG（1.4）：minimizer-space de Bruijn 图宏基因组组装器（源码分析）
 
-> 2026-08 整理，纯源码分析（`metaMDBG-metaMDBG-1.4/`，版本 `1.4`）。metaMDBG 是
+> 2026-08-13 整理，纯源码分析（`metaMDBG-metaMDBG-1.4/`，版本 `1.4`）。metaMDBG 是
 > 面向**长而准的宏基因组 reads**（PacBio HiFi、Nanopore R10.4+）的组装器，论文
 > [High-quality metagenome assembly from long accurate reads with metaMDBG]
 > (Nature Biotechnology 2023)，作者 Gaëtan Benoit、Rayan Chikhi、Christopher
@@ -57,7 +57,8 @@ metaMDBG-metaMDBG-1.4/
 └── ext/                          # vendored: minimap2, spoa, htslib, TurboPFor
 ```
 
-> 源码总量约 8.3 万行（`wc -l src/*`），大头是 `Commons.hpp`、`CreateMdbg.cpp/hpp`、
+> 源码总量约 9.7 万行（`wc -l` 覆盖 `src/` 下全部 `.cpp/.hpp/.h`，含 `utils/`
+> 的 phmap/edlib/MurmurHash3），大头是 `Commons.hpp`（8378）、`CreateMdbg.cpp/hpp`、
 > `ProgressiveAbundanceFilter.hpp`、`ToBasespace2.hpp`、`ReadCorrection.hpp`。
 > 文件多、注释少（大量被注释的旧代码），核心算法集中在 ProgressiveAbundanceFilter
 > 与 ToBasespace2。
@@ -108,8 +109,12 @@ _lastK = Commons::computeLastK(_minimizerDensityAssembly, readStats._n50ReadLeng
    从各 cutoff 快照生成 `contigs.nodepath`。
 3. `toMinspaceContigs(...)`：把 nodepath 转回 minimizer 序列，写入
    `unitig_data.txt`（非 final）或 `contig_data_init.txt`（final）。
-4. 每轮结束时 `savePassData(k)`；非首轮 `dumpUnitigAbundances` 备份
-   `unitigGraph_prev.*` 并写 refined abundance。
+4. 每轮结束 `savePassData(k)` 把 `assembly_graph.gfa` + `parameters.gz` 备份到
+   `pass_k<k>/`（`AssemblyPipeline.hpp:1435`）。"unitig 反馈"的中间状态落盘：
+   `graph` 步在 k>firstK+1 时调 `computeNextUnitigGraph` 加载上一轮
+   `unitigGraph_prev.*`（`CreateMdbg.cpp:3744`）；`contig` 步写
+   `unitigGraph.nodes.refined_abundances.bin`（`GenerateContigs.hpp:764`），
+   供下一轮 `graph` 的 `loadRefinedAbundances`（`CreateMdbg.cpp:391`）复用。
 
 **k′ 的语义与长度换算**（`AssemblyPipeline::writeParameters`,
 `AssemblyPipeline.hpp:1479`）：multi-k 里的 `k` 是**一个 k′-min-mer 包含的
@@ -300,9 +305,10 @@ cutoff 倒序消费（见下）。
    → 分区内去重计数 → 合并（`KminmerCounter::partitionKminmers`，
    `CreateMdbg.hpp:3652`）。这是典型的"外排序式"大数据手法，pgr 若做超大
    数据集（如 `kmer count` 溢出内存）可参考分区+归并，而非一味加大内存。
-9. **内存驱动的批量分片**：toBasespace 用 `--max-memory`（`peakMemory/8`，
-   clamp `[1,100]`）决定 minimap2 一次读入多少 reads（`ToBasespace2.hpp:337`）——
-   峰值内存预算显式控制批大小。pgr 若加长读抛光，可把内存预算作为一等参数。
+9. **内存驱动的批量分片**：toBasespace 用 `--max-memory`（默认 8 GB，
+   `_maxMemoryGB/8`，clamp `[1,100]`）决定 minimap2 一次读入多少 reads
+   （`ToBasespace2.hpp:337`）——峰值内存预算显式控制批大小。pgr 若加长读抛光，
+   可把内存预算作为一等参数。
 
 > 结论：metaMDBG 对 pgr 的最大价值是**§6.3 的渐进丰度过滤**——它给出了
 > "不解析菌株气泡、用丰度逐级简化"的成熟实现，正好验证用户对气泡处理的直觉；
@@ -315,7 +321,7 @@ cutoff 倒序消费（见下）。
 
 1. **渐进丰度过滤 → unitig 覆盖度驱动的布局前过滤**：
    `ProgressiveAbundanceFilter::removeAbundanceNoQueue`
-   （`ProgressiveAbundanceFilter.hpp:2181`）：`t=1.1` 起步、`~10%` 步长、
+   （`ProgressiveAbundanceFilter.hpp:2183`）：`t=1.1` 起步、`~10%` 步长、
    每轮删 `abundance < t` 的 unitig 并 recompact 邻接——不是单阈值一刀切。
    pgr `asm unitig` 头部已带 `cov=`，v1 可在 `asm olc` 布局前按 unitig
    丰度多轮剔除（或给 `asm unitig` 加渐进 `--min-coverage` 模式）。

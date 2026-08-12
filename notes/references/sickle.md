@@ -1,6 +1,6 @@
 # sickle: 基于滑动窗口的 FASTQ 自适应质量修剪
 
-> 整理于 2026-08，源自对 `sickle-master/`（v1.33）源码的分析。目的：sickle 的滑动窗口质量修剪算法是 pgr `fq trim-qual`（`src/libs/fq/trim.rs`）中默认 `--method sliding` 的直接算法来源。本文分析 sickle 的滑动窗口自适应修剪算法、CLI 与配对逻辑，并记录 pgr 移植时的取舍与两者差异。`kseq.h` 等 I/O 基础设施仅作背景（pgr 用 noodles 已覆盖）。
+> 整理于 2026-08-13，源自对 `sickle-master/`（v1.33）源码的分析。目的：sickle 的滑动窗口质量修剪算法是 pgr `fq trim-qual`（`src/libs/fq/trim.rs`）中默认 `--method sliding` 的直接算法来源。本文分析 sickle 的滑动窗口自适应修剪算法、CLI 与配对逻辑，并记录 pgr 移植时的取舍与两者差异。`kseq.h` 等 I/O 基础设施仅作背景（pgr 用 noodles 已覆盖）。
 
 ## 1. 简介
 
@@ -57,7 +57,7 @@
 - **切点初始值**：`three_prime_cut = seq.l`（默认不切 3'）、`five_prime_cut = 0`、`found_five_prime = 0`（`sliding.c:41-43`）。若整个循环从未触发 3' 分支，`three_prime_cut` 保持 `seq.l`，即 3' 端不做任何修剪。
 - **3' 分支的守卫条件** `(found_five_prime == 1 || no_fiveprime)`（`sliding.c:93`）：当 `-x` 未开且 5' 从未找到时，3' 分支永不进入，循环滑完全长后由第 6 步 `found_five_prime == 0 && !no_fiveprime` 兜底丢弃——这正是"5' 未找到即丢弃"的实现机制。
 - **滑动用差分而非重算**：`window_total -= 首碱基; window_total += 新碱基`，O(1) 滑动整个窗口（`sliding.c:107-111`）。pgr 用相同的差分滑动实现。
-- **差分滑动的越界守卫**：加新碱基前先判 `window_start+window_size < qual.l`（`sliding.c:108`），最后一个窗口迭代对 `window_total` 的修改因无下一轮而实际未使用。pgr 的 `sliding_cut` 沿用了同一守卫（`trim.rs:175`）。
+- **差分滑动的越界守卫**：加新碱基前先判 `window_start+window_size < qual.l`（`sliding.c:108`），最后一个窗口迭代对 `window_total` 的修改因无下一轮而实际未使用。pgr 的 `sliding_cut` 沿用了同一守卫（`trim.rs:116`）。
 - **`seq.l` 与 `qual.l` 混用**：窗口大小与长度阈值取 `fqrec->seq.l`，而滑动循环上界用 `fqrec->qual.l`（`sliding.c:37,49,64`）。对规范 FASTQ 二者相等；pgr 的 `sliding_cut` 统一以 `qual.len()` 为准，无此混用。
 - **`window_start+window_size > qual.l` 作为"最后窗口"判定**：注意循环条件已是 `i <= qual.l - window_size`，故迭代内该条件实际恒为假（`qual.l - window_size + window_size > qual.l` 为假）。这是一段**冗余/死代码**（`sliding.c:92`），3' 修剪实际只由 `window_avg < qual_threshold` 触发。pgr 的 `sliding_cut` 移植时确实丢弃了该死条件（`trim.rs` 只保留 `avg < threshold`）。
 - **5' 切点是窗口内首个达阈值碱基，3' 切点是窗口内首个低于阈值碱基**：两者都返回**绝对位置**（基于原始序列），不是相对窗口偏移。
@@ -120,13 +120,13 @@ qual[five..three]
 
 ### 4.1 现状对比
 
-pgr 的 `fq` 命令目前已拥有 `to-fa`、`interleave`、`norm`、`range`、`sample`、`split`、`clean`、`filter`、`clump`、`trim-qual` 等子命令（`src/cmd_pgr/fq/mod.rs`）。其中 **`trim-qual`**（`src/cmd_pgr/fq/trim_qual.rs`，实现位于 `src/libs/fq/trim.rs`）正是本笔记主题：**按质量分数修剪**，且默认算法即 sickle 式滑动窗口。
+pgr 的 `fq` 命令目前已拥有 `to-fa`、`interleave`、`norm`、`range`、`sample`、`split`、`clean`、`filter`、`clump`、`trim-qual` 等子命令（`src/cmd/fq/mod.rs`）。其中 **`trim-qual`**（`src/cmd/fq/trim_qual.rs`，实现位于 `src/libs/fq/trim.rs`）正是本笔记主题：**按质量分数修剪**，且默认算法即 sickle 式滑动窗口。
 
 即：笔记最初撰写时"pgr 没有质量修剪功能"的现状已改变，sickle 填补的空白已由 `fq trim-qual` 实现。sickle 分析的价值从"未来移植参考"转为"对照 pgr 实际实现、澄清差异与取舍"。
 
 ### 4.2 pgr `fq trim-qual` 对 sickle 的移植与差异
 
-pgr `trim-qual` 核心 `sliding_cut`（`trim.rs:143`）忠实对齐了 sickle 的 `sliding_window`，但有以下差异：
+pgr `trim-qual` 核心 `sliding_cut`（`trim.rs:84`）忠实对齐了 sickle 的 `sliding_window`，但有以下差异：
 
 | 维度 | sickle | pgr `trim-qual` |
 | :--- | :--- | :--- |
@@ -146,15 +146,15 @@ pgr `trim-qual` 核心 `sliding_cut`（`trim.rs:143`）忠实对齐了 sickle �
 
 1. **短读窗口大小**：对读长 `<10bp`，sickle 把窗口取为**读段全长**，pgr 取 `max(1, n/10)=1`。对默认长度阈值 20 而言此类读段通常早已被丢弃，故实际影响有限，但语义并不完全一致。
 2. **配对保配策略**：sickle 的 `-M` 模式会把失败读段输出为单碱基 `N` 以保持记录数/配对。pgr `trim-qual` **未实现**此模式——双端仅一端通过时通过端写入 `--outfile-single`，两端都失败则直接丢弃，记录数不保持。pgr 的 `interleave` 等命令不与 `trim-qual` 联动补齐该行为。
-3. **质量校验时机（顺序）**：sickle 的"读长 < 长度阈值即丢弃"发生在任何质量读取之前（`sliding.c:49-54` 先于窗口初始化），短读根本不调用 `get_quality_num`，故无效质量的短读会被静默丢弃、不报错；pgr 的 `trim_interval` 却是先 `validate_quality`（`trim.rs:270`）再查长度阈值（`trim.rs:271`），即对即将被丢弃的短读也做质量校验并可能 `bail`。这是"零 panic + 友好报错"取向带来的严格化差异：pgr 对坏质量短读会报错，而 sickle 直接丢弃。
-4. **5' 切点内层回退**：sickle 的 5' 内层循环必能找到首个达阈碱基（`sliding.c:77-82`）；pgr 用 `.find(...).unwrap_or(window_start)`（`trim.rs:163-165`）补了一个**实际不可达**的默认回退（`avg >= threshold` 已保证窗口内至少一个达阈碱基）。两者结果等价，pgr 多出的 `unwrap_or` 是防御性写法。
+3. **质量校验时机（顺序）**：sickle 的"读长 < 长度阈值即丢弃"发生在任何质量读取之前（`sliding.c:49-54` 先于窗口初始化），短读根本不调用 `get_quality_num`，故无效质量的短读会被静默丢弃、不报错；pgr 的 `trim_interval` 却是先 `validate_quality`（`trim.rs:211`）再查长度阈值（`trim.rs:212`），即对即将被丢弃的短读也做质量校验并可能 `bail`。这是"零 panic + 友好报错"取向带来的严格化差异：pgr 对坏质量短读会报错，而 sickle 直接丢弃。
+4. **5' 切点内层回退**：sickle 的 5' 内层循环必能找到首个达阈碱基（`sliding.c:77-82`）；pgr 用 `.find(...).unwrap_or(window_start)`（`trim.rs:104-106`）补了一个**实际不可达**的默认回退（`avg >= threshold` 已保证窗口内至少一个达阈碱基）。两者结果等价，pgr 多出的 `unwrap_or` 是防御性写法。
 
 ### 4.3 值得借鉴的健壮性设计（pgr 已落实）
 
-1. **质量值越界即报错**（`sliding.c:21`）：不是静默裁剪。pgr 项目硬约束是"任何用户输入都不应 panic"，此处已落实为 `validate_quality` 返回 `anyhow` 错误（`trim.rs:245`），而非 sickle 的 `exit(1)`。
+1. **质量值越界即报错**（`sliding.c:21`）：不是静默裁剪。pgr 项目硬约束是"任何用户输入都不应 panic"，此处已落实为 `validate_quality` 返回 `anyhow` 错误（`trim.rs:186`），而非 sickle 的 `exit(1)`。
 2. **文件名去重校验**（`trim_paired.c:259,295`）：输入输出不可相同，防止覆盖输入——pgr `trim_qual::execute` 用 `ensure_outfile_distinct`（`trim_qual.rs:125`）及输出文件两两去重落实。
-3. **双端不匹配的容错**：文件长短不一时警告并只处理公共部分，不崩——pgr `run_paired` 用 `warn_pair_mismatch` 实现，只警告一次（定义于 `trim.rs:457`）。
-4. **`+` 行 header 丢弃**：输出统一为单个 `+`，避免嵌套 header 不一致——pgr `write_record` 保留原 name/comment 但 `+` 行固定输出（`trim.rs:296-313`）。
+3. **双端不匹配的容错**：文件长短不一时警告并只处理公共部分，不崩——pgr `run_paired` 用 `warn_pair_mismatch` 实现，只警告一次（定义于 `trim.rs:398`）。
+4. **`+` 行 header 丢弃**：输出统一为单个 `+`，避免嵌套 header 不一致——pgr `write_record` 保留原 name/comment 但 `+` 行固定输出（`trim.rs:237-254`）。
 
 ### 4.4 与 pgr 现有约束的差异点（移植取舍）
 
@@ -181,4 +181,4 @@ pgr `trim-qual` 核心 `sliding_cut`（`trim.rs:143`）忠实对齐了 sickle �
 
 ---
 
-*参考来源: [sickle GitHub](https://github.com/najoshi/sickle) | 本项目源码 `sickle-master/`（v1.33） | pgr `src/libs/fq/trim.rs` + `src/cmd_pgr/fq/trim_qual.rs`*
+*参考来源: [sickle GitHub](https://github.com/najoshi/sickle) | 本项目源码 `sickle-master/`（v1.33） | pgr `src/libs/fq/trim.rs` + `src/cmd/fq/trim_qual.rs`*

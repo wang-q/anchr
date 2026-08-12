@@ -1,6 +1,6 @@
 # fairy（fairy-prime）：FracMinHash 稀疏采样 + 宏基因组 coverage（源码分析）
 
-> 2026-08 整理，基于本地 `fairy-prime/`（v0.5.8，2024 Microbiome，
+> 2026-08-13 整理，基于本地 `fairy-prime/`（v0.5.8，2024 Microbiome，
 > bluenote-1577/fairy，从 sylph fork）。功能：多样本宏基因组 MAG binning
 > 的 contig coverage 计算，替代 all-to-all read alignment（BWA/minimap2），
 > 声称快 100-1000×。对应 pgr 语境：`pgr fq norm` 大数据量方案调研中
@@ -51,11 +51,16 @@
   而不是先编码成字节再哈希——这正是 pgr `libs/hash.rs::seq_fracminhash`（L650-656）
   刻意避免的（raw 2-bit 值结构化、需先 `.to_le_bytes()` 再 rapidhash）。
 - **哈希族混用**：fairy 有两套哈希：`mm_hash64`（u64→u64，采样用）+ 可逆版
-  `rev_hash_64`（seeding.rs:18，倒着逆推最终化步骤，源码有 `_get_kmer_identity`
-  死代码想反解 kmer）；另有 `mm_hash`（usize 版）+ `MMHasher`/`MMHashSet`
-  （types.rs:74-99，取自身为 `HashMap<K,V,MMBuildHasher>`）。**genome sketch 的
+  `rev_hash_64`（seeding.rs:18-52，逐步骤逆推 murmur 最终化以反解原始 kmer，
+  未被调用，属死代码）；另有 `mm_hash`（usize 版）+ `MMHasher`/`MMHashSet`
+  （types.rs:74-99，类型为 `HashMap<K,V,MMBuildHasher>`）。**genome sketch 的
   去重 set 用 murmur 系 `MMHashSet`（sketch.rs:401）**，而 **read 计数用
-  `FxHashMap`**——两类结构哈希族不一致，是 fairy 的既有实现细节。
+  `FxHashMap`**（字段声明的类型）——两类结构哈希族不一致，是 fairy 的既有实现
+  细节。注意：字段虽声明为 `FxHashMap`，但 `SequencesSketch::new`（types.rs:137）
+  与 `sketch_sequences_needle`（sketch.rs:798）新建表时用的是 `std HashMap::default()`
+  （默认 RandomState 哈希器），`from_enc`（types.rs:140）才真正构造 `FxHashMap`。
+  另有一处易混淆的死代码 `_get_kmer_identity`（contain.rs:1180），它按
+  `count==1` 的比例估计 read 的 kmer identity，与「反解 kmer」无关。
 - **采样**：`threshold = u64::MAX / c`；`hash < threshold` 才保留
   → 采样率 ≈ 1/c。默认 `c=50`（约 1/50，sylph 为 1/200）。
 - **滚动**：f 左移 2 位累积、r 右移 + 顶部补补链，与 pgr 现有滚动同构；
@@ -124,7 +129,11 @@
   2. `full_covs` = 未命中补 0 + 命中的 covs（≤max_cov）；
   3. λ：默认 `ratio_lambda` = `count(mode+1)/count(mode) × (mode+1)`，
      要求 ≥25 个命中、mode+1 存在、两侧计数 ≥ `min_count_correct`（默认 3）；
-     备选 `mme` / `nb`（矩估计二分）/ `mle`（零位 + Newton-Raphson）；
+     备选 `mme`（矩估计）/ `nb`（named `binary_search_lambda`）/ `mle`（零位 +
+     Newton-Raphson）；四种估计分别由**隐藏 CLI 开关** `--ratio` / `--mme` /
+     `--nb` / `--mle` 选择（cmdline.rs:103-110），并另有隐藏 `--no-ci`（关
+     bootstrap CI）与 `--no-adjust`（关 λ 校正，直接用 naive_ani，
+     cmdline.rs:111-114、contain.rs:868）；
   4. `final_est_cov` = λ（可估）| median<15 时 `geq1_mean_cov` | median。
 - **方差**：对 `full_covs` 前 95% 窗口算（`VAR_CUTOFF=10` 以下不剪）。
 - **CI**：100 次 bootstrap（`fastrand::seed(7)` 固定），5-95 分位，
@@ -210,8 +219,8 @@
 6. **fairy 不含 graph 构建、对 pgr `asm` 无直接借鉴**：它完全是「稀疏采样
    sketch → 计数 → 查询」这条丰度/覆盖度估计路线，**没有 de Bruijn 或任何图
    结构**（全库无图构建代码），也没有 error-correction。因此对 pgr 的
-   `asm`（OLC overlap-layout-consensus，`cmd_pgr/asm/{olc,ovlp,layout,contig}.rs`）
-   与 `fq` error-correction（`cmd_pgr/fq/ec_kmer.rs`、`ec_overlap.rs`）**没有
+   `asm`（OLC overlap-layout-consensus，`cmd/asm/{olc,ovlp,layout,contig}.rs`）
+   与 `fq` error-correction（`cmd/fq/ec_kmer.rs`、`ec_overlap.rs`）**没有
    可直接迁移的算法**——它们需要的是 kmer 深度 / 图 / 比对，而非稀疏采样。
    对 pgr 的借鉴价值在**稀疏采样 + 查询表**这一范式（对应 `dist frac/mash`），
    而非图算法。若要为 `fq ec` 找"重复去除/计数门控"的现成参考，fairy 的
@@ -249,3 +258,13 @@
   `_derep_if_reassign_threshold`、`_get_kmer_identity`、`_ani_from_lambda_moment`
   等均未被调用；本版本实际只走 `print_cov_matrix`（binning 矩阵）路径，
   abundance 输出功能整体未落地。
+- **`binary_search_lambda` 名为二分实为线性扫描**（inference.rs:26-99）：注释
+  掉的二分代码都在，实际用的却是 0..10000 步的均匀线性扫描找最优点（还带
+  `dbg!` 调试输出）；`nb` 路径即走此函数。
+- **更多死代码**：`MultGenomeSketch` 类型（types.rs:163）整文件无引用；
+  `PAIR_REGEX`（constants.rs:1）从未使用（与 `MAX_DEDUP_LEN` 同为死常量）；
+  `rev_hash_64`（seeding.rs:18）在 crate 内无调用；`sketch_genome` 合并版
+  （sketch.rs:443）亦无调用者（coverage 只用 `sketch_genome_individual`）。
+- **`contain` 恒走 pseudotax 的另一后果**：`_print_ani_result` 的
+  pseudotax 分支会 `.unwrap()` 取 `rel_abund`/`seq_abund`，但它们恒为 `None`；
+  若该死代码被启用，pseudotax 路径会直接 panic——目前它不被调用故无碍。

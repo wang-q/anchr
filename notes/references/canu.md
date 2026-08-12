@@ -1,6 +1,6 @@
 # Canu（2.3）：OLC 组装器源码分析（overlap / layout / consensus）
 
-> 2026-08-12 整理，纯源码分析（`canu-2.3/`，版本 2.3，GitHub `marbl/canu`）。
+> 2026-08-13 整理，纯源码分析（`canu-2.3/`，版本 2.3，GitHub `marbl/canu`）。
 > Canu 是 Celera Assembler r4587（`wgs-assembler`）的 fork，面向高噪声单分子
 > 长读（PacBio CLR/ONT）。**与 pgr 的关系**：不是要对 reads 做 OLC，而是用户
 > 的设计意图——**把不同 k 各自生成的 unitigs 当"伪 reads"，在 unitig 层做
@@ -31,14 +31,14 @@
 canu-2.3/src/
 ├── pipelines/canu.pl        # 总流水线（cor/obt/utg 三阶段调度）
 ├── meryl/                   # k-mer 计数（每阶段先统计 abundance，供 overlap/纠错用）
-├── overlapInCore/           # ★ Celera 经典 k-mer seed overlap（已降级）
+│   ├── overlapInCore/           # ★ Celera 经典 k-mer seed overlap（obt/utg 阶段默认，见 §3）
 │   ├── overlapInCore.C              # 入口 + 全局哈希表
 │   ├── overlapInCore-Build_Hash_Index.C   # 全 reads k-mer 建哈希索引
 │   ├── overlapInCore-Find_Overlaps.C      # ★ 滑窗查哈希 → 候选命中（Find_Overlaps:235）
 │   ├── overlapInCore-Process_String_Overlaps.C  # ★ 对角合并 → Myers 扩展（:581/:442）
 │   ├── edalign.C                   # Myers 位向量扩展（Extend_Alignment）
 │   └── overlapPair.C               # overlap 记录/质量
-├── mhap/                    # MHAP 2.1.3 jar + mhapConvert（默认 overlapper）
+├── mhap/                    # MHAP 2.1.3 jar + mhapConvert（correction 默认 overlapper；obt/utg 默认 ovl，见 §3）
 ├── bogart/                  # ★ unitigger（BOG，Celera 血统）
 │   ├── bogart.C                     # ★ 主流程（阶段标记见 §5）
 │   ├── AS_BAT_BestOverlapGraph.C    # ★ best edge 图（findInitialEdges:67）
@@ -76,15 +76,19 @@ canu-2.3/src/
 ```
 doCorrection(1144)  meryl → overlap(cor, mhap) → buildCorrectionLayouts →
                     filterCorrectionLayouts → generateCorrectedReads(falconConsensus)
-doTrimming(1165)    meryl → overlap(obt, mhap) → trimReads / splitReads
-doUnitigging(1179)  meryl → overlap(utg, mhap) → readErrorDetection →
+doTrimming(1165)    meryl → overlap(obt, ovl) → trimReads / splitReads
+doUnitigging(1179)  meryl → overlap(utg, ovl) → readErrorDetection →
                     overlapErrorAdjustment → unitig(bogart) → consensus(utgcns)
                     → generateOutputs
 ```
 
-- overlapper 默认全部 `mhap`（`canu.pl:125-127`）；`overlapInCore` 走
-  `ovlOverlapper=ovl`，`canu.pl:710-720` 有醒目的 `DO-NOT-USE` /
-  `LUDICROUSLY SLOW` 警告框（原笔记写 `:718`，实际是 710–720 的整块警告）。
+- overlapper 默认**并非三段全用 mhap**：`Defaults.pm:955-957` 设
+  `corOverlapper=mhap`、`obtOverlapper=ovl`、`utgOverlapper=ovl`（correction 用
+  MHAP，trimming/unitigging 用 overlapInCore）；只有 `-fast` 模式才把三段全设成
+  `mhap`（`canu.pl:125-127`）。`canu.pl:710-720` 有醒目的 `DO-NOT-USE` /
+  `LUDICROUSLY SLOW` 警告框，且**仅针对 `corOverlapper=ovl`**（correction 对
+  原始 reads 用 ovl 太慢；原笔记写 `:718`，实际是 710–720 的整块警告，
+  `Defaults.pm:160-163` 也解释了全局 `-overlapper=ovl` 被禁的原因）。
 - correction 是 Canu 相对 Celera 8 的新增阶段：Celera 8 直接用原始 reads
   做 overlap；Canu 先把每条 read 按 overlap 布局纠错成 consensus 再组装。
 - 每阶段按 `-canuIterationMax`（默认 1）可迭代重跑：各 `*Check` 子程序以
@@ -93,7 +97,10 @@ doUnitigging(1179)  meryl → overlap(utg, mhap) → readErrorDetection →
 
 ## 4. overlap 检测
 
-### 4.1 overlapInCore（Celera 经典，k-mer seed → 扩展）
+> 两种 overlapper 的分工（见 §3）：correction 阶段默认 MHAP；obt/utg
+> 阶段默认 overlapInCore（`ovl`）。以下分别描述。
+
+### 4.1 overlapInCore（Celera 经典，k-mer seed → 扩展；obt/utg 阶段默认）
 
 1. **建索引**（`Build_Hash_Index.C`）：所有 reads 的每个 k-mer 以 2-bit 编码滑窗
    哈希，存入哈希表 + check 位向量（`Hash_Check_Array` 快速排除）。
@@ -109,7 +116,7 @@ doUnitigging(1179)  meryl → overlap(utg, mhap) → readErrorDetection →
 pgr 把扩展步收成"整条精确相等"（无错误模型）。overlapInCore 的 k-mer 计数
 过滤、evalue 评分等错误率机制在 pgr 完美匹配路线下不需要。
 
-### 4.2 MHAP（默认）
+### 4.2 MHAP（correction 阶段默认；obt/utg 默认 overlapInCore，见 §3）
 
 - 二进制只有 `mhap-2.1.3.jar` + `mhapConvert.C`（MHAP 源码是独立仓库）。
 - 算法（Canu 论文 + MHAP 文档）：MinHash sketch + **自适应 k-mer 加权**
@@ -124,7 +131,7 @@ pgr 把扩展步收成"整条精确相等"（无错误模型）。overlapInCore 
 LOADING AND FILTERING OVERLAPS(491)  OverlapCache 按误差率/长度过滤
 BUILDING GREEDY TIGS(540)            BestOverlapGraph → ChunkGraph →
                                      populateUnitig 按 chunk 长度序 greedy 建 tig
-                                     optimizePositions(555) → splitDiscontinuous(566)
+                                     optimizePositions(560) → splitDiscontinuous(566)
                                      → detectSpurs(573)
 PLACE CONTAINED READS(589)           placeUnplacedUsingAllOverlaps(600) + 二次优化
 MERGE ORPHANS(624)                   孤儿并入（无相似度阈值）
@@ -155,8 +162,8 @@ GENERATE OUTPUTS(754)                findCircularContigs → setParentAndHang �
   `layout` 的"按 unitig 长度降序取种子"一致。
 - **repeat breaking**（`AS_BAT_MarkRepeatReads.C:973` `markRepeatReads`）：
   内部是证据驱动的一条流水线（每 tig）：
-  `annotateRepeatsOnRead:83`（从 AssemblyGraph 收集"外部 reads 对 tig 的 overlap"
-  → `mergeAnnotations:117`（按证据 read 折叠成 tig 坐标区间）
+  `annotateRepeatsOnRead:84`（从 AssemblyGraph 收集"外部 reads 对 tig 的 overlap"
+  → `mergeAnnotations:118`（按证据 read 折叠成 tig 坐标区间）
   → `discardSpannedRepeats`（被 tig 内 read 完整跨越的区间不算重复）
   → `mergeAdjacentRegions`（先外扩 `MIN_ANCHOR_HANG` 再合并相邻区间）
   → `findConfusedEdges`（找"confused edge"：某 read 的 best edge 落在重复区，
@@ -170,7 +177,7 @@ GENERATE OUTPUTS(754)                findCircularContigs → setParentAndHang �
 - **气泡**（`mergeOrphans` 第二遍，`bogart.C:639`）：按相似度阈值
   `similarityBubble` 合并平行路径——正是用户裁定"不处理"的那种启发式。
 
-### 5.1 关键参数默认值（`bogart.C:87-128`）
+### 5.1 关键参数默认值（`bogart.C:85-126`）
 
 > 注意：`bogart.C` 的 usage help 文本（`:376-423`）与代码实际默认值有**多处不符**
 > （help 文本过时），下表以代码默认值为准。
@@ -227,7 +234,7 @@ consensus 算法字符分发：
 
 | 环节 | Celera 8 经典 | Canu 2.3 | 结论 |
 |---|---|---|---|
-| overlap | `overlapInCore`（k-mer seed + Myers） | 默认 MHAP（MinHash + 自适应加权）；overlapInCore 保留但警告不用 | 重写，明显更好 |
+| overlap | `overlapInCore`（k-mer seed + Myers） | cor 默认 MHAP（MinHash + 自适应加权）；obt/utg 默认仍是 overlapInCore，cor 用 ovl 才警告不用（见 §3） | 重写，明显更好 |
 | correction | 无独立纠错 | correction 阶段（falconConsensus） | 新增 |
 | layout/unitig | BOGART unitigger | bogart（同源，头注 r4587） | 继承 + 维护，骨架未变 |
 | consensus | AS_CNS（multi-align + early exit） | utgcns（template stitch + edlib + POA-DAG + bestPath） | 重写，明显更好 |
@@ -322,9 +329,12 @@ unitigs 当"伪 reads"，直接在 unitig 层做 OLC 拼接**。
   查 `[bgnRefID, endRefID]` 的参考范围，处理完即释放下一块。→ pgr 的
   `asm ovlp` 目前把全部 unitigs 一次建索引（unitig 数远小于 reads），
   宏基因组数据量大时可参照此"分块建索引 + 滑窗查询"以控内存峰值。
-- **并行按块划分（`bogart.C:977-978` / `MarkRepeatReads` blockSize）**：
-  Canu 用 `tiLimit` 与线程数把 tig 分成近似均匀的块（`blockSize`），
-  repeat 检测等阶段按 tig 并行。pgr 用 rayon 按 unitig 并行，思路一致。
+- **并行按块划分的"半成品"（`AS_BAT_MarkRepeatReads.C:980`）**：Canu 在
+  `markRepeatReads` 里算了 `blockSize = (tiLimit < 100000*numThreads) ?
+  numThreads : tiLimit/99999`（`:980`），但**并未真正按 tig 并行**——bogart
+  目录下没有任何 OpenMP 指令，tig 循环（`:987`）是串行 `for`，`blockSize`
+  实为未用变量（原笔记误标 `bogart.C:977-978`，该文件仅 774 行，无此行）。
+  pgr 用 rayon 按 unitig 并行，思路更彻底。
 - **overlap 对称化**：`OverlapCache::symmetrizeOverlaps` 保证图边双向一致，
   避免 layout 方向歧义。pgr 的 `ovlp` 已通过 canonical 索引 + 双向验证
   天然对称（§8.5 第 4 条）。

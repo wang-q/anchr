@@ -1,9 +1,9 @@
 # SKESA / skesa-rs：de Bruijn 图短读组装器（源码分析）
 
-> 2026-08 整理，纯源码分析。SKESA（`SKESA-master/`，C++）是 NCBI 的微生物
+> 2026-08-13 整理，纯源码分析。SKESA（`SKESA-master/`，C++）是 NCBI 的微生物
 > 基因组 de-novo 短读组装器，论文 [SKESA: strategic k-mer extension for
 > scrupulous assemblies](https://doi.org/10.1186/s13059-018-1540-z)（Genome
-> Biology 2018）；`skesa-rs/` 是基于 SKESA v2.4.0 快照（commit
+> Biology 2018）；`skesa-rs/` 是基于 SKESA v2.4.0 / SAUTE v1.3.0 快照（commit
 > `27caba2`，2024-10-11）的**逐位忠实 Rust 移植**（henriksson-lab/rustification
 > 项目），并追求与 C++ 输出字节级一致。两者共享同一算法族，是 pgr 做
 > k-mer 计数 / de Bruijn 图遍历的**首选参考**。
@@ -62,8 +62,9 @@ Rust `src/` 同名对应：`concurrent_hash.rs`、`sorted_counter.rs`/
   `macro_rules! define_kmer_enum` 展开 16 个变体的全操作分派（`kmer.rs`）。
 - 关键操作：`revcomp`、`shl/shr`、`oahash`（SKESA 自定义哈希，`KmerOaHasher`
   复刻为 Rust `Hasher`）、`resize`（换精度，左截断/补零 + 顶字掩码）。
-- 变长 k-mer 用 `u64` 字数组；`<=32nt` 走 `Flat((u64,u64))`，多字走内联数组
-  保持缓存局部性。
+- 变长 k-mer 的 `LargeInt<N>` 一律内联存储为 `[u64; N]`（Rust `large_int.rs`）；
+  `Flat((u64,u64)) / 内联数组 / boxed` 的存储分级属于 `KmerCount::Storage`
+  （见 §3.3），并非 k-mer 编码本身。
 
 ### 3.2 并发 k-mer 计数（`concurrenthash.hpp` / Rust `concurrent_hash.rs`）
 
@@ -158,14 +159,17 @@ Rust `src/` 同名对应：`concurrent_hash.rs`、`sorted_counter.rs`/
 
 1. **建首图 @ min_kmer**（默认 21）；算 read 平均长、genome size 估计
    （从 k-mer histogram 的 `CalculateGenomeSize`）。
-2. **自动抬阈值**（`assembler.hpp:963-981`，Rust `assembler.rs:178-199`）：
+2. **自动抬阈值**（`assembler.hpp:963-981`，Rust `assembler.rs:177-198`）：
    若 coverage 过高，`new_min_count = coverage/50`、`new_max_kmer_count =
    coverage/10`，并 `remove_low_count` 剪枝。
 3. **GenerateNewSeeds → ImproveContigs**：`graph_digger` 保守组装出 seed contig
-   （jump=0 的保守版）；有 `--seeds` 则从种子扩展；`mark_previous_contigs`
-   标已用 k-mer，`assemble_contigs_with_visited` 找新种子（避开已组装区）。
+   （jump=0 的保守版，`ImproveContigs` 见 `assembler.hpp:713`）；有 `--seeds`
+   则从种子扩展；`ConverToSContigAndMarkVisited`（`assembler.hpp:730`）把上一轮
+   contig 用到的 k-mer 标为 visited，`GenerateNewSeeds`（`graphdigger.hpp:2871`，
+   Rust 对应 `assemble_contigs_with_visited`，`graph_digger.rs:154`）在已组装区
+   之外找新种子。
 4. **max_kmer 估计**：`max_kmer = read_len+1 - (max_kmer_count/avg_count)×(read_len-min_kmer+1)`，
-   clamp 到奇数（`assembler.rs:315-328`）。
+   clamp 到奇数（`assembler.rs:316-329`）。
 5. **paired-end 连接**：
    - `estimate_insert_size`（抽样 10000 对，用首轮图估 insert N50，clamp 到
      `MAX_KMER`）；`paired_insert_limit = 3×N50`。
@@ -174,7 +178,7 @@ Rust `src/` 同名对应：`concurrent_hash.rs`、`sorted_counter.rs`/
    - Rust `paired_reads.rs`：`connect_pairs` / `estimate_insert_size_full`。
 6. **clean reads**：`clean_reads` 把完全落在已组装 contig 内的 read 剔除
    （`cleanup_min_contig_len = max(max_kmer, paired_insert_n50)`，Rust
-   `assembler.rs:407`），防止陈旧 k-mer 污染下一轮 histogram。
+   `assembler.rs:408`），防止陈旧 k-mer 污染下一轮 histogram。
 7. **后续轮**：`max_kmer` 往上的每轮，用上一轮 contig 做"引导"，把未解重复区
    用更长 k 重连；`linked_contig.rs` 的 `ConnectFragments` 走连接链。
 8. 输出 contigs（`--min-contig` 默认 200 过滤），可选 GFA。

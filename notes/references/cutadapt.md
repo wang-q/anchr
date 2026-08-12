@@ -1,18 +1,18 @@
 # cutadapt: Mott/BWA 式质量修剪与接头去除
 
-> 整理于 2026-08，源自对 `cutadapt-main/`（v5.2, 2025-10-23）源码的分析。最初承接 [sickle.md](./sickle.md) 中"现代质量修剪算法对比"的结论——滑窗仍是默认，cutadapt 的 `-q` 提供了**唯一真正不同的算法方向**（Mott/BWA 累积质量法），故初稿聚焦**按质量分数修剪**，为 pgr 的 `fq trim-qual` 提供算法与 CLI 参考。后按需求补充了**接头（adapter）去除**的完整算法（indel-aware 半全局比对、多适配器匹配、修饰器与配对端处理），本文现同时覆盖质量修剪与接头去除两条主线。pgr 当前主要关心质量修剪，接头部分为算法参考。
+> 整理于 2026-08-13，源自对 `cutadapt-main/`（v5.2, 2025-10-23）源码的分析。最初承接 [sickle.md](./sickle.md) 中"现代质量修剪算法对比"的结论——滑窗仍是默认，cutadapt 的 `-q` 提供了**唯一真正不同的算法方向**（Mott/BWA 累积质量法），故初稿聚焦**按质量分数修剪**，为 pgr 的 `fq trim-qual` 提供算法与 CLI 参考。后按需求补充了**接头（adapter）去除**的完整算法（indel-aware 半全局比对、多适配器匹配、修饰器与配对端处理），本文现同时覆盖质量修剪与接头去除两条主线。pgr 当前主要关心质量修剪，接头部分为算法参考。
 
 ## 1. 简介
 
 `cutadapt`（Marcel Martin, 2011）是 FASTQ 预处理的事实标准工具，以**接头/引物去除**见长，同时提供质量修剪、长度过滤、poly-A 修剪、expected-errors 过滤等。
 
-- **质量修剪入口**：CLI 的 `-q, --quality-cutoff [5'CUTOFF,]3'CUTOFF`（见 [cli.py](file:///home/wangq/Scripts/pgr/cutadapt-main/src/cutadapt/cli.py#L268)）。
-- **核心实现**：`quality_trim_index`（[qualtrim.pyx](file:///home/wangq/Scripts/pgr/cutadapt-main/src/cutadapt/qualtrim.pyx#L22)），Cython 加速，单条读段 O(n)。
+- **质量修剪入口**：CLI 的 `-q, --quality-cutoff [5'CUTOFF,]3'CUTOFF`（见 [cli.py](file:///home/wangq/Scripts/anchr/cutadapt-main/src/cutadapt/cli.py#L268)）。
+- **核心实现**：`quality_trim_index`（[qualtrim.pyx](file:///home/wangq/Scripts/anchr/cutadapt-main/src/cutadapt/qualtrim.pyx#L22)），Cython 加速，单条读段 O(n)。
 - **算法来源**：注释明确说明与 **BWA 的 `bwa_trim_read`** 相同（`qualtrim.pyx:29-33`）。这与经典 Mott 算法同源（BWA `-q` 即 Mott 算法），累计和取最小。
 - **变体**：`nextseq_trim_index`（NextSeq polyG 暗循环）、`poly_a_trim_index`（poly-A/poly-T）、`expected_errors`（Edgar 2015 期望错误数）。
 - **接头去除主线**：见 §3——Cython 半全局比对器 `Aligner`（indel-aware、混合 cost/score）+ k-mer 预过滤 + 多适配器索引，配以 `AdapterCutter` 修饰器与配对端变体。
 
-> **范围说明 / 落地状态**：初稿时 pgr 的 `fq trim-qual` 还是设计提案；现已实现于 `src/cmd_pgr/fq/trim_qual.rs` + `src/libs/fq/trim.rs`，`quality_trim_index`（Mott/BWA 累积质量法）作为 `--method mott`，与继承自 sickle 的滑窗（`--method sliding`）并存。§5 已从"设计提案"改写为"已实现对照 + 剩余借鉴点"。
+> **范围说明 / 落地状态**：初稿时 pgr 的 `fq trim-qual` 还是设计提案；现已实现于 `src/cmd/fq/trim_qual.rs` + `src/libs/fq/trim.rs`，`quality_trim_index`（Mott/BWA 累积质量法）作为 `--method mott`，与继承自 sickle 的滑窗（`--method sliding`）并存。§5 已从"设计提案"改写为"已实现对照 + 剩余借鉴点"。
 
 ## 2. 核心算法：`quality_trim_index`（Mott/BWA 累积质量法）
 
@@ -62,13 +62,13 @@ return (start, stop)
 
 ### 2.3 三个变体（`qualtrim.pyx`）
 
-1. **`nextseq_trim_index`**（`--nextseq-trim`）：NextSeq 双色编码中"暗循环"（无颜色）通常被读成高质量 G，出现在读段 3' 端。算法与 `quality_trim_index` 的 3' 端相同，但把 **G 碱基的质量强制设为 `cutoff - 1`**（`qualtrim.pyx:107-108`），使其不贡献正累积，从而把 polyG 尾巴当低质量去掉。
+1. **`nextseq_trim_index`**（`--nextseq-trim`）：NextSeq 双色编码中"暗循环"（无颜色）通常被读成高质量 G，出现在读段 3' 端。算法与 `quality_trim_index` 的 3' 端相同，但把 **G 碱基的质量强制设为 `cutoff - 1`**（`qualtrim.pyx:107-108`）。效果与直觉相反：正常算法里高质量 G（`q >> cutoff`）会贡献强负值使 `s<0` 提前 break、从而把 G 尾**保住**；而把 G 的 `q` 设为 `cutoff-1` 后，每个 G 对累积和只贡献固定的 `+1`（`s += cutoff - (cutoff-1) = 1`），G 尾不再触发提前终止，累积和最大点落到 G 尾左缘，从而把 polyG 尾巴当低质量去掉。
 2. **`poly_a_trim_index`**（`--poly-a`）：poly-A/poly-T 尾巴检测，'A'(或'T') 得 +1，其他碱基 −2，累计 score 最大处为切点。错误率上限 0.2 的校验是**位置相关的**：5' 端（polyT head）为 `errors * 5 <= i+1`、3' 端（polyA tail）为 `errors * 5 <= n-i`（`qualtrim.pyx:147,161`），即错误按"当前已扫到的尾巴长度"而非整条读长计。长度 < 3 的尾巴忽略（`best_index < 3` → 0；`best_index > n-3` → n）。
 3. **`expected_errors`**（`--max-ee`）：用 Edgar et al. (2015) 公式从 Phred 质量计算期望错误数 `sum(10^(-Q/10))`，用于按总错误数过滤（非修剪）。C 实现 `expected_errors_from_phreds`（`qualtrim.pyx:15`）。
 
 ## 3. adapter 修剪算法：indel-aware 半全局比对
 
-cutadapt 的接头去除核心是一个 Cython 实现的**混合 cost/score 半全局比对器** `Aligner`（[_align.pyx](file:///home/wangq/Scripts/pgr/cutadapt-main/src/cutadapt/_align.pyx#L93)），配合 k-mer 预过滤（`KmerFinder`）与多适配器索引（`AdapterIndex`）。pgr 的接头去除走 BBDuk k-mer 路线（`clean --ref --k`），**未采用**本节算法，此处为算法参考。
+cutadapt 的接头去除核心是一个 Cython 实现的**混合 cost/score 半全局比对器** `Aligner`（[_align.pyx](file:///home/wangq/Scripts/anchr/cutadapt-main/src/cutadapt/_align.pyx#L93)），配合 k-mer 预过滤（`KmerFinder`）与多适配器索引（`AdapterIndex`）。pgr 的接头去除走 BBDuk k-mer 路线（`clean --ref --k`），**未采用**本节算法，此处为算法参考。
 
 ### 3.1 类层次：`Adapter` / `Match`（adapters.py）
 
@@ -128,7 +128,7 @@ cutadapt 的接头去除核心是一个 Cython 实现的**混合 cost/score 半�
 
 ### 3.5 k-mer 预过滤（_kmer_finder.pyx + kmer_heuristic.py）
 
-真正的 DP 比对前先做**可命中性检查** `KmerFinder.kmers_present()`（adapters.py:715 等）：对每条 adapter 生成一组"位置 → k-mer 集合"，要求 read 中至少一个 k-mer 出现在指定位置附近，否则直接判不匹配、跳过昂贵的 DP。`create_positions_and_kmers`（kmer_heuristic.py:118）按错误率把 adapter 分成若干段，每段取 `max_errors+1` 个互不重叠 chunk 作为必需 k-mer（例：AAAAATTTTT 允许 1 错时，AAAAA 或 TTTTT 至少一个必须存在）；front/back 适配器另加部分重叠的短 k-mer（`create_back_overlap_searchsets`）。k-mer 过长无法建索引时退回 `MockKmerFinder`（恒真，退化为纯 DP）。
+真正的 DP 比对前先做**可命中性检查** `KmerFinder.kmers_present()`（adapters.py:715 等）：对每条 adapter 生成一组"位置 → k-mer 集合"，要求 read 中至少一个 k-mer 出现在指定位置附近，否则直接判不匹配、跳过昂贵的 DP。`create_positions_and_kmers`（kmer_heuristic.py:120）按错误率把 adapter 分成若干段，每段取 `max_errors+1` 个互不重叠 chunk 作为必需 k-mer（例：AAAAATTTTT 允许 1 错时，AAAAA 或 TTTTT 至少一个必须存在）；front/back 适配器另加部分重叠的短 k-mer（`create_back_overlap_searchsets`）。k-mer 过长无法建索引时退回 `MockKmerFinder`（恒真，退化为纯 DP）。
 
 - **shift-and 位并行多模式匹配**（_kmer_finder.pyx）：`KmerFinder.kmers_present`（:170）把同一搜索位置的一组必需 k-mer **首尾相接拼进单个 64-bit 机器字**，每碱基占 1 位；`init_mask` 标记各 k-mer 的起点位、`found_mask` 标记终点位，再对 read 单遍跑 shift-and（`shift_and_multiple_is_present`，:241）：`R = (R<<1 | init_mask) & needle_mask[base]`，`R & found_mask` 非零即命中。多条 k-mer 同时检测，**O(read_len) 且常数极小**；总长超过 64 位时在 `__cinit__` 内层循环自动拆成多个 bitmask 分组（:131-149）。`needle_mask` 是 128 项查表（按 ASCII 值索引），IUPAC 兼容匹配通过 `_match_tables.matches_lookup` 预合并到位掩码里。对 pgr 以 k-mer 为中心的路线（如 `clean --k` 的 BBDuk 计数、`paf` k-mer 索引）是值得参考的位并行技巧——相比逐 k-mer `find()`，它把多模式匹配常数压到最低。
 
@@ -198,11 +198,11 @@ cutadapt 的 read 修饰器按**固定顺序**依次对 read 生效，`make_pipe
 
 ## 5. 对 pgr 的启示：`fq trim-qual` 与 `fq clean`
 
-> **落地状态**：pgr 的 `fq trim-qual` 已实现（`src/cmd_pgr/fq/trim_qual.rs` + `src/libs/fq/trim.rs`），本文 §2 的 `quality_trim_index` 以 `Method::Mott` 落地为 `--method mott`。本节从初稿的"设计提案"改写为"已实现对照 + 剩余借鉴点"。
+> **落地状态**：pgr 的 `fq trim-qual` 已实现（`src/cmd/fq/trim_qual.rs` + `src/libs/fq/trim.rs`），本文 §2 的 `quality_trim_index` 以 `Method::Mott` 落地为 `--method mott`。本节从初稿的"设计提案"改写为"已实现对照 + 剩余借鉴点"。
 
 ### 5.1 已落地：`mott_cut`（`libs/fq/trim.rs`）
 
-`Method::Mott` 在 `trim_interval`（`libs/fq/trim.rs:263`）中调用 `mott_cut`（`libs/fq/trim.rs:192`），与 Cython 版 `quality_trim_index` 逐行对应，约 30 行，仍是"单遍累积 + 局部最大"：
+`Method::Mott` 在 `trim_interval`（`libs/fq/trim.rs:204`）中调用 `mott_cut`（`libs/fq/trim.rs:133`），与 Cython 版 `quality_trim_index` 逐行对应，约 30 行，仍是"单遍累积 + 局部最大"：
 
 ```rust
 fn mott_cut(qual: &[u8], base: u8, cutoff_front: f64, cutoff_back: f64) -> (usize, usize) {
@@ -216,9 +216,9 @@ fn mott_cut(qual: &[u8], base: u8, cutoff_front: f64, cutoff_back: f64) -> (usiz
 
 - **int → f64**：cutadapt 的 `-q` 是整数 cutoff；pgr 的 `--qual-threshold` 是 `f64`，score 累积用 f64，阈值语义更宽（可给小数）。数值上等价于整数版。
 - **单阈值两端共用**：`trim_interval` 把 `--qual-threshold` 同时作为 front 与 back cutoff；`--no-fiveprime` 时 front 置 `0.0` 禁用 5' 修剪。**未实现** cutadapt 的 `5,3` 独立 cutoff（见 §5.3.1）。
-- **零 panic 校验**：`process_record` 先调 `validate_quality`（`trim.rs:245`），把质量字符限制在 `[base, base+93]`，越界即 `bail!` 报错——正是初稿 §5.4 的建议，已落实。
+- **零 panic 校验**：`process_record` 先调 `validate_quality`（`trim.rs:186`），把质量字符限制在 `[base, base+93]`，越界即 `bail!` 报错——正是初稿 §5.4 的建议，已落实。
 - **区间判定一致**：`start >= stop → (0,0)`；`trim_interval` 再按 `--length-threshold` 决定丢弃整条。
-- **`--polyg-right`（polyg_end, `trim.rs:227`）**：3' 端数连续 G 跑，达标才剪（见 §5.3.2 与 cutadapt 的差异）。
+- **`--polyg-right`（polyg_end, `trim.rs:168`）**：3' 端数连续 G 跑，达标才剪（见 §5.3.2 与 cutadapt 的差异）。
 
 ### 5.2 与滑窗共存（已实现）
 
@@ -230,7 +230,7 @@ CLI 已提供 `--method sliding`（默认）与 `--method mott`（`trim_qual.rs:
 2. **cutadapt 的 NextSeq polyG（`nextseq_trim_index`）未移植**：pgr 的 `--polyg-right`（`polyg_end`）是 **BBDuk 式简单实现**——从 3' 端数连续 G 跑，长度达标才剪；`fq clean` 的 `--trim-poly-g-right` 同理。cutadapt 则是把 G 的质量强制设为 `cutoff-1` 后**嵌入累积算法**，能处理"夹着少量错配/低质量非 G 段"的 G 尾。对"纯连续 G 尾"两者等价，对"含噪声的 G 尾"cutadapt 式更鲁棒。若 pgr 面向 NovaSeq/NextSeq 平台，可评估移植 nextseq 式。
 3. **poly-A 位置相关错误率（`poly_a_trim_index`）**：cutadapt 按"已扫到的尾巴长度"限制错误率（`errors*5 <= i+1` / `n-i`），比"整条按错误数"更精细；pgr `clean` 的 `--trim-poly-a` 走 BBDuk `trimpolyA`，语义不同。
 4. **`--max-ee` 期望错误数过滤未落地为独立选项**：pgr 的 `expected_errors`（`trim_adapter.rs:907`、`clump.rs:607`）是 BBTools 式（`sum(10^(-Q/10))`，`prob[128]` 查表），用于 dedup/clump 排序，**不是** cutadapt 的 Edgar 2015 用户级过滤。长读场景可把 `--max-ee` 作为 `fq filter` 的过滤选项参考。
-5. **`--quality-base` 可配置**：pgr 的 `--quality-base`（`33/64/auto`）比 cutadapt 更强——除显式覆盖外，还通过 BBDuk flip-flop 启发式（`detect_quality_base`, `trim.rs:88`）自动探测编码。
+5. **`--quality-base` 可配置**：pgr 的 `--quality-base`（`33/64/auto`）比 cutadapt 更强——除显式覆盖外，还通过 BBDuk flip-flop 启发式（`detect_quality_base`, `qual.rs`）自动探测编码。
 
 ### 5.4 与 `fq clean` 的关系（重要澄清）
 

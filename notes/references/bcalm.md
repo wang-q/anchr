@@ -1,6 +1,6 @@
 # bcalm (BCALM 2)：紧凑 de Bruijn 图构建（源码分析）
 
-> 2026-08 整理，纯源码分析（`bcalm/`，版本 `v2.2.3`）。BCALM 2 是
+> 2026-08-13 整理，纯源码分析（`bcalm/`，版本 `v2.2.3`）。BCALM 2 是
 > Rayan Chikhi 等人的紧凑 de Bruijn 图（compacted de Bruijn graph, cdBG）构建
 > 工具，ISMB 2016 / Bioinformatics 32(12): i201–i208。**后续更新**：用户补全了
 > `gatb-core` 子模块（`git submodule` 已检出到 `gatb-core/gatb-core/`），核心算法
@@ -22,12 +22,15 @@
   最后用 **union-find（UF）把各桶产出的单元片段 "glue" 拼成完整 unitig**，并
   用 `LinkTigs` 重算 unitig 间 `L:` 边。完整三段流水线见 §3。
 - **计数是精确的，不用 Bloom filter**：BCALM 2 的 k-mer 计数走 GATB 的 **DSK**
-  （磁盘外部排序），把每个 k-mer 的**精确出现次数**写进 `.h5`；全程**没有用到
-  Bloom filter**（`gatb-core/src` 下无任何 bloom 实现）。凡需要"过滤掉测序错误"
-  都是事后读 `.h5` 时按丰度阈值判定的，而不是靠近似集合去重。这一点与许多其它
-  k-mer 工具（如依赖 Bloom/`minhash` 近似的工具）形成鲜明对比，对 pgr 的意义：
-  `KmerTable` 的精确计数路线与 BCALM 2 一致，可借鉴其"先精确数、后按阈值过滤"的
-  解耦。
+  （`kmer/impl/SortingCountAlgorithm.hpp`，磁盘外部排序），把每个 k-mer 的**精确
+  出现次数**写进 `.h5`；凡需要"过滤掉测序错误"都是事后读 `.h5` 时按丰度阈值判定，
+  而不是靠近似集合去重。注意：GATB 库本身**自带 Bloom 实现**
+  （`tools/collections/impl/Bloom.{hpp,cpp}` 与 `kmer/impl/{BloomAlgorithm,
+  BloomBuilder,DebloomAlgorithm,DebloomMinimizerAlgorithm,LinearCounter}.cpp` 的
+  "dsk + bloom" 计数路线，供 bcalm1/Minia 风格使用），只是 BCALM 2 的计数**不走**
+  这套 Bloom 路径。这一点与许多其它 k-mer 工具（如依赖 Bloom/`minhash` 近似的
+  工具）形成鲜明对比，对 pgr 的意义：`KmerTable` 的精确计数路线与 BCALM 2 一致，
+  可借鉴其"先精确数、后按阈值过滤"的解耦。
 - **双链语义**：所有 k-mer 转 canonical 表示（k-mer 与其反向互补视为同一对象，
   RC 后只出现一次）；unitig 方向不保证跨 run 一致。
 - **输入输出**：`-in`（单文件或多文件列表 `ls -1 *.fastq > list_reads`）；
@@ -75,10 +78,14 @@ bcalm/
 ### 2.2 调度链（`GraphUnitigs.cpp` → `UnitigsConstructionAlgorithm.cpp`）
 
 `GraphUnitigsTemplate<span>::create()` 读参数并决定做哪几步：`do_bcalm`（bcalm2
-分桶压缩）、`do_bglue`（UF 拼接）、`do_unitigs`/`do_links`（LinkTigs 算边）。
+分桶压缩）、`do_bglue`（UF 拼接）、`do_links`（LinkTigs 算边；`do_unitigs` 只是
+"是否从未建过 cdBG"的状态判断 `!checkState(STATE_BCALM2_DONE)`）。
 `UnitigsConstructionAlgorithm::execute()` 依次调
 `bcalm2<>()` → `bglue<>()` → `link_tigs<>()`。可选 `-skip-bcalm`/`-skip-bglue`/
-`-redo-links`/`-skip-links`（`pufferize.py` 末尾就用到这些来只重算链接）。
+`-redo-links`/`-skip-links`（`pufferize.py` 末尾就用到这些来只重算链接）；另有
+`-redo-bcalm`/`-redo-bglue`（后者需先在 `bglue_algo.cpp` 打开
+`debug_keep_glue_files=true` 保留 glue 文件才能重跑）与 `-nb-glue-partitions`
+（覆盖 glue 分区数，`UnitigsConstructionAlgorithm.cpp:103-105` 读取）。
 
 ## 3. 三段流水线（真实算法，`gatb-core/.../bcalm2/`）
 
@@ -142,8 +149,10 @@ BCALM 2 把 cdBG 构建拆成三段：**分桶压缩（bcalm2）→ UF 全局拼
    一个 unitig 的端点 k-mer 并到同一等价类**。UF 结果镜像成 `ufkmers_vector`
    （32 位类号）。
 4. **按 UF 类分片**：把 glue 序列按 `ufclass % nbGluePartitions` 写进
-   `prefix.gluePartition.<i>`（`nbGluePartitions` = min(2000, max_open_files/2)，防文件
-   句柄超限）；无标记（`!found_class`）的序列直接作为最终 unitig 输出。
+   `prefix.gluePartition.<i>`（`nbGluePartitions = min(2000, getMaxFilesNumber()/2)`
+   ——代码里先取 `max_open_files = getMaxFilesNumber()/2` 再 `min(2000, max_open_files)`，
+   防文件句柄超限；可被 `-nb-glue-partitions` 覆盖）；无标记（`!found_class`）的
+   序列直接作为最终 unitig 输出。
 5. **逐片拼链**（线程池）：`determine_order_sequences` 用 `kmerIndex`（端点 k-mer →
    序列索引集合）从**链的端点**（无 `lmark` 或 `rmark` 的那端）出发，沿 `rmark`
    逐个找后继拼接成 `chain`（必要时 `revcomp` + 高位置 1 标记反链）；剩余未拼上的
@@ -151,7 +160,7 @@ BCALM 2 把 cdBG 构建拆成三段：**分桶压缩（bcalm2）→ UF 全局拼
    并在环处断开）。`glue_sequences` 按链顺序"砍掉后续序列首 k-mer"拼出最终序列。
 6. **写头**：`make_header` 输出 `LN:i:<len>` + `KC:i:<sum>`/`km:f:<mean>`（或
    `-all-abundance-counts` 的 `ab:Z:<...>`），写 `BufferedFasta`（自实现带互斥锁的
-   缓冲 FASTA 输出，`needs_consecutive_ids` 时补连续 ID）。
+   缓冲 FASTA 输出，定义于 `bglue_algo.hpp`，`needs_consecutive_ids` 时补连续 ID）。
 
 > 端点标记语义：glue 序列的 comment 前两字符是 `lmark rmark`（'1'/'0'）；凡
 > `lmark`/`rmark` 为 1 说明该端与桶 minimizer 不一致、**必然还有另一段要接**——
@@ -297,12 +306,12 @@ overlap 恰好构成类型 4 的镜像对——所以 overlap 天然满足双向
 **frequency-based minimizer 的实现**（`-minimizer-type 1`，默认）：DSK 计数阶段会
 额外统计每个 minimizer 的出现频率，存入 minimizers 组的 `minimFrequency`
 （`uint32[4^m]`，`bcalm_algo.cpp:321-326` 读出）。构造模型时传入
-`ComparatorMinimizerFrequencyOrLex`（`Model.hpp:910-977`），该比较器**优先比较
-minimizer 的观察频率，频率低的判为"更小"，频率相同再退回字典序**（`:964-966`）。
+`ComparatorMinimizerFrequencyOrLex`（`Model.hpp:911-978`），该比较器**优先比较
+minimizer 的观察频率，频率低的判为"更小"，频率相同再退回字典序**（`:965-967`）。
 这样选出的 minimizer 往往是**罕见（低重复）的 m-mer**，从而让各 minimizer 桶的
 k-mer 数更均匀——对 §3.1 的线程池逐桶压缩负载均衡有利（`minimizerMin/max` 宏也
 用同一比较器，`bcalm_algo.cpp:118-119`）。`-minimizer-type 0` 则纯按字典序比较
-（`ComparatorMinimizer`，`Model.hpp:901-905`）。
+（`ComparatorMinimizer`，`Model.hpp:902-906`）。
 
 **更大的 k**：源码编译时用 `cmake -DKSIZE_LIST="32 64 ... 320"` 指定 k 的
 倍数（只能 32 的倍数，必须含 32），运行时可用到列表最大值；中间值用更小的

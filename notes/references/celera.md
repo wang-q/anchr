@@ -1,11 +1,11 @@
 # Celera Assembler（wgs-8.3rc2）：原版 OLC 组装器源码分析
 
-> 2026-08-12 整理，纯源码分析（`wgs-8.3rc2/`，revision 4627，2015-05-24 发布，
+> 2026-08-13 整理，纯源码分析（`wgs-8.3rc2/`，revision 4627，2015-05-24 发布，
 > 即 CABOG / wgs-assembler）。与 `references/canu.md` 配套：Canu fork 自 Celera
 > **r4587**（更早），8.3rc2 是主干上更晚的 r4627——两条线随后分化。本文档记录
 > 原版 OLC（overlap → unitig → consensus → scaffold）结构，并逐组件与 Canu
 > 对照；pgr 视角沿用 canu.md §8 的设计意图（**多 k unitig 的 OLC 拼接**）。
-> **实现状态（2026-08-12）**：已落地为 `pgr asm ovlp`/`layout`/`cns`/`olc`
+> **实现状态（2026-08-13）**：已落地为 `pgr asm ovlp`/`layout`/`cns`/`olc`
 >  四命令（`design/olc.md`），§10 的"pgr 借鉴"列按实现结果更新。
 
 ## 1. 概况
@@ -75,7 +75,7 @@ wgs-8.3rc2/
   seed 查找（`merOverlapperSeedBatchSize`）+ 扩展（`merOverlapperExtendBatchSize`），
   直接用 meryl 计数过滤（mer overlapper 读 meryl，`:2567`）。
 - `unitigger`（`:688`）：**utg（默认，非 SFF）/ bog（SFF，Best Overlap Graph）/
-  bogart（AS_BAT）** 三选一；`getUnitigger()`（`:1387`）按 gkpStore 特征自动选
+  bogart（AS_BAT）** 三选一；`getUnitigger()`（`:1389`）按 gkpStore 特征自动选
   utg/bog。
 - 误差率参数族：`utgErrorRate`（BOG/UTG）、`utgGraphErrorRate`/`utgMergeErrorRate`
   （bogart）、`cgwErrorRate`（scaffold 合并）、`obtErrorRate`（finalTrim）。
@@ -135,13 +135,14 @@ mergeSplitJoin(469)         ★ merge=bubble pop、split=repeat/unique junction 
                               join=promiscuous unitig 连接
 extendByMates(477, 可选)     用 mate 扩展（-E）
 reconstructRepeats(486, 可选) 重建重复（-R）
-cleanup(499)                splitDiscontinuous(499) + placeContains(501) + promoteToSingleton(512)
+cleanup(499)                splitDiscontinuous(499) + placeContains(502) + promoteToSingleton(512)
 setParentAndHang(518) / 输出
 ```
 
-- **bubble/repeat 判定用覆盖度证据**（`AS_BAT_MergeSplitJoin.C:46-47`）：
+- **bubble/repeat 判定用覆盖度证据**（`AS_BAT_MergeSplitJoin.C:45-46`）：
   `SPURIOUS_COVERAGE_THRESHOLD=6`（非 unitig reads 覆盖 >6 才算 repeat 区）、
-  `ISECT_NEEDED_TO_BREAK=15`（确认 repeat junction 的最少 reads 数）——
+  `ISECT_NEEDED_TO_BREAK=15`（确认 repeat junction 的最少 reads 数，同文件
+  `REGION_END_WEIGHT=15` 在 repeat 区端点虚构的 intersections 数）——
   比 Canu 的相似度阈值更"证据驱动"。
 - 辅助程序：`splitUnitigs.C`、`markRepeatUnique.C`、`computeCoverageStat.C`、
   `classifyMates*.C`（mate 分类）、`petey.C`。
@@ -167,7 +168,7 @@ Canu 继承 **AS_BAT 血统**（头注 r4587），但：
 
 mate（paired-end）是原版 unitig/scaffold 的核心证据（Canu 长读版已全部删除）：
 
-- `classifyMates.C:32-71`（`cmWorker`）：对每个 mate 依次跑 **spur → chimera → BFS
+- `classifyMates.C:34-73`（`cmWorker`）：对每个 mate 依次跑 **spur → chimera → BFS
   → DFS → RFS → suspicious** 六层搜索，按 mate 间是否存在满意路径把 read 分为
   可接受/可疑，并对 innie/normal/anti/outtie 四向分别计数（`doSearchBFS/DFS/RFS/
   Suspicious`）。并行用 kmer 包的 `sweatShop` 线程池。
@@ -184,16 +185,20 @@ mate（paired-end）是原版 unitig/scaffold 的核心证据（Canu 长读版�
 
 1. **MA 构建**（`MultiAlignment_CNS.C`）：unitig 的 reads 按 overlap 的方向/
    hangs 把每条 read 的碱基（**beads**）对齐成 **columns**（`Column`/`Bead`/
-   `Fragment`/`MANode` 结构，`SeedMAWithFragment:357`）。
+   `Fragment`/`MANode`/`BaseCount` 结构，`SeedMAWithFragment:357`）。
    - 底层数据（`MultiAlignment_CNS_private.H`）：`Bead`（`soffset`/`foffset` +
-     `prev/next/up/down` 双向十字链，`frag_index`/`column_index`，`:208-217`）、
-     `Column`（`call` bead 指针 + `BaseCount count[]` 预聚合每列 4 碱基计数 +
-     `depth`，`:254-262`）、`Fragment`（含 `is_contained/container_iid/manode`
-     placement 元数据，`:228-244`）、`MANode`（若干列的集合，即一个 unitig 的
-     MA 原子，`:269-275`）。`BaseCount` 预聚合计数让逐列投票 O(1) 读取。
+     `prev/next/up/down` 双向十字链，`frag_index`/`column_index`，`:208-218`）、
+     `BaseCount`（`count[]` 预聚合每列 4 碱基计数 + `depth`，`:250-253`）、
+     `Column`（`call` bead 指针 + `base_count`，`:255-263`）、`Fragment`（含
+     `is_contained/container_iid/manode` placement 元数据，`:229-245`）、
+     `MANode`（若干列的集合，即一个 unitig 的 MA 原子，`:268-274`）。
+     `BaseCount` 预聚合计数让逐列投票 O(1) 读取。
 2. **逐列投票**（`BaseCall.C`）：`BaseCallQuality:84`（质量加权投票，
-   `cw[5]` consensus weight + QV）+ `BaseCallMajority:41`（简单多数），由
-   `GetMANodeConsensus`（`MultiAlignment_CNS.C:393`）调用。
+   `cw[5]` consensus weight + QV）+ `BaseCallMajority:41`（简单多数），由调度器
+   `BaseCall`（`BaseCall.C:455`，按 phasing/options 分流到两版）在 MA 精炼阶段
+   调用（`AbacusRefine.C:1171/1250`、`RefreshMANode.C:665/840`）；`GetMANodeConsensus`
+   （`MultiAlignment_CNS.C:393`，由 `unitigConsensus::generateConsensus`
+   `MultiAlignUnitig.C:1105-1118` 驱动）只是把已写入 call bead 的结果读出来。
    - `BaseCallQuality` 不只是多数：把某列 beads 按 **best allele / 其他等位基因 /
      guides（非 read 的 unitig 序列）** 三组分类（`BaseCall.C:118-144`），支持
      等位基因拆分（`split_alleles`）与 **SNP phasing**（`CNS_OPTIONS_DO_PHASING_
@@ -233,7 +238,7 @@ bestPath + min-coverage 修剪（为高噪声长读设计）。**pgr 完美匹�
 
 ### 9.2 gkpStore：read 数据库（`AS_PER/gkFragment.H`）
 
-- 三种 fragment 类型（`gkFragment.H:80-91`）：**Packed**（<256bp，
+- 三种 fragment 类型（`gkFragment.H:84-91`）：**Packed**（<256bp，
   `AS_READ_MAX_PACKED_LEN_BITS=8`）、**Normal**（≤2^18-1，
   `AS_READ_MAX_NORMAL_LEN_BITS=18`，`AS_global.H:220-227`）、**Strobe**（预留）。
   记录体用编译期位域打包，packed 型恰为 32bit，配 `#error ... size wrong`
@@ -265,18 +270,19 @@ bestPath + min-coverage 修剪（为高噪声长读设计）。**pgr 完美匹�
 - 库结构（`AS_OVS_overlapStore.H:34-78`）：`OverlapStoreInfo` 头 + 按 iid 的稀疏索引
   `OverlapStoreOffsetRecord`（`a_iid / fileno / offset / numOlaps`），按
   `numOverlapsPerFile` 切成多文件；`AS_OVS_readOverlapsFromStore` 先定位 offset 再顺序读。
-- 端判定辅助（`AS_OVS_overlap.H:271-319`）：由 `a_hang / b_hang / flipped` 组合推导
+- 端判定辅助（`AS_OVS_overlap.H:268-318`）：由 `a_hang / b_hang / flipped` 组合推导
   5'/3' 端与 contain/container——不存冗余标志，纯位运算。
 
 ### 9.4 tigStore：unitig/consensus 数据库（`AS_CNS/tigStore.C`）
 
 - 每条 unitig/contig 存为一个 **MultiAlign**（`MultiAlign.C`），dump 支持
-  `properties / frags / unitigs / consensus / layout / multialign / matepair /
-  sizes / coverage / thinoverlap / fmap` 12 种视图（`tigStore.C:34-45`）。其中
+  `properties / frags / unitigs / consensus / consensusGapped / layout /
+  multialign / matepair / sizes / coverage / thinoverlap / fmap` 12 种视图
+  （`tigStore.C:35-46`）。其中
   **layout** 视图即 read 在 contig 上的 placement（方向 + 坐标），是 pgr
   `asm layout` 输出的对应物。
 - BAT / CGW / consensus 各阶段读写同一 tigStore，靠 `unitig_status`
-  （`AS_UNIQUE / AS_NOTREZ / AS_SEP / AS_UNASSIGNED`，`tigStore.C:107-110`）与
+  （`AS_UNIQUE / AS_NOTREZ / AS_SEP / AS_UNASSIGNED`，`tigStore.C:107-111`）与
   `suggest_repeat` 标记推进。
 
 ### 9.5 BAT 内存 bank：FragmentInfo + OverlapCache
@@ -287,8 +293,11 @@ unitigger 把磁盘三库载入内存以提速（pgr `asm layout` 同款思路�
   `_fragLength / _mateIID / _libIID` + 每库 `_mean / _stddev`，
   `memoryUsage()` 自报 3×uint32/read。
 - `OverlapCache`（`AS_BAT_OverlapCache.H:119-184`）：overlap 内存堆，`BAToverlapInt`
-  位打包 **8B/条**（`AS_OVS_HNGBITS` hang + `AS_BAT_ERRBITS=7~12bit` erate +
-  flipped + b_iid，`:51-57`），工作态展开为 32B 的 `BAToverlap`。用 **memory-mapped
+  位打包 **默认 12B/条**（8B word + 4B `b_iid`；仅在 read 长度位 <13 时才用 8B 变体，
+  `:50` 注释 "12 bytes per overlap"）。字段为 `AS_OVS_HNGBITS` hang（各 19bit）+ `error`
+  `AS_BAT_ERRBITS`（`MIN 7 ~ MAX=AS_OVS_ERRBITS(12)`，`AS_BAT_OverlapCache.H:34-35`）
+  + `flipped` + `b_iid`（`:51-57` 为 12B 变体），工作态展开为 32B 的 `BAToverlap`（`:82-93`）。
+  用 **memory-mapped
   cache 文件**（`AS_BAT/memoryMappedFile.H`）避免重读 ovlStore；用 `_OVSerate→_BATerate`
   与 `_BATerate→error` 两张查找表做精度转换（`:179-180`）；带线程私有缓冲
   `OverlapCacheThreadData`。**位打包 + 查找表 + mmap 缓存**是 pgr 高性能内存表示的
@@ -332,7 +341,7 @@ unitigger 把磁盘三库载入内存以提速（pgr `asm layout` 同款思路�
   回来逐列多数投票即可，无需 Canu 的模板重比对。
 - 8.3rc2 已把 pbdagcon 列为可选 consensus，佐证"模板+DAG"是 Celera 主干演进
   方向——对 pgr 的意义仍是"只取 consensus 后半段"，不整套搬 OLC。
-- **实现映射（2026-08-12）**：`asm ovlp` = seed→verify 精确版；`asm layout`
+- **实现映射（2026-08-13）**：`asm ovlp` = seed→verify 精确版；`asm layout`
   = greedy best-edge + 互惠检查（连接端语义见 canu.md §8.5）；`asm cns`
   = 精确缝合（overlap 已对齐坐标，投票无增量，留 v1）。合成数据 30× 下
   contigs 全部为基因组精确子串；6× 低覆盖出现重复区环形错装（top2 repeat
@@ -346,17 +355,17 @@ unitigger 把磁盘三库载入内存以提速（pgr `asm layout` 同款思路�
 | overlap | `AS_OVL/OlapFromSeedsOVL.H:74/82` | `DEFAULT_KMER_LEN=9`、`EDIT_DIST_PROB_BOUND=1e-4` |
 | trimming | `AS_MER/merTrim.C` / `AS_OBT/finalTrim.C` | k-mer / overlap 修剪 |
 | unitig | `AS_BOG/BuildUnitigs.C` | BOG unitigger（utg/bog） |
-| unitig | `AS_BAT/bogart.C:416-519` | BOGART 主流程（placeContains:434/placeZombies:462/mergeSplitJoin:471/extendByMates:477/reconstructRepeats:488） |
-| unitig | `AS_BAT/AS_BAT_MergeSplitJoin.C:46-47` | bubble/repeat 覆盖度阈值 6/15 |
-| unitig | `AS_BAT/classifyMates.C:32-71` | mate 分类（spur/chimera/BFS/DFS/RFS/suspicious） |
+| unitig | `AS_BAT/bogart.C:416-519` | BOGART 主流程（placeContains:434/placeZombies:460/mergeSplitJoin:469/extendByMates:477/reconstructRepeats:486） |
+| unitig | `AS_BAT/AS_BAT_MergeSplitJoin.C:45-46` | bubble/repeat 覆盖度阈值 6/15 |
+| unitig | `AS_BAT/classifyMates.C:34-73` | mate 分类（spur/chimera/BFS/DFS/RFS/suspicious） |
 | unitig | `AS_BAT/AS_BAT_InsertSizes.H:30-52` | 每库 insert size mean/stddev |
 | read 库 | `AS_PER/gkFragment.H` | gkpStore（Packed/Normal/Strobe + clear range 17 档 + mate 方向） |
 | overlap 库 | `AS_OVS/AS_OVS_overlap.H` | ovlStore 位打包（OVL/OBT/MER/UNS + erate 12bit） |
 | overlap 库 | `AS_OVS/AS_OVS_overlapStore.H:34-78` | ovlStore 头 + 按 iid 稀疏索引 |
-| unitig 库 | `AS_CNS/tigStore.C:34-45` | tigStore / MultiAlign 12 种 dump 视图 |
-| 内存 bank | `AS_BAT/AS_BAT_OverlapCache.H:119-184` | BAToverlapInt 8B + mmap + erate 查找表 |
+| unitig 库 | `AS_CNS/tigStore.C:35-46` | tigStore / MultiAlign 12 种 dump 视图 |
+| 内存 bank | `AS_BAT/AS_BAT_OverlapCache.H:119-184` | BAToverlapInt 12B（+mmap + erate 查找表） |
 | consensus | `AS_CNS/BaseCall.C:41/84` | 多数/质量加权列投票 |
-| consensus | `AS_CNS/MultiAlignment_CNS.C:357/393` | MA 播种 / consensus 调用 |
-| consensus | `AS_CNS/MultiAlignment_CNS_private.H:208-275` | Bead/Column/Fragment/MANode 结构 |
+| consensus | `AS_CNS/MultiAlignment_CNS.C:357/393` | MA 播种 / consensus 结果读取 |
+| consensus | `AS_CNS/MultiAlignment_CNS_private.H:208-275` | Bead/Column/BaseCount/Fragment/MANode 结构 |
 | scaffold | `AS_CGW/AS_CGW_main.C` + `ScaffoldGraph_CGW.C` | mate 驱动 scaffold |
-| 流水线 | `AS_RUN/runCA.pl:688/820/1387` | unitigger/consensus 选择 |
+| 流水线 | `AS_RUN/runCA.pl:688/820/1389` | unitigger/consensus 选择 |

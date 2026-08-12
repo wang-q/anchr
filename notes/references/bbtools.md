@@ -1,6 +1,6 @@
 # BBTools: reads 处理与组装的主参考工具包
 
-> 整理于 2026-08，源自对仓库根 `BBTools-40.01/`（2026-02-11）源码的分析。
+> 整理于 2026-08-13，源自对仓库根 `BBTools-40.01/`（2026-02-11）源码的分析。
 > BBTools 是 fq/asm 迁移的主参考：`fq` 家族以 BBTools 39.38 逐字节核对
 > （golden 见 [audit-fq.md](../audit/audit-fq.md)），`asm` 家族对照 BBTools
 > tadpole（contig）与 bbmap `perfectmode`（map，见
@@ -24,8 +24,8 @@
 
 | 路径 | 内容 |
 | :--- | :--- |
-| `*.sh`（顶层 ~320 个） | 命令入口脚本，每个工具一个 `.sh` |
-| `current/` | Java 源码，按包组织（`clump/`、`jgi/`、`assemble/`、`map/`、`bbduk/` 等） |
+| `*.sh`（顶层 309 个） | 命令入口脚本，每个工具一个 `.sh` |
+| `current/` | Java 源码，按包组织（`clump/`、`jgi/`、`assemble/`、`align2/`、`bbduk/` 等） |
 | `resources/` | 参考数据（如 `lambda.fa.gz`，OLC 冒烟用） |
 | `jni/` | JNI 原生扩展（`BBMergeOverlapper.c`、`BandedAlignerJNI.c` 等，已禁用） |
 
@@ -41,11 +41,11 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [anchr-trim-replace.md](../de
 | bbnorm | `jgi.KmerNormalize` | `current/jgi/KmerNormalize.java` | `fq norm` |
 | reformat 降采样 | `jgi.ReformatReads` | `current/jgi/ReformatReads.java` | `fq sample` |
 | bbduk | `jgi.BBDuk`（39.38）/ `bbduk.BBDukS`（40.01） | `current/jgi/BBDuk.java`、`current/bbduk/` | `fq trim-adapter` / `fq trim` |
-| bbmerge / tbo/tpe | `jgi.BBMergeOverlapper.mateByOverlapRatio` | `current/jgi/BBMergeOverlapper.java` | `fq merge` / `fq overlap` |
+| bbmerge / tbo/tpe | `jgi.BBMerge`（委托 `BBMergeOverlapper.mateByOverlapRatio`） | `current/jgi/BBMergeOverlapper.java` | `fq merge` / `fq overlap` |
 | repair | `jgi.SplitPairsAndSingles rp` | `current/jgi/SplitPairsAndSingles.java` | `fq split` |
 | kmercountexact | `jgi.KmerCountExact` | `current/jgi/KmerCountExact.java` | k-mer 基础（留 pgr） |
 | tadpole | `assemble.Tadpole` | `current/assemble/Tadpole.java` | `asm contig`/`asm unitig`、`fq extend`/`fq ec-kmer` |
-| bbmap | `map.AbstractMapThread` | `current/map/AbstractMapThread.java` | `asm map`（`perfectmode`） |
+| bbmap | `align2.BBMap`（核心映射线程 `align2.AbstractMapThread`） | `current/align2/AbstractMapThread.java` | `asm map`（`perfectmode`） |
 
 ## 4. 已确认的关键语义要点
 
@@ -60,7 +60,9 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [anchr-trim-replace.md](../de
    array），k 无上限；逐字节一致需复刻其 `-Xmx` 相关内存语义，已文档化偏差
    （[fq-assemble.md](../design/fq-assemble.md)）。
 4. **bbmap perfectmode**：种子-验证、完美匹配（无错配无缺口）、`ambiguous=all`
-   语义在 `AbstractMapThread.java:1371` 确认（[asm-map.md](../design/asm-map.md)）。
+   语义在 `current/align2/AbstractMapThread.java:1371` 确认（`maxMismatches=
+   (PERFECTMODE||SEMIPERFECTMODE)?0:...`，另见 :810 门控"imperfect 不可完美映射"）
+   （[asm-map.md](../design/asm-map.md)）。
 5. **golden 数据**：`tests/bbtools/Lambda/`（`R1.2k.fq.gz`、`golden/` 等）是
    fq 逐字节对照的基准，随 fq 测试迁移批次从 pgr 迁入。
 
@@ -68,6 +70,8 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [anchr-trim-replace.md](../de
 
 - 39.38 → 40.01 的主要变化：`bbduk` 入口从 `jgi.BBDuk` 改为 `bbduk.BBDukS`；
   其余 7 个 trim 流水线工具的入口类不变（[anchr-trim-replace.md](../design/anchr-trim-replace.md) §4.2）。
+- 各 `*.sh` 在 launch 时除类名外还会硬编码默认参数，比对语义时应留意，如
+  `bbnorm.sh` 追加 `bits=32`、`bbmap.sh` 追加 `build=1 overwrite=true fastareadlen=500`。
 - `BBMergeOverlapper` 的 Java fallback 有 JNI 版本，anchr 侧用纯 Rust 移植，
   两版 JNI 均不采用。
 - 性能对照见 [bbtools-vs-anchr.md](../benchmarks/bbtools-vs-anchr.md)
