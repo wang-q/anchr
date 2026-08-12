@@ -108,5 +108,10 @@ cmp asm_layout    asm layout "$W/ovlp.paf" "$W/ut.fa" -o layout.tsv
 cp "$W/asm_layout.a/layout.tsv" "$W/layout.tsv"
 cmp asm_cns       asm cns "$W/layout.tsv" "$W/ut.fa" -o cns.fa
 
+# ---- batch 4: sam group (ihist / to-rg) ----
+printf '@HD\tVN:1.6\tSO:unknown\n@SQ\tSN:ut\tLN:1000\np1\t67\tut\t11\t255\t31M\t=\t31\t70\tACGT\tIIII\np1\t147\tut\t31\t255\t31M\t=\t11\t-70\tACGT\tIIII\np2\t67\tut\t101\t255\t31M\t=\t121\t70\tACGT\tIIII\np2\t147\tut\t121\t255\t31M\t=\t101\t-70\tACGT\tIIII\n' >"$W/in.sam"
+cmp sam_to_rg     sam to-rg "$W/in.sam"
+cmp sam_ihist     sam ihist "$W/in.sam"
+
 echo "PASS=$PASS FAIL=$FAIL"
 echo "workdir=$W"

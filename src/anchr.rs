@@ -32,6 +32,7 @@ fn main() -> anyhow::Result<()> {
         .subcommand(cmd::paf2ovlp::make_subcommand())
         .subcommand(cmd::quorum::make_subcommand())
         .subcommand(cmd::restrict::make_subcommand())
+        .subcommand(cmd::sam::make_subcommand())
         .subcommand(cmd::show2ovlp::make_subcommand())
         .subcommand(cmd::template::make_subcommand())
         .subcommand(cmd::trim::make_subcommand())
@@ -75,6 +76,7 @@ Subcommand groups:
         Some(("paf2ovlp", sub_matches)) => cmd::paf2ovlp::execute(sub_matches),
         Some(("covered", sub_matches)) => cmd::covered::execute(sub_matches),
         Some(("restrict", sub_matches)) => cmd::restrict::execute(sub_matches),
+        Some(("sam", sub_matches)) => cmd::sam::execute(sub_matches),
         // Overlaps - Daligner pipelines
         Some(("overlap", sub_matches)) => cmd::overlap::execute(sub_matches),
         Some(("orient", sub_matches)) => cmd::orient::execute(sub_matches),

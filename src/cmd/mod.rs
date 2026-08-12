@@ -17,6 +17,7 @@ pub mod overlap2;
 pub mod paf2ovlp;
 pub mod quorum;
 pub mod restrict;
+pub mod sam;
 pub mod show2ovlp;
 pub mod template;
 pub mod trim;
