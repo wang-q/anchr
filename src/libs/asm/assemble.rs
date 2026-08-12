@@ -311,12 +311,18 @@ pub fn assemble_unitigs<W: Write>(
         writeln!(out, "H\tVN:Z:1.0\tks:i:{}", opts.k)?;
     }
     let min_len = opts.resolved_min_contig_len();
+    // GFA segments below min_len are dropped, so an L edge may only reference
+    // a kept segment; otherwise the graph would dangle (zero-dangling policy).
+    let kept: Vec<bool> = unitigs.iter().map(|u| u.bases.len() >= min_len).collect();
     for (i, u) in unitigs.iter_mut().enumerate() {
         u.id = i;
         if u.bases.len() >= min_len {
             if opts.emit_gfa {
                 writeln!(out, "S\t{}\t{}", u.id, String::from_utf8_lossy(&u.bases))?;
                 for l in &links[i] {
+                    if !kept[l.to] {
+                        continue;
+                    }
                     writeln!(
                         out,
                         "L\t{}\t{}\t{}\t{}\t{}M",
@@ -327,16 +333,14 @@ pub fn assemble_unitigs<W: Write>(
                         opts.k.saturating_sub(1),
                     )?;
                 }
+            } else if opts.emit_links {
+                // Like the GFA `L` edges, the BCALM-style `L:` header entries
+                // must only reference kept unitigs (zero-dangling policy).
+                let kept_links: Vec<Link> =
+                    links[i].iter().filter(|l| kept[l.to]).copied().collect();
+                write_unitig(out, u, Some(&kept_links))?;
             } else {
-                write_unitig(
-                    out,
-                    u,
-                    if opts.emit_links {
-                        Some(&links[i])
-                    } else {
-                        None
-                    },
-                )?;
+                write_unitig(out, u, None)?;
             }
             stats.contigs_built += 1;
             stats.bases_built += u.bases.len() as u64;

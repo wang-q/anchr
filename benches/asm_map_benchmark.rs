@@ -45,6 +45,7 @@ fn bench_map(c: &mut Criterion) {
             outu: None,
             paired: false,
             max_reads: None,
+            parallel: 8,
         };
         b.iter(|| {
             let stats = map_files(refs(), read_paths(), &opts).unwrap();

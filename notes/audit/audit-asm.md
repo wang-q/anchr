@@ -189,11 +189,58 @@ asm 家族对照 BBTools tadpole（contig）、BCALM2/GATB `ograph.cpp graph3`
 
 第八轮结论：仅修正报告自身的一条行为描述不准确，无代码/文档缺陷，审核收敛。
 
+## 第九轮复核（`--links` 悬空引用 + 基准编译）
+
+本轮对 `unitig` 的零悬空策略做了 GFA / FASTA 两条输出路径的对称复核，并全量编译
+`--all-targets`（含 benches），发现两处新缺陷：
+
+- **`unitig --links`（bcalm FASTA 模式）悬空引用缺陷**：上一轮为 GFA 输出加
+  零悬空策略（`L` 边不引用被 `--min-contig-len` 丢弃的 segment），但同一循环里
+  FASTA `--links` 分支仍把 `links[i]` 原样写入 `L:+:<to>:<ori>` 头部条目，未过滤
+  被丢弃的 unitig id，导致头部引用不存在的 `unitig_<id>`——与 GFA 属同一类
+  悬空引用缺陷，只因 `command_asm_unitig_links_header` 测试用 `--min-contig-len 1`
+  （不触发丢弃）而未被覆盖。修复：在 `libs/asm/assemble.rs` 的 FASTA `--links`
+  分支用与 GFA 相同的 `kept` 过滤 `links[i]` 后再写入头部。回归
+  `command_asm_unitig_links_no_dangling`（bubble 数据 + 默认 `--min-contig-len`，
+  校验每个 `L:` 引用的 id 都存在于输出头部；已证实在修复前失败）。
+- **`benches/asm_map_benchmark.rs` 编译错误**：`MapOptions` 初始化缺 `parallel`
+  字段（`libs/map.rs` 的 `MapOptions` 新增了 `parallel` 而基准未补），`cargo
+  check --all-targets` 报 E0063。修复：补 `parallel: 8`（与 `map` 命令默认一致）。
+  编译通过。
+
+第九轮结论：`cargo fmt` 干净，`cargo clippy --all-targets` 无新增告警（仅存的
+`bases_in` 字段未读等为既有死代码告警，非本轮引入），`cargo test` asm 全部通过
+（cli_asm 11 + cli_asm_contig 9 + cli_asm_map 11 + cli_asm_olc 12 + cli_asm_unitig 11）。
+
+## 第十轮复核（零悬空策略闭环 + 全量回归）
+
+本轮对第九轮的两处修复做收敛复核，并对整个 asm 命令族做再扫描，未发现新缺陷：
+
+- **零悬空策略闭环确认**：`emit_links`/`emit_gfa` 仅在 `unitig` 命令暴露
+  （`cmd/asm/unitig.rs`），且两条输出分支（GFA `L` 边、FASTA `L:` 头部）均已用
+  同一 `kept` 过滤，无遗漏的悬空引用路径。`olc` 管线用 `min_contig_len: 0`
+  （自动 max(124, 2k)）做中间 unitig 过滤，overlap/layout/consensus 都在该已过滤
+  集合上运行，内部一致、无悬空风险。
+- **文档一致性**：`docs/asm.md` 中 `-k`/`--overlap-k` 的 `1..=128` 边界与
+  `contig`/`unitig`/`map`/`ovlp`/`olc` 帮助文本一致，无残留旧边界措辞。
+- **并行边界**：`map` 用 `parallel_arg_with_default("8")`（`value_parser`
+  1..=1024 强制）；`contig`/`unitig` 用 `parse_parallel_auto` 校验（auto/1..=1024）。
+  均无越界风险。
+- **边界/溢出复核**：`overlap.rs` 空 unitig 集合时 `seed_k` 归 0 → `ensure` 友好报错
+  不 panic；`consensus` 除零（seq.len()>=k）不可能；`layout` 坐标 `overlap_len<=prev_end`
+  防下溢；`tadpole.rs` 的 `min_prob` 滑动乘积对 >127 质量值做了 `min(127)` 钳制，
+  `extension_rollback` 用 `saturating_add`/`min` 防溢出。
+
+第十轮结论：经纵深复核（含第九轮修复的回归验证、全量 `cargo check --all-targets`
+编译与 54 个 asm 用例通过），未发现新的代码/文档缺陷，零悬空策略闭环、边界与
+溢出不变量健全，审核收敛。
+
 ## 结论
 
 `asm` 命令族审核完成（累计修复 5 类问题 + 4 处 `-o` 防护统一 + 1 处 `--keep-dir`
 文档修正 + 1 处 `--outm`/`--outu` 冲突防护 + 1 处 `--overlap-k` 上限校验 + 第七轮
 3 处：`map` 帮助单复数、`contig`/`unitig` 的 `-k` 上限帮助、`cns` 布局 id 连续性与
-巨型分配防护），经纵深复核收敛；与 BBTools/BCALM
+巨型分配防护 + 第九轮 2 处：`unitig --links` 悬空引用、`asm_map_benchmark.rs` 编译
+错误），经纵深复核收敛；与 BBTools/BCALM
 语义对拍、边界输入验证零 panic，`cargo fmt`/`clippy` 干净（asm 相关无新增告警），
 相关集成测试与 `cargo test --lib` 全部通过。

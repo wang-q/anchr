@@ -232,6 +232,71 @@ fn command_asm_unitig_gfa() {
     assert!(links >= 4, "links: {links}");
 }
 
+/// `--gfa` with the default `--min-contig-len` must not emit `L` edges to
+/// segments that were dropped by the length filter (dangling references).
+#[test]
+fn command_asm_unitig_gfa_no_dangling_links() {
+    // A bubble (P+X+S vs P+Y+S) yields a short unitig bounded by branches that
+    // shares endpoints with two longer unitigs; the short one is filtered out
+    // by min_len but must not leave dangling `L` targets.
+    let reads = [
+        "GAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATTGACTACGACGCGCTCATT",
+        "TGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATTGACTACGACGCGCTCATTCCCTTGTCGGAGAGTTATGGAACAAGGACGCTGTCTGAGACTAGA",
+        "TAACATACACGTCAGCACGAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATT",
+        "AGACAATTACATAACATACACGTCAGCACGAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCG",
+        "GTTAAGTAAGTGTGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATTGACTACGACGCGCTCATTCCCTTGTCGGAGAGTTATGGAACAAGGACGCTG",
+        "CCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATTGACTACGACGCGCTCATTCCCTTGTCGGAGAGTTATGGAACAAGGACGCTGTCTGAGACTAGAAGACAGATAGT",
+        "TTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCAAACTCCAGCGCGGTCAGTTCCATCACCCTAAGT",
+        "CAGCACGAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCA",
+        "GTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCAAACTCCAGCGCGG",
+        "GTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCAAACTCCAGCGCGGTCAGTTCCATCACCCTAAGTAACCGA",
+        "TACATAACATACACGTCAGCACGAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGA",
+        "CCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCAAACTCCAGCGCGGTCAGT",
+    ];
+    let out_dir = tempfile::tempdir().unwrap();
+    let infile = out_dir.path().join("bubble.fa");
+    let out = out_dir.path().join("out.gfa");
+    let mut fa = String::new();
+    for (i, r) in reads.iter().enumerate() {
+        fa.push_str(&format!(">r{i}\n{r}\n"));
+    }
+    std::fs::write(&infile, fa).unwrap();
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "31",
+            "--gfa",
+        ])
+        .assert()
+        .success();
+    let gfa = std::fs::read_to_string(&out).unwrap();
+    let mut segments = std::collections::HashSet::new();
+    for line in gfa.lines() {
+        if line.starts_with('S') {
+            segments.insert(line.split('\t').nth(1).unwrap().to_string());
+        }
+    }
+    let mut links = 0usize;
+    for line in gfa.lines() {
+        if !line.starts_with('L') {
+            continue;
+        }
+        links += 1;
+        // L: <from> <from_ori> <to> <to_ori> <cigar>.
+        let fields: Vec<&str> = line.split('\t').collect();
+        assert!(
+            segments.contains(fields[1]) && segments.contains(fields[3]),
+            "dangling L reference: {line}"
+        );
+    }
+    assert!(links > 0, "expected links between kept unitigs");
+}
+
 /// `--links` appends BCALM-style `L:` entries to FASTA headers.
 #[test]
 fn command_asm_unitig_links_header() {
@@ -271,6 +336,74 @@ fn command_asm_unitig_links_header() {
             .any(|f| f.starts_with("L:+:") || f.starts_with("L:-:"))
     });
     assert!(any_link, "no L: entries in headers");
+}
+
+/// `--links` with the default `--min-contig-len` must not emit `L:` header
+/// entries referencing unitigs dropped by the length filter (dangling refs,
+/// the FASTA counterpart of the GFA `L`-edge zero-dangling policy).
+#[test]
+fn command_asm_unitig_links_no_dangling() {
+    let reads = [
+        "GAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATTGACTACGACGCGCTCATT",
+        "TGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATTGACTACGACGCGCTCATTCCCTTGTCGGAGAGTTATGGAACAAGGACGCTGTCTGAGACTAGA",
+        "TAACATACACGTCAGCACGAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATT",
+        "AGACAATTACATAACATACACGTCAGCACGAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCG",
+        "GTTAAGTAAGTGTGATGCATACGCCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATTGACTACGACGCGCTCATTCCCTTGTCGGAGAGTTATGGAACAAGGACGCTG",
+        "CCTTTACTTGCTGTGTCCACCCCATCGGACTGGCATTTTTATTACACTCAGAAACAGAACATGCGTTCGCTCTATTGACTACGACGCGCTCATTCCCTTGTCGGAGAGTTATGGAACAAGGACGCTGTCTGAGACTAGAAGACAGATAGT",
+        "TTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCAAACTCCAGCGCGGTCAGTTCCATCACCCTAAGT",
+        "CAGCACGAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCA",
+        "GTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCAAACTCCAGCGCGG",
+        "GTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCAAACTCCAGCGCGGTCAGTTCCATCACCCTAAGTAACCGA",
+        "TACATAACATACACGTCAGCACGAAACTTGTTGGCCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGA",
+        "CCCAGTGTGAATCGCTTAAGGGTTAAGTAAGTGTGATGCATACGTCGGGTAATTTTGACAGGTCACGCAGAGGCGCGCCCTCCTGAAGTGCGTGGACACTCGCTATGAATCTCTGATTTACCCACTCTGCCAAACTCCAGCGCGGTCAGT",
+    ];
+    let out_dir = tempfile::tempdir().unwrap();
+    let infile = out_dir.path().join("bubble.fa");
+    let out = out_dir.path().join("out.fa");
+    let mut fa = String::new();
+    for (i, r) in reads.iter().enumerate() {
+        fa.push_str(&format!(">r{i}\n{r}\n"));
+    }
+    std::fs::write(&infile, fa).unwrap();
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "31",
+            "--links",
+        ])
+        .assert()
+        .success();
+    let recs = parse_fa(&std::fs::read(&out).unwrap());
+    let ids: std::collections::HashSet<String> = recs
+        .iter()
+        .map(|(h, _)| {
+            h.split(',')
+                .next()
+                .unwrap()
+                .trim_start_matches("unitig_")
+                .to_string()
+        })
+        .collect();
+    let mut links = 0usize;
+    for (h, _) in &recs {
+        for f in h.split_whitespace() {
+            // L:<from_ori>:<to_id>:<to_ori>.
+            if let Some(rest) = f.strip_prefix("L:") {
+                links += 1;
+                let to_id = rest.split(':').nth(1).unwrap();
+                assert!(
+                    ids.contains(to_id),
+                    "dangling L: reference to {to_id} in header {h}"
+                );
+            }
+        }
+    }
+    assert!(links > 0, "expected L: entries between kept unitigs");
 }
 
 /// A k-mer above the 128-base key limit must fail cleanly instead of
