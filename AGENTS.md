@@ -8,7 +8,7 @@
 - 本文件 (`AGENTS.md`) : 使用中文编写
 - **代码注释 (doc comments `///` `//!` 和行内 `//`)**: 英文
 - **Git 提交信息**: 英文
-- **文档正文** (如 `doc/*.md` 中的说明文字): 英文
+- **文档正文** (如 `docs/*.md` 中的说明文字): 英文
 - **Notes** (如 `notes/*.md` 中的供我自己看的说明文字): 中文
 
 ## Bash 命令执行
@@ -146,7 +146,7 @@ cargo test -- --test-threads=1
   `fq/`、`asm/` 子目录。
 - **`src/libs/`** - 共享工具库和核心逻辑（当前 `overlap` 等；fq/asm/olc 业务迁移目标）。
 - **`templates/`** - 流程模板文件。
-- **`doc/`** - 用户面向命令文档。
+- **`docs/`** - 用户面向命令文档。
 - **`notes/`** - 开发者面向笔记（中文）：`notes/design/`（设计稿/移植笔记）、
   `notes/references/`（外部工具源码分析）、`notes/audit/`（代码审核记录）、
   `notes/benchmarks/`（基准对比）。
