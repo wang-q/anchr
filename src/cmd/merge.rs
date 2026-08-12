@@ -1,4 +1,3 @@
-use bio::io::fasta;
 use clap::*;
 use cmd_lib::*;
 use petgraph::prelude::*;
@@ -99,7 +98,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let abs_infile = if infile == "stdin" {
         infile.to_string()
     } else {
-        intspan::absolute_path(infile)
+        pgr::libs::io::absolute_path(infile)
             .unwrap()
             .display()
             .to_string()
@@ -108,7 +107,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let abs_outfile = if outfile == "stdout" {
         outfile.to_string()
     } else {
-        intspan::absolute_path(outfile)
+        pgr::libs::io::absolute_path(outfile)
             .unwrap()
             .display()
             .to_string()
@@ -129,7 +128,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     run_cmd!(info "==> Build ovlp graph")?;
     let mut seen = BTreeSet::new();
     let mut ovlps = vec![]; // In order for these overlaps to live long enough
-    for line in &intspan::read_lines("merge.ovlp.tsv") {
+    for line in &pgr::libs::io::read_lines("merge.ovlp.tsv")? {
         let ovlp = anchr::Overlap::new(line);
         if ovlp.is_empty() {
             continue;
@@ -202,7 +201,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     }
     // Branching nodes will stay
 
-    intspan::write_lines("overlapped.list", &graph.nodes().collect::<Vec<_>>())?;
+    anchr::utils::write_lines("overlapped.list", &graph.nodes().collect::<Vec<_>>())?;
     if is_svg {
         run_cmd!(info "==> Write .svg file")?;
         g2gv(&graph, &abs_outfile)?;
@@ -215,7 +214,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     )?;
 
     run_cmd!(info "==> Merge")?;
-    let seq_of = anchr::read_fasta(&abs_infile);
+    let seq_of = anchr::read_fasta(&abs_infile)?;
     let topo_sorted = algo::toposort(&graph, None).unwrap();
     let mut merge_of = BTreeMap::new();
     let mut serial = 1;
@@ -269,9 +268,9 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         }
         serial += 1;
     }
-    let mut fa_out = fasta::Writer::new(intspan::writer("merged.fasta"));
+    let mut fa_out = pgr::libs::fmt::fa::writer("merged.fasta")?;
     for (k, v) in merge_of.iter() {
-        let record = fasta::Record::with_attrs(k, None, v.as_ref());
+        let record = pgr::libs::fmt::fa::FastaRecord::new(k, v.as_ref());
         fa_out.write_record(&record)?;
     }
 

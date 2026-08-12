@@ -104,7 +104,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         if infile == "stdin" {
             abs_infiles.push("stdin".to_string());
         } else {
-            let absolute = intspan::absolute_path(infile)
+            let absolute = pgr::libs::io::absolute_path(infile)
                 .unwrap()
                 .display()
                 .to_string();
@@ -115,7 +115,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let abs_outfile = if outfile == "stdout" {
         outfile.to_string()
     } else {
-        intspan::absolute_path(outfile)
+        pgr::libs::io::absolute_path(outfile)
             .unwrap()
             .display()
             .to_string()

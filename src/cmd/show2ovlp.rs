@@ -1,7 +1,7 @@
 use clap::*;
 use regex::Regex;
 use std::collections::BTreeMap;
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -49,7 +49,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // Loading
     //----------------------------
     let is_orig = args.get_flag("orig");
-    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
+    let mut writer = pgr::libs::io::writer(args.get_one::<String>("outfile").unwrap())?;
 
     lazy_static::lazy_static! {
         static ref RE_LEN: Regex = Regex::new(
@@ -62,7 +62,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     let mut len_of = BTreeMap::new();
     let mut replace_of = BTreeMap::new();
-    for line in &intspan::read_lines(args.get_one::<String>("replace.tsv").unwrap()) {
+    for line in &pgr::libs::io::read_lines(args.get_one::<String>("replace.tsv").unwrap())? {
         let fields: Vec<&str> = line.split('\t').collect();
         if fields.len() != 2 {
             continue;
@@ -98,7 +98,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         .unwrap();
     }
 
-    let reader = intspan::reader(args.get_one::<String>("show.txt").unwrap());
+    let reader = pgr::libs::io::reader(args.get_one::<String>("show.txt").unwrap())?;
     for line in reader.lines().map_while(Result::ok) {
         let show = line.replace(',', "");
         let Some(caps) = RE_SHOW.captures(&show) else {

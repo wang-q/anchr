@@ -100,7 +100,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         if infile == "stdin" {
             abs_infiles.push("stdin".to_string());
         } else {
-            let absolute = intspan::absolute_path(infile)
+            let absolute = pgr::libs::io::absolute_path(infile)
                 .unwrap()
                 .display()
                 .to_string();
@@ -112,7 +112,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let abs_outfile = if outfile == "stdout" {
         outfile.to_string()
     } else {
-        intspan::absolute_path(outfile)
+        pgr::libs::io::absolute_path(outfile)
             .unwrap()
             .display()
             .to_string()
@@ -121,7 +121,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let mut abs_restrict = "".to_string();
     if args.contains_id("restrict") {
         let restrict = args.get_one::<String>("restrict").unwrap();
-        abs_restrict = intspan::absolute_path(restrict)
+        abs_restrict = pgr::libs::io::absolute_path(restrict)
             .unwrap()
             .display()
             .to_string();
@@ -177,9 +177,9 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let mut id_of_idx: BTreeMap<NodeIndex, String> = BTreeMap::new();
 
     let lines = if !abs_restrict.is_empty() {
-        intspan::read_lines("restrict.ovlp.tsv")
+        pgr::libs::io::read_lines("restrict.ovlp.tsv")?
     } else {
-        intspan::read_lines("renamed.ovlp.tsv")
+        pgr::libs::io::read_lines("renamed.ovlp.tsv")?
     };
     for line in &lines {
         let ovlp = anchr::Overlap::new(line);
@@ -289,7 +289,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         .filter(|(_, v)| **v == 1)
         .map(|(k, _)| id_of_idx.get(k).unwrap().to_string())
         .collect::<Vec<String>>();
-    intspan::write_lines("rc.list", &negatives.iter().map(AsRef::as_ref).collect())?;
+    anchr::utils::write_lines("rc.list", &negatives.iter().map(AsRef::as_ref).collect::<Vec<&str>>())?;
     run_cmd!(
         hnsm rc -c renamed.fasta rc.list -o renamed.rc.fasta
     )?;

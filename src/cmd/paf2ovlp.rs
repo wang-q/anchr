@@ -1,5 +1,5 @@
 use clap::*;
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -27,10 +27,10 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
     // Loading
     //----------------------------
-    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
+    let mut writer = pgr::libs::io::writer(args.get_one::<String>("outfile").unwrap())?;
 
     for infile in args.get_many::<String>("infiles").unwrap() {
-        let reader = intspan::reader(infile);
+        let reader = pgr::libs::io::reader(infile)?;
         for line in reader.lines().map_while(Result::ok) {
             let ovlp = anchr::Overlap::from_paf(&line);
 

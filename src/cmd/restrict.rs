@@ -1,7 +1,7 @@
 use clap::*;
-use intspan::*;
+use pgr::libs::io::{reader, read_lines, writer};
 use std::collections::HashSet;
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -36,14 +36,14 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     //----------------------------
     // Loading
     //----------------------------
-    let mut writer = writer(args.get_one::<String>("outfile").unwrap());
-    let reader = reader(args.get_one::<String>("infile").unwrap());
+    let mut writer = writer(args.get_one::<String>("outfile").unwrap())?;
+    let reader = reader(args.get_one::<String>("infile").unwrap())?;
 
     //----------------------------
     // Load restricts
     //----------------------------
     let mut restricts: HashSet<String> = HashSet::new();
-    for line in read_lines(args.get_one::<String>("restrict").unwrap()) {
+    for line in read_lines(args.get_one::<String>("restrict").unwrap())? {
         let mut parts: Vec<&str> = line.split('\t').collect();
         if parts.len() == 2 {
             parts.sort_unstable();

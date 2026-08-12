@@ -1,6 +1,7 @@
 use clap::*;
 use itertools::Itertools;
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::PathBuf;
 use std::{env, fs};
 use tera::{Context, Tera};
@@ -143,7 +144,7 @@ Fastq files can be gzipped
 
 // command implementation
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
-    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
+    let mut writer = pgr::libs::io::writer(args.get_one::<String>("outfile").unwrap())?;
 
     // context from args
     let mut opt = HashMap::new();

@@ -1,27 +1,32 @@
-use bio::io::fasta;
+use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 
-pub fn read_fasta(input: &str) -> BTreeMap<String, String> {
-    let mut reader = intspan::reader(input);
-    let fa_in = fasta::Reader::new(reader);
-
+pub fn read_fasta(input: &str) -> anyhow::Result<BTreeMap<String, String>> {
+    let mut reader = SeqReader::new(input)?;
+    let mut rec = SeqRecord::new();
     let mut seq_of = BTreeMap::new();
-    for result in fa_in.records() {
-        // obtain record or fail with error
-        let record = result.unwrap();
-
-        if record.is_empty() {
+    while reader.read_record(&mut rec)? {
+        if rec.sequence().is_empty() {
             continue;
         }
 
-        let name = record.id().to_string();
-        let seq = String::from_utf8(record.seq().to_vec().to_ascii_uppercase()).unwrap();
+        let name = rec.name().to_string();
+        let seq = String::from_utf8(rec.sequence().to_vec().to_ascii_uppercase()).unwrap();
 
         seq_of.insert(name, seq);
     }
 
-    seq_of
+    Ok(seq_of)
+}
+
+/// Write lines to `outname`, one per line (gzip supported via `pgr::libs::io::writer`).
+pub fn write_lines(outname: &str, lines: &[&str]) -> anyhow::Result<()> {
+    let mut writer = pgr::libs::io::writer(outname)?;
+    for line in lines {
+        writeln!(writer, "{}", line)?;
+    }
+    Ok(())
 }
 
 pub fn ucfirst(s: &str) -> String {

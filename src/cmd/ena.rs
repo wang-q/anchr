@@ -1,4 +1,5 @@
 use clap::*;
+use std::io::Write;
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -28,7 +29,7 @@ pub fn make_subcommand() -> Command {
 
 // command implementation
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
-    let mut writer = intspan::writer(args.get_one::<String>("outfile").unwrap());
+    let mut writer = pgr::libs::io::writer(args.get_one::<String>("outfile").unwrap())?;
 
     let kb = match args.get_one::<String>("infile").unwrap().as_ref() {
         "info" => include_str!("../../templates/ena_info.pl"),

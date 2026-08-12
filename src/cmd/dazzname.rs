@@ -1,6 +1,4 @@
-use bio::io::fasta;
 use clap::*;
-use std::io::{BufRead, Write};
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -52,7 +50,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let is_no_replace = args.get_flag("no-replace");
 
     let outfile = args.get_one::<String>("outfile").unwrap();
-    let mut fa_out = fasta::Writer::new(intspan::writer(outfile));
+    let mut fa_out = pgr::libs::fmt::fa::writer(outfile)?;
 
     let opt_prefix = args.get_one::<String>("prefix").unwrap();
     let mut opt_start = *args.get_one::<usize>("start").unwrap();
@@ -63,23 +61,19 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // Ops
     //----------------------------
     for infile in args.get_many::<String>("infiles").unwrap() {
-        let reader = intspan::reader(infile);
-
-        let fa_in = fasta::Reader::new(reader);
-        for result in fa_in.records() {
-            // obtain record or fail with error
-            let record = result.unwrap();
-
-            if record.is_empty() {
+        let mut reader = pgr::libs::fmt::fa::reader(infile)?;
+        let mut rec = pgr::libs::fmt::seq::SeqRecord::new();
+        while reader.read_record(&mut rec)? {
+            if rec.sequence().is_empty() {
                 continue;
             }
 
-            let name = record.id().to_string();
-            let length = record.seq().len();
+            let name = rec.name().to_string();
+            let length = rec.sequence().len();
             let serial = opt_start;
 
             let name_new = format!("{}/{}/0_{}", opt_prefix, serial, length);
-            let record_new = fasta::Record::with_attrs(&name_new, None, record.seq());
+            let record_new = pgr::libs::fmt::fa::FastaRecord::new(&name_new, rec.sequence());
 
             fa_out
                 .write_record(&record_new)
@@ -94,9 +88,9 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     }
 
     if !is_no_replace {
-        intspan::write_lines(
+        anchr::utils::write_lines(
             &format!("{}.replace.tsv", outfile),
-            &rplc_lines.iter().map(AsRef::as_ref).collect(),
+            &rplc_lines.iter().map(AsRef::as_ref).collect::<Vec<&str>>(),
         )?;
     }
 

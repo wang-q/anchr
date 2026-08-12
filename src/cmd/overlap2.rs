@@ -146,11 +146,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // Paths
     //----------------------------
     run_cmd!(info "==> Absolute paths")?;
-    let file1 = intspan::absolute_path(args.get_one::<String>("infile").unwrap())
+    let file1 = pgr::libs::io::absolute_path(args.get_one::<String>("infile").unwrap())
         .unwrap()
         .display()
         .to_string();
-    let file2 = intspan::absolute_path(args.get_one::<String>("infile2").unwrap())
+    let file2 = pgr::libs::io::absolute_path(args.get_one::<String>("infile2").unwrap())
         .unwrap()
         .display()
         .to_string();
