@@ -1,21 +1,21 @@
-# pgr fq index：按 read name 的随机访问（设计稿）
+# anchr fq index：按 read name 的随机访问（设计稿）
 
-> 状态：**一期已实现（2026-08）**——单文件 `pgr fq range`（API 与 `fa range`
-> 对齐，含 name 归一化与交错 `#n` 消歧）；双端 S2 待二期。
+> 状态：**一期已实现（2026-08）**——单文件 `anchr fq range`（API 与
+> `pgr fa range` 对齐，含 name 归一化与交错 `#n` 消歧）；双端 S2 待二期。
 >
 > 配套：[seq-reader.md](seq-reader.md)（FAFQ 读取与 BGZF 基础设施）、
 > [anchr-trim-replace.md](anchr-trim-replace.md)（fq 命令组现状，含 trim-qual）。
 
 ## 0. 动机
 
-FASTA 侧已有按 name 的 `.loc` 索引（`src/libs/loc.rs`）：文本格式
-`name\t明文偏移\trecord_size`，`fa range` 自动构建/复用，BGZF 文件经
+FASTA 侧已有按 name 的 `.loc` 索引（`pgr::libs::loc.rs`，pgr 基础层）：文本格式
+`name\t明文偏移\trecord_size`，`pgr fa range` 自动构建/复用，BGZF 文件经
 `CachedBgzfReader` 按明文偏移 seek（依赖 `.gzi`）。用户希望 FASTQ 获得同样的
 能力：**从超大 FASTQ 按 read name 随机提取子集**，而不是每次全文件流式过滤。
 
-## 1. 核心问题：API 是否与 `fa range` 完全对齐
+## 1. 核心问题：API 是否与 `pgr fa range` 完全对齐
 
-`fa range` 的形态：`pgr fa range in.fa "chr1:1-1000" "chr2(-):2000-3000"`，
+`pgr fa range` 的形态：`pgr fa range in.fa "chr1:1-1000" "chr2(-):2000-3000"`，
 自动建 `.loc`，支持 `-r`（范围文件）/`-c`（LRU 缓存）/`-u`（强制重建索引）/
 `-o`。语义：`name`（整条）或 `name:start-end`（子段），`(-)` 负链反向互补。
 
@@ -23,16 +23,16 @@ FASTA 侧已有按 name 的 `.loc` 索引（`src/libs/loc.rs`）：文本格式
 
 | 方案 | 形态 | 收益 | 成本 |
 |---|---|---|---|
-| **A（推荐）：完全对齐** | `pgr fq range in.fq "read1:10-200" "read2"`，参数与 `fa range` 一致 | API 与 FA 一模一样，脚本/心智统一；长读（ONT/PacBio）可取 read 内部片段 | 子段提取需同时切 seq+qual；`.loc` 之外无额外索引信息 |
-| B：最小 | `pgr fq index` + `pgr fq fetch`，只按 name 整条提取 | 实现最小 | API 与 FA 不一致，未来对齐要再改 |
+| **A（推荐）：完全对齐** | `anchr fq range in.fq "read1:10-200" "read2"`，参数与 `pgr fa range` 一致 | API 与 FA 一模一样，脚本/心智统一；长读（ONT/PacBio）可取 read 内部片段 | 子段提取需同时切 seq+qual；`.loc` 之外无额外索引信息 |
+| B：最小 | `anchr fq index` + `anchr fq fetch`，只按 name 整条提取 | 实现最小 | API 与 FA 不一致，未来对齐要再改 |
 
 **关键洞察：索引格式可以零成本对齐**。`.loc` 存的是"记录级"的
 （明文偏移, record_size），FASTQ 的 4 行记录整体即一个 record；取子段时
-`fetch_record` 先取整条再切分（`fa range` 正是 fetch 整条后 `slice_record`）。
+`fetch_record` 先取整条再切分（`pgr fa range` 正是 fetch 整条后 `slice_record`）。
 所以方案 A 不需要在索引里多存任何字段。
 
 **推荐 A**，理由：
-1. 索引与查询架构直接复用 `loc.rs` 骨架，A 与 B 的差异只在"取到整条后要不要
+1. 索引与查询架构直接复用 `pgr::libs::loc.rs` 骨架，A 与 B 的差异只在"取到整条后要不要
    支持 `name:start-end` 切片"——增量极小。
 2. 用户明确看重"API 一模一样"；对齐后 FA/FQ 脚本可互替。
 3. read 子段对长读数据有真实用途（截取 read 内部区域），不是空泛灵活性。
@@ -52,14 +52,14 @@ FASTA 侧已有按 name 的 `.loc` 索引（`src/libs/loc.rs`）：文本格式
 明文 / 普通 gzip / BGZF 三种输入：
 - 明文、gzip：`GzReader` 流式解压扫描，`.loc` 存明文偏移。
 - BGZF：同样流式扫明文偏移（构建侧）；查询侧 `CachedBgzfReader` + `.gzi`
-  按明文偏移定位块——与 `fa range` 完全同路。
+  按明文偏移定位块——与 `pgr fa range` 完全同路。
 
 ## 3. CLI 设计（方案 A）
 
 ```
-pgr fq range in.fq "read1:10-200" "read2" ...
+anchr fq range in.fq "read1:10-200" "read2" ...
 
-Options（与 fa range 一致）：
+Options（与 pgr fa range 一致）:
   -r, --rgfile    从文件读 name/range 列表
   -c, --cache     LRU 缓存容量（默认 1）
   -u, --update    强制重建 .loc 索引
@@ -78,11 +78,11 @@ Options（与 fa range 一致）：
 | 主题 | FA 现状 | FQ 处理 | 状态 |
 |---|---|---|---|
 | 索引格式 | `name\t偏移\tsize` | 完全一致 | 定稿 |
-| 子段语法 | `chr1:1-1000` | 复用 `ds::Range`，`read1:10-200` | 方案 A 定稿 |
+| 子段语法 | `chr1:1-1000` | 复用 `pgr::libs::ds::Range`，`read1:10-200` | 方案 A 定稿 |
 | 负链 `(-)` | 反向互补 | 不支持（切片时忽略 strand） | 已定 |
 | 子段输出 `+` 行 | — | 输出单个 `+`（与 trim-qual 一致） | 已定 |
 | 重复 name | IndexMap 后者覆盖 | 归一化 key + `#n` 消歧（不丢数据） | 已定 |
-| 索引重建 | mtime 判断（`loc_is_fresh`） | 同 | 定稿 |
+| 索引重建 | mtime 判断（`pgr::libs::loc.rs::loc_is_fresh`） | 同 | 定稿 |
 | 缓存 | LRU<FastaRecord> | LRU<原始记录字节 Vec<u8>> | 定稿 |
 | 普通 gzip | 不支持（需 BGZF） | 明确报错"only plain text and BGZF" | 已定 |
 
@@ -162,9 +162,10 @@ FASTQ 双端数据的 name 有三种常见模式：
 
 ## 8. 一期实现记录（2026-08）
 
-- 代码：`src/libs/loc.rs`（`normalize_pair_name`/`create_fq_loc`/
-  `open_fq_indexed`/`query_fq_locs`）、`src/cmd_pgr/fq/range.rs`（参数与
-  `fa range` 一致：infile + ranges + `-r`/`-c`/`-u`/`-o`）。
+- 代码：`pgr::libs/loc.rs`（`normalize_pair_name`/`create_fq_loc`/
+  `open_fq_indexed`/`query_fq_locs`，pgr 基础层）、`src/cmd/fq/range.rs`
+  （anchr 命令，参数与 `pgr fa range` 一致：infile + ranges +
+  `-r`/`-c`/`-u`/`-o`）。
 - 行为：4 行结构扫描建 `.loc`；name 归一化（strip `/1` `/2`），同 key 多条
   追加 `#n`；查询返回精确 key + 全部 `#n` 变体（交错/合并文件 pair 两条
   同时返回、保持顺序）；`name:start-end` 同时切 seq 与 qual，`+` 行输出
@@ -178,4 +179,5 @@ FASTQ 双端数据的 name 有三种常见模式：
 
 ---
 
-*参考来源: [fa range](../../src/cmd_pgr/fa/range.rs) | [loc.rs](../../src/libs/loc.rs) | [seq-reader.md](seq-reader.md)*
+*参考来源: pgr `fa range`（`pgr/src/cmd_pgr/fa/range.rs`）| pgr `loc.rs`
+（`pgr/src/libs/loc.rs`）| [seq-reader.md](seq-reader.md)*

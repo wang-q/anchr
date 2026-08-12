@@ -1,4 +1,4 @@
-# `pgr asm map`：完美匹配 reads 映射（anchors 流程 bbmap 替代，设计）
+# `anchr asm map`：完美匹配 reads 映射（anchors 流程 bbmap 替代，设计）
 
 > 2026-08-11。目标：替代 anchr `anchors.tera.sh` 中的 `bbwrap.sh`
 > `perfectmode maxindel=0 strictmaxindel` 调用。需求 = **exact string
@@ -24,14 +24,14 @@ BBTools 源码确认 `perfectmode` 语义（`AbstractMapThread.java:1371`
 `maxMismatches=0`；`BBMap.java setPerfectMode` `MINIMUM_ALIGNMENT_SCORE_RATIO=1.0`；
 `maxindel=0 strictmaxindel` 禁 indel）→ read 必须与参考某位置整条一致。
 
-**2026-08-11 更新**：basecov 不再由 `asm map` 在内存里累计，改为从
-mapped SAM 派生（`pgr sam to-rg` → `pgr rg coverage`）。理由：职责分离
+**2026-08-11 更新**：basecov 不再由 `anchr asm map` 在内存里累计，改为从
+mapped SAM 派生（`anchr sam to-rg` → `pgr rg coverage`）。理由：职责分离
 （map 只出 SAM），覆盖度从产物推导与内存累计数学等价（完美匹配 CIGAR
 恒为 `L M`，正/反链都只是一个区间，重复区域的 ambiguous=all 每个 hit 一
 条记录，两侧语义自动一致），且省掉 map 内 4 B/bp 的 AtomicU32 数组。
 模板侧的两个消费者都能用 rg/runlist 组合表达：median/MAD 对 detailed
-JSON 按层加权；covered 区域 = `rg coverage -d` → `runlist some`（lower..upper
-层名）→ `runlist combine --op union`。
+JSON 按层加权；covered 区域 = `pgr rg coverage -d` → `pgr runlist some`（lower..upper
+层名）→ `pgr runlist combine --op union`。
 
 ## 2. 算法
 
@@ -39,8 +39,8 @@ JSON 按层加权；covered 区域 = `rg coverage -d` → `runlist some`（lower
 
 - 输入：UT.fasta（组装结果，通常 Mb 级）。
 - 对每个 k-mer 窗口（默认 k=31，`--kmer`，上限 64 = u128 key）用
-  `libs::kmer::canonical_keys` 收集 canonical key + 位置。
-- 记录 `(key, contig_id, pos)`，按 key 排序（`libs::ds::radix_sort_u128`
+  `pgr::libs::kmer::canonical_keys` 收集 canonical key + 位置。
+- 记录 `(key, contig_id, pos)`，按 key 排序（`pgr::libs::ds::radix_sort_u128`
   Myers American-flag），key 相同的候选位置连续 → 二分查找区间。
 - 不需要存 strand：验证阶段同时比较 read 与其 rc。
 
@@ -71,16 +71,16 @@ JSON 按层加权；covered 区域 = `rg coverage -d` → `runlist some`（lower
 ### 2.5 覆盖度派生（组合管道，不在 map 内）
 
 ```
-pgr asm map UT.fasta R1.fq.gz R2.fq.gz --outm mapped.sam --outu unmapped.sam
-pgr sam to-rg mapped.sam > mapped.rg        # 每条 mapped 记录一行 chr:start-end
-pgr rg coverage mapped.rg -m 2 -o cov.json  # 逐位深度（runlist JSON）
+anchr asm map UT.fasta R1.fq.gz R2.fq.gz --outm mapped.sam --outu unmapped.sam
+anchr sam to-rg mapped.sam > mapped.rg        # 每条 mapped 记录一行 chr:start-end
+pgr rg coverage mapped.rg -m 2 -o cov.json   # 逐位深度（runlist JSON）
 ```
 
-- `sam to-rg`：跳过 `@` 头与 unmapped（FLAG 0x4 / RNAME `*` / POS 0）；
+- `anchr sam to-rg`：跳过 `@` 头与 unmapped（FLAG 0x4 / RNAME `*` / POS 0）；
   CIGAR 的 M/D/N/=/X 计入跨度，I/S/H/P 不计（本命令只产出 `L M`，
   解析器按通用 SAM 写）。
-- **读取基于 noodles-sam 0.81**（2026-08-11）：`libs/fmt/sam.rs` 改用
-  noodles 流式 Reader/Record，`to_ranges` 签名与输出契约不变（strict
+- **读取基于 noodles-sam 0.81**（2026-08-11）：`libs/fmt/sam.rs`（anchr 业务）
+  改用 noodles 流式 Reader/Record，`to_ranges` 签名与输出契约不变（strict
   报错信息改为 `malformed SAM record: ...`）。版本配套：sam 0.81 ↔
   noodles-core 0.18 ↔ gff 0.54（同一发行列车）。
 - **写出仍手写**（2026-08-11 记录）：试过把 map 的 SAM 写出换成 noodles
@@ -90,9 +90,9 @@ pgr rg coverage mapped.rg -m 2 -o cov.json  # 逐位深度（runlist JSON）
   下游 `ut.chr.sizes` 等按 RefName 匹配的环节会断。**结论：写出保持
   手写**；将来做配对模式（TLEN/配对位）时需先定 refname 策略
   （要么全链路 sanitize，要么继续原始写出），再决定是否迁移 Writer。
-- `rg coverage -d`（detailed）输出"每深度一层"的 runlist JSON；模板的
+- `pgr rg coverage -d`（detailed）输出"每深度一层"的 runlist JSON；模板的
   median/MAD 按层加权（run 长度 × 深度），covered 区域 = 层名在
-  [lower, upper] 的层 `runlist some` + `runlist combine --op union`。
+  [lower, upper] 的层 `pgr runlist some` + `pgr runlist combine --op union`。
 - 内存画像：map 内零覆盖度内存；rg 侧事件数组约 32 B/read，与参考大小
   无关（与原来的 4 B/bp 恰好相反，锚定场景两者都只是几十~几百 MB）。
 - 代价：mapped SAM 必须保留并重读一遍（模板本来就要 cat 一次数行数，
@@ -105,14 +105,14 @@ pgr rg coverage mapped.rg -m 2 -o cov.json  # 逐位深度（runlist JSON）
 对足够估计插入长度分布**（测序错误与插入长度独立，完美子集无偏；Lambda
 40k reads 双端完美率 ~75%，样本量充足），不需要完整比对器。
 
-- `asm map --paired`：R1/R2 成对处理（要求恰好 2 个 reads 文件），双端
+- `anchr asm map --paired`：R1/R2 成对处理（要求恰好 2 个 reads 文件），双端
   都完美匹配才算 mapped pair；SAM 写配对位（0x1/0x2/0x40/0x80 + 链向）、
   RNEXT/PNEXT、signed TLEN（proper FR = 同参考 + 异链 + 相向，insert =
   右端 - 左端 + 1）。**一端的 hit 取第一个**（(cid,pos) 序，确定性）。
   对含一个 unmapped 端的 pair，整对写 outu（mapped pair 才进 outm，保证
   outm 里每对都完整，Picard/iHist 可直接消费）。`--max-reads` = bbmap
   `reads=`（按记录数计，pair 算 2），模板 `reads={{opt.reads}}` 直接映射。
-- `pgr sam ihist`（`libs/fmt/sam.rs`，noodles 解析）：按规范化名字
+- `anchr sam ihist`（`libs/fmt/sam.rs`，anchr 业务，noodles 解析）：按规范化名字
   （首个空白 token，去尾部 `/1` `/2`）分组配对，proper FR pair 计插入
   长度；输出 reformat ihist 文本格式（`#Mean/#Median/#Mode/#STDev/
   #PercentOfPairs` + `#InsertSize\tCount`，golden `merge.ihist*.txt`
@@ -128,13 +128,13 @@ pgr rg coverage mapped.rg -m 2 -o cov.json  # 逐位深度（runlist JSON）
 ## 3. 命令形状
 
 ```
-pgr asm map [OPTIONS] <ref.fa> <reads.fq...>
+anchr asm map [OPTIONS] <ref.fa> <reads.fq...>
   -k, --kmer <int>      种子 k-mer 长度，默认 31，上限 64
   --outm <file>         完美匹配 reads 的 SAM（mapped.sam 兼容）
   --outu <file>         未匹配 reads 的 SAM（unmapped.sam 兼容）
   -p, --parallel <int>  真实并行（rayon，与 assemble 的单线程确定性不同）
 
-pgr sam to-rg [OPTIONS] <infile>            # SAM → .rg（stdin 可用）
+anchr sam to-rg [OPTIONS] <infile>           # SAM → .rg（stdin 可用）
 ```
 
 - reads 接受 1+ 个文件（R1/R2 或多个单端文件），FASTQ 或 FASTA。
@@ -150,8 +150,8 @@ MG1655 参考（`tests/genome/mg1655.fa.gz`）× 1M 纠错 reads（anchr
 
 * 完美贴回 505,305/1,000,000（50.5%），539,045 hits（1.5% 多映射）；
 * **mapped reads 坐标抽查 10/10 与参考区间逐碱基一致**（含反向链）；
-* mapped 子集平均覆盖 38.4×（`sam to-rg` + `rg coverage` 剖面正常）；
-* 50% 贴回率解释：`asm map` 是完美匹配，任何残余错误（纠错 reads 仍有
+* mapped 子集平均覆盖 38.4×（`anchr sam to-rg` + `pgr rg coverage` 剖面正常）；
+* 50% 贴回率解释：`anchr asm map` 是完美匹配，任何残余错误（纠错 reads 仍有
   ~1% 错误）都导致未贴回——anchr 自身 bwa 容错映射 mosdepth 271× 佐证
   reads 确实来自该参考（见 `3_bwa/R.mosdepth.summary.txt`）。工具行为
   符合设计；bbmap 黑盒对照因本机 Java 配对读 gz 失败暂缓。
@@ -162,8 +162,8 @@ MG1655 参考（`tests/genome/mg1655.fa.gz`）× 1M 纠错 reads（anchr
   - 重复区域 read → 多个 mapped 记录（ambiguous=all）；
   - read 长度 < k → unmapped。
 - Lambda 数据 sanity：mapped 比例合理、确定性（两次运行逐字节一致）、
-  `sam to-rg` → `rg coverage` 的深度与 mapped SAM 一致（合成测试：两条
-  50 bp read 重叠 40 bp → `rg coverage -m 2` 输出恰为 `21-60`）。
+  `anchr sam to-rg` → `pgr rg coverage` 的深度与 mapped SAM 一致（合成测试：两条
+  50 bp read 重叠 40 bp → `pgr rg coverage -m 2` 输出恰为 `21-60`）。
 - 与 bbmap 黑盒对照暂不做（本机 Java 配对读 gz 失败；语义由 perfectmode
   源码 + 合成测试锚定）。
 

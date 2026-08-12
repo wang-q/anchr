@@ -9,6 +9,11 @@
 > （与 FA 读取不迁移同理）。anchr 依赖 pgr crate（基础库），跨项目依赖
 > 可接受（均自有项目）。
 
+> 2026-08-13 状态：**迁移已执行完毕**。anchr 现已具备 fq/asm 全部命令
+> （`src/cmd/fq/` 15 个、`src/cmd/asm/` 8 个，业务库
+> `src/libs/fq|asm|olc/`），依赖 pgr crate 基础库（fmt/qual/kmer/paf/io/
+> ds/loc/sys）。本文件为迁移方案档案，阶段 1–4 均已落地，供追溯。
+
 ## 1. 决策背景
 
 pgr 定位"通用基因组数据处理工具集"，anchr 定位"染色体级组装流程编排器"。

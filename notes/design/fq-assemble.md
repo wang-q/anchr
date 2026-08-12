@@ -1,4 +1,4 @@
-# `pgr asm contig`：tadpole contigMode 迁移（设计）
+# `anchr asm contig`：tadpole contigMode 迁移（设计）
 
 > 2026-08-11。目标：替代 anchr 中 tadpole 的**组装用途**（contigMode）：
 > 2_insert_size 流程（硬依赖）与 unitigs 流程（`--unitigger tadpole` 可选
@@ -86,14 +86,14 @@ Tadpole1（k≤31）路径同构，junction 方向判定按
   gc/hh/caga 由 `calcScalarsFast` 计算（实现时逐行对照）。
 - 排序：length 降序 → coverage 降序 → 序列字典序 → id。
 - **顺序无关性**：行走受 leftCounts 隐藏分支约束，contig 集合由
-  （图 + 阈值 + 认领）唯一确定，与种子扫描顺序无关 → pgr 的
+  （图 + 阈值 + 认领）唯一确定，与种子扫描顺序无关 → anchr 的
   HashMap 迭代顺序不影响输出（黑盒验证确认后定案；排序含序列字典序
   兜底，id 只在完全重复时生效）。
 
 ## 3. 命令形状
 
 ```
-pgr asm contig [OPTIONS] <infiles>...
+anchr asm contig [OPTIONS] <infiles>...
   -k, --kmer <int>        默认 31（2_insert_size 用；unitigs 由模板按 k 循环调用）
   -o, --outfile <file>    输出 FASTA（默认 stdout）
   -p, --parallel <int|auto>  兼容参数，校验但不启用（确定性单线程，同 ecc/extend）
@@ -120,7 +120,7 @@ pgr asm contig [OPTIONS] <infiles>...
 
 ## 6. 实现状态与已知偏差（2026-08-11 定案）
 
-`pgr asm contig` 已实现：contig 构建（多轮种子/行走/认领）+ contig 图 +
+`anchr asm contig` 已实现：contig 构建（多轮种子/行走/认领）+ contig 图 +
 BubblePopper + 排序重编号 + 输出，全部确定性与单线程等价。
 
 **气泡开关（2026-08-11 定案）**：默认 `pop_bubbles=true`（tadpole
@@ -148,7 +148,7 @@ tadpole 的气泡消除**顺序相关**：expand 顺序决定重叠气泡中"谁
 - Java 的哈希表 cell 顺序随 `-Xmx` 变化（Xmx1g/3g/8g → prime
   228983/213973/194057），但构建顺序 68/89、71/89 个 id 不同——即
   "逐字节一致"本身只对特定内存参数成立；
-- pgr 用确定性扫描顺序（canonical kmer 排序）代替 Java 的哈希 cell
+- anchr 用确定性扫描顺序（canonical kmer 排序）代替 Java 的哈希 cell
   顺序，输出确定且跨运行稳定，但 bubble 解析结果与 tadpole 有少量
   差异（Lambda 2000 对：67 vs 66 contig，总碱基差 ≤100，序列集合
   重合 ≥90%）。
@@ -156,25 +156,25 @@ tadpole 的气泡消除**顺序相关**：expand 顺序决定重叠气泡中"谁
 **决策（用户确认，2026-08-11）**：不做哈希表布局复刻，接受确定性输出
 + 文档化偏差。理由：逐字节一致需复刻 BBTools 内存模型（`-Xmx` 相关
 prime）+ 开放寻址插入顺序 + 溢出树，约几百行无生物学价值的"镜像
-Java 内存布局"代码，且结果脆弱（换 `-Xmx` 即失效）。pgr 的 contig
+Java 内存布局"代码，且结果脆弱（换 `-Xmx` 即失效）。anchr 的 contig
 集合/总碱基与 tadpole 一致，差异只是少数气泡的"走哪条路径"（两条
 都是合法组装选择，序列质量等价），对 anchr 用途（insert-size 参考、
 unitigs 组装）影响可忽略。
 
-回归测试：`tests/cli_fq_assemble.rs` + golden
+回归测试：`tests/cli_asm_contig.rs` + golden
 `tests/bbtools/Lambda/golden/tadpole_contigs31.fasta.gz`（tadpole
 默认输出 67 contig），断言确定性、总碱基差 ≤100、序列集合重合 ≥90%。
 
 ## 7. 性能优化（2026-08-11）
 
-计数表与组装扫描按 `libs/kmer`（FastK/Myers 计数骨架）模式改造，输出
+计数表与组装扫描按 `pgr::libs::kmer`（FastK/Myers 计数骨架）模式改造，输出
 逐字节不变（golden 全绿）：
 
 - **`TadpoleTable::sorted_entries`**：canonical k-mer 排序快照用
   `OnceLock` 缓存一次；`scan_table` 16 轮种子扫描改为线性迭代，去掉
   每轮 O(n log n) 的 collect+sort（原 HashMap 迭代需每轮排序保证确定性）。
 - **并行构建**：`TadpoleTable::build` 按 4096 reads 分块 rayon 并行计数
-  + 确定性合并；表内容与单线程一致（`libs/kmer::build_table` 同款模式）。
+  + 确定性合并；表内容与单线程一致（`pgr::libs::kmer::build_table` 同款模式）。
 - **基准**（`benches/fq_assemble_benchmark.rs`，Lambda 20k reads，k=31，
   release）：assemble 全流程 576 ms →（sorted_entries）313 ms →
   （+并行 build）157 ms，~3.7×；build 247 ms → ~100 ms。
@@ -186,9 +186,9 @@ unitigs 组装）影响可忽略。
   构建开销）；radix 的价值需数百万级 k-mer 才可能显现，届时再评估。
   k>64 的多 word radix 泛化同步搁置。
 
-## 8. `pgr asm unitig` 命令（2026-08-11，借鉴 BCALM graph3）
+## 8. `anchr asm unitig` 命令（2026-08-11，借鉴 BCALM graph3）
 
-新增独立命令 `pgr asm unitig`（**不从 assemble 加开关**）：不做种子
+新增独立命令 `anchr asm unitig`（**不从 assemble 加开关**）：不做种子
 扩展/气泡，改为**最大 unitig 压缩**（`ograph.cpp` `graph3` 语义）。拆分
 原因：`--no-bubbles`（tadpole 兼容参数）与 unitig 压缩语义不同但名字
 相似，放在同一命令下造成困惑；独立命令让每个命令只有一种组装哲学
@@ -229,14 +229,14 @@ unitigs 组装）影响可忽略。
 
 * **unitig 序列 100% 一致**（2403/2403，canonical 方向归一后逐条相同，
   聚合统计完全相同：总数/总长/N50/最长）——`asm unitig` 本体验证通过；
-* **L: 边集部分一致**：pgr 无向边 3801 条 vs bcalm 3331 条，共同 2577
-  （bcalm 边的 77%），pgr 多 1224、缺 754。**深层定位（2026-08-12）**：
+* **L: 边集部分一致**：anchr 无向边 3801 条 vs bcalm 3331 条，共同 2577
+  （bcalm 边的 77%），anchr 多 1224、缺 754。**深层定位（2026-08-12）**：
   bcalm 的边 = "canonical 端点 (k-1)-mer 共享图"（5019 条）的**子集**
   （3325/3331 在图内），多出的 1694 条图边 bcalm 不发——过滤条件不在
   README、也不在本地源码（`bcalm/` 无 LinkTigs 实现；安装的
   `/home/wangq/.cbp/bin/bcalm` 可能带补丁）。曾尝试按 README
   outcoming-edge 语义（源最后/rc 最后 k-mer → 目标第一个 k-mer）重写
-  `compute_links`：边集未对齐（共同 2512）且因 pgr 存 canonical 方向、
+  `compute_links`：边集未对齐（共同 2512）且因 anchr 存 canonical 方向、
   同一物理端在两工具中可能是前缀或后缀，**回归丢失真实边**（如
   71245 unitig → 其 rc 方向邻居），已回退。结论：`--links` 保持现有
   简化语义（`fq-assemble.md` §8.1 方向规则），逐边对齐需 bcalm 链接

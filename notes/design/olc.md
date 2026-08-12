@@ -1,8 +1,8 @@
 # OLC 组装设计：多 k unitig 层的 overlap → layout → consensus
 
 > 状态：**已实现（2026-08-12，M1–M4 全部落地）**。命令：
-> `pgr asm ovlp` / `layout` / `cns` / `olc`；库：`libs/olc/`
-> （overlap / layout / consensus）。合成基因组端到端验证通过
+> `anchr asm ovlp` / `layout` / `cns` / `olc`；库：`libs/olc/`
+> （overlap / layout / consensus，anchr 业务库）。合成基因组端到端验证通过
 > （30× 无错 reads → contigs 全部为基因组精确子串，最长覆盖 97.5%；
 > 低覆盖 6× 出现重复区经典错装，符合预期）。
 > **真实数据验证（Lambda，2026-08-12）**：见 §12——抓出并修复左向延伸
@@ -24,13 +24,13 @@ reads ──(多 k 各生成 unitigs)──> 伪 reads ──(overlap)──> PA
 
 **核心裁定（用户，2026-08-12）**：
 
-* 不做 reads 级 OLC——reads 先用 DBG（`pgr asm unitig`）压缩成 unitigs；
+* 不做 reads 级 OLC——reads 先用 DBG（`anchr asm unitig`）压缩成 unitigs；
 * 多 k（默认 21/51/81）各生成一套 unitigs，合并后当伪 reads；
 * unitig 语义 = 最大无分支路径（bcalm graph3 移植，无气泡），OLC 只处理
   unitig 间 overlap，不引入"平行路径选哪条"的启发式；
 * 气泡/孤儿合并不处理（既有裁定）。
 
-**成功标准**：合成基因组 reads → `pgr asm olc` 输出 contigs 覆盖完整基因组
+**成功标准**：合成基因组 reads → `anchr asm olc` 输出 contigs 覆盖完整基因组
 （identity 100%，因 overlap 精确）；Lambda 真实 reads 冒烟测试输出合理
 （contig 数 / N50 与 tadpole contig 同量级）；1701+ 测试全绿、fmt/clippy 干净。
 
@@ -57,13 +57,13 @@ reads ──(多 k 各生成 unitigs)──> 伪 reads ──(overlap)──> PA
 
 ### S0 伪 reads 生成（复用，不新写）
 
-每个 k 跑 `pgr asm unitig`（`libs/asm/assemble.rs::assemble_unitigs`，
+每个 k 跑 `anchr asm unitig`（`libs/asm/assemble.rs::assemble_unitigs`，
 bcalm graph3 压缩语义，默认 k=31 / solid ≥3）。产出物：unitig FASTA。
 
 **命名**：`asm unitig` 的输出名恒为 `unitig_<id>`，多 k 合并必然撞名。
 OLC 阶段统一重命名：`<tag>:<name>`，tag 默认取输入文件 stem
 （仅保留 `[A-Za-z0-9_.-]`，空则用文件序号）——确定性且可回溯到 k。
-（`pgr asm olc` 驱动器内部直接用 `k<k值>` 作 tag。）
+（`anchr asm olc` 驱动器内部直接用 `k<k值>` 作 tag。）
 
 ### S1 overlap 检测（新 `libs/olc/overlap.rs`）
 
@@ -82,10 +82,10 @@ OLC 阶段统一重命名：`<tag>:<name>`，tag 默认取输入文件 stem
    * `dovetail`：q 5'/3' 端与 t 3'/5' 端重叠（两端各留出 >0 的非重叠段），
      或 q 完全包含于 t（contain，长度 ≥ L）；
    * `contain`：q ⊂ t 或 t ⊂ q——不参与延伸，留作共识覆盖证据；
-5. 输出 PAF（复用 `libs/paf/record.rs` 12 列 + `ov:A:D|C` tag），
+5. 输出 PAF（复用 `pgr::libs::paf/record.rs` 12 列 + `ov:A:D|C` tag），
    去重（同一对多 seed 命中取最长）、排除自身（q==t 及回文 rc）。
 
-**并行**：rayon 按 unitig 并行查询；索引构建与 `asm map` 同路径。
+**并行**：rayon 按 unitig 并行查询；索引构建与 `anchr asm map` 同路径。
 
 ### S2 layout（新 `libs/olc/layout.rs`）
 
@@ -119,25 +119,25 @@ overlap 全精确 ⇒ consensus = 沿 layout **精确缝合**：
 
 **列投票留 v1**：若未来引入错配 overlap 或真实数据暴露 junction 不一致，
 再加 AS_CNS `BaseCallMajority` 式逐列投票 + min-coverage 修剪
-（Canu `consensusNoSplit` 语义），复用 `asm map` + `sam to-rg` +
-`rg coverage` 的回放设施（`references/canu.md` §8.3 已论证）。
+（Canu `consensusNoSplit` 语义），复用 `anchr asm map` + `anchr sam to-rg` +
+`pgr rg coverage` 的回放设施（`references/canu.md` §8.3 已论证）。
 
 ## 5. 命令设计
 
-新增 `pgr asm` 三个叶子命令 + 一个驱动器（四层：`libs/olc/*` 管逻辑，
-`cmd_pgr/asm/*` 薄壳）：
+新增 `anchr asm` 三个叶子命令 + 一个驱动器（四层：`libs/olc/*` 管逻辑，
+`cmd/asm/*` 薄壳）：
 
 | 命令 | 输入 → 输出 | 逻辑 |
 |---|---|---|
-| `pgr asm ovlp` | unitig FASTA(s) → PAF | `libs/olc/overlap.rs` |
-| `pgr asm layout` | PAF + unitig FASTA → layout TSV | `libs/olc/layout.rs` |
-| `pgr asm cns` | layout TSV + unitig FASTA → contigs FASTA | `libs/olc/consensus.rs` |
-| `pgr asm olc` | reads → contigs FASTA（驱动器） | 内部组合 S0–S3，阶段间走内存 |
+| `anchr asm ovlp` | unitig FASTA(s) → PAF | `libs/olc/overlap.rs` |
+| `anchr asm layout` | PAF + unitig FASTA → layout TSV | `libs/olc/layout.rs` |
+| `anchr asm cns` | layout TSV + unitig FASTA → contigs FASTA | `libs/olc/consensus.rs` |
+| `anchr asm olc` | reads → contigs FASTA（驱动器） | 内部组合 S0–S3，阶段间走内存 |
 
-`pgr asm olc` 参数：
+`anchr asm olc` 参数：
 
 ```text
-pgr asm olc <infiles>... -o contigs.fa \
+anchr asm olc <infiles>... -o contigs.fa \
     --kmer 21,51,81          # 逗号分隔，默认 21,51,81
     --min-count-seed 3       # 透传 asm unitig
     --overlap-k 17           # S1 seed k
@@ -171,19 +171,19 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
 
 | 环节 | 复用 | 用途 |
 |---|---|---|
-| S0 | `libs/asm/assemble.rs::assemble_unitigs` | unitig 生成（命令层 `asm unitig` 已包装） |
-| S1 | `libs/map.rs`（MapIndex 形态 + `canonical_keys` + radix） | canonical k-mer 种子索引 |
-| S1 | `libs/kmer/key.rs::Kmer` | 边界 k-mer 编解码 / rc / canonical |
-| S1 | `libs/nt::rev_comp` | 方向验证 |
-| S1 | `libs/paf/record.rs` | PAF 写出 |
-| S1 | `libs/ds/radix_sort.rs::radix_sort_bytes` | 索引排序 |
-| S2 | `libs/ds/dsu.rs`（仅若需要连通分量） | 布局分组（v0 可不用） |
-| S3 | `libs/fmt/seq.rs::SeqReader` | unitig FASTA 读取 |
-| 全部 | `libs/io.rs` reader/writer、`cmd_pgr/args.rs` 标准参数 | I/O 与 CLI 一致性 |
+| S0 | `libs/asm/assemble.rs::assemble_unitigs`（anchr 业务） | unitig 生成（命令层 `asm unitig` 已包装） |
+| S1 | `libs/map.rs`（MapIndex 形态 + `canonical_keys` + radix，anchr 业务） | canonical k-mer 种子索引 |
+| S1 | `pgr::libs::kmer/key.rs::Kmer` | 边界 k-mer 编解码 / rc / canonical |
+| S1 | `pgr::libs::nt::rev_comp` | 方向验证 |
+| S1 | `pgr::libs::paf/record.rs` | PAF 写出 |
+| S1 | `pgr::libs::ds/radix_sort.rs::radix_sort_bytes` | 索引排序 |
+| S2 | `pgr::libs::ds/dsu.rs`（仅若需要连通分量） | 布局分组（v0 可不用） |
+| S3 | `pgr::libs::fmt/seq.rs::SeqReader` | unitig FASTA 读取 |
+| 全部 | `pgr::libs::io.rs` reader/writer、`cmd/args.rs` 标准参数 | I/O 与 CLI 一致性 |
 | 驱动 | `libs/asm/assemble.rs` + 上述各 libs | 内存组合，无中间文件 |
 
 **不引入新依赖**（AGENTS.md 硬性要求）；k-mer 表示统一用 FastK 字节键
-（`design/kmer.md` §12 的唯一表示），与 `pgr kmer`/`pgi`/`asm map` 同套。
+（`pgr::libs::kmer` 的唯一表示），与 `pgr kmer`/`pgi`/`anchr asm map` 同套。
 
 ## 8. 验证计划
 
@@ -199,7 +199,7 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
 ### 集成测试（tests/cli_asm_olc.rs）
 
 * 合成基因组（随机 ~2 kb 序列）→ 生成多份 reads（子串 + rc，覆盖 ~20×）
-  → `pgr asm olc` → contigs 与基因组逐段精确一致（identity 100%）；
+  → `anchr asm olc` → contigs 与基因组逐段精确一致（identity 100%）；
 * 阶段管道形态（`asm unitig` ×3 k → `asm ovlp` → `asm layout` →
   `asm cns`）与驱动器输出一致；
 * Lambda 真实 reads 冒烟（`tests/bbtools/Lambda/R1.2k.fq.gz` 等）：
@@ -214,17 +214,17 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
 
 | 里程碑 | 内容 | 验证 |
 |---|---|---|
-| M1 | `libs/olc/overlap.rs` + `pgr asm ovlp` | ✅ 5 单测 + 3 集成测试 |
-| M2 | `libs/olc/layout.rs` + `pgr asm layout` | ✅ 5 单测（线性/反向/分支/互惠/contain） |
-| M3 | `libs/olc/consensus.rs` + `pgr asm cns` | ✅ 4 单测（含不一致 overlap 友好报错） |
-| M4 | `pgr asm olc` 驱动器 + 集成测试 + `docs/asm.md` + todo/笔记更新 | ✅ 合成基因组重建 + 确定性 + 阶段管道等价 |
+| M1 | `libs/olc/overlap.rs` + `anchr asm ovlp` | ✅ 5 单测 + 3 集成测试 |
+| M2 | `libs/olc/layout.rs` + `anchr asm layout` | ✅ 5 单测（线性/反向/分支/互惠/contain） |
+| M3 | `libs/olc/consensus.rs` + `anchr asm cns` | ✅ 4 单测（含不一致 overlap 友好报错） |
+| M4 | `anchr asm olc` 驱动器 + 集成测试 + `docs/asm.md` + todo/笔记更新 | ✅ 合成基因组重建 + 确定性 + 阶段管道等价 |
 
 ### 实现说明（与设计定稿的偏差）
 
 * layout 的互惠检查实现在**连接端**（target 的 junction end 的 best edge
   指回当前 unitig），而非自由端——线性链因此可连续延伸；
 * 阶段命令 `layout` 需要 unitig FASTA（不止 PAF），用于长度与命名校验，
-  `cns` 同理；命名逻辑抽到 `cmd_pgr/asm/common.rs` 三命令共用；
+  `cns` 同理；命名逻辑抽到 `cmd/asm/common.rs` 三命令共用；
 * 驱动器的 unitig 命名 `k<k>:unitig_<id>`（不是 `<stem>:`），阶段管道用
   文件 stem；两者互不冲突（驱动器 `--keep-dir` 产物可直接喂阶段命令）；
 * `asm unitig` 新增内存版 `assemble_unitigs_buf`（`assemble.rs` 最小重构：
@@ -243,7 +243,7 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
   有两个成熟参考——`references/skesa.md` §7.1（`FilterLowAbundanceNeighbors`
   fraction=0.1 多层过滤 + 可逆性检查）与 `references/metaMDBG.md` §9
   （渐进丰度过滤 t=1.1/10% 步长 + RepeatRemover 的桥接 reads 证据，
-  pgr 用 `asm map` + `sam to-rg` + `rg coverage` 回放即等价设施）；
+  pgr 用 `anchr asm map` + `anchr sam to-rg` + `pgr rg coverage` 回放即等价设施）；
   多 k 反馈（SKESA clean_reads / metaMDBG unitig 反馈）为 v2 候选。
 * **参考**：`canu-2.3/src/bogart/`、`wgs-8.3rc2/src/AS_BAT/` 源码随取随用；
   不引入其代码/依赖（Canu EOL）。
@@ -305,7 +305,7 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
 ### 12.4 reads 回贴验证（2026-08-12，确认全长 contig 正确）
 
 预过滤后 OLC 把 Lambda 拼成**单条 48,387 bp contig**（≈ 48,502 参考）。
-reads 回贴验证（`asm map`，完美匹配）：
+reads 回贴验证（`anchr asm map`，完美匹配）：
 
 * 40,000 reads 中 **34,697（86.7%）完美贴回** contig；对 NC_001416 参考
   只有 34,069（85.2%）——OLC contig 多捕获 628 条，正是参考缺失的
@@ -329,7 +329,8 @@ reads 回贴验证（`asm map`，完美匹配）：
     48,502），16 条旧 contig 全部是它的子串（内容零丢失）。注意：
     过滤会改变 greedy 路径选择（这正是目的——多 k 冗余曾打断互惠链），
     "内容保留"而非"布局不变"。
-* **repeat breaking 覆盖度证据**：桥接 reads 回放（`asm map` + `sam
-  to-rg` + `rg coverage`），阈值参考 SKESA fraction / metaMDBG 语义；
+* **repeat breaking 覆盖度证据**：桥接 reads 回放（`anchr asm map` +
+  `anchr sam to-rg` + `pgr rg coverage`），阈值参考 SKESA fraction /
+  metaMDBG 语义；
   需 reads 侧验证口径（参考菌株不匹配时不能只用贴回率）。
 * 真实宏基因组数据验证 + 调参。

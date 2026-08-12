@@ -110,7 +110,7 @@ pgr 迁移面不含 unitig 组装；merge 流程的 tadpole 只取其 ecc/extend
   dead-end 停，深度比可穿强分支；作为 unitigger 结果不确定（ecc/extend
   场景没问题，unitig 组装不如前两者）。
 
-**结论**：若将来 pgr 要接管 unitigs（`pgr unitigs`），参考实现应是
+**结论**：若将来 anchr 要接管 unitigs（`anchr unitigs`），参考实现应是
 BCALM 式 minimizer 分区 + cDBG 压实（确定性 unitig，可并行、内存可控），
 而非 Tadpole 克隆；彩色图（Bifrost 的差异化能力）暂不需要。本次 merge
 迁移不动 unitigs，bcalm/Bifrost 维持外部依赖即可。
@@ -285,7 +285,7 @@ BBTools-40.01 源码（`jgi/BBMerge*`、`assemble/Tadpole*`、`jgi/Clumpify*`）
 
 ## 6. 实现状态（bbmerge 迁移完成，2026-08-11）
 
-**`pgr fq merge` 已实现并通过 BBTools 40.01 黑盒逐字节对照**（Lambda 40k
+**`anchr fq merge` 已实现并通过 BBTools 40.01 黑盒逐字节对照**（Lambda 40k
 pairs，`tests/cli_fq_merge.rs`）：
 
 * `--ecco --mix --vstrict --net bbmerge.bbnet` ≡ `bbmerge.sh ecco mix vstrict`
@@ -310,7 +310,7 @@ pairs，`tests/cli_fq_merge.rs`）：
 
 ## 7. 实现状态（tadpole ecc/extend 迁移完成，2026-08-11）
 
-**`pgr fq ec-kmer` / `pgr fq extend` 已实现并通过 BBTools 40.01 黑盒逐字节对照**
+**`anchr fq ec-kmer` / `anchr fq extend` 已实现并通过 BBTools 40.01 黑盒逐字节对照**
 （Lambda 40k pairs 全量 + 2k pairs 子集 golden，`tests/cli_fq_ecc.rs` /
 `tests/cli_fq_extend.rs`，fmt/clippy clean，全量测试绿）：
 
@@ -350,7 +350,7 @@ pairs，`tests/cli_fq_merge.rs`）：
 
 ### 7.2 merge phase 4（bbmerge-auto extend2/rem，2026-08-11 完成）
 
-**`pgr fq merge --strict --no-make-vector --extend2 80 --rem` 已实现并通过
+**`anchr fq merge --strict --no-make-vector --extend2 80 --rem` 已实现并通过
 BBTools 40.01 黑盒逐字节对照**（`ext_sub.fq.gz` 2000 对，merged/unmerged/
 ihist 全一致，`merge4.*` golden + `cli_fq_merge.rs` 测试）。
 

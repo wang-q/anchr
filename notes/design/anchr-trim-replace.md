@@ -6,7 +6,7 @@
 > 配套：[本文档](anchr-trim-replace.md)（已实现，覆盖 sickle 部分）、
 > [seq-reader.md](seq-reader.md)（FAFQ/BGZF 基础设施）。
 
-> **定位（2026-08 修正）**：`pgr fq trim-qual` 只替换流水线中的 **sickle**（第 9 步，
+> **定位（2026-08 修正）**：`anchr fq trim-qual` 只替换流水线中的 **sickle**（第 9 步，
 > 多阈值质量/长度参数扫描），**不替换 BBTools 任何组件**。BBTools 8 步（第 1-8）
 > 是另一个替换目标，逐项梳理见 §3。
 
@@ -26,7 +26,7 @@
 | 8 | `repair.sh` | 交错 → R1/R2/singles | `out/out2/outs` |
 | 9 | `sickle` | 多阈值质量/长度修剪（参数扫描） | `-q/-l` 遍历，`Q{qual}L{len}/` 目录 |
 
-第 9 步（sickle）已由 `pgr fq trim-qual` 覆盖（anchr 的 sickle 调用只有
+第 9 步（sickle）已由 `anchr fq trim-qual` 覆盖（anchr 的 sickle 调用只有
 `-q/-l/-t sanger`，未用 `-n` 截断，trim-qual 均已覆盖），见
 [本文档](anchr-trim-replace.md)。注意：bbduk trim（第 5 步）里的
 `qtrim/minlen/maxns/ftm` 是 **bbduk 的参数，不属于 trim-qual 的替换范围**。
@@ -64,7 +64,7 @@
 | M2 `fq split`/`fq sample` | **完成，逐字节一致** | `cli_fq_split.rs`/`cli_fq_sample.rs` 对照 repair/reformat golden；2026-08-10 晚复核 sample：6 组 target/seed（含超总量边界）+ 单端输入，与 39.38 `reformat.sh samplebasestarget` 逐字节一致（FastRandomXoshiro/allowUpsample=false/per-pair 决策全对上） |
 | M3-M5 `fq trim-adapter` | **完成，逐字节一致** | `cli_fq_trim_adapter.rs` 对照 trim/filter golden；`--stats` 输出 bbduk `stats=` 3 列格式，与 39.38 逐字节一致（#File 路径行除外，见 §6.5）；2026-08-10 晚复核：19 组 trim 变体（k/mink/hdist/minlen/trimq/ftm/maxns/tbo/tpe/qtrim/组合）+ 3 组 filter k 变体 + 质量边界，与 39.38 `bbduk.sh ordered=t` 逐字节一致；修复 changequality 与 qtrim 空 read 边界（见下） |
 | M7 kmercountexact | **完成，逐字节一致** | `pgr kmer hist --khist-text/--peaks`（logScale + CallPeaks 全移植）对照 R.khist.txt/R.peaks.txt |
-| M6 bbnorm cutoff | **完成（精确表语义）** | `pgr fq norm`（精确 canonical 表 + bbnorm per-read 判定逻辑：truedepth/depthAL 分位数 + toss 条件）；与 bbnorm bits=16 近似计数在 min=3 边界差 ~21 对（39846 vs 39888），属设计稿已声明的"先精确 KmerTable"路线 |
+| M6 bbnorm cutoff | **完成（精确表语义）** | `anchr fq norm`（精确 canonical 表 + bbnorm per-read 判定逻辑：truedepth/depthAL 分位数 + toss 条件）；与 bbnorm bits=16 近似计数在 min=3 边界差 ~21 对（39846 vs 39888），属设计稿已声明的"先精确 KmerTable"路线 |
 | M8 集成 | **完成（原语路线）** | 只提供可组合原语（clump/split/sample/trim-adapter/fq norm/hist），**不内置 pl trim 流水线**——编排属于 anchr，pgr 不做"别人的活"（2026-08-10 修正，`pl trim` 已移除）；anchr 模板把 `bbduk.sh` 等调用换成 pgr 命令、用管道串联避免中间 gz |
 
 基准见 [bbtools-vs-anchr.md](../benchmarks/bbtools-vs-anchr.md)
@@ -107,7 +107,7 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
   有差异，迁移语义与 golden 验证**一律以本地 39.38 为准**，40.01 只作算法演进
   参考，不作为移植来源。
 
-- **替换对象**：`trim.tera.sh` 第 1-8 步（第 9 步 sickle 已由 `pgr fq trim-qual`
+- **替换对象**：`trim.tera.sh` 第 1-8 步（第 9 步 sickle 已由 `anchr fq trim-qual`
   覆盖，见 [本文档](anchr-trim-replace.md)）。
 - **不做**：复刻 Java 工程外壳（JVM、`-Xmx`、每步 gz 落盘、`if [ ! -e ]` 缓存）；
   `filterbytile.sh` 默认跳过。**clumpify 已确认纳入迁移范围**（2026-08-10），
@@ -124,15 +124,15 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
 
 | # | 流水线步骤 | BBTools 入口类 | 源码位置（参考） | 行数 | pgr 目标 |
 |---|---|---|---|---|---|
-| 1 | clumpify | `clump.Clumpify` | `current/clump/Clumpify.java` | 705 | `libs/fq/clump.rs` + `pgr fq clump` |
+| 1 | clumpify | `clump.Clumpify` | `current/clump/Clumpify.java` | 705 | `libs/fq/clump.rs` + `anchr fq clump` |
 | 2 | filterbytile | `hiseq.AnalyzeFlowCell` | `current/hiseq/AnalyzeFlowCell.java` | 1935 | 不做 |
-| 3 | bbnorm cutoff | `jgi.KmerNormalize` | `current/jgi/KmerNormalize.java` | 3895 | `libs/fq/norm.rs` + `pgr fq norm` |
-| 4 | reformat 降采样 | `jgi.ReformatReads` | `current/jgi/ReformatReads.java` | 1994 | `libs/fq/sample.rs` + `pgr fq sample` |
-| 5 | bbduk trim | `jgi.BBDuk`（39.38 实际入口） | 本地 `~/.cbp/libexec/bbtools/current/jgi/BBDuk.java`（5384 行）；40.01 的 `jgi/BBDuk.java`（5462 行）+ `bbduk/` BBDukS 家族作参考 | 5384 | `libs/fq/trim_adapter.rs` + `pgr fq trim-adapter` |
+| 3 | bbnorm cutoff | `jgi.KmerNormalize` | `current/jgi/KmerNormalize.java` | 3895 | `libs/fq/norm.rs` + `anchr fq norm` |
+| 4 | reformat 降采样 | `jgi.ReformatReads` | `current/jgi/ReformatReads.java` | 1994 | `libs/fq/sample.rs` + `anchr fq sample` |
+| 5 | bbduk trim | `jgi.BBDuk`（39.38 实际入口） | 本地 `~/.cbp/libexec/bbtools/current/jgi/BBDuk.java`（5384 行）；40.01 的 `jgi/BBDuk.java`（5462 行）+ `bbduk/` BBDukS 家族作参考 | 5384 | `libs/fq/trim_adapter.rs` + `anchr fq trim-adapter` |
 | 5b | tbo / tpe | `jgi.BBMergeOverlapper.mateByOverlapRatio` | 本地 1256 行；40.01 1503 行 | 1256 | 同上命令的 overlap 子模块（纯 Rust 移植 Java fallback，JNI 两版本均已禁用） |
-| 6 | bbduk filter | 同上（`jgi.BBDuk` `cardinality` 模式） | 同上 | — | `pgr fq trim-adapter --filter`（复用 kmer 表） |
-| 7 | kmercountexact | `jgi.KmerCountExact` | `current/jgi/KmerCountExact.java` | 1155 | 复用 `libs/kmer`（table/hist/gsize）+ 补 peaks 文本 |
-| 8 | repair | `jgi.SplitPairsAndSingles rp` | `current/jgi/SplitPairsAndSingles.java` | 909 | `libs/fq/split.rs` + `pgr fq split` |
+| 6 | bbduk filter | 同上（`jgi.BBDuk` `cardinality` 模式） | 同上 | — | `anchr fq trim-adapter --filter`（复用 kmer 表） |
+| 7 | kmercountexact | `jgi.KmerCountExact` | `current/jgi/KmerCountExact.java` | 1155 | 复用 `pgr::libs::kmer`（table/hist/gsize）+ 补 peaks 文本 |
+| 8 | repair | `jgi.SplitPairsAndSingles rp` | `current/jgi/SplitPairsAndSingles.java` | 909 | `libs/fq/split.rs` + `anchr fq split` |
 
 > 版本差异注意：`bbduk.sh` 在本地 39.38 中入口是 `jgi.BBDuk`；40.01 才改成
 > `bbduk.BBDukS`（新 bbduk 包）。迁移以 39.38 的 `jgi.BBDuk` 为准，40.01 的
@@ -141,15 +141,15 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
 
 ### 4.3 目标 CLI（已实现，2026-08-10 定稿）
 
-- `pgr fq clump`：按 kmer 签名排序/聚类 reads（对齐 `clumpify.sh`；`--dedupe
+- `anchr fq clump`：按 kmer 签名排序/聚类 reads（对齐 `clumpify.sh`；`--dedupe
   --dupesubs 0` 整对去重已实现——R1 与 R2 都精确匹配（N 通配）才算重复，
   保留期望错误更少的那对；超内存数据走外部 hash 桶路径（`--mem` 控制，
   确定性桶序，见 §4.6）。
-- `pgr fq split`：交错输入 → R1/R2/singles（对齐 `repair.sh rp`，是
+- `anchr fq split`：交错输入 → R1/R2/singles（对齐 `repair.sh rp`，是
   `fq interleave` 的反操作）。
-- `pgr fq sample`：按目标碱基数/比例降采样（对齐 `reformat.sh
+- `anchr fq sample`：按目标碱基数/比例降采样（对齐 `reformat.sh
   samplebasestarget`）。
-- `pgr fq trim-adapter`（核心）：
+- `anchr fq trim-adapter`（核心）：
   - 修剪模式（默认）：`--ref <fa> --k <trimk> --min-k <11> --hamming-distance <1>`
     + `--trim-quality <15> --minlen <60> --max-ns <0> --force-trim-mod <5>`；`--no-tbo`/
     `--no-tpe`/`--no-qtrim` 关闭对应步骤；配对丢弃由 `--no-toss-broken-reads`
@@ -159,7 +159,7 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
     `k=<matchk> cardinality`）；
   - 双端输入为 interleaved，R1/R2 同步处理（tbo/tpe 需要同读对）；
   - 质量修剪复用 `libs/fq/trim.rs`（trim-qual 的 sliding/mott、polyG）。
-- `pgr fq norm`：`--min <cutoff>`（对齐 `bbnorm.sh min=`；`bits=16` 近似
+- `anchr fq norm`：`--min <cutoff>`（对齐 `bbnorm.sh min=`；`bits=16` 近似
   哈希 vs 精确 KmerTable 的内存策略见 §4.5）。
 - `pgr kmer hist` 已有（FastK 兼容）；补 `--peaks` 文本输出对齐
   `kmercountexact.sh` 的 `khist.txt`/`peaks.txt`。
@@ -168,7 +168,7 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
 
 ### 4.4 里程碑与验证
 
-1. **M1 `pgr fq clump`**：按 kmer 签名排序（+`--dedupe` 整对去重），对齐
+1. **M1 `anchr fq clump`**：按 kmer 签名排序（+`--dedupe` 整对去重），对齐
    `clumpify.sh`。→ 与本地 39.38 `clumpify.sh` 输出逐字节比对（顺序、去重
    语义）。注：dedupe golden 用 `threads=1` 生成——BBTools threads>1 时
    dedupe 输出顺序不确定（clump 线程竞态），删除集合一致；pgr 的 dedupe
@@ -197,7 +197,7 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
    fallback 语义（JNI 在两版本中均已禁用，实际运行即该路径）。
    → 用 insert 短于 read 长度的双端数据（合成）逐字节比对。
 5. **M5 bbduk filter + cardinality** → 输出 read 集合与 `stats` 文本逐字节一致。
-6. **M6 `pgr fq norm`** → 过滤后输出与 39.38 `bbnorm.sh` 逐字节一致（先精确
+6. **M6 `anchr fq norm`** → 过滤后输出与 39.38 `bbnorm.sh` 逐字节一致（先精确
    KmerTable；大数据量再评估近似哈希路径，对齐 `bits=16` 语义）。
 7. **M7 kmer hist peaks** → `khist.txt`/`peaks.txt` 逐字节一致（已有 hist 基础）。
 8. **M8 集成与基准**：anchr 新模板（pgr-only）端到端：流水线最终输出与 BBTools
@@ -227,7 +227,7 @@ BBTools-40.01 源码已置于仓库根 `BBTools-40.01/`——该目录自带 `.g
 
 ### 4.6 内存模型与外部排序（2026-08-10 定稿）
 
-`pgr fq clump` 的排序内存上限：
+`anchr fq clump` 的排序内存上限：
 
 ```
 mem_limit = min( --mem（默认 2g）,  物理内存 × 0.5,  数据估算 )
@@ -262,12 +262,12 @@ bucket 强制外部桶路径；指定 `--buckets` 等价于隐含 bucket 模式�
 
 ### 4.7 流水线命令并行化（2026-08-10）
 
-通用组件 `libs/par::ordered_map`：有界保序并行流水线（feeder 线程 +
+通用组件 `pgr::libs::par::ordered_map`：有界保序并行流水线（feeder 线程 +
 `workers` 个 worker + 按输入序收集的 collector），内存由通道容量界定，
 输出顺序与线程数无关。已接入：
 
-* `pgr fq trim-adapter --parallel N`（默认逻辑 CPU 数）：流式读取
-  （`libs/fq/pairs::PairReader`，不再整体载入内存）+ 并行处理每对 reads，
+* `anchr fq trim-adapter --parallel N`（默认逻辑 CPU 数）：流式读取
+  （`pgr::libs::fq/pairs::PairReader`，不再整体载入内存）+ 并行处理每对 reads，
   按序写回。50 万对合成数据实测 threads=1 9.2s → threads=8 1.4s（6.6×），
   峰值内存 ~15MB（流式、有界），threads=1/8 输出逐字节一致且与 golden
   一致。
@@ -375,7 +375,7 @@ parameters"，39.38 与 40.01 一致），但这是**新功能**，不在 anchr 
 * 分箱与 keep/toss 正交：任何 read 都会恰好进入一个 bin，可只分箱不
   归一化；两遍式（全量建表 → 分类），确定性，与已实现的 norm 语义一致。
 
-**若将来要做**：`pgr fq norm` 的扩展——建表与 depthAL 计算全为现成，
+**若将来要做**：`anchr fq norm` 的扩展——建表与 depthAL 计算全为现成，
 加 `lbd/hbd` + 三个输出通道即可，成本不大。当前无动作。
 
 ### 4.10 reformat.sh 功能全景盘查（2026-08-10）
@@ -400,7 +400,7 @@ parameters"，39.38 与 40.01 一致），但这是**新功能**，不在 anchr 
   （实测也真的输出）。后续源码分析以 `.class` strings + 黑盒实测为准，
   `.java` 只作提示性参考。
 * 移植成本：pgr 没有 SAM reader，需先能读 sam（`|TLEN|` 或双线
-  insertSizeMapped）+ 直方图输出；属于新命令（如 `pgr fq ihist` 或挂在
+  insertSizeMapped）+ 直方图输出；属于新命令（如 `anchr fq ihist` 或挂在
   `paf`/`fa` 侧）。**是否纳入迁移待用户定**（ihist 属于 2_insert_size
   模板，不在 trim 流水线 8 步内）。
 
@@ -449,8 +449,8 @@ BBMerge 在 overlap merge 时从 read 对重叠/缺口反推 `bestInsert`
    maxns/stats/tossbrokenreads）——已移植并核对 ✅；
 2. trim.tera.sh filter（k/cardinality/stats/tossbrokenreads）——已移植 ✅；
 3. **merge.era.sh 纯 qtrim**（`bbduk.sh qtrim=r trimq={{opt.qual}}
-   minlen={{opt.len}}`，无 ref）——**缺口**：`pgr fq trim-adapter` 的
-   `--ref` 目前必填；`pgr fq trim-qual` 是 sickle 语义（sliding/Mott），
+   minlen={{opt.len}}`，无 ref）——**缺口**：`anchr fq trim-adapter` 的
+   `--ref` 目前必填；`anchr fq trim-qual` 是 sickle 语义（sliding/Mott），
    与 bbduk 的 optimalMode（testOptimal）输出不一致，不能顶替。
 
 **结论：bbduk 全部参数里，对 anchr 有用的只剩 merge.era.sh 的纯 qtrim
@@ -482,7 +482,7 @@ minlen=0、ftm=5 组合）与 `bbduk.sh qtrim=r trimq=... minlen=...` 逐字节
   输出**解压后逐字节一致**（name、顺序、序列、质量、行宽/换行等格式细节；
   gz 压缩字节不要求一致；顺序由 M1 clumpify 保证）；
 - `khist.txt`/`peaks.txt` 逐字节一致（已达成）；`trim.stats.txt`/
-  `filter.stats.txt` 统计文本已复刻（`pgr fq trim-adapter --stats`，3 列
+  `filter.stats.txt` 统计文本已复刻（`anchr fq trim-adapter --stats`，3 列
   格式与 39.38 逐字节一致，见 §6.5）；
 - 端到端墙钟时间显著下降（8 个 JVM 进程 → Rust 单进程流式）；
 - 中间文件可选（管道模式不落盘）。
@@ -492,14 +492,14 @@ minlen=0、ftm=5 组合）与 `bbduk.sh qtrim=r trimq=... minlen=...` 逐字节
 1. 版本基线：以本地安装的 BBTools 39.38（`jgi.BBDuk` 入口）为对齐与验证
    基准、仓库内 40.01 仅作参考——是否确认？本地 39.38 源码是否也放进仓库
    参考目录（当前只有 40.01）？
-2. 命令命名（2026-08-10 定稿）：`pgr fq` 下全部动词/约定风格——`clump`、
+2. 命令命名（2026-08-10 定稿）：`anchr fq` 下全部动词/约定风格——`clump`、
    `norm`、`sample`、`split`、`interleave`、`range`（与 `fa range` 同约定）、
    `to-fa`（与 `fa to-2bit` 同约定）；trim 家族统一为 "trim-<目标>"：
    `trim-adapter` + `trim-qual`（原 trim-q）。
 3. ~~接头修剪语义~~ → 已定：完全复刻（tbo/tpe/hdist 全部移植，逐字节一致）。
 4. 中间文件策略：流水线管道串联（pgr 命令流式、不落 gz）是否可接受？
    （2026-08-10 已定：接受管道串联，不内置 `pl trim`。）
-5. 统计文本（2026-08-10 已实现）：`pgr fq trim-adapter --stats <file>` 输出
+5. 统计文本（2026-08-10 已实现）：`anchr fq trim-adapter --stats <file>` 输出
    bbduk `stats=` 3 列格式（`#File`/`#Total`/`#Matched`/`#Name` + 每参考序列
    行），排序 = StringCount（bases 降序、reads 降序、name 升序），每 read
    记首个命中 kmer 的 scaffold（ktrim 的 `id0` / countSetKmers 的
@@ -552,9 +552,9 @@ bbduk 功能（默认关闭，不影响既有 golden）。**14 组 Lambda 真实
 `fq trim-adapter` 拆为两个命令，对应 bbduk 的两次调用（模式互斥，bbduk
 一次 pass 只能做一个 kmer 操作）：
 
-* `pgr fq clean`：bbduk 第一次调用（kmer 修剪 + 质量/长度/GC/polymer/
+* `anchr fq clean`：bbduk 第一次调用（kmer 修剪 + 质量/长度/GC/polymer/
   kmask），删掉 filter 模式的 `--no-ktrim` 开关；
-* `pgr fq filter`：bbduk 第二次调用（kmer 匹配判定丢弃），默认
+* `anchr fq filter`：bbduk 第二次调用（kmer 匹配判定丢弃），默认
   k=27（anchr matchk）/mink=0/hdist=0/minlen=10，只暴露 kmer 匹配 +
   minlen/max-ns/toss/stats。
 
@@ -567,7 +567,7 @@ ktrim/kmask 短 kmer 扫描的 `lim` 应为 `max(-1, stop-k)`（数据短于 k �
 
 ### 4.14 FQ 代码复审（2026-08-11，外部审核后自查）
 
-复查 `libs/fq/` 与 `cmd_pgr/fq/`，发现并修复 3 个与 bbduk 语义偏差/
+复查 `libs/fq/` 与 `cmd/fq/`，发现并修复 3 个与 bbduk 语义偏差/
 panic 的 bug（均被合成反例复现，Lambda golden 上被掩盖）：
 
 1. **kmask `maskfullycovered` 命中语义反了**：bbduk 命中 kmer 窗口
@@ -618,12 +618,12 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "\
 > 多阈值批量修剪**。
 ### 7.1. CLI 设计
 ### 7.1.1 命名
-`pgr fq trim-qual`（用户已确认）。`-q`（quality）显式表明"按质量分数修剪"，与
-"去接头"（`trim`/trimming）区分。子命令用连字符风格，与 `pgr fq to-fa`、
-`pgr fq interleave` 一致。
+`anchr fq trim-qual`（用户已确认）。`-q`（quality）显式表明"按质量分数修剪"，与
+"去接头"（`trim`/trimming）区分。子命令用连字符风格，与 `anchr fq to-fa`、
+`anchr fq interleave` 一致。
 ### 7.1.2 参数（已定稿）
 ```
-pgr fq trim-qual [options] <infiles...>
+anchr fq trim-qual [options] <infiles...>
 Input:
   <infiles...>  单端 1 个文件；双端 2 个文件（分别对应 R1/R2）
 Options:
@@ -703,7 +703,7 @@ anchr 的场景是"一批阈值各跑一遍"。两个可选方案：
 | 零 panic | 质量字符越界（`qual - base` 得负或超范围）须返回 `anyhow` 错误，不静默处理 |
 | 文件名去重 | 输入/输出不可相同，防覆盖（对齐 `ensure_outfile_distinct` 硬约束） |
 | 质量编码 | `--quality-base 33|64|auto`，默认 auto（规则见 §1.4）；Solexa 按 +64 近似；输出与输入同编码 |
-| 分层 | 算法（滑窗/Mott）放 `libs/fq/`，`cmd_pgr/fq/` 仅做 clap 编排 |
+| 分层 | 算法（滑窗/Mott）放 `libs/fq/`，`cmd/fq/` 仅做 clap 编排 |
 | 依赖 | 用自研 `SeqReader`（`fmt/seq.rs`）读 FAFQ，不引入新依赖 |
 ### 7.4. 测试计划
 - **单元**：滑窗与 Mott 对已知质量串的切点断言（两端质量高/低、中部低质量区、
@@ -742,9 +742,9 @@ anchr 的场景是"一批阈值各跑一遍"。两个可选方案：
 方向/算法模型、`-l` 绝对长度、singles 语义；明确拒绝 maq/mbq/maxns/mlf/maxlength
 等额外过滤与 `rieb=f` 选项。
 ### 7.7. 实现记录（2026-08）
-**落地**：`pgr fq trim-qual` 已实现并验证。
+**落地**：`anchr fq trim-qual` 已实现并验证。
 - 代码：`src/libs/fq/trim.rs`（滑窗/Mott 算法、质量编码检测、单/双端编排）、
-  `src/cmd_pgr/fq/trim_q.rs`（clap 薄壳）、`src/libs/fmt/seq.rs`（`SeqRecord`
+  `src/cmd/fq/trim_q.rs`（clap 薄壳）、`src/libs/fmt/seq.rs`（`SeqRecord`
   加 `Clone`，供 auto 检测的采样缓冲）。
 - 与设计稿的差异：
   - `--no-fiveprime` 对 mott 同样有效：5' cutoff 置 0（cutadapt `-q 0,N` 语义），
