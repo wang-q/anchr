@@ -278,6 +278,53 @@ bucket 强制外部桶路径；指定 `--buckets` 等价于隐含 bucket 模式�
 
 ### 4.8 bbnorm norm：精确 vs 近似分析记录（2026-08-10，未定）
 
+## 5. 参考序列库数据来源（2026-08-13 核对）
+
+trim 流水线的两个参考 FASTA（`anchr trim` 的 `--filter "adapter artifact"`
+映射，`results/model.md` 的 `--filter "adapter artifact"` 用法）：
+
+| 参数 | 文件 | 来源 | 核对结果 |
+| :--- | :--- | :--- | :--- |
+| `--adapter` | `data/illumina_adapters.fa.gz`（158 条） | BBTools `resources/adapters.fa` | 逐条一致（仅 BBTools 版末尾多一空行） |
+| `--artifact` | `data/sequencing_artifacts.fa.gz`（164 条 + PhiX） | BBTools `resources/sequencing_artifacts.fa.gz` + **追加 PhiX 174 完整基因组** | anchr 版多 79 行（`>NC_001422.1` + 序列），BBTools 版无 |
+
+- 参考序列统一存 `data/`（[data/README.md](../../../data/README.md)），
+  两个 `.fa.gz` 压缩存储（`include_bytes!` + flate2 解压），默认写当前
+  目录平文件，`--adapter`/`--artifact` 可覆盖。
+- **PhiX 追加是 anchr 侧扩展**：把 PhiX spike-in 污染纳入 artifact 过滤；
+  BBTools 把 PhiX 单独放 `resources/phix174_ill.ref.fa.gz`（过滤时显式指定）。
+- **检测层（`fq qc`）是另一套库**：Overrep 来源标注用 FastQC
+  `Configuration/contaminant_list.txt`（151 条 Illumina adapter/primer，
+  无 PhiX），与过滤层的 BBTools 库用途不同（标注 vs 去除）。
+
+### 5.1 污染序列方案（建议）
+
+采用"检测跟 FastQC、过滤跟 BBTools"的分层：
+
+- **QC 检测/标注**（`fq qc` Overrep）：保持 FastQC contaminant_list——与
+  FastQC 报告标准一致（已 golden 验证）；PhiX 不纳入（FastQC 标准行为，
+  若需识别可在 contaminant 库追加，作为可选扩展并记录偏差）。
+- **过滤/去除**（`anchr trim`/`fq clean`）：保持 BBTools 组件化——adapter
+  用 `illumina_adapters.fa`、污染用 `sequencing_artifacts.fa`（含 PhiX 合并）。
+  PhiX 合并进 artifact 库的收益是零配置过滤 spike-in；代价是用户无法
+  单独排除 PhiX（如需保留 PhiX reads 计数，可用 `--artifact` 自定义库）。
+- 暂不拆分 PhiX 为独立参数（贴合 BBTools 的 `phix174` 单独文件）——
+  当前合并方案在 model.md 流程已工作，拆分收益（可选择性）低于改动成本；
+  若后续出现"保留 PhiX 用于校准计数"的需求再拆。
+
+### 5.2 序列数据的许可（2026-08-13）
+
+| 数据 | 来源 | 许可 | anchr 处理 |
+| :--- | :--- | :--- | :--- |
+| `templates/illumina_adapters.fa` | BBTools `adapters.fa` | BBTools "free for unlimited use" | 无附加声明 |
+| `templates/sequencing_artifacts.fa` | BBTools `sequencing_artifacts.fa.gz` + NCBI PhiX174 | BBTools free + PhiX 公共领域 | 无附加声明 |
+| `data/contaminant_list.txt` | FastQC `contaminant_list.txt` | **GPL v3** | 头部声明 + 附 `FastQC_DATA_LICENSE`（对齐 Falco 做法） |
+| `data/adapter_list.txt`（6 条） | FastQC `adapter_list.txt` | **GPL v3** | 与 contaminant 同目录，许可见 `data/README.md` |
+
+> anchr 本身是 MIT；FastQC 来源的序列数据按 GPL v3 单独声明（Falco 同款
+> 做法：MIT 代码 + `data/Configuration/FastQC_DATA_LICENSE`）。BBTools 和
+> NCBI 数据无附加限制。
+
 **原始用法（anchr `templates/trim.tera.sh`）**：
 
 ```bash

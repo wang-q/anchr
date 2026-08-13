@@ -26,7 +26,7 @@ flate2 = "1.1.8"
 # Pinned to the pgr commit used during migration (phase 1 libs pub-ification).
 # Local development overrides this via .cargo/config.toml -> ../pgr.
 # Bump deliberately after pgr API changes that anchr needs.
-pgr = { git = "https://github.com/wang-q/pgr", rev = "526cec1f21350cc6be574f4db945eeb2238e5068" }
+pgr = { git = "https://github.com/wang-q/pgr", rev = "48d2381fadb2d438f212bf9e6b61944bd44abc1f" }
 
 tera = "1.20.0"
 # data structure
@@ -46,6 +46,7 @@ log = "0.4"
 lru = "0.13.0"
 env_logger = "0.11"
 noodles-sam = "0.81.0"
+serde_json = "1.0.151"
 
 [build-dependencies]
 

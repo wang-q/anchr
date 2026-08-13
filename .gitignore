@@ -106,6 +106,7 @@ Cargo.lock
 *.tsv
 !*.tera.sh
 !scripts/*.sh
+!data/*.fa
 
 # mdBook output directory
 /book/

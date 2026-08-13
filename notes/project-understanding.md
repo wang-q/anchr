@@ -247,6 +247,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `asm-map.md` | perfect-mode map 移植 |
 | `fq-range.md` | FASTQ `.loc` 索引（range 命令） |
 | `asm-olc.md` | OLC 三段设计 |
+| `qc.md` | 自有 QC 方案设计（FastQC/Falco 双参考，M1-M4 里程碑） |
 
 ## 11. 外部工具参考索引（notes/references/）
 

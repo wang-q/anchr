@@ -1,0 +1,14 @@
+# This file contains a set of sequence fragments which will be explicitly
+# searched against your library.  The reporting will be similar to the
+# Kmer plot, except that every sequence in this list will be shown so
+# you can use this to judge the level of adapter read-through even if those
+# adapter sequences aren't picked out by the Kmer module.
+#
+# Data from FastQC (GPL v3) — see FastQC_DATA_LICENSE in this directory.
+#
+Illumina Universal Adapter					AGATCGGAAGAG
+Illumina Small RNA 3' Adapter				TGGAATTCTCGG
+Illumina Small RNA 5' Adapter				GATCGTCGGACT
+Nextera Transposase Sequence				CTGTCTCTTATA
+PolyA										AAAAAAAAAAAA
+PolyG										GGGGGGGGGGGG

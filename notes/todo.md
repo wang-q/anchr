@@ -61,11 +61,18 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
   `-Xmx`。差异 = 定义差异不是 bug，需在文档中定稿并记录边界差异；
 - **`dep`/`ena`/`template` 命令的外部工具版本核对**：依赖
   dazzler/hnsm 系统工具，CI/容器环境预装清单待整理。
-- **QC 方案迁移**（`notes/references/fastqc.md` + `falco.md`，双参考设计
-  提案）：把 `templates/2_fastqc.tera.sh` 的外部 `fastqc` 调用换成 Rust
-  实现的 QC 统计（BasicStats/质量/GC/N/长度先行，k-mer/adapter 后置）；
-  golden 双基准（FastQC 语义 + Falco 数值），txt 统计先行，HTML 用 tera
-  模板渲染。
+- **QC 方案实施**（设计稿 [design/qc.md](design/qc.md)，参考
+  `references/fastqc.md` + `falco.md`）：按 M1-M4 推进——M1 统计型模块
+  （BasicStats/质量/GC/N/长度，`anchr fq qc` + fastqc_data.txt/summary.txt）；
+  M2 富集模块（adapter/overrep/kmer/duplication）；M3 HTML + tile +
+  GCModel；M4 模板替换 + 双 golden（FastQC + Falco 实跑对照）。
+
+> **2026-08-13 进度**：M1 完成（`anchr fq qc` + fastqc 0.12.1 golden
+> 数值零差异）。**M1-M4 已完成**（并行、富集模块、GCModel/tile/HTML、
+> 模板替换）；剩余：HTML 视觉打磨、
+> Falco 双 golden 对照（htslib 1.21 装好后已完成：anchr 与两参考底层
+> 数值一致，Falco 的分箱/GC/grade 变体非 anchr 差异）。KmerContent
+> 富集路径与边界测试（空/单读/变长/超长）已验证补齐。
 
 ## 3. 挂账 / 待决
 

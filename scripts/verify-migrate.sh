@@ -5,6 +5,12 @@
 # notes/design/fq-asm-migrate.md): for every migrated command, run the same
 # input through anchr and pgr and require byte-identical outputs.
 #
+# NOTE (2026-08-13): the migration is complete and pgr has removed the
+# fq/asm/sam commands, so a rebuilt `pgr` binary no longer has them. This
+# script is kept as the historical stage-3 verification tool; it only runs
+# against a pgr binary built before the removal (e.g. the stale debug
+# binary, which still carries fq/asm/sam).
+#
 # Requires:
 #   - anchr binary (prefers target/release, falls back to target/debug;
 #     use ANCHR=... to override)

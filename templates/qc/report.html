@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FastQC Report: {{ filename }}</title>
+<style>
+body { font-family: sans-serif; margin: 2em; }
+h2 { color: #333; }
+table { border-collapse: collapse; margin-bottom: 2em; }
+td, th { border: 1px solid #ccc; padding: 3px 8px; text-align: right; }
+th { background: #eee; }
+.fail { color: #c00; font-weight: bold; }
+.warn { color: #c80; font-weight: bold; }
+.pass { color: #080; }
+</style>
+</head>
+<body>
+<h1>FastQC Report</h1>
+<h2>{{ filename }}</h2>
+
+<h3>Basic Statistics <span class="{{ basic_grade }}">{{ basic_grade }}</span></h3>
+<table>
+{% for row in basic %}<tr><td>{{ row.0 }}</td><td>{{ row.1 }}</td></tr>{% endfor %}
+</table>
+
+<h3>Per base sequence quality <span class="{{ pbq_grade }}">{{ pbq_grade }}</span></h3>
+<svg width="800" height="300">
+<polyline points="{% for row in per_base_quality %}{{ row.x }},{{ row.mean_y }} {% endfor %}" fill="none" stroke="steelblue"/>
+<polyline points="{% for row in per_base_quality %}{{ row.x }},{{ row.median_y }} {% endfor %}" fill="none" stroke="orange"/>
+</svg>
+<table>
+<tr><th>#Base</th><th>Mean</th><th>Median</th><th>Lower Quartile</th><th>Upper Quartile</th><th>10th Percentile</th><th>90th Percentile</th></tr>
+{% for row in per_base_quality %}<tr><td>{{ row.label }}</td><td>{{ row.mean }}</td><td>{{ row.median }}</td><td>{{ row.lq }}</td><td>{{ row.uq }}</td><td>{{ row.p10 }}</td><td>{{ row.p90 }}</td></tr>{% endfor %}
+</table>
+
+<h3>Per sequence quality scores <span class="{{ psq_grade }}">{{ psq_grade }}</span></h3>
+<table>
+<tr><th>Quality</th><th>Count</th></tr>
+{% for row in per_seq_quality %}<tr><td>{{ row.0 }}</td><td>{{ row.1 }}</td></tr>{% endfor %}
+</table>
+
+<h3>Per base sequence content <span class="{{ pbc_grade }}">{{ pbc_grade }}</span></h3>
+<table>
+<tr><th>#Base</th><th>G</th><th>A</th><th>T</th><th>C</th></tr>
+{% for row in per_base_content %}<tr><td>{{ row.0 }}</td><td>{{ row.1 }}</td><td>{{ row.2 }}</td><td>{{ row.3 }}</td><td>{{ row.4 }}</td></tr>{% endfor %}
+</table>
+
+<h3>Per sequence GC content <span class="{{ gc_grade }}">{{ gc_grade }}</span></h3>
+<svg width="800" height="200">
+<polyline points="{% for row in gc %}{{ row.0 * 7 }},{{ 180 - row.1 }} {% endfor %}" fill="none" stroke="green"/>
+</svg>
+
+<h3>Per base N content <span class="{{ n_grade }}">{{ n_grade }}</span></h3>
+<table>
+<tr><th>#Base</th><th>N-Count</th></tr>
+{% for row in per_base_n %}<tr><td>{{ row.0 }}</td><td>{{ row.1 }}</td></tr>{% endfor %}
+</table>
+
+<h3>Sequence Length Distribution <span class="{{ len_grade }}">{{ len_grade }}</span></h3>
+<table>
+<tr><th>Length</th><th>Count</th></tr>
+{% for row in length %}<tr><td>{{ row.0 }}</td><td>{{ row.1 }}</td></tr>{% endfor %}
+</table>
+
+<h3>Sequence Duplication Levels <span class="{{ dup_grade }}">{{ dup_grade }}</span></h3>
+<table>
+<tr><th>#Total Deduplicated Percentage</th><td>{{ dup_total }}</td></tr>
+<tr><th>#Duplication Level</th><th>Percentage of total</th></tr>
+{% for row in dup %}<tr><td>{{ row.0 }}</td><td>{{ row.1 }}</td></tr>{% endfor %}
+</table>
+
+<h3>Overrepresented sequences <span class="{{ overrep_grade }}">{{ overrep_grade }}</span></h3>
+<table>
+<tr><th>Sequence</th><th>Count</th><th>Percentage</th><th>Possible Source</th></tr>
+{% for row in overrep %}<tr><td>{{ row.0 }}</td><td>{{ row.1 }}</td><td>{{ row.2 }}</td><td>{{ row.3 }}</td></tr>{% endfor %}
+</table>
+
+<h3>Adapter Content <span class="{{ adapter_grade }}">{{ adapter_grade }}</span></h3>
+<table>
+<tr><th>Position</th>
+{% for name in adapter_names %}<th>{{ name }}</th>{% endfor %}</tr>
+{% for row in adapter %}<tr><td>{{ row.0 }}</td>{% for v in row.1 %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}
+</table>
+
+</body>
+</html>

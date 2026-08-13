@@ -214,7 +214,12 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     } else {
         // write default adapter file
         let file = "illumina_adapters.fa";
-        fs::write(file, include_str!("../../templates/illumina_adapters.fa"))?;
+        let mut gz = flate2::read::GzDecoder::new(
+            include_bytes!("../../data/illumina_adapters.fa.gz").as_slice(),
+        );
+        let mut content = String::new();
+        std::io::Read::read_to_string(&mut gz, &mut content)?;
+        fs::write(file, content)?;
         env::current_dir()?.join(file).canonicalize().unwrap()
     };
     let binding = path.to_str().unwrap().to_string();
@@ -227,10 +232,12 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     } else {
         // write default adapter file
         let file = "sequencing_artifacts.fa";
-        fs::write(
-            file,
-            include_str!("../../templates/sequencing_artifacts.fa"),
-        )?;
+        let mut gz = flate2::read::GzDecoder::new(
+            include_bytes!("../../data/sequencing_artifacts.fa.gz").as_slice(),
+        );
+        let mut content = String::new();
+        std::io::Read::read_to_string(&mut gz, &mut content)?;
+        fs::write(file, content)?;
         env::current_dir()?.join(file).canonicalize().unwrap()
     };
     let binding = path.to_str().unwrap().to_string();

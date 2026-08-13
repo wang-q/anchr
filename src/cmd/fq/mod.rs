@@ -7,6 +7,7 @@ pub mod filter;
 pub mod interleave;
 pub mod merge;
 pub mod norm;
+pub mod qc;
 pub mod range;
 pub mod s_filter;
 pub mod sample;
@@ -26,6 +27,7 @@ pub fn make_subcommand() -> Command {
         .subcommand(interleave::make_subcommand())
         .subcommand(merge::make_subcommand())
         .subcommand(norm::make_subcommand())
+        .subcommand(qc::make_subcommand())
         .subcommand(range::make_subcommand())
         .subcommand(sample::make_subcommand())
         .subcommand(split::make_subcommand())
@@ -47,6 +49,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         }
         Some(("merge", sub_matches)) => merge::execute(sub_matches),
         Some(("norm", sub_matches)) => norm::execute(sub_matches),
+        Some(("qc", sub_matches)) => qc::execute(sub_matches),
         Some(("range", sub_matches)) => range::execute(sub_matches),
         Some(("sample", sub_matches)) => sample::execute(sub_matches),
         Some(("split", sub_matches)) => split::execute(sub_matches),

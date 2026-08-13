@@ -13,10 +13,10 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    if [ ! -e ${PREFIX}1_fastqc.html ]; then
-        fastqc -t {{ opt.parallel }} \
+    if [ ! -e ${PREFIX}1.fq.gz_fastqc/fastqc_report.html ]; then
+        anchr fq qc -p {{ opt.parallel }} \
             ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
-            -o .
+            -o . -f both
     fi
 done
 
