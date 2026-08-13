@@ -61,6 +61,11 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
   `-Xmx`。差异 = 定义差异不是 bug，需在文档中定稿并记录边界差异；
 - **`dep`/`ena`/`template` 命令的外部工具版本核对**：依赖
   dazzler/hnsm 系统工具，CI/容器环境预装清单待整理。
+- **QC 方案迁移**（`notes/references/fastqc.md` + `falco.md`，双参考设计
+  提案）：把 `templates/2_fastqc.tera.sh` 的外部 `fastqc` 调用换成 Rust
+  实现的 QC 统计（BasicStats/质量/GC/N/长度先行，k-mer/adapter 后置）；
+  golden 双基准（FastQC 语义 + Falco 数值），txt 统计先行，HTML 用 tera
+  模板渲染。
 
 ## 3. 挂账 / 待决
 

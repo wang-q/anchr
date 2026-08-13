@@ -259,6 +259,8 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `cutadapt.md` / `sickle.md` | `fq trim-qual` 算法来源 |
 | `fairy.md` | `fq norm` 大数据方案调研 |
 | `quorum.md` | read 纠错参考（`fq ec-kmer`） |
+| `fastqc.md` | reads 质控参考（`2_fastqc.tera.sh`，迁移候选） |
+| `falco.md` | FastQC 的 C++ 仿制实现（QC 方案第二参考，输出兼容） |
 
 ## 12. 笔记根 / audit / benchmarks 索引
 
