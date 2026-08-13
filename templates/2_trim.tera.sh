@@ -113,6 +113,7 @@ done
 
 if [ -s statTrimReads.md ]; then
     cat statTrimReads.md
+    mkdir -p ${BASH_DIR}/../9_markdown
     mv statTrimReads.md ${BASH_DIR}/../9_markdown
 fi
 

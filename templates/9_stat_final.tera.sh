@@ -118,4 +118,5 @@ rgr md ${tempfile} --right 2-4 -o statFinal.md
 echo -e "\nTable: statFinal\n" >> statFinal.md
 
 cat statFinal.md
+mkdir -p ${BASH_DIR}/../9_markdown
 mv statFinal.md ${BASH_DIR}/../9_markdown

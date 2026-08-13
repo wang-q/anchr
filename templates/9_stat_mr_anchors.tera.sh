@@ -55,4 +55,5 @@ rgr md ${tempfile} --right 2-11 -o ${FILENAME_MD}
 echo -e "\nTable: ${FILENAME_MD}\n" >> ${FILENAME_MD}
 
 cat ${FILENAME_MD}
+mkdir -p ${BASH_DIR}/../9_markdown
 mv ${FILENAME_MD} ${BASH_DIR}/../9_markdown

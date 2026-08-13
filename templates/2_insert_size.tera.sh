@@ -152,4 +152,5 @@ cat statInsertSize.tsv |
 echo -e "\nTable: statInsertSize\n" >> statInsertSize.md
 
 cat statInsertSize.md
+mkdir -p ${BASH_DIR}/../9_markdown
 mv statInsertSize.md ${BASH_DIR}/../9_markdown

@@ -172,6 +172,7 @@ cat statMergeReads.tsv |
 echo -e "\nTable: statMergeReads\n" >> statMergeReads.md
 
 cat statMergeReads.md
+mkdir -p ${BASH_DIR}/../9_markdown
 mv statMergeReads.md ${BASH_DIR}/../9_markdown
 
 cat statMergeInsert.tsv |
@@ -181,6 +182,7 @@ cat statMergeInsert.tsv |
 echo -e "\nTable: statMergeInsert\n" >> statMergeInsert.md
 
 cat statMergeInsert.md
+mkdir -p ${BASH_DIR}/../9_markdown
 mv statMergeInsert.md ${BASH_DIR}/../9_markdown
 
 END_TIME=$(date +%s)

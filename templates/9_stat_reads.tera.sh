@@ -72,4 +72,5 @@ rgr md statReads.tsv --right 2-4 -o statReads.md
 echo -e "\nTable: statReads\n" >> statReads.md
 
 cat statReads.md
+mkdir -p ${BASH_DIR}/../9_markdown
 mv statReads.md ${BASH_DIR}/../9_markdown

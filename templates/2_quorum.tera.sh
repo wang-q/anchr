@@ -129,6 +129,7 @@ if [ -e Q0L0/statQuorum.R.tsv ]; then
     echo -e "\nTable: statQuorum\n" >> statQuorum.md
 
     cat statQuorum.md
+    mkdir -p ${BASH_DIR}/../9_markdown
     mv statQuorum.md ${BASH_DIR}/../9_markdown
 fi
 

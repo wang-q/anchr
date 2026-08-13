@@ -74,4 +74,5 @@ cat statFastK.tsv |
 echo -e "\nTable: statFastK\n" >> statFastK.md
 
 cat statFastK.md
+mkdir -p ${BASH_DIR}/../9_markdown
 mv statFastK.md ${BASH_DIR}/../9_markdown

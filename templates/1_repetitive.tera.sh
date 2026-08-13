@@ -49,4 +49,5 @@ cat statRepetitive.tsv |
 echo -e "\nTable: statRepetitive\n" >> statRepetitive.md
 
 cat statRepetitive.md
+mkdir -p ${BASH_DIR}/../9_markdown
 mv statRepetitive.md ${BASH_DIR}/../9_markdown
