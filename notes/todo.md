@@ -5,33 +5,6 @@
 > 按类型组织（已完成 / 待实现 / 挂账待决 / 待验证 / 低风险审计 /
 > 技术债 / 明确不做），不按会话轮次。
 
-## 0. 会话交接（2026-08-13，fq/asm 迁移收尾）
-
-> 会话交接材料，供下一次会话恢复上下文；读取后按用户指示清理。
-
-**当前状态**：289 测试通过；`scripts/verify-migrate.sh` 22/22 双轨核对通过；
-fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档，零代码差异）。
-工作树 2 处未提交：`Cargo.toml`（pgr rev → `ace4ee8`）、
-`notes/design/fq-asm-migrate.md`（同步 pgr 的基准迁移说明）。
-
-**最近提交**：`88fac59`（project-understanding + 基准引用修正）、
-`a8edc18`（pgr dep 更新 + fq_assemble/asm_map benchmarks 迁入）、
-`0abbd3b`（fq/asm 全套工具迁入）、`9060e73`（covered 改用 pgr runlist）、
-`9f05c71`（bio/intspan 依赖移除）。
-
-**本会话成果**：
-- fq/asm 业务 + 命令 + 测试 + golden 全部迁入 anchr，依赖 pgr 基础层
-  （git rev 锁定 + 本地 `.cargo/config.toml` patch）；
-- `bio`/`intspan` 外部 crate 移除：序列 I/O、IntSpan、分层覆盖改用 pgr
-  （covered 经基准验证从 vendored Coverage 迁到 `pgr::libs::runlist`，
-  sweep 路径快 2-30×，`benches/covered_benchmark.rs`）；
-- 基础设施对齐 pgr：AGENTS.md、rust-toolchain、CI（zigbuild）、
-  `docs/`（原 `doc/`）、notes 目录、`notes/project-understanding.md`、
-  `notes/todo.md`（本文）、`notes/benchmarks/bbtools-vs-anchr.md`；
-- 双轨 golden 核对脚本 `scripts/verify-migrate.sh`（22 命令，含 stderr
-  规范化）；核对中发现并修复：dispatch `unwrap` → `?`（Zero Panic）、
-  env_logger 缺失（日志不可见）、核对脚本只比 stdout 的漏洞。
-
 ## 1. 已完成（一行结论，细节见链接）
 
 - fq/asm 迁移阶段 1-4：25 命令 + 业务 libs + 21 测试 + golden 数据
@@ -45,10 +18,22 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
 - 项目理解与索引：`notes/project-understanding.md`、`notes/todo.md`；
 - 基准：`fq_assemble`/`asm_map`/`covered` benchmarks +
   `bbtools-vs-anchr.md`（[benchmarks](benchmarks/bbtools-vs-anchr.md)）；
-- 双轨核对 22/22：`scripts/verify-migrate.sh`（[verify-migrate.sh](../../scripts/verify-migrate.sh)）。
-- supermer 两段计数接入评估：`asm unitig --supermer`（pgr commit
-  `769f82f`），输出与默认逐字节一致、端到端无收益，暂缓
-  （[asm-assemble.md](design/asm-assemble.md) §12）。
+- QC M1-M4 完成（`anchr fq qc`，FastQC/Falco 底层数值一致，见
+  [qc.md](design/qc.md)）；
+- cuttlefish 2.2.0 调研 + 基准：不整体借鉴，DFA 状态分类思路已吸收
+  （[references/cuttlefish.md](references/cuttlefish.md)、
+  [asm-assemble.md](design/asm-assemble.md) §11/§12.2）；
+- `asm unitig` 效率攻坚：DFA 默认 walk、流式计数、单池复用、状态表
+  内嵌计数、`--parallel` 默认 `min(逻辑核/2, 8)`；输出与旧引擎逐字节
+  一致（[asm-assemble.md](design/asm-assemble.md) §12.2）；
+- supermer 转正为 **FASTA 默认计数**（pgr `b31af11`：自适应 m + slices
+  API；FASTQ 自动回退 direct 保 `min_prob`；`--no-supermer` 强制），
+  新默认 half(8) 基线 k31 1.36 s/597 MB、k99 2.19 s/1131 MB
+  （[asm-assemble.md](design/asm-assemble.md) §12.3、
+  [unitig-bench.md](benchmarks/unitig-bench.md)）；
+- 双轨核对 22/22（历史）：`scripts/verify-migrate.sh` 只对"删除
+  fq/asm/sam 之前"的 pgr 有效，新版 pgr 下全 FAIL 属预期（脚本头已
+  注明），勿当 bug。
 
 ## 2. 待实现
 
@@ -63,19 +48,9 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
   未定）：anchr 走精确表 + 外部桶；bbnorm `bits=16` 近似表结果依赖
   `-Xmx`。差异 = 定义差异不是 bug，需在文档中定稿并记录边界差异；
 - **`dep`/`ena`/`template` 命令的外部工具版本核对**：依赖
-  dazzler/hnsm 系统工具，CI/容器环境预装清单待整理。
-- **QC 方案实施**（设计稿 [design/qc.md](design/qc.md)，参考
-  `references/fastqc.md` + `falco.md`）：按 M1-M4 推进——M1 统计型模块
-  （BasicStats/质量/GC/N/长度，`anchr fq qc` + fastqc_data.txt/summary.txt）；
-  M2 富集模块（adapter/overrep/kmer/duplication）；M3 HTML + tile +
-  GCModel；M4 模板替换 + 双 golden（FastQC + Falco 实跑对照）。
-
-> **2026-08-13 进度**：M1 完成（`anchr fq qc` + fastqc 0.12.1 golden
-> 数值零差异）。**M1-M4 已完成**（并行、富集模块、GCModel/tile/HTML、
-> 模板替换）；剩余：HTML 视觉打磨、
-> Falco 双 golden 对照（htslib 1.21 装好后已完成：anchr 与两参考底层
-> 数值一致，Falco 的分箱/GC/grade 变体非 anchr 差异）。KmerContent
-> 富集路径与边界测试（空/单读/变长/超长）已验证补齐。
+  dazzler/hnsm 系统工具，CI/容器环境预装清单待整理；
+- **pgr 并行读 gz（可选）**：asm-assemble.md §12.3 第 5 条，pgr 侧
+  决定是否做（风险>收益暂缓）。
 
 ## 3. 挂账 / 待决
 
@@ -85,28 +60,10 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
   副本需随 pgr 更新（阶段 4 完成标注），`project-understanding.md` §6.3
   的"待补全"条目逐项销账；
 - **audit 文档增量**：`notes/audit/audit-fq.md`/`audit-asm.md` 是迁移时
-  的审计快照；后续 anchr 侧对 fq/asm 的修改应更新审计记录而非 pgr 侧。
-- **pgr supermer 再评估**：pgr 支持质量门控 + 按数据自适应 minimizer
-  后，重跑 `asm unitig --supermer` 基准并决定是否转正；当前作为实验
-  开关保留（[asm-assemble.md](design/asm-assemble.md) §12.1）。
-- **效率攻坚（2026-08-14 进度）**：walk 是隐藏瓶颈，DFA + solid_entries
-  已修复；**DFA 已设为 unitig 默认 walk 引擎**（full k31 -16%、k99
-  -28%，逐字节一致，`--no-dfa` 回退）；supermer 自适应 m（`min(12,
-  max(5, k/4))`）落地，但组合在新默认下 k31/k99 反而慢（内存省
-  14%/12%），降级为纯实验；**direct 计数已流式化**（chunk 32768，
-  k31 1.43 s/694 MB、k99 1.88 s/1455 MB，墙钟 +0-8%、内存 -27%）；
-  walk 覆盖度已改为扩展时累积；**DFA 状态表内嵌计数**后默认组合到
-  k31 1.34 s/670 MB、k99 1.69 s/~1.6 GB；**分类条目复用 + visited
-  字节数组**后再到 full k31 1.21 s/663 MB、k99 1.63 s/1348 MB
-  （small/medium 亦 -31~-51%）。**pgr §12.3 落地（commit b31af11）**：
-  supermer k31 lib 0.595 s，anchr 已接入 slices API 并把 supermer 设为
-  **FASTA 默认计数**（FASTQ 自动回退 direct；`--no-supermer` 强制），
-  新默认 half(8) 基线 k31 1.36 s/597 MB、k99 2.19 s/1131 MB
-  （[asm-assemble.md](design/asm-assemble.md) §12.2/§12.3）。
-- **并行安全（2026-08-14）**：并行 walk 实验（`--parallel-walk`）因计数
-  + 分类 + walk 多层线程池叠加导致系统卡死，已整体移除；`--parallel`
-  默认改为 **min(逻辑核/2, 8)**（自适应，auto 仍可显式指定吃满）。
-  基准文档数字为 auto(32) 时代所测，默认 half 下墙钟略慢、线程更稳。
+  的审计快照；后续 anchr 侧对 fq/asm 的修改应更新审计记录而非 pgr 侧；
+- **pgr supermer 质量门控**：当前 FASTQ 自动回退 direct；若 pgr 给
+  supermer 补质量门控，可去掉回退并统一计数路径
+  （[asm-assemble.md](design/asm-assemble.md) §12.1）。
 
 ## 4. 待验证 / 等数据或场景到位
 
@@ -120,13 +77,12 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
 - **OLC 宏基因组/长读真实数据验证**（pgr 移交）：`asm olc` 四命令在
   宏基因组/长读数据上的端到端验证；
 - **fq range BGZF**：真实 BGZF 输入（含 `.gzi`）的端到端验证
-  （测试已覆盖 plain + BGZF 小数据，见 `tests/cli_fq_range.rs`）。
+  （测试已覆盖 plain + BGZF 小数据，见 `tests/cli_fq_range.rs`）；
+- **gz/大输入回归**：默认 supermer 路径在 gz 输入下的全链回归 +
+  更大数据集的峰值内存（当前基准为 plain 144 MB 级别）。
 
 ## 5. 低风险审计记录项（可顺手修）
 
-- 既有 8 处 warning：`Overlap` dead_code（libs/overlap.rs）、
-  `tadpole` 未读字段（`error_extension_pincer`/`error_extension_tail`）、
-  `HashMap` unused import（overlap2.rs）、lib.rs `#[macro_use]` 等；
 - `scripts/verify-migrate.sh` 的 `asm_olc` 用例用 Lambda 数据（约 6 s），
   可考虑缩小输入加速日常核对；
 - `notes/benchmarks/` 目录索引：迁移 `bbtools-vs-anchr.md` 后补一篇
@@ -149,4 +105,6 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
 - 不搬 pgr 专属基准：`benches/` 33 个 .rs 与 `notes/benchmarks/` 12 篇
   均服务 pgr 剩余命令/基础层，留在 pgr；
 - 不内置 pgr 的比对/索引/遮蔽命令（`align`/`pgi`/`pbit`/`rept` 等）；
-- 不重新引入 `bio`/`intspan` 外部 crate（pgr 已内嵌等价实现）。
+- 不重新引入 `bio`/`intspan` 外部 crate（pgr 已内嵌等价实现）；
+- 不做并行 walk（`--parallel-walk` 已撤：多阶段线程池叠加会卡死系统，
+  教训已记入 [asm-assemble.md](design/asm-assemble.md) §12.2）。
