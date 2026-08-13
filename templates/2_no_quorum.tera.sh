@@ -31,11 +31,11 @@ for Q in 0 {{ opt.qual }}; do
             fi
 
             log_info "Qual-Len: Q${Q}L${L}.${PREFIX}"
-            log_info "    pgr fq interleave"
+            log_info "    anchr fq interleave"
 
             # Create .cor.fa.gz
-            pgr fq interleave \
-                --fq --name-prefix pe \
+            anchr fq interleave \
+                --name-prefix pe \
                 ${PREFIX}1.fq.gz \
 {% if opt.se == "0" -%}
                 ${PREFIX}2.fq.gz \
@@ -43,8 +43,8 @@ for Q in 0 {{ opt.qual }}; do
                 > ${PREFIX}.interleave.fa
 
             if [ -e ${PREFIX}s.fq.gz ]; then
-                pgr fq interleave \
-                    --fq --name-prefix se \
+                anchr fq interleave \
+                    --name-prefix se \
                     ${PREFIX}s.fq.gz \
                     >> ${PREFIX}.interleave.fa
             fi

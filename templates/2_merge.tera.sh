@@ -50,24 +50,26 @@ for PREFIX in R S T; do
     bash mergeread.sh
 
     # Create .cor.fa.gz
-    pgr fq interleave \
-        --fq --name-prefix unmerged \
+    anchr fq interleave \
+        --name-prefix unmerged \
         ${PREFIXU}1.fq.gz \
         ${PREFIXU}2.fq.gz \
         > ${PREFIXM}.interleave.fa
 
-    pgr fq interleave \
-        --fq --name-prefix single \
+    anchr fq interleave \
+        --name-prefix single \
         ${PREFIXU}s.fq.gz \
         >> ${PREFIXM}.interleave.fa
 
-    pgr fq interleave \
-        --fq --name-prefix merged \
+    anchr fq interleave \
+        --name-prefix merged \
         ${PREFIXM}1.fq.gz \
         >> ${PREFIXM}.interleave.fa
 
-    # Shuffle interleaved reads.
-    log_info Shuffle interleaved reads.
+    # Shuffle interleaved read pairs.
+    # .interleave.fa is FASTA (4 lines per pair: name1/seq1 then name2/seq2),
+    # so group 4 lines per row to shuffle whole pairs.
+    log_info Shuffle interleaved read pairs.
     cat ${PREFIXM}.interleave.fa |
         awk '{
             OFS="\t"; \

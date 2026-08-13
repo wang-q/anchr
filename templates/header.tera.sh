@@ -76,7 +76,7 @@ stat_format () {
 
 stat_format_fq () {
     echo $(
-            pgr fq to-fa $@ |
+            anchr fq to-fa $@ |
                 pgr fa n50 -H -N 50 -S -C stdin
         ) |
         perl -nla -MNumber::Format -e '
