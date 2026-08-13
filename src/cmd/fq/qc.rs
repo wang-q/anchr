@@ -5,6 +5,7 @@
 //! `{input}_fastqc/` (fastqc layout).
 
 use crate::libs::qc::analyzer::QcStats;
+use crate::libs::fq::scan::{next_record, FastqRecord};
 use anyhow::Context;
 use clap::{Arg, ArgMatches, Command};
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
@@ -100,47 +101,11 @@ fn run_one(
     parallel: usize,
     format: &str,
 ) -> anyhow::Result<()> {
-    let mut reader =
-        SeqReader::new(infile).with_context(|| format!("failed to open {infile}"))?;
-    let mut rec = SeqRecord::new();
-
-    // Sample up to 200 reads for Phred encoding detection (pgr).
-    let mut sample: Vec<SeqRecord> = Vec::new();
-    while sample.len() < 200 && reader.read_record(&mut rec)? {
-        sample.push(rec.clone());
-    }
-    let offset = detect_quality_base(&sample);
-
-    let mut reads = sample;
-    while reader.read_record(&mut rec)? {
-        reads.push(rec.clone());
-    }
-
-    let stats = if parallel > 1 && reads.len() > parallel {
-        let chunk = reads.len().div_ceil(parallel);
-        reads
-            .par_chunks(chunk)
-            .enumerate()
-            .map(|(ci, block)| {
-                let mut s = QcStats::new(name, offset);
-                for (li, r) in block.iter().enumerate() {
-                    s.consume(r, (ci * chunk + li) as u64);
-                }
-                s
-            })
-            .reduce(
-                || QcStats::new(name, offset),
-                |mut a, b| {
-                    a.merge(&b);
-                    a
-                },
-            )
+    let is_gz = Path::new(infile).extension() == Some(std::ffi::OsStr::new("gz"));
+    let stats = if infile == "stdin" || is_gz {
+        run_streamed(infile, name, parallel)?
     } else {
-        let mut s = QcStats::new(name, offset);
-        for (i, r) in reads.iter().enumerate() {
-            s.consume(r, i as u64);
-        }
-        s
+        run_mmap(infile, name, parallel)?
     };
 
     if stats.n_reads() == 0 {
@@ -170,4 +135,121 @@ fn run_one(
     }
 
     Ok(())
+}
+
+/// Plain (non-gzip) files: mmap the whole file and scan records in place —
+/// zero-copy, mirroring falco's mmap-based reader.
+fn run_mmap(infile: &str, name: &str, parallel: usize) -> anyhow::Result<QcStats> {
+    let f = fs::File::open(infile).with_context(|| format!("failed to open {infile}"))?;
+    // SAFETY: the mmap is read-only and outlives every borrow of `data`
+    // taken below (it lives in this function's frame).
+    let data = unsafe { memmap2::Mmap::map(&f) }.context("failed to mmap input")?;
+
+    // Sample up to 200 reads for Phred encoding detection (pgr).
+    let mut sample: Vec<SeqRecord> = Vec::new();
+    let mut pos = 0usize;
+    while sample.len() < 200 {
+        match next_record(&data, &mut pos) {
+            Some(r) => {
+                let mut rec = SeqRecord::new();
+                rec.set_sequence(r.seq.to_vec());
+                rec.set_quality(r.qual.to_vec());
+                sample.push(rec);
+            }
+            None => break,
+        }
+    }
+    let offset = detect_quality_base(&sample);
+
+    let stats = if parallel > 1 {
+        // Collect zero-copy record views for the whole file, then process
+        // in chunks (the 200-read sample above was only for detection).
+        let mut reads: Vec<FastqRecord> = Vec::new();
+        let mut p = 0usize;
+        while let Some(r) = next_record(&data, &mut p) {
+            reads.push(r);
+        }
+        let chunk = reads.len().div_ceil(parallel).max(1);
+        reads
+            .par_chunks(chunk)
+            .enumerate()
+            .map(|(ci, block)| {
+                let mut s = QcStats::new(name, offset);
+                for (li, r) in block.iter().enumerate() {
+                    s.consume_parts(r.seq, r.qual, r.name, (ci * chunk + li) as u64);
+                }
+                s
+            })
+            .reduce(
+                || QcStats::new(name, offset),
+                |mut a, b| {
+                    a.merge(&b);
+                    a
+                },
+            )
+    } else {
+        let mut s = QcStats::new(name, offset);
+        let mut i = 0u64;
+        for r in sample.iter() {
+            s.consume(r, i);
+            i += 1;
+        }
+        while let Some(r) = next_record(&data, &mut pos) {
+            s.consume_parts(r.seq, r.qual, r.name, i);
+            i += 1;
+        }
+        s
+    };
+    Ok(stats)
+}
+
+/// Gzip/stdin inputs: keep the streaming pgr reader (decompressing a whole
+/// multi-GB file into RAM costs more in page faults than it saves).
+fn run_streamed(infile: &str, name: &str, parallel: usize) -> anyhow::Result<QcStats> {
+    let mut reader =
+        SeqReader::new(infile).with_context(|| format!("failed to open {infile}"))?;
+    let mut rec = SeqRecord::new();
+
+    // Sample up to 200 reads for Phred encoding detection (pgr).
+    let mut sample: Vec<SeqRecord> = Vec::new();
+    while sample.len() < 200 && reader.read_record(&mut rec)? {
+        sample.push(rec.clone());
+    }
+    let offset = detect_quality_base(&sample);
+
+    Ok(if parallel > 1 {
+        let mut reads = sample;
+        while reader.read_record(&mut rec)? {
+            reads.push(rec.clone());
+        }
+        let chunk = reads.len().div_ceil(parallel).max(1);
+        reads
+            .par_chunks(chunk)
+            .enumerate()
+            .map(|(ci, block)| {
+                let mut s = QcStats::new(name, offset);
+                for (li, r) in block.iter().enumerate() {
+                    s.consume(r, (ci * chunk + li) as u64);
+                }
+                s
+            })
+            .reduce(
+                || QcStats::new(name, offset),
+                |mut a, b| {
+                    a.merge(&b);
+                    a
+                },
+            )
+    } else {
+        let mut s = QcStats::new(name, offset);
+        for (i, r) in sample.iter().enumerate() {
+            s.consume(r, i as u64);
+        }
+        let mut i = sample.len() as u64;
+        while reader.read_record(&mut rec)? {
+            s.consume(&rec, i);
+            i += 1;
+        }
+        s
+    })
 }

@@ -9,15 +9,33 @@ use pgr::libs::fmt::seq::SeqRecord;
 use std::collections::BTreeMap;
 use std::io::Write;
 
-use super::base_groups::{make_base_groups, BaseGroup};
+use super::base_groups::make_base_groups;
 
-const QUAL_BINS: usize = 128;
+// Phred bins 0..=63 (ASCII quality - offset); 64 slots keep the whole
+// per-position array L1/L2-friendly (128 ASCII slots were 4× the footprint).
+const QUAL_BINS: usize = 64;
 const GC_BINS: usize = 101;
+/// 4^7 possible 7-mers; also the column stride of the dense kmer grid.
+const KMER_KEYS: usize = 1 << 14;
+
+/// Per-base action table for the hot per-position loop. Value layout:
+/// `(count_slot << 3) | pc_slot`; pc_slot 0-4 (A,C,G,T,N), 7 = skip;
+/// count_slot 0-3 (A,C,G,T), 7 = no aggregate count. Replaces the 5-way
+/// jump-table dispatch (indirect branches mispredict on random sequence).
+static BASE_TABLE: [u8; 256] = {
+    let mut t = [0x3Fu8; 256]; // 7<<3 | 7: skip both
+    t[b'A' as usize] = 0;
+    t[b'C' as usize] = (1 << 3) | 1;
+    t[b'G' as usize] = (2 << 3) | 2;
+    t[b'T' as usize] = (3 << 3) | 3;
+    t[b'N' as usize] = (7 << 3) | 4;
+    t
+};
 
 /// Per-position ASCII quality counts (index = ASCII char value).
 #[derive(Clone, Copy)]
 struct QualityCount {
-    counts: [u64; QUAL_BINS],
+    counts: [u32; QUAL_BINS],
 }
 
 impl Default for QualityCount {
@@ -29,20 +47,21 @@ impl Default for QualityCount {
 }
 
 impl QualityCount {
-    fn add(&mut self, qc: u8) {
-        self.counts[qc as usize] += 1;
+    /// Add one Phred quality value (ASCII minus the encoding offset).
+    fn add(&mut self, phred: u8) {
+        self.counts[(phred.min(QUAL_BINS as u8 - 1)) as usize] += 1;
     }
 
     fn total(&self) -> u64 {
-        self.counts.iter().sum()
+        self.counts.iter().map(|&c| c as u64).sum()
     }
 
-    fn mean(&self, offset: u8) -> f64 {
+    fn mean(&self) -> f64 {
         let mut total = 0u64;
         let mut n = 0u64;
-        for (i, &c) in self.counts.iter().enumerate().skip(offset as usize) {
-            total += (i as u64 - offset as u64) * c;
-            n += c;
+        for (i, &c) in self.counts.iter().enumerate() {
+            total += i as u64 * c as u64;
+            n += c as u64;
         }
         if n == 0 {
             0.0
@@ -53,17 +72,17 @@ impl QualityCount {
 
     /// fastqc `QualityCount.getPercentile`: integer `n*p/100` then the first
     /// quality whose cumulative count reaches the target (Phred value).
-    fn percentile(&self, offset: u8, p: u64) -> f64 {
+    fn percentile(&self, p: u64) -> f64 {
         let n = self.total();
         if n == 0 {
             return -1.0;
         }
         let target = n * p / 100;
         let mut count = 0u64;
-        for (i, &c) in self.counts.iter().enumerate().skip(offset as usize) {
-            count += c;
+        for (i, &c) in self.counts.iter().enumerate() {
+            count += c as u64;
             if count >= target {
-                return (i - offset as usize) as f64;
+                return i as f64;
             }
         }
         -1.0
@@ -146,29 +165,42 @@ pub struct QcStats {
     filename: String,
     n_reads: u64,
     total_bases: u64,
-    g_count: u64,
-    c_count: u64,
-    a_count: u64,
-    t_count: u64,
+    // aggregate ACGT counts (A, C, G, T); array form lets the hot loop use
+    // a single table lookup + indexed increment instead of a 5-way jump
+    // table (branch mispredictions were a top-2 stall source)
+    base_counts: [u64; 4],
     len_min: u32,
     len_max: u32,
-    len_hist: BTreeMap<u32, u64>,
+    // flat per-length counts (index = read length); a BTreeMap was a
+    // per-read tree walk in the hot path
+    len_hist: Vec<u64>,
     encoding_offset: u8,
     // per-position accumulators (index = 0-based position)
     per_base_quality: Vec<QualityCount>,
-    per_base_content: Vec<[u64; 5]>, // A C G T N
+    per_base_content: Vec<[u32; 5]>, // A C G T N
     // per-read accumulators
-    seq_quality_hist: BTreeMap<i32, u64>, // integer avg ASCII quality -> reads
+    // integer avg ASCII quality -> reads (flat array: avg is 33..=126)
+    seq_quality_hist: Vec<u64>,
+    seq_qual_min: u8,
+    seq_qual_max: u8,
     seq_gc_hist: Vec<f64>,
     gc_models: BTreeMap<u32, GcModel>,
     // M2: truncated-sequence counts (fastqc OverRepresentedSeqs; also feeds
     // the DuplicationLevel module)
-    seq_counts: BTreeMap<Vec<u8>, u64>,
+    // (truncated length, fixed 50-byte sequence) — hash map: one hash per
+    // read instead of a BTreeMap's ~log(n) memcmp comparisons per entry
+    seq_counts: std::collections::HashMap<(u8, [u8; 50]), u64, FnvBuild>,
     // M2: adapter position counts (fastqc AdapterContent)
     adapter_positions: Vec<[u64; 6]>,
     longest_seq: u32,
     // M2: 7-mer position counts (fastqc KmerContent; sense strand only)
-    kmer_counts: std::collections::HashMap<u16, Vec<u64>>,
+    // Dense 7-mer grid, row-major: `grid[key * kmer_stride + pos]`.
+    // Replaces the per-position HashMap entry (hashbrown machinery was a
+    // top-2 hotspot even with FNV); rows are contiguous so increments hit
+    // sequential cache lines. When a longer read arrives the grid is
+    // re-laid-out once (length steps are rare; copy cost negligible).
+    kmer_grid: Vec<u32>,
+    kmer_stride: usize,
     total_kmer_per_pos: Vec<u64>,
     // M3: per-tile quality (fastqc PerTileQualityScores)
     tile_ignore: bool,
@@ -183,6 +215,12 @@ impl QcStats {
             filename: filename.to_string(),
             encoding_offset,
             seq_gc_hist: vec![0.0; GC_BINS],
+            seq_quality_hist: vec![0; 128],
+            seq_qual_min: u8::MAX,
+            seq_qual_max: 0,
+            seq_counts: std::collections::HashMap::with_capacity_and_hasher(1 << 18, FnvBuild),
+            kmer_grid: Vec::new(),
+            kmer_stride: 0,
             ..Default::default()
         }
     }
@@ -192,13 +230,25 @@ impl QcStats {
     /// in the whole file (used for the 2% kmer sampling, which must be
     /// global even when processing is split across parallel chunks).
     pub fn consume(&mut self, rec: &SeqRecord, global_index: u64) {
-        let seq = rec.sequence();
-        let qual = rec.quality_scores();
+        self.consume_parts(
+            rec.sequence(),
+            rec.quality_scores(),
+            rec.name(),
+            global_index,
+        );
+    }
+
+    /// Same as [`Self::consume`] but from borrowed record parts (zero-copy
+    /// FASTQ parsing path; avoids building an owned `SeqRecord` per read).
+    pub fn consume_parts(&mut self, seq: &[u8], qual: &[u8], name: &[u8], global_index: u64) {
         let len = seq.len() as u32;
 
         self.n_reads += 1;
         self.total_bases += len as u64;
-        *self.len_hist.entry(len).or_insert(0) += 1;
+        if self.len_hist.len() <= len as usize {
+            self.len_hist.resize(len as usize + 1, 0);
+        }
+        self.len_hist[len as usize] += 1;
         if self.n_reads == 1 {
             self.len_min = len;
             self.len_max = len;
@@ -210,59 +260,140 @@ impl QcStats {
         if self.per_base_quality.len() < seq.len() {
             self.per_base_quality
                 .resize(seq.len(), QualityCount::default());
-            self.per_base_content.resize(seq.len(), [0u64; 5]);
+            self.per_base_content.resize(seq.len(), [0u32; 5]);
         }
-        for (i, &b) in seq.iter().enumerate() {
-            if i < qual.len() {
-                self.per_base_quality[i].add(qual[i]);
-            }
-            let idx = match b {
-                b'A' => Some(0),
-                b'C' => Some(1),
-                b'G' => Some(2),
-                b'T' => Some(3),
-                b'N' => Some(4),
-                _ => None,
-            };
-            if let Some(k) = idx {
-                self.per_base_content[i][k] += 1;
-            }
-            match b {
-                b'G' => self.g_count += 1,
-                b'C' => self.c_count += 1,
-                b'A' => self.a_count += 1,
-                b'T' => self.t_count += 1,
-                _ => {}
-            }
-        }
-
-        // per-read average quality: integer division over ASCII chars
-        if !qual.is_empty() {
-            let sum: u64 = qual.iter().map(|&c| c as u64).sum();
-            let avg = (sum / qual.len() as u64) as i32;
-            *self.seq_quality_hist.entry(avg).or_insert(0) += 1;
-        }
-
-        // per-read GC: truncate >100bp to hundreds, then GCModel fractions
-        let trunc = if seq.len() > 1000 {
+        // single pass over `seq`: per-base quality/content + aggregate
+        // ACGT/GC counts + per-read average quality (was 3 passes)
+        let trunc_gc = if seq.len() > 1000 {
             (seq.len() / 1000) * 1000
         } else if seq.len() > 100 {
             (seq.len() / 100) * 100
         } else {
             seq.len()
         };
-        let gc_count = seq[..trunc].iter().filter(|&&b| b == b'G' || b == b'C').count() as u32;
+        let mut qual_sum: u64 = 0;
+        let mut gc_count = 0u32;
+        let qual_len = qual.len();
+        // Hoisted (LLVM reloads it from `self` every position otherwise),
+        // and the quality path is split off: reads normally have
+        // qual.len() == seq.len(), so the shared loop needs no per-position
+        // `i < qual_len` compare; malformed shorter qualities take the tail.
+        let offset = self.encoding_offset;
+        let n = qual_len.min(seq.len());
+        // per-position: quality slot + content slot + aggregate count via a
+        // single table lookup (no 5-way jump table; the two guard branches
+        // are ~always taken on ACGT data so they predict perfectly), and
+        // the loop is unrolled 2x to halve per-position loop overhead.
+        // The per_base vectors are resized to >= seq.len() above, so all
+        // indices here are in bounds (checked via get_unchecked).
+        let pq = &mut self.per_base_quality;
+        let pc_arr = &mut self.per_base_content;
+        let counts = &mut self.base_counts;
+        macro_rules! process_pos {
+            ($b:expr, $q:expr, $i:expr, $count_gc:expr) => {{
+                unsafe { pq.get_unchecked_mut($i) }.add($q.saturating_sub(offset));
+                qual_sum += $q as u64;
+                let v = BASE_TABLE[$b as usize] as usize;
+                if v & 7 != 7 {
+                    unsafe {
+                        *pc_arr
+                            .get_unchecked_mut($i)
+                            .get_unchecked_mut(v & 7) += 1;
+                    }
+                    let cs = v >> 3;
+                    if cs != 7 {
+                        unsafe { *counts.get_unchecked_mut(cs) += 1 };
+                    }
+                }
+                if $count_gc && ($b == b'G' || $b == b'C') {
+                    gc_count += 1;
+                }
+            }};
+        }
+        // Split at trunc_gc: only the first trunc_gc positions contribute to
+        // the per-read GC count, so two loops remove the per-position
+        // `i < trunc_gc` compare (fastqc truncates GC counting at 100/1000).
+        let mut i = 0usize;
+        let seq_p = seq.as_ptr();
+        let qual_p = qual.as_ptr();
+        // full positions with GC counting (first trunc_gc)
+        while i + 2 <= n.min(trunc_gc) {
+            process_pos!(unsafe { *seq_p.add(i) }, unsafe { *qual_p.add(i) }, i, true);
+            process_pos!(
+                unsafe { *seq_p.add(i + 1) },
+                unsafe { *qual_p.add(i + 1) },
+                i + 1,
+                true
+            );
+            i += 2;
+        }
+        if i < n.min(trunc_gc) {
+            process_pos!(unsafe { *seq_p.add(i) }, unsafe { *qual_p.add(i) }, i, true);
+        }
+        // remaining positions (beyond trunc_gc): no GC counting
+        while i + 2 <= n {
+            process_pos!(unsafe { *seq_p.add(i) }, unsafe { *qual_p.add(i) }, i, false);
+            process_pos!(
+                unsafe { *seq_p.add(i + 1) },
+                unsafe { *qual_p.add(i + 1) },
+                i + 1,
+                false
+            );
+            i += 2;
+        }
+        if i < n {
+            process_pos!(unsafe { *seq_p.add(i) }, unsafe { *qual_p.add(i) }, i, false);
+        }
+        for (i, &b) in seq[n..].iter().enumerate() {
+            let pc = &mut self.per_base_content[n + i];
+            match b {
+                b'A' => {
+                    pc[0] += 1;
+                    self.base_counts[0] += 1;
+                }
+                b'C' => {
+                    pc[1] += 1;
+                    self.base_counts[1] += 1;
+                }
+                b'G' => {
+                    pc[2] += 1;
+                    self.base_counts[2] += 1;
+                }
+                b'T' => {
+                    pc[3] += 1;
+                    self.base_counts[3] += 1;
+                }
+                b'N' => pc[4] += 1,
+                _ => {}
+            }
+            if n + i < trunc_gc && (b == b'G' || b == b'C') {
+                gc_count += 1;
+            }
+        }
+
+        // per-read average quality: integer division over ASCII chars
+        if !qual.is_empty() {
+            let avg = (qual_sum / qual.len() as u64) as i32;
+            self.seq_quality_hist[avg as usize] += 1;
+            self.seq_qual_min = self.seq_qual_min.min(avg as u8);
+            self.seq_qual_max = self.seq_qual_max.max(avg as u8);
+        }
+
+        // per-read GC: GCModel fractions from the in-pass GC count
         let model = self
             .gc_models
-            .entry(trunc as u32)
-            .or_insert_with(|| GcModel::new(trunc as u32));
+            .entry(trunc_gc as u32)
+            .or_insert_with(|| GcModel::new(trunc_gc as u32));
         for &(p, inc) in model.values(gc_count) {
             self.seq_gc_hist[p] += inc;
         }
 
-        // overrep/duplication: truncate to 50 bp (fastqc default)
+        // overrep/duplication: truncate to 50 bp (fastqc default); fixed
+        // [u8; 50] key avoids a per-read Vec allocation (hot path)
         let trunc = if seq.len() > 50 { &seq[..50] } else { seq };
-        *self.seq_counts.entry(trunc.to_vec()).or_insert(0) += 1;
+        let mut key = [0u8; 50];
+        key[..trunc.len()].copy_from_slice(trunc);
+        *self.seq_counts.entry((trunc.len() as u8, key)).or_insert(0) += 1;
 
         // adapter content: indexOf each adapter, increment to the current
         // longest-read bound (fastqc semantics)
@@ -272,9 +403,73 @@ impl QcStats {
             self.adapter_positions.resize(cur_max as usize, [0u64; 6]);
         }
         let cur_max = self.longest_seq.saturating_sub(12) + 1;
-        for (a, (_, aseq)) in adapters().iter().enumerate() {
-            if let Some(idx) = find_subseq(seq, aseq.as_bytes()) {
-                for p in idx..cur_max as usize {
+        // Single pass over the read locating the first occurrence of each
+        // of the 6 adapters (their leading 2 bytes are pairwise distinct,
+        // so one match branch suffices). Early-exits once all are found;
+        // replaces 6 independent `find_subseq` scans per read.
+        let ads = adapters();
+        let sigs = adapter_sigs();
+        let table = adapter_pair_table();
+        let mut found = [None; 6];
+        // bitmask of adapters still missing: single register check per
+        // position (the old `found.iter().any()` re-read 6 stack slots)
+        let mut mask = 0b111111u8;
+        let l = seq.len();
+        let mut i = 0;
+        // 4 positions per iteration: two unaligned u32 loads cover the
+        // overlapping pairs at i..i+3; quarters the loop-control overhead
+        while i + 6 <= l && mask != 0 {
+            let p0 = unsafe { read_u32_un(seq, i) };
+            let p1 = unsafe { read_u32_un(seq, i + 2) };
+            let a = adapter_at(table, p0 as u16);
+            if a != 0xF {
+                verify_adapter(a as usize, i, l, seq, sigs, ads, &mut found, &mut mask);
+            }
+            if mask != 0 {
+                let a = adapter_at(table, (p0 >> 8) as u16);
+                if a != 0xF {
+                    verify_adapter(a as usize, i + 1, l, seq, sigs, ads, &mut found, &mut mask);
+                }
+            }
+            if mask != 0 {
+                let a = adapter_at(table, p1 as u16);
+                if a != 0xF {
+                    verify_adapter(a as usize, i + 2, l, seq, sigs, ads, &mut found, &mut mask);
+                }
+            }
+            if mask != 0 {
+                let a = adapter_at(table, (p1 >> 8) as u16);
+                if a != 0xF {
+                    verify_adapter(a as usize, i + 3, l, seq, sigs, ads, &mut found, &mut mask);
+                }
+            }
+            i += 4;
+        }
+        // 2 positions per iteration (remaining 2-3 tail positions)
+        while i + 4 <= l && mask != 0 {
+            let p = unsafe { read_u32_un(seq, i) };
+            let a = adapter_at(table, p as u16);
+            if a != 0xF {
+                verify_adapter(a as usize, i, l, seq, sigs, ads, &mut found, &mut mask);
+            }
+            if mask != 0 {
+                let a = adapter_at(table, (p >> 8) as u16);
+                if a != 0xF {
+                    verify_adapter(a as usize, i + 1, l, seq, sigs, ads, &mut found, &mut mask);
+                }
+            }
+            i += 2;
+        }
+        // tail: one remaining pair (odd length)
+        if i + 2 <= l && mask != 0 {
+            let a = adapter_at(table, u16::from_le_bytes([seq[i], seq[i + 1]]));
+            if a != 0xF {
+                verify_adapter(a as usize, i, l, seq, sigs, ads, &mut found, &mut mask);
+            }
+        }
+        for (a, pos) in found.iter().enumerate() {
+            if let Some(idx) = pos {
+                for p in *idx..cur_max as usize {
                     self.adapter_positions[p][a] += 1;
                 }
             }
@@ -284,20 +479,34 @@ impl QcStats {
         // skips kmers containing Ns
         if (global_index + 1) % 50 == 0 && seq.len() >= 7 {
             let seq = if seq.len() > 500 { &seq[..500] } else { seq };
-            if self.total_kmer_per_pos.len() < seq.len() - 6 {
-                self.total_kmer_per_pos.resize(seq.len() - 6, 0);
+            let l = seq.len();
+            if self.total_kmer_per_pos.len() < l - 6 {
+                self.ensure_kmer_positions(l - 6);
             }
-            for i in 0..=(seq.len() - 7) {
-                if seq[i..i + 7].iter().any(|&b| !matches!(b, b'A' | b'C' | b'G' | b'T')) {
-                    continue;
+            // Sliding 7-mer window: O(1) per position instead of re-scanning
+            // 7 bytes per window (E. coli has almost no Ns, so the old
+            // `any()` scan rarely exited early; ~7x fewer byte loads).
+            let mut code = 0u16;
+            let mut non_acgt = 0u32;
+            for &b in &seq[..7] {
+                code = (code << 2) | encode_base(b);
+                non_acgt += u32::from(!matches!(b, b'A' | b'C' | b'G' | b'T'));
+            }
+            let mut i = 0;
+            while i + 7 <= l {
+                if non_acgt == 0 {
+                    self.kmer_grid[code as usize * self.kmer_stride + i] += 1;
+                    self.total_kmer_per_pos[i] += 1;
                 }
-                let key = encode_kmer(&seq[i..i + 7]);
-                let entry = self.kmer_counts.entry(key).or_default();
-                if entry.len() < self.total_kmer_per_pos.len() {
-                    entry.resize(self.total_kmer_per_pos.len(), 0);
+                if i + 7 == l {
+                    break;
                 }
-                entry[i] += 1;
-                self.total_kmer_per_pos[i] += 1;
+                let out = seq[i];
+                let inc = seq[i + 7];
+                code = ((code << 2) | encode_base(inc)) & 0x3FFF;
+                non_acgt += u32::from(!matches!(inc, b'A' | b'C' | b'G' | b'T'));
+                non_acgt -= u32::from(!matches!(out, b'A' | b'C' | b'G' | b'T'));
+                i += 1;
             }
         }
 
@@ -308,13 +517,13 @@ impl QcStats {
             self.tile_total_count += 1;
             if self.tile_total_count > 10_000 && self.tile_total_count % 10 != 0 {
                 // skip sampling
-            } else if let Some(tile) = self.detect_tile(rec.name()) {
+            } else if let Some(tile) = self.detect_tile(name) {
                 let entry = self.tile_quality.entry(tile).or_default();
                 if entry.len() < qual.len() {
                     entry.resize(qual.len(), QualityCount::default());
                 }
                 for (i, &q) in qual.iter().enumerate() {
-                    entry[i].add(q);
+                    entry[i].add(q.saturating_sub(self.encoding_offset));
                 }
             }
         }
@@ -335,24 +544,39 @@ impl QcStats {
     }
 
     fn detect_tile(&mut self, name: &[u8]) -> Option<u32> {
-        let s = std::str::from_utf8(name).ok()?;
-        let fields: Vec<&str> = s.split(':').collect();
-        if let Some(pos) = self.tile_split_pos {
-            if pos < fields.len() {
-                return fields[pos].parse().ok();
+        // Split on ':' without allocating a Vec of fields (hot path: every
+        // sampled read calls this). Caches the field index like fastqc:
+        // Casava 1.8+ (>= 7 fields) uses field 4, legacy (>= 5) field 2.
+        let pos = match self.tile_split_pos {
+            Some(p) => p,
+            None => {
+                let colons = name.iter().filter(|&&c| c == b':').count();
+                if colons >= 6 {
+                    self.tile_split_pos = Some(4);
+                    4
+                } else if colons >= 4 {
+                    self.tile_split_pos = Some(2);
+                    2
+                } else {
+                    self.tile_ignore = true;
+                    return None;
+                }
             }
-            self.tile_ignore = true;
-            return None;
+        };
+        let mut field = 0usize;
+        let mut start = 0usize;
+        for (i, &c) in name.iter().enumerate() {
+            if c == b':' {
+                if field == pos {
+                    return parse_u32_bytes(&name[start..i]);
+                }
+                field += 1;
+                start = i + 1;
+            }
         }
-        if fields.len() >= 7 {
-            self.tile_split_pos = Some(4);
-            return fields[4].parse().ok();
+        if field == pos {
+            return parse_u32_bytes(&name[start..]);
         }
-        if fields.len() >= 5 {
-            self.tile_split_pos = Some(2);
-            return fields[2].parse().ok();
-        }
-        self.tile_ignore = true;
         None
     }
 
@@ -361,10 +585,9 @@ impl QcStats {
         let was_empty = self.n_reads == 0;
         self.n_reads += other.n_reads;
         self.total_bases += other.total_bases;
-        self.g_count += other.g_count;
-        self.c_count += other.c_count;
-        self.a_count += other.a_count;
-        self.t_count += other.t_count;
+        for (a, &b) in self.base_counts.iter_mut().zip(&other.base_counts) {
+            *a += b;
+        }
         if other.n_reads > 0 {
             if was_empty {
                 self.len_min = other.len_min;
@@ -374,14 +597,17 @@ impl QcStats {
                 self.len_max = self.len_max.max(other.len_max);
             }
         }
-        for (&len, &count) in &other.len_hist {
-            *self.len_hist.entry(len).or_insert(0) += count;
+        if other.len_hist.len() > self.len_hist.len() {
+            self.len_hist.resize(other.len_hist.len(), 0);
+        }
+        for (a, &b) in self.len_hist.iter_mut().zip(&other.len_hist) {
+            *a += b;
         }
         if other.per_base_quality.len() > self.per_base_quality.len() {
             self.per_base_quality
                 .resize(other.per_base_quality.len(), QualityCount::default());
             self.per_base_content
-                .resize(other.per_base_content.len(), [0u64; 5]);
+                .resize(other.per_base_content.len(), [0u32; 5]);
         }
         for (a, b) in self.per_base_quality.iter_mut().zip(&other.per_base_quality) {
             a.merge(b);
@@ -391,14 +617,18 @@ impl QcStats {
                 a[k] += b[k];
             }
         }
-        for (&q, &c) in &other.seq_quality_hist {
-            *self.seq_quality_hist.entry(q).or_insert(0) += c;
+        for (a, &b) in self.seq_quality_hist.iter_mut().zip(&other.seq_quality_hist) {
+            *a += b;
+        }
+        if other.seq_qual_min != u8::MAX {
+            self.seq_qual_min = self.seq_qual_min.min(other.seq_qual_min);
+            self.seq_qual_max = self.seq_qual_max.max(other.seq_qual_max);
         }
         for (a, &b) in self.seq_gc_hist.iter_mut().zip(&other.seq_gc_hist) {
             *a += b;
         }
-        for (seq, &c) in &other.seq_counts {
-            *self.seq_counts.entry(seq.clone()).or_insert(0) += c;
+        for (&key, &c) in &other.seq_counts {
+            *self.seq_counts.entry(key).or_insert(0) += c;
         }
         if other.adapter_positions.len() > self.adapter_positions.len() {
             self.adapter_positions
@@ -411,20 +641,39 @@ impl QcStats {
             }
         }
         if other.total_kmer_per_pos.len() > self.total_kmer_per_pos.len() {
-            self.total_kmer_per_pos.resize(other.total_kmer_per_pos.len(), 0);
+            self.ensure_kmer_positions(other.total_kmer_per_pos.len());
         }
         for (a, &b) in self.total_kmer_per_pos.iter_mut().zip(&other.total_kmer_per_pos) {
             *a += b;
         }
-        for (&key, pos) in &other.kmer_counts {
-            let entry = self.kmer_counts.entry(key).or_default();
-            if entry.len() < pos.len() {
-                entry.resize(pos.len(), 0);
-            }
-            for (a, &b) in entry.iter_mut().zip(pos) {
-                *a += b;
+        // row-major grids: add each key's overlapping positions in place
+        let s = self.kmer_stride;
+        let os = other.kmer_stride;
+        for key in 0..KMER_KEYS {
+            for i in 0..os {
+                self.kmer_grid[key * s + i] += other.kmer_grid[key * os + i];
             }
         }
+    }
+
+    /// Grow the kmer grid to `positions` columns, re-laying existing rows
+    /// (the old stride only changes when a longer read arrives).
+    fn ensure_kmer_positions(&mut self, positions: usize) {
+        self.total_kmer_per_pos.resize(positions, 0);
+        let old_stride = self.kmer_stride;
+        if old_stride == positions {
+            return;
+        }
+        let mut new_grid = vec![0u32; KMER_KEYS * positions];
+        if old_stride > 0 {
+            for key in 0..KMER_KEYS {
+                new_grid[key * positions..key * positions + old_stride].copy_from_slice(
+                    &self.kmer_grid[key * old_stride..key * old_stride + old_stride],
+                );
+            }
+        }
+        self.kmer_grid = new_grid;
+        self.kmer_stride = positions;
     }
 
     /// Per-group quality stats: each position's percentile/mean is computed
@@ -432,7 +681,6 @@ impl QcStats {
     /// across the group (fastqc `PerBaseQualityScores.getPercentile/getMean`).
     fn group_quality_stats(&self) -> Vec<GroupQualityStats> {
         let groups = make_base_groups(self.per_base_quality.len() as u32);
-        let offset = self.encoding_offset;
         let mut out = Vec::with_capacity(groups.len());
         for g in &groups {
             let mut count = 0usize;
@@ -446,12 +694,12 @@ impl QcStats {
                 let q = &self.per_base_quality[p as usize];
                 if q.total() > 100 {
                     count += 1;
-                    mean += q.mean(offset);
-                    median += q.percentile(offset, 50);
-                    lq += q.percentile(offset, 25);
-                    uq += q.percentile(offset, 75);
-                    p10 += q.percentile(offset, 10);
-                    p90 += q.percentile(offset, 90);
+                    mean += q.mean();
+                    median += q.percentile(50);
+                    lq += q.percentile(25);
+                    uq += q.percentile(75);
+                    p10 += q.percentile(10);
+                    p90 += q.percentile(90);
                 }
             }
             if count > 0 {
@@ -472,9 +720,9 @@ impl QcStats {
     }
 
     /// Aggregated per-group base counts as [A, C, G, T, N].
-    fn group_contents(&self) -> Vec<[u64; 5]> {
+    fn group_contents(&self) -> Vec<[u32; 5]> {
         let groups = make_base_groups(self.per_base_content.len() as u32);
-        let mut out = vec![[0u64; 5]; groups.len()];
+        let mut out = vec![[0u32; 5]; groups.len()];
         for (i, g) in groups.iter().enumerate() {
             for p in (g.start - 1)..g.end {
                 for k in 0..5 {
@@ -493,7 +741,7 @@ impl QcStats {
     }
 
     fn total_acgtn(&self) -> u64 {
-        self.a_count + self.c_count + self.g_count + self.t_count
+        self.base_counts.iter().sum()
     }
 
     /// Render `fastqc_data.txt` (fastqc 0.12.1 compatible).
@@ -515,8 +763,8 @@ impl QcStats {
             format!("{}-{}", self.len_min, self.len_max)
         };
         writeln!(w, "Sequence length\t{}", len_str)?;
-        let at = self.a_count + self.t_count;
-        let gc = self.g_count + self.c_count;
+        let at = self.base_counts[0] + self.base_counts[3];
+        let gc = self.base_counts[2] + self.base_counts[1];
         let gc_pct = if at + gc > 0 {
             (gc * 100) / (at + gc)
         } else {
@@ -559,12 +807,10 @@ impl QcStats {
             self.grade_per_sequence_quality()
         )?;
         writeln!(w, "#Quality\tCount")?;
-        if let (Some(&min), Some(&max)) =
-            (self.seq_quality_hist.keys().min(), self.seq_quality_hist.keys().max())
-        {
-            for q in min..=max {
-                let count = self.seq_quality_hist.get(&q).copied().unwrap_or(0);
-                writeln!(w, "{}\t{:.1}", q - offset as i32, count as f64)?;
+        if self.seq_qual_min <= self.seq_qual_max {
+            for q in self.seq_qual_min..=self.seq_qual_max {
+                let count = self.seq_quality_hist[q as usize];
+                writeln!(w, "{}\t{:.1}", q as i32 - offset as i32, count as f64)?;
             }
         }
         writeln!(w, ">>END_MODULE")?;
@@ -630,7 +876,7 @@ impl QcStats {
             self.grade_length()
         )?;
         writeln!(w, "#Length\tCount")?;
-        for (&len, &count) in &self.len_hist {
+        for (len, &count) in self.len_hist.iter().enumerate().filter(|(_, &c)| c != 0) {
             writeln!(w, "{}\t{:.1}", len, count as f64)?;
         }
         writeln!(w, ">>END_MODULE")?;
@@ -737,7 +983,7 @@ impl QcStats {
                         "{}\t{}\t{}",
                         tile,
                         g,
-                        q.mean(self.encoding_offset) - global_mean
+                        q.mean() - global_mean
                     )?;
                 }
             }
@@ -799,8 +1045,8 @@ impl QcStats {
         } else {
             format!("{}-{}", self.len_min, self.len_max)
         };
-        let at = self.a_count + self.t_count;
-        let gc = self.g_count + self.c_count;
+        let at = self.base_counts[0] + self.base_counts[3];
+        let gc = self.base_counts[2] + self.base_counts[1];
         let gc_pct = if at + gc > 0 { (gc * 100) / (at + gc) } else { 0 };
         let basic: Vec<serde_json::Value> = [
             ("Filename", self.filename.clone()),
@@ -862,10 +1108,8 @@ impl QcStats {
             .collect();
         ctx.insert("per_base_quality", &pbq);
 
-        let psq: Vec<serde_json::Value> = self
-            .seq_quality_hist
-            .iter()
-            .map(|(&q, &c)| json!([q - offset as i32, c as f64]))
+        let psq: Vec<serde_json::Value> = (self.seq_qual_min..=self.seq_qual_max)
+            .map(|q| json!([q as i32 - offset as i32, self.seq_quality_hist[q as usize] as f64]))
             .collect();
         ctx.insert("per_seq_quality", &psq);
 
@@ -915,7 +1159,9 @@ impl QcStats {
         let len_rows: Vec<serde_json::Value> = self
             .len_hist
             .iter()
-            .map(|(&l, &c)| json!([l, c as f64]))
+            .enumerate()
+            .filter(|(_, &c)| c != 0)
+            .map(|(l, &c)| json!([l, c as f64]))
             .collect();
         ctx.insert("length", &len_rows);
         ctx.insert("dup_total", &dedup_pct);
@@ -966,9 +1212,12 @@ impl QcStats {
     fn grade_per_sequence_quality(&self) -> &'static str {
         let mut total = 0u64;
         let mut n = 0u64;
-        for (&q, &c) in &self.seq_quality_hist {
-            total += q as u64 * c;
-            n += c;
+        if self.seq_qual_min <= self.seq_qual_max {
+            for q in self.seq_qual_min..=self.seq_qual_max {
+                let c = self.seq_quality_hist[q as usize];
+                total += q as u64 * c;
+                n += c;
+            }
         }
         if n == 0 {
             return "pass";
@@ -983,7 +1232,7 @@ impl QcStats {
         }
     }
 
-    fn grade_per_base_content(&self, contents: &[[u64; 5]]) -> &'static str {
+    fn grade_per_base_content(&self, contents: &[[u32; 5]]) -> &'static str {
         for &[a, c, g, t, _n] in contents {
             let total = a + c + g + t;
             if total == 0 {
@@ -1001,7 +1250,7 @@ impl QcStats {
         "pass"
     }
 
-    fn grade_per_base_n(&self, contents: &[[u64; 5]]) -> &'static str {
+    fn grade_per_base_n(&self, contents: &[[u32; 5]]) -> &'static str {
         for &[a, c, g, t, n] in contents {
             let total = a + c + g + t + n;
             if total == 0 {
@@ -1128,10 +1377,11 @@ impl QcStats {
     fn overrep_rows(&self) -> Vec<(Vec<u8>, u64, f64, String)> {
         let total = self.n_reads.max(1) as f64;
         let mut rows: Vec<(Vec<u8>, u64, f64, String)> = Vec::new();
-        for (seq, &count) in &self.seq_counts {
+        for (&(len, seq), &count) in &self.seq_counts {
+            let seq = &seq[..len as usize];
             let pct = count as f64 / total * 100.0;
             if pct > 0.1 {
-                rows.push((seq.clone(), count, pct, match_source(seq)));
+                rows.push((seq.to_vec(), count, pct, match_source(seq)));
             }
         }
         rows.sort_by(|a, b| b.1.cmp(&a.1));
@@ -1197,8 +1447,17 @@ impl QcStats {
         let positions = self.total_kmer_per_pos.len();
         let groups = make_base_groups(positions as u32);
         let mut hits: Vec<(u16, u64, f64, String)> = Vec::new();
-        for (&key, pos) in &self.kmer_counts {
-            let kmer_total: u64 = pos.iter().sum();
+        let stride = self.kmer_stride;
+        for key in 0..KMER_KEYS {
+            let row = key * stride;
+            // row sum over all sampled positions
+            let mut kmer_total = 0u64;
+            for p in 0..positions {
+                kmer_total += self.kmer_grid[row + p] as u64;
+            }
+            if kmer_total == 0 {
+                continue;
+            }
             let expected_prop = kmer_total as f64 / total_kmer as f64;
             let mut best: Option<(f64, f64, String)> = None; // p, obs_exp, group label
             for g in &groups {
@@ -1206,7 +1465,7 @@ impl QcStats {
                 let mut group_hits = 0u64;
                 for p in (g.start - 1)..g.end.min(positions as u32) {
                     group_count += self.total_kmer_per_pos[p as usize];
-                    group_hits += pos[p as usize];
+                    group_hits += self.kmer_grid[row + p as usize] as u64;
                 }
                 if group_count == 0 {
                     continue;
@@ -1229,7 +1488,7 @@ impl QcStats {
                 }
             }
             if let Some((p, oe, group)) = best {
-                hits.push((key, kmer_total, oe, group));
+                hits.push((key as u16, kmer_total, oe, group));
                 let _ = p;
             }
         }
@@ -1247,14 +1506,14 @@ impl QcStats {
                 global.merge(q);
             }
         }
-        let global_mean = global.mean(self.encoding_offset);
+        let global_mean = global.mean();
         let mut max_dev = 0.0f64;
         for quals in self.tile_quality.values() {
             let mut q = QualityCount::default();
             for p in quals {
                 q.merge(p);
             }
-            max_dev = max_dev.max((q.mean(self.encoding_offset) - global_mean).abs());
+            max_dev = max_dev.max((q.mean() - global_mean).abs());
         }
         let grade = if max_dev > 10.0 {
             "fail"
@@ -1323,6 +1582,129 @@ fn adapters() -> &'static Vec<(&'static str, &'static str)> {
             })
             .collect()
     })
+}
+
+/// Unaligned fixed-width loads for the hot adapter scan. Callers guarantee
+/// `i + N <= seq.len()` before invoking (bounds are checked in the loop).
+#[inline(always)]
+unsafe fn read_u16_un(seq: &[u8], i: usize) -> u16 {
+    debug_assert!(i + 2 <= seq.len());
+    unsafe { std::ptr::read_unaligned(seq.as_ptr().add(i) as *const u16) }
+}
+
+#[inline(always)]
+unsafe fn read_u32_un(seq: &[u8], i: usize) -> u32 {
+    debug_assert!(i + 4 <= seq.len());
+    unsafe { std::ptr::read_unaligned(seq.as_ptr().add(i) as *const u32) }
+}
+
+#[inline(always)]
+unsafe fn read_u64_un(seq: &[u8], i: usize) -> u64 {
+    debug_assert!(i + 8 <= seq.len());
+    unsafe { std::ptr::read_unaligned(seq.as_ptr().add(i) as *const u64) }
+}
+
+/// Precomputed fixed-width signatures for the 6 built-in adapters (all
+/// 12 bp in the current data): `(bytes[2..4] as u16, bytes[4..12] as u64)`.
+/// After the pairwise-distinct 2-byte dispatch, these verify the remaining
+/// 10 bp with two loads + compares instead of a libc memcmp. Entries with
+/// other lengths are `None` and fall back to the general slice comparison.
+static ADAPTER_SIGS: std::sync::OnceLock<[Option<(u16, u64)>; 6]> =
+    std::sync::OnceLock::new();
+
+fn adapter_sigs() -> &'static [Option<(u16, u64)>; 6] {
+    ADAPTER_SIGS.get_or_init(|| {
+        let mut sigs = [None; 6];
+        for (a, (_, s)) in adapters().iter().enumerate() {
+            if a >= 6 {
+                break;
+            }
+            let b = s.as_bytes();
+            if b.len() == 12 {
+                sigs[a] = Some((
+                    u16::from_ne_bytes([b[2], b[3]]),
+                    u64::from_ne_bytes(b[4..12].try_into().unwrap()),
+                ));
+            }
+        }
+        sigs
+    })
+}
+
+/// 32768-entry 4-bit lookup: pair (little-endian u16 of b0,b1) -> adapter
+/// index (0xF = none), packed two per byte. 32 KB fits L1 on modern x86
+/// (the 64 KB u8 version sat at the L1/L2 boundary), and the sentinel
+/// encoding keeps the whole lookup to one load + shift/mask.
+static ADAPTER_PAIR_TABLE: std::sync::OnceLock<[u8; 1 << 15]> =
+    std::sync::OnceLock::new();
+
+fn adapter_pair_table() -> &'static [u8; 1 << 15] {
+    ADAPTER_PAIR_TABLE.get_or_init(|| {
+        let mut t = [0xFFu8; 1 << 15];
+        for (a, (_, s)) in adapters().iter().enumerate() {
+            if a >= 6 {
+                break;
+            }
+            let b = s.as_bytes();
+            if b.len() >= 2 {
+                let pair = b[0] as usize | (b[1] as usize) << 8;
+                let nib = a as u8 & 0xF;
+                if pair & 1 == 0 {
+                    t[pair >> 1] = (t[pair >> 1] & 0xF0) | nib;
+                } else {
+                    t[pair >> 1] = (t[pair >> 1] & 0x0F) | (nib << 4);
+                }
+            }
+        }
+        t
+    })
+}
+
+/// Look up the adapter candidate for a 2-byte pair in the packed table
+/// (0xF = no adapter starts with this pair).
+#[inline(always)]
+fn adapter_at(table: &[u8; 1 << 15], pair: u16) -> u8 {
+    let idx = pair as usize;
+    let v = table[idx >> 1];
+    if idx & 1 == 0 {
+        v & 0xF
+    } else {
+        v >> 4
+    }
+}
+
+/// Verify that adapter `a` really occurs at `i` (fixed-width 12 bp compare
+/// via the precomputed signature; generic slice fallback for other lengths).
+#[inline(always)]
+fn verify_adapter(
+    a: usize,
+    i: usize,
+    l: usize,
+    seq: &[u8],
+    sigs: &[Option<(u16, u64)>; 6],
+    ads: &[(&str, &str)],
+    found: &mut [Option<usize>; 6],
+    mask: &mut u8,
+) {
+    if *mask & (1 << a) == 0 {
+        return;
+    }
+    // `a` comes from the pair table (0..5 or the 0xFF sentinel, already
+    // filtered), so all three indexes are in bounds; unchecked indexing
+    // removes two bounds compares on the ~18 false-positive pairs per read.
+    debug_assert!(a < 6);
+    let matched = if let Some((tail2, body8)) = *unsafe { sigs.get_unchecked(a) } {
+        i + 12 <= l
+            && unsafe { read_u16_un(seq, i + 2) } == tail2
+            && unsafe { read_u64_un(seq, i + 4) } == body8
+    } else {
+        let aseq = unsafe { ads.get_unchecked(a) }.1.as_bytes();
+        i + aseq.len() <= l && &seq[i..i + aseq.len()] == aseq
+    };
+    if matched {
+        unsafe { *found.get_unchecked_mut(a) = Some(i) };
+        *mask &= !(1 << a);
+    }
 }
 
 /// Full fastqc contaminant library (`data/contaminant_list.txt`, 151
@@ -1456,26 +1838,61 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 fn find_subseq(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    if needle.is_empty() || needle.len() > haystack.len() {
+    if needle.len() < 2 || needle.len() > haystack.len() {
         return None;
     }
-    haystack
-        .windows(needle.len())
-        .position(|w| w == needle)
+    // Two-byte prescreen: scan for the first byte, check the second byte
+    // (plain compare), then verify the rest — avoids a memcmp on every
+    // first-byte hit (~1/4 of positions) and cuts memcmp calls ~16× for
+    // adapter matching (6× per read).
+    let first = needle[0];
+    let second = needle[1];
+    let rest = &needle[2..];
+    let mut i = 0;
+    while i + needle.len() <= haystack.len() {
+        let Some(off) = haystack[i..].iter().position(|&b| b == first) else {
+            return None;
+        };
+        i += off;
+        if i + 2 + rest.len() > haystack.len() {
+            return None;
+        }
+        if haystack[i + 1] == second && &haystack[i + 2..i + 2 + rest.len()] == rest {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
 }
 
-fn encode_kmer(seq: &[u8]) -> u16 {
-    let mut key = 0u16;
-    for &b in seq {
-        key <<= 2;
-        key |= match b {
-            b'A' => 0,
-            b'C' => 1,
-            b'G' => 2,
-            _ => 3,
-        };
+/// 2-bit base encoding for 7-mer keys (matches fastqc's kmer key order:
+/// A=0, C=1, G=2, anything else = 3; the rolling window skips non-ACGT
+/// windows before use).
+#[inline(always)]
+fn encode_base(b: u8) -> u16 {
+    match b {
+        b'A' => 0,
+        b'C' => 1,
+        b'G' => 2,
+        _ => 3,
     }
-    key
+}
+
+/// Parse an ASCII decimal u32 without UTF-8 validation or allocation
+/// (tile ids in the read header).
+#[inline]
+fn parse_u32_bytes(b: &[u8]) -> Option<u32> {
+    if b.is_empty() {
+        return None;
+    }
+    let mut v = 0u32;
+    for &c in b {
+        if !c.is_ascii_digit() {
+            return None;
+        }
+        v = v.checked_mul(10)? + (c - b'0') as u32;
+    }
+    Some(v)
 }
 
 fn kmer_to_string(key: u16) -> String {
@@ -1589,6 +2006,53 @@ fn betacf(x: f64, a: f64, b: f64) -> f64 {
     h
 }
 
+/// Minimal FNV-1a hasher: much faster than `SipHash` for the fixed 51-byte
+/// `seq_counts` keys (hashbrown only needs any valid `Hasher`).
+#[derive(Default)]
+struct FnvHasher(u64);
+
+impl std::hash::Hasher for FnvHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        let mut h = self.0;
+        // Hash the first 8 bytes and the last 8 bytes (2 multiplies instead
+        // of 7 for a 51-byte key). The full key is still stored and
+        // compared on probe, so correctness is unaffected; the suffix fold
+        // keeps adapter-prefixed read families from clustering in one
+        // bucket (they share the prefix but not the tail).
+        if bytes.len() >= 8 {
+            h ^= u64::from_ne_bytes(bytes[..8].try_into().unwrap());
+            h = h.wrapping_mul(0x100000001b3);
+        } else {
+            for &b in bytes {
+                h ^= b as u64;
+                h = h.wrapping_mul(0x100000001b3);
+            }
+        }
+        // fold the tail so different 8-byte prefixes plus distinct suffixes
+        // still get distinct hashes cheaply
+        if bytes.len() > 8 {
+            let tail = &bytes[bytes.len() - 8..];
+            h ^= u64::from_ne_bytes(tail.try_into().unwrap());
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        self.0 = h;
+    }
+
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Default)]
+struct FnvBuild;
+
+impl std::hash::BuildHasher for FnvBuild {
+    type Hasher = FnvHasher;
+    fn build_hasher(&self) -> FnvHasher {
+        FnvHasher(0xcbf29ce484222325)
+    }
+}
+
 /// fastqc `BasicStats.formatLength`: bp/kbp/Mbp/Gbp, trailing `.0` dropped.
 fn format_length(len: u64) -> String {
     let (value, unit) = if len >= 1_000_000_000 {
@@ -1619,14 +2083,14 @@ mod tests {
 
     #[test]
     fn quality_count_percentile_matches_fastqc() {
-        // 4 reads: Phred 0, 2, 4, 7 (ASCII 33/35/37/40)
+        // 4 reads: Phred 0, 2, 4, 7
         let mut q = QualityCount::default();
-        for c in [33u8, 35, 37, 40] {
+        for c in [0u8, 2, 4, 7] {
             q.add(c);
         }
-        assert_eq!(q.percentile(33, 50), 2.0);
-        assert_eq!(q.percentile(33, 25), 0.0);
-        assert_eq!(q.percentile(33, 90), 4.0);
-        assert_eq!(q.mean(33), 3.25);
+        assert_eq!(q.percentile(50), 2.0);
+        assert_eq!(q.percentile(25), 0.0);
+        assert_eq!(q.percentile(90), 4.0);
+        assert_eq!(q.mean(), 3.25);
     }
 }
