@@ -145,7 +145,7 @@ bench() { # $1 = config label, $2 = config id
 }
 
 echo "scale=$SCALE  k=$K  threads=$THREADS  runs=$RUNS  input=$IN"
-echo "note: -p binds counting (+ --dfa classification); auto = all cores; walk is single-threaded/deterministic"
+echo "note: -p binds counting (+ --dfa classification); default half(<=8), auto = all cores; walk is single-threaded/deterministic"
 echo
 printf "%-8s %-16s %10s  %-24s  %s\n" "scale" "config" "peak RSS" "wall (mean±σ)" "output (n50 sum avg esize count)"
 printf "%-8s %-16s %10s  %-24s  %s\n" "-----" "------" "--------" "----------------" "-----------------------------"

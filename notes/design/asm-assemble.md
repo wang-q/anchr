@@ -546,7 +546,8 @@ rc）**为 0**。
 ## 11. DFA 状态分类（借鉴 cuttlefish）评估（2026-08-14）
 
 把 cuttlefish 的"先分类、后提取"路线按我们的语义移植成可选引擎
-（`anchr asm unitig --dfa [--parallel N]`，`src/libs/asm/dfa.rs`）：
+（**2026-08-14 起为 `asm unitig` 默认引擎**；`--no-dfa` 回退桶扫描，
+实现见 `src/libs/asm/dfa.rs`）：
 
 * **分类 pass**：对每个 solid canonical k-mer 预计算 4 个字段
   `VertexState{in_count, out_count, in_base, out_base}`（入/出度与唯一
@@ -561,7 +562,9 @@ rc）**为 0**。
   不是 cuttlefish 的 (k+1)-mer 阈值，因此输出仍与 bcalm 逐序列一致。
 * **全流水线绑定**（2026-08-14）：`--parallel N` 现在同时约束计数
   （`TadpoleTable::build_threaded`）与 DFA 分类两个可并行阶段；`auto`
-  用满全部逻辑核（rayon 全局池）。walk 仍保持确定性单线程。
+  用满全部逻辑核（rayon 全局池）。**默认 `--parallel` 为 8**（2026-08-14
+  改为 `min(逻辑核/2, 8)` 自适应，避免默认吃满逻辑核；`auto` 仍可显式
+  指定）。walk 仍保持确定性单线程。
 
 ### 11.1 正确性
 
@@ -609,6 +612,11 @@ Lambda（k=31）与 G37 full（k=31/99）上，`--dfa --parallel 1/4/8` 的输�
   主导，差距消失（k=99 p8 两者都在 ~1.0 GB）；
 * walk 仍单线程，遍历占比 <1%（§9.1），并行化收益有限且引入排序/确定性
   负担，暂不做。
+
+> **并行 walk 实验已撤下（2026-08-14）**：曾实现"原子 seed 认领 +
+> 最小 k-mer 拥有者保留"的并行 walk（`--parallel-walk`），但并行计数 +
+> 分类 + walk 多层线程池叠加会把系统跑满（实测卡死），已整体移除；
+> 默认 `--parallel` 改为自适应 `min(逻辑核/2, 8)`（本机为 8）。
 
 ### 11.3 后续方向
 
@@ -674,3 +682,102 @@ stage 2 加权展开，输出与直接路径逐字节一致，测试覆盖 k=3..
      固定 m=12 未必匹配数据集；注意长 k + 短读时折叠本身只有 ~1.1×，
      自适应只能改善、不能根治。
   两者任一落地后重跑 §12 的基准表，再决定 `--supermer` 是否转正。
+
+### 12.3 pgr 计数优化交接（2026-08-14）
+
+anchr 侧已收敛（DFA 默认 walk、流式 direct 计数、状态表内嵌计数、
+单池复用、`--parallel` 默认 `min(逻辑核/2, 8)`）。剩余最大单一差距在
+pgr 计数：G37 full k=31 约 **0.9 s** vs FastK **0.68 s**（同机、纯计数）。
+
+给 pgr 的优化清单（按收益排序）：
+
+1. **自适应 minimizer**：pgr supermer 固定 m=12；anchr 侧实测
+   k=31 最优 m=8、k=63/99 最优 m=12、k=127 两者接近（启发式
+   `min(12, max(5, k/4))` 已进 anchr CLI，pgr 可内置同样选择）；
+2. **连续缓冲替代每序列 `Vec`**：supermer stage-1 目前 `per_seq: Vec<Vec<u8>>`
+   逐个分配，可改为单块连续缓冲 + 偏移表（FastK 同款），减少分配与
+   缓存未命中；
+3. **避免克隆/移动开销**：`build_table` 接受 `&[Vec<u8>]`，调用方需先
+   备好全量 seqs；可加"借用切片"API（`&[&[u8]]` 或迭代器）让 anchr
+   流式路径直接喂；
+4. **调 chunk / 排序阈值**：`radix_sort_bytes_par` 的 `PAR_SMALL`
+   （1<<18）与 supermer stage-2 的展开粒度可按数据集调；
+5. **（可选）并行读输入**：FastK `-T` 多线程读文件；pgr 读取单线程，
+   gz 输入时差距更明显。
+
+复现（同机、plain FASTA）：
+
+```bash
+# FastK（纯计数+profile）
+/usr/bin/time -v FastK -T32 -t1 -k31 -N/tmp/fk31 -P/tmp /tmp/pe.cor.fa
+# pgr 直接 / supermer
+/usr/bin/time -v pgr kmer table /tmp/pe.cor.fa -k31 -o /tmp/d.pkt
+/usr/bin/time -v pgr kmer table /tmp/pe.cor.fa -k31 --supermer -o /tmp/s.pkt
+```
+
+目标：pgr supermer k=31 端到端 ≤ 0.7 s、内存 ≤ 800 MB（当前 1.01 s /
+854 MB，见 `notes/benchmarks/bench-supermer-vs-fastk.md`）。
+
+### 12.2 效率攻坚：walk 瓶颈与组合优化（2026-08-14）
+
+分阶段计时（G37 full k=31，`--supermer --dfa -p8`）：
+
+| 阶段 | 耗时 | 说明 |
+| :--- | ---: | :--- |
+| read_records | 0.12 s | 读 144 MB FASTA |
+| supermer count | 0.85 s | pgr 两段计数（move+pack+sort+expand） |
+| walk+classify+coverage | 0.47 s | dfa classify 0.10 s + walk/覆盖度/输出 |
+
+关键发现：**walk+build 曾是隐藏瓶颈**（默认引擎 ~0.9 s，和计数同级）——
+早期 §9.1 的"遍历 <1%"是在计数 12.8 s 时代测的，计数提速后 walk 占比
+被放大。两个修复：
+
+* **DFA 状态引擎**把每步 8 次邻居查询换成 O(1) 状态查询（classify 并行
+  0.10 s @8 线程）；
+* **`solid_entries`** 只物化 count ≥ threshold 的顶点，不再构造 55 万
+  个低丰度 `Kmer`（walk+build 0.69 → 0.47 s）。
+* **DFA 设为默认引擎（2026-08-14）**：full k31 **1.324 s / 948 MB** vs
+  桶扫描 1.578 s / 1030 MB（-16% / -8%）；k99 **1.880 s / 1998 MB** vs
+  2.622 s / 2095 MB（-28% / -5%），输出逐字节一致。`--no-dfa` 保留旧
+  引擎作对照。
+* **direct 计数流式化（2026-08-14）**：unitig 默认路径改为
+  `TadpoleTable::build_streamed`——按 32768 记录/块经 bounded channel
+  分发给 worker（std 线程），不保留全部 reads。G37 full：k31
+  **1.43 s / 694 MB**（vs 内存路径 1.32 s / 948 MB：墙钟 +8%、内存
+  -27%）；k99 **1.88 s / 1455 MB**（vs 1.88 s / 1998 MB：墙钟持平、
+  内存 -27%）。`ANCHR_STREAM_CHUNK`/`ANCHR_STREAM_CAP` 可调
+  （16384/cap2 更省内存但墙钟 +20%）。supermer 路径仍走 `read_records`
+  （pgr API 需要全量 seqs）。
+* **DFA 状态表内嵌计数（2026-08-14）**：分类时把 canonical 计数也存入
+  `VertexStates.counts`，walk 的覆盖度/`ab:Z` 从 O(1) 索引取，不再每
+  k-mer 重做 `get_count` 的 canonical + 二分。G37 full 默认组合进一步
+  到 **k31 1.344 s / 670 MB**、**k99 1.69 s / ~1.6 GB**（walk+build
+  0.62 → 0.36 s），输出逐字节一致。
+* **分类条目复用 + visited 字节数组（2026-08-14）**：`VertexStates`
+  保留排序后的 solid 条目（walk 不再二次构建 `solid_entries`），
+  `visited` 从 FNV HashSet 换成按顶点索引的 `Vec<u8>`。G37 full 默认
+  组合到 **k31 1.264 s / 699 MB**、**k99 1.625 s / 1348 MB**
+  （walk+build 0.36 → 0.27 s），输出逐字节一致；`--no-dfa` 回退路径
+  也已验证一致。
+* **walk 覆盖度累积**：unitig 两条 walk 在扩展时直接累积 canonical
+  计数（右循环 `right_counts` + 左循环 `left_counts`，按
+  `reverse(left[1..]) + right` 拼回输出顺序），`calc_coverage` 与
+  `calc_abundances` 的二次扫描已从 unitig 路径删除（contig 路径保留
+  `calc_coverage`）。实测墙钟无显著变化——二次扫描本就不是大头，
+  但逻辑上少了两遍滑窗 + canonical 重算，且 `ab:Z` 直接复用同一份
+  计数。
+
+minimizer 扫描（`--supermer --dfa -p8`，runs 2，输出均与默认逐字节一致）：
+
+| k | m=5 | m=8 | m=10 | m=12 | 默认（直接+桶扫描） |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| 31 wall | 1.454 s | **1.442 s** | 1.475 s | 1.491 s | 1.574 s |
+| 31 RSS | 779 MB | 791 MB | 831 MB | 841 MB | 945 MB |
+| 99 wall | 2.861 s | 2.861 s | 2.868 s | **2.825 s** | 2.701 s |
+| 99 RSS | 1338 MB | 1311 MB | 1301 MB | 1283 MB | 2044 MB |
+
+当前最佳组合：**k=31 `--supermer --dfa -p8 -m8`**（1.44 s / 791 MB，
+比默认快 8%、内存省 16%）；**k=99 `-m12`**（2.83 s / 1283 MB，比默认
+慢 5%、内存省 37%）。剩余差距在计数（0.85 vs FastK 0.68 s）与
+walk/覆盖度（0.37 s）；计数由 pgr 侧继续优化，覆盖度可在 anchr 侧用
+walk 中累积计数替代二次扫描。

@@ -89,6 +89,22 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
 - **pgr supermer 再评估**：pgr 支持质量门控 + 按数据自适应 minimizer
   后，重跑 `asm unitig --supermer` 基准并决定是否转正；当前作为实验
   开关保留（[asm-assemble.md](design/asm-assemble.md) §12.1）。
+- **效率攻坚（2026-08-14 进度）**：walk 是隐藏瓶颈，DFA + solid_entries
+  已修复；**DFA 已设为 unitig 默认 walk 引擎**（full k31 -16%、k99
+  -28%，逐字节一致，`--no-dfa` 回退）；supermer 自适应 m（`min(12,
+  max(5, k/4))`）落地，但组合在新默认下 k31/k99 反而慢（内存省
+  14%/12%），降级为纯实验；**direct 计数已流式化**（chunk 32768，
+  k31 1.43 s/694 MB、k99 1.88 s/1455 MB，墙钟 +0-8%、内存 -27%）；
+  walk 覆盖度已改为扩展时累积；**DFA 状态表内嵌计数**后默认组合到
+  k31 1.34 s/670 MB、k99 1.69 s/~1.6 GB；**分类条目复用 + visited
+  字节数组**后再到 full k31 1.21 s/663 MB、k99 1.63 s/1348 MB
+  （small/medium 亦 -31~-51%）。剩余：计数（pgr，~0.9 vs FastK
+  0.68 s）——是否设 supermer 默认仍待定
+  （[asm-assemble.md](design/asm-assemble.md) §12.2）。
+- **并行安全（2026-08-14）**：并行 walk 实验（`--parallel-walk`）因计数
+  + 分类 + walk 多层线程池叠加导致系统卡死，已整体移除；`--parallel`
+  默认改为 **min(逻辑核/2, 8)**（自适应，auto 仍可显式指定吃满）。
+  基准文档数字为 auto(32) 时代所测，默认 half 下墙钟略慢、线程更稳。
 
 ## 4. 待验证 / 等数据或场景到位
 

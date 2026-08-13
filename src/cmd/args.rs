@@ -97,6 +97,18 @@ pub fn parse_parallel_auto(s: &str) -> anyhow::Result<usize> {
     Ok(n)
 }
 
+/// Parse a `--parallel` value for the asm pipeline: `auto` = all logical
+/// cores, `half` (the default) = `min(logical/2, 8)` so small laptops and
+/// big servers both get a sane, non-oversubscribed count, or an explicit
+/// integer in `1..=1024`.
+pub fn parse_parallel(s: &str) -> anyhow::Result<usize> {
+    match s {
+        "auto" => Ok(pgr::libs::sys::logical_cpus()),
+        "half" => Ok(pgr::libs::sys::logical_cpus().div_ceil(2).clamp(1, 8)),
+        _ => parse_parallel_auto(s),
+    }
+}
+
 /// `--no-ns` flag (output size without Ns).
 /// `--name-prefix` argument with an optional default value.
 pub fn name_prefix_arg(default: Option<&'static str>) -> Arg {

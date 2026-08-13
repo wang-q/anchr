@@ -164,7 +164,7 @@ impl TadpoleTable {
         reads: &[(Vec<u8>, Vec<u8>)],
         k: usize,
         min_prob: f32,
-        threads: usize,
+        _threads: usize,
     ) -> Self {
         let (prob_correct, prob_correct_inv) = prob_tables();
         if reads.is_empty() {
@@ -215,15 +215,10 @@ impl TadpoleTable {
                     merge_tables,
                 )
         };
-        let table = if threads > 0 {
-            let pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(threads)
-                .build()
-                .expect("failed to build counting thread pool");
-            pool.install(|| build(reads))
-        } else {
-            build(reads)
-        };
+        // Ambient pool: the caller wraps the assemble call in a single rayon
+        // pool of `--parallel` threads; creating another pool here would
+        // oversubscribe the machine.
+        let table = build(reads);
         Self {
             table,
             prefix_index: OnceLock::new(),
@@ -234,13 +229,128 @@ impl TadpoleTable {
     /// FastK-style super-mer two-stage counting (pgr `kmer::supermer`).
     /// Counts every N-free k-mer without quality gating (byte-identical to
     /// the direct path on FASTA / no-quality input).
-    pub(crate) fn build_supermer(reads: &[(Vec<u8>, Vec<u8>)], k: usize) -> anyhow::Result<Self> {
-        let seqs: Vec<Vec<u8>> = reads.iter().map(|(s, _)| s.clone()).collect();
-        let table = pgr::libs::kmer::supermer::build_table(&seqs, k)?;
+    pub(crate) fn build_supermer(
+        reads: Vec<(Vec<u8>, Vec<u8>)>,
+        k: usize,
+        m: Option<usize>,
+    ) -> anyhow::Result<Self> {
+        let t0 = std::time::Instant::now();
+        // Move the sequence buffers out of the (seq, phred) pairs instead of
+        // cloning: the super-mer path does not use qualities, and keeping a
+        // second byte copy costs ~0.65 GB on G37 full.
+        let seqs: Vec<Vec<u8>> = reads.into_iter().map(|(s, _)| s).collect();
+        let table = match m {
+            Some(m) => pgr::libs::kmer::supermer::build_table_with_m(&seqs, k, m)?,
+            None => pgr::libs::kmer::supermer::build_table(&seqs, k)?,
+        };
+        if std::env::var_os("ANCHR_SM_TIMING").is_some() {
+            eprintln!(
+                "supermer count: {:.3}s (move+pack+sort+expand)",
+                t0.elapsed().as_secs_f64()
+            );
+        }
         Ok(Self {
             table,
             prefix_index: OnceLock::new(),
             sorted: OnceLock::new(),
+        })
+    }
+
+    /// Streaming direct counter: reads `infiles` record-by-record, fans out
+    /// to `threads` workers that emit packed keys in bounded chunks and
+    /// merge per-worker count tables. Unlike `build_threaded` this never
+    /// holds all reads (the ~0.65 GB `(seq, phred)` copy on G37 full), so
+    /// peak memory stays bounded by the chunk/worker buffers. Returns the
+    /// table and the number of records consumed.
+    pub(crate) fn build_streamed(
+        infiles: &[String],
+        k: usize,
+        min_prob: f32,
+        threads: usize,
+    ) -> anyhow::Result<(Self, u64)> {
+        let threads = threads.max(1);
+        let (prob_correct, prob_correct_inv) = prob_tables();
+        let chunk: usize = std::env::var("ANCHR_STREAM_CHUNK")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(32768);
+        let cap: usize = std::env::var("ANCHR_STREAM_CAP")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(2);
+        std::thread::scope(|s| -> anyhow::Result<(Self, u64)> {
+            let mut senders = Vec::with_capacity(threads);
+            let mut receivers = Vec::with_capacity(threads);
+            for _ in 0..threads {
+                let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<(Vec<u8>, Vec<u8>)>>(cap);
+                senders.push(tx);
+                receivers.push(rx);
+            }
+            let mut handles = Vec::with_capacity(threads);
+            for rx in receivers {
+                let (pc, pci) = (prob_correct.clone(), prob_correct_inv.clone());
+                handles.push(s.spawn(move || {
+                    let mut raw: Vec<u8> = Vec::new();
+                    let mut table = pgr::libs::kmer::KmerTable {
+                        k,
+                        keys: Vec::new(),
+                        counts: Vec::new(),
+                    };
+                    while let Ok(recs) = rx.recv() {
+                        for (seq, qual) in recs {
+                            count_read_kmers_packed(&mut raw, &seq, &qual, k, min_prob, &pc, &pci);
+                        }
+                        if !raw.is_empty() {
+                            let t = count_keys_seq(std::mem::take(&mut raw), k);
+                            table = merge_tables(table, t);
+                        }
+                    }
+                    table
+                }));
+            }
+            let mut reads_in = 0u64;
+            let mut idx = 0usize;
+            let mut buf: Vec<(Vec<u8>, Vec<u8>)> = Vec::with_capacity(chunk);
+            for infile in infiles {
+                let mut reader = SeqReader::new(infile)?;
+                let mut rec = SeqRecord::new();
+                while reader.read_record(&mut rec)? {
+                    canonicalize_quality(&mut rec);
+                    buf.push((
+                        rec.sequence().to_vec(),
+                        to_phred(rec.sequence(), rec.quality_scores()),
+                    ));
+                    reads_in += 1;
+                    if buf.len() >= chunk {
+                        senders[idx % threads]
+                            .send(std::mem::take(&mut buf))
+                            .map_err(|_| anyhow::anyhow!("streaming count channel closed"))?;
+                        idx += 1;
+                    }
+                }
+            }
+            if !buf.is_empty() {
+                senders[idx % threads]
+                    .send(buf)
+                    .map_err(|_| anyhow::anyhow!("streaming count channel closed"))?;
+            }
+            drop(senders);
+            let mut table = pgr::libs::kmer::KmerTable {
+                k,
+                keys: Vec::new(),
+                counts: Vec::new(),
+            };
+            for h in handles {
+                table = merge_tables(table, h.join().expect("streaming count worker panicked"));
+            }
+            Ok((
+                Self {
+                    table,
+                    prefix_index: OnceLock::new(),
+                    sorted: OnceLock::new(),
+                },
+                reads_in,
+            ))
         })
     }
 
@@ -340,6 +450,26 @@ impl TadpoleTable {
         })
     }
 
+    /// Sorted (canonical k-mer, count) pairs with `count >= threshold`,
+    /// built by scanning the packed table without materializing the
+    /// below-threshold keys (the walk/classification passes only visit
+    /// solid vertices).
+    pub(crate) fn solid_entries(&self, threshold: u32) -> Vec<(Kmer, u32)> {
+        let kb = self.table.key_bytes();
+        self.table
+            .keys
+            .chunks_exact(kb)
+            .zip(self.table.counts.iter())
+            .filter(|(_, &c)| c >= threshold)
+            .map(|(b, &c)| {
+                (
+                    Kmer(pgr::libs::kmer::key::Kmer::from_bytes(self.table.k, b)),
+                    c,
+                )
+            })
+            .collect()
+    }
+
     /// Counts of the four right-extensions of `kmer`.
     pub(crate) fn fill_right_counts(&self, kmer: &Kmer) -> [u32; 4] {
         let mut out = [0u32; 4];
@@ -361,6 +491,42 @@ impl TadpoleTable {
         }
         out
     }
+}
+
+/// Merge two sorted, deduplicated k-mer tables into one (combining equal
+/// Sequential `count_keys`: sorts the packed keys with the non-parallel MSD
+/// radix path and groups identical keys into counts. Used by the streamed
+/// worker threads so they never spawn rayon work (single-pool pipeline).
+fn count_keys_seq(mut keys: Vec<u8>, k: usize) -> pgr::libs::kmer::KmerTable {
+    let key_bytes = k.div_ceil(4);
+    if keys.is_empty() {
+        return pgr::libs::kmer::KmerTable {
+            k,
+            keys,
+            counts: Vec::new(),
+        };
+    }
+    let n_keys = keys.len() / key_bytes;
+    pgr::libs::ds::radix_sort::radix_sort_bytes(&mut keys, key_bytes, &mut vec![(); n_keys]);
+    let mut counts: Vec<u32> = Vec::with_capacity(n_keys);
+    let mut i = 0usize;
+    let mut w = 0usize;
+    while i < n_keys {
+        let mut j = i + 1;
+        while j < n_keys
+            && keys[j * key_bytes..(j + 1) * key_bytes] == keys[i * key_bytes..(i + 1) * key_bytes]
+        {
+            j += 1;
+        }
+        if w != i {
+            keys.copy_within(i * key_bytes..(i + 1) * key_bytes, w * key_bytes);
+        }
+        counts.push((j - i).min(u32::MAX as usize) as u32);
+        w += 1;
+        i = j;
+    }
+    keys.truncate(w * key_bytes);
+    pgr::libs::kmer::KmerTable { k, keys, counts }
 }
 
 /// Merge two sorted, deduplicated k-mer tables into one (combining equal

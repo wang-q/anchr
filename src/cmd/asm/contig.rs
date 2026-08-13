@@ -106,8 +106,8 @@ Examples:
                 .long("parallel")
                 .short('p')
                 .num_args(1)
-                .default_value("auto")
-                .help("Worker threads for k-mer counting (default: auto = all cores); walk stays deterministic"),
+                .default_value("half")
+                .help("Worker threads for k-mer counting (default: half of logical cores, capped at 8; auto = all cores); walk stays deterministic"),
         )
 }
 
@@ -128,8 +128,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
     // Validate the thread-count value; processing stays deterministic
     // single-pass (see the design notes), so the result is not used.
-    let parallel =
-        crate::cmd::args::parse_parallel_auto(args.get_one::<String>("parallel").unwrap())?;
+    let parallel = crate::cmd::args::parse_parallel(args.get_one::<String>("parallel").unwrap())?;
     let k = *args.get_one::<usize>("kmer").unwrap();
     let opts = AssembleOptions {
         k,
@@ -151,7 +150,15 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;
-    let stats = assemble(&infiles, &mut out, &opts)?;
+    let stats = if opts.parallel > 0 {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(opts.parallel)
+            .build()
+            .with_context(|| "failed to build assembly thread pool")?;
+        pool.install(|| assemble(&infiles, &mut out, &opts))?
+    } else {
+        assemble(&infiles, &mut out, &opts)?
+    };
     out.flush()?;
     eprintln!(
         "Reads in: {}  Contigs: {}  Bases: {}  Longest: {}",

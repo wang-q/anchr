@@ -30,7 +30,13 @@ pub(crate) struct VertexState {
 /// Classified states for every vertex in `TadpoleTable::sorted_entries`,
 /// with a canonical-key index for the walk.
 pub(crate) struct VertexStates {
+    /// Sorted solid (canonical k-mer, count) entries; kept so the walk
+    /// reuses the classification pass instead of rebuilding `solid_entries`.
+    entries: Vec<(Kmer, u32)>,
     states: Vec<VertexState>,
+    /// Canonical counts parallel to `states` (per-unitig coverage; avoids a
+    /// second `get_count` canonical+bsearch per k-mer during the walk).
+    counts: Vec<u32>,
     index: HashMap<Kmer, usize, BuildHasherDefault<KmerFnvHasher>>,
 }
 
@@ -44,47 +50,57 @@ impl VertexStates {
             threads
         };
         let t0 = std::time::Instant::now();
-        let entries = table.sorted_entries();
+        let entries = table.solid_entries(threshold);
         let mut states = vec![VertexState::default(); entries.len()];
+        let mut counts = vec![0u32; entries.len()];
 
-        let fill = |states: &mut [VertexState]| {
-            states.par_iter_mut().enumerate().for_each(|(i, st)| {
-                let (km, count) = entries[i];
-                if count < threshold {
-                    return;
-                }
-                let (in_count, in_base) = count_in(table, &km, threshold);
-                let (out_count, out_base) = count_out(table, &km, threshold);
-                *st = VertexState {
-                    in_count,
-                    out_count,
-                    in_base,
-                    out_base,
-                };
-            });
+        let fill = |states: &mut [VertexState], counts: &mut [u32]| {
+            states
+                .par_iter_mut()
+                .zip(counts.par_iter_mut())
+                .enumerate()
+                .for_each(|(i, (st, cnt))| {
+                    let (km, count) = entries[i];
+                    if count < threshold {
+                        return;
+                    }
+                    *cnt = count;
+                    let (in_count, in_base) = count_in(table, &km, threshold);
+                    let (out_count, out_base) = count_out(table, &km, threshold);
+                    *st = VertexState {
+                        in_count,
+                        out_count,
+                        in_base,
+                        out_base,
+                    };
+                });
         };
 
         if threads > 1 {
-            let pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(threads)
-                .build()
-                .expect("failed to build classification thread pool");
-            pool.install(|| fill(&mut states));
+            // Ambient pool: the command wraps the whole assemble call in a
+            // single rayon pool of `--parallel` threads, so classification
+            // must not create a second pool (thread oversubscription).
+            fill(&mut states, &mut counts);
         } else {
-            states.iter_mut().enumerate().for_each(|(i, st)| {
-                let (km, count) = entries[i];
-                if count < threshold {
-                    return;
-                }
-                let (in_count, in_base) = count_in(table, &km, threshold);
-                let (out_count, out_base) = count_out(table, &km, threshold);
-                *st = VertexState {
-                    in_count,
-                    out_count,
-                    in_base,
-                    out_base,
-                };
-            });
+            states
+                .iter_mut()
+                .zip(counts.iter_mut())
+                .enumerate()
+                .for_each(|(i, (st, cnt))| {
+                    let (km, count) = entries[i];
+                    if count < threshold {
+                        return;
+                    }
+                    *cnt = count;
+                    let (in_count, in_base) = count_in(table, &km, threshold);
+                    let (out_count, out_base) = count_out(table, &km, threshold);
+                    *st = VertexState {
+                        in_count,
+                        out_count,
+                        in_base,
+                        out_base,
+                    };
+                });
         }
 
         let mut index =
@@ -99,7 +115,28 @@ impl VertexStates {
                 threads
             );
         }
-        VertexStates { states, index }
+        VertexStates {
+            entries,
+            states,
+            counts,
+            index,
+        }
+    }
+
+    /// Sorted solid entries (deterministic seed scan order).
+    pub(crate) fn entries(&self) -> &[(Kmer, u32)] {
+        &self.entries
+    }
+
+    /// Index of a canonical k-mer in the parallel `states`/`counts` arrays.
+    pub(crate) fn idx(&self, canon: &Kmer) -> Option<usize> {
+        self.index.get(canon).copied()
+    }
+
+    /// Exact canonical count of a vertex already in canonical form (0 for
+    /// absent). O(1): one index lookup + one array read.
+    pub(crate) fn count_canonical(&self, canon: &Kmer) -> u32 {
+        self.index.get(canon).map(|&i| self.counts[i]).unwrap_or(0)
     }
 
     /// Unique successor base of the *oriented* `kmer` (forward or RC), or

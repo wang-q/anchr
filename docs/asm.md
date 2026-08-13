@@ -53,7 +53,8 @@ anchr asm contig [OPTIONS] <infiles>...
     per line (paths may be relative to the current directory; blank lines
     and `#` comments are ignored).
 *   `-p, --parallel <int|auto>`: Worker threads for k-mer counting
-    (default `auto` = all cores); the walk stays deterministic
+    (default: half of logical cores, capped at 8; `auto` = all cores);
+    the walk stays deterministic
     single-pass.
 
 Input is one or more FASTA/FASTQ files, plain or gzipped. Pairing is
@@ -122,21 +123,24 @@ anchr asm unitig [OPTIONS] <infiles>...
     bcalm `convertToGFA.py` output.
 *   `--all-abundance-counts`: Append `ab:Z:<c1> <c2> ...` to FASTA headers,
     one canonical k-mer count per position (bcalm `-all-abundance-counts`).
-*   `--dfa`: Experimental: classify every solid k-mer's in/out degree once
-    (cuttlefish-style DFA state) and walk unitigs from the state table;
-    output is byte-identical to the default engine. `-p/--parallel` now
-    actually parallelizes the classification pass (the walk stays
-    deterministic single-threaded).
+*   `--dfa`: Use the DFA-state walk engine (cuttlefish-style classification
+    + O(1) state lookups). **This is the default** since 2026-08-14
+    (k=31 -18%, k=99 -23% wall vs the bucket-scan walk, byte-identical
+    output); kept as an explicit flag for compatibility.
+*   `--no-dfa`: Disable the DFA-state walk and use the bucket-scan walk.
 *   `--supermer`: Experimental: FastK-style super-mer two-stage counting
     (pgr `kmer::supermer`, fixed minimizer m=12). Output is byte-identical
     on FASTA / no-quality input; counts without quality gating. Currently
     not faster than the direct path on the G37 workload (see
     `notes/design/asm-assemble.md` §12).
+*   `--supermer-m <int>`: Minimizer length for `--supermer` (experimental
+    sweep; m=8 is best on G37 k=31, m=12 on k=99).
 *   `--list-files`: Treat `<infiles>` as list files, one sequence file path
     per line (blank lines and `#` comments are ignored).
 *   `-p, --parallel <int|auto>`: Worker threads for the whole pipeline
-    (k-mer counting + `--dfa` classification when enabled; default `auto`
-    = all cores). The walk stays deterministic single-threaded.
+    (k-mer counting + `--dfa` classification when enabled; default: half of
+    logical cores, capped at 8; `auto` = all cores). The walk stays
+    deterministic single-threaded.
 
 Input is one or more FASTA/FASTQ files, plain or gzipped. Pairing is
 irrelevant for assembly (BCALM semantics): unpaired reads and files with an

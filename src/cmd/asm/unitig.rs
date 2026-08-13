@@ -103,7 +103,13 @@ Examples:
             Arg::new("dfa")
                 .long("dfa")
                 .action(ArgAction::SetTrue)
-                .help("Experimental: classify vertices once (DFA state) before walking unitigs"),
+                .help("Use the DFA-state walk engine (default; kept for compatibility)"),
+        )
+        .arg(
+            Arg::new("no_dfa")
+                .long("no-dfa")
+                .action(ArgAction::SetTrue)
+                .help("Disable the DFA-state walk engine (use the bucket-scan walk)"),
         )
         .arg(
             Arg::new("supermer")
@@ -112,12 +118,19 @@ Examples:
                 .help("Experimental: FastK-style super-mer two-stage counting (pgr kmer::supermer); counts without quality gating"),
         )
         .arg(
+            Arg::new("supermer_m")
+                .long("supermer-m")
+                .num_args(1)
+                .value_parser(value_parser!(usize))
+                .help("Minimizer length for --supermer (default: auto min(12, max(5, k/4)))"),
+        )
+        .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
                 .num_args(1)
-                .default_value("auto")
-                .help("Worker threads: with --dfa, controls the classification pass (default: ignored)"),
+                .default_value("half")
+                .help("Worker threads for counting + DFA classification (default: half of logical cores, capped at 8; auto = all cores)"),
         )
 }
 
@@ -136,10 +149,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // Reject `-o` that would overwrite an input file (the writer is opened
     // before the reads are consumed).
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
-    let parallel =
-        crate::cmd::args::parse_parallel_auto(args.get_one::<String>("parallel").unwrap())?;
+    let parallel = crate::cmd::args::parse_parallel(args.get_one::<String>("parallel").unwrap())?;
+    let k = *args.get_one::<usize>("kmer").unwrap();
+    let use_supermer = args.get_flag("supermer");
     let opts = AssembleOptions {
-        k: *args.get_one::<usize>("kmer").unwrap(),
+        k,
         min_contig_len: args
             .get_one::<usize>("min_contig_len")
             .copied()
@@ -151,15 +165,29 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         emit_links: args.get_flag("links"),
         emit_gfa: args.get_flag("gfa"),
         all_abundance_counts: args.get_flag("all_abundance_counts"),
-        use_dfa: args.get_flag("dfa"),
-        use_supermer: args.get_flag("supermer"),
+        use_dfa: !args.get_flag("no_dfa"),
+        use_supermer,
+        supermer_m: args
+            .get_one::<usize>("supermer_m")
+            .copied()
+            .or_else(|| use_supermer.then(|| (12).min((5).max(k / 4)))),
         parallel,
         ..AssembleOptions::default()
     };
 
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;
-    let stats = assemble_unitigs(&infiles, &mut out, &opts)?;
+    // One rayon pool for the whole pipeline (counting + DFA classification);
+    // the streamed counting workers sort sequentially and never spawn rayon.
+    let stats = if opts.parallel > 0 {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(opts.parallel)
+            .build()
+            .with_context(|| "failed to build assembly thread pool")?;
+        pool.install(|| assemble_unitigs(&infiles, &mut out, &opts))?
+    } else {
+        assemble_unitigs(&infiles, &mut out, &opts)?
+    };
     out.flush()?;
     eprintln!(
         "Reads in: {}  Unitigs: {}  Bases: {}  Longest: {}",

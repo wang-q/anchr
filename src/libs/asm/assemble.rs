@@ -67,6 +67,8 @@ pub struct AssembleOptions {
     /// Experimental: use pgr's FastK-style super-mer two-stage counter
     /// instead of the direct emission + sort path (no quality gating).
     pub use_supermer: bool,
+    /// Minimizer length for `--supermer` (None = pgr default).
+    pub supermer_m: Option<usize>,
     /// Worker threads for the whole k-mer pipeline (counting + DFA
     /// classification); `0` uses the rayon global pool (all cores). The
     /// walk stays deterministic single-threaded.
@@ -94,6 +96,7 @@ impl Default for AssembleOptions {
             all_abundance_counts: false,
             use_dfa: false,
             use_supermer: false,
+            supermer_m: None,
             parallel: 0,
         }
     }
@@ -277,30 +280,6 @@ fn read_records(infiles: &[String]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     Ok(reads)
 }
 
-/// Per-k-mer canonical counts in output sequence order (BCALM `ab:Z`
-/// vector). Mirrors the windowing in `calc_coverage`.
-fn calc_abundances(bases: &[u8], table: &TadpoleTable, k: usize) -> Vec<u32> {
-    if bases.len() < k {
-        return Vec::new();
-    }
-    let mut kmer = Kmer::new(k);
-    let mut len = 0usize;
-    let mut out = Vec::with_capacity(bases.len() - k + 1);
-    for &b in bases {
-        if base_defined(b) {
-            kmer.push_right(base_code(b));
-            len += 1;
-        } else {
-            len = 0;
-            kmer.reset();
-        }
-        if len >= k {
-            out.push(table.get_count(&kmer));
-        }
-    }
-    out
-}
-
 /// One maximal unitig (non-branching path; BCALM `graph3` semantics).
 #[derive(Clone)]
 struct Unitig {
@@ -421,13 +400,45 @@ fn assemble_unitigs_core(
         key::Kmer::MAX_K,
         opts.k
     );
-    let reads = read_records(infiles)?;
-    let table = if opts.use_supermer {
-        TadpoleTable::build_supermer(&reads, opts.k)?
+    let (table, reads_in) = if opts.use_supermer {
+        let t0 = std::time::Instant::now();
+        let reads = read_records(infiles)?;
+        if std::env::var_os("ANCHR_SM_TIMING").is_some() {
+            eprintln!(
+                "read_records: {:.3}s ({} reads)",
+                t0.elapsed().as_secs_f64(),
+                reads.len()
+            );
+        }
+        let n = reads.len() as u64;
+        (
+            TadpoleTable::build_supermer(reads, opts.k, opts.supermer_m)?,
+            n,
+        )
+    } else if opts.parallel > 0 {
+        let t0 = std::time::Instant::now();
+        let (table, n) =
+            TadpoleTable::build_streamed(infiles, opts.k, opts.min_prob, opts.parallel)?;
+        if std::env::var_os("ANCHR_SM_TIMING").is_some() {
+            eprintln!(
+                "streamed count: {:.3}s ({} reads)",
+                t0.elapsed().as_secs_f64(),
+                n
+            );
+        }
+        (table, n)
     } else {
-        TadpoleTable::build_threaded(&reads, opts.k, opts.min_prob, opts.parallel)
+        // `parallel == 0` (e.g. olc defaults): keep the historical in-memory
+        // path on the rayon global pool.
+        let reads = read_records(infiles)?;
+        let n = reads.len() as u64;
+        (
+            TadpoleTable::build_threaded(&reads, opts.k, opts.min_prob, 0),
+            n,
+        )
     };
 
+    let t_walk = std::time::Instant::now();
     let mut unitigs = if opts.use_dfa {
         let states = VertexStates::classify(&table, opts.min_count_seed as u32, opts.parallel);
         build_unitigs_dfa(&table, opts, &states)
@@ -435,8 +446,15 @@ fn assemble_unitigs_core(
         build_unitigs(&table, opts)
     };
     unitigs.sort_by(unitig_cmp);
+    if std::env::var_os("ANCHR_SM_TIMING").is_some() {
+        eprintln!(
+            "walk+build: {:.3}s ({} unitigs)",
+            t_walk.elapsed().as_secs_f64(),
+            unitigs.len()
+        );
+    }
     let stats = AssembleStats {
-        reads_in: reads.len() as u64,
+        reads_in,
         ..AssembleStats::default()
     };
     Ok((unitigs, stats))
@@ -553,8 +571,8 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
     let mut visited: HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>> =
         HashSet::default();
     let mut unitigs = Vec::new();
-    for (seed, count) in table.sorted_entries().iter() {
-        if *count < threshold || visited.contains(seed) {
+    for (seed, seed_count) in table.solid_entries(threshold).iter() {
+        if visited.contains(seed) {
             continue;
         }
         // `base_at(0)` is the 3' end (last base pushed); rebuild 5'->3'.
@@ -565,6 +583,8 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
         // Extend right while the path stays non-branching.
         let mut circular = false;
         let mut kmer = rightmost_kmer(&bb, k);
+        let mut right_counts: Vec<u32> = Vec::new();
+        right_counts.push(*seed_count);
         while let Some(b) = unique_solid_out(&kmer, table, threshold) {
             let mut next = kmer;
             next.push_right(b);
@@ -577,11 +597,19 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
                 break;
             }
             bb.push(number_to_base(b));
+            right_counts.push(table.get_count(&canon));
             visited.insert(canon);
             kmer = next;
         }
         // Extend left by reverse-complementing and extending right.
         let mut rc: Vec<u8> = rev_comp(&bb).collect();
+        // Canonical counts of the RC walk in RC order; the final sequence
+        // is revcomp(rc), so its per-k-mer counts are the reverse (or, after
+        // the canonical flip below, the same) list. This accumulates
+        // coverage during the walk and removes the `calc_coverage` second
+        // pass (and the `ab:Z` second pass when requested).
+        let mut left_counts: Vec<u32> = Vec::with_capacity(rc.len() - k + 1);
+        left_counts.push(*seed_count); // first RC k-mer = rc(seed)
         let mut rkmer = rightmost_kmer(&rc, k);
         while let Some(b) = unique_solid_out(&rkmer, table, threshold) {
             let mut next = rkmer;
@@ -595,20 +623,30 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
                 break;
             }
             rc.push(number_to_base(b));
+            left_counts.push(table.get_count(&canon));
             visited.insert(canon);
             rkmer = next;
         }
         bb = rev_comp(&rc).collect();
         // Canonical orientation, like the contig mode.
-        if !canonical(&bb) {
+        let keep = canonical(&bb);
+        if !keep {
             bb = rev_comp(&bb).collect();
         }
-        let (coverage, min_cov, max_cov) = calc_coverage(&bb, table, k);
-        let abundances = if want_abundances {
-            calc_abundances(&bb, table, k)
+        // The RC walk covers the left prefix (positions 0..l-1 of the final
+        // sequence, reversed) plus a duplicate of the last right k-mer; the
+        // right walk covers positions l..l+r. Reassemble the output-order
+        // counts from the two lists (drop `left_counts[0]`, which is the
+        // same canonical k-mer as the last right entry).
+        let mut counts: Vec<u32> = left_counts[1..].iter().rev().copied().collect();
+        counts.extend_from_slice(&right_counts);
+        let counts = if keep {
+            counts
         } else {
-            Vec::new()
+            counts.into_iter().rev().collect()
         };
+        let (coverage, min_cov, max_cov) = cov_from_counts(&counts);
+        let abundances = if want_abundances { counts } else { Vec::new() };
         unitigs.push(Unitig {
             bases: bb,
             id: 0,
@@ -628,28 +666,30 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
 /// buckets per step. The walk order/decisions are identical to
 /// `build_unitigs` (same seed scan, same visited/circular handling).
 fn build_unitigs_dfa(
-    table: &TadpoleTable,
+    _table: &TadpoleTable,
     opts: &AssembleOptions,
     states: &VertexStates,
 ) -> Vec<Unitig> {
     let k = opts.k;
-    let threshold = opts.min_count_seed as u32;
     let want_abundances = opts.all_abundance_counts || opts.emit_gfa;
-    let mut visited: HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>> =
-        HashSet::default();
+    let entries = states.entries();
+    let mut visited = vec![0u8; entries.len()];
     let mut unitigs = Vec::new();
-    for (seed, count) in table.sorted_entries().iter() {
-        if *count < threshold || visited.contains(seed) {
+    for (seed, seed_count) in entries.iter() {
+        let si = states.idx(seed).expect("seed in classification states");
+        if visited[si] == 1 {
             continue;
         }
         // `base_at(0)` is the 3' end (last base pushed); rebuild 5'->3'.
         let mut bb: Vec<u8> = (0..k)
             .map(|i| number_to_base(seed.base_at(k - 1 - i)))
             .collect();
-        visited.insert(*seed);
+        visited[si] = 1;
         // Extend right while the path stays non-branching.
         let mut circular = false;
         let mut kmer = rightmost_kmer(&bb, k);
+        let mut right_counts: Vec<u32> = Vec::new();
+        right_counts.push(*seed_count);
         while let Some(b) = states.out_base(&kmer) {
             let mut next = kmer;
             next.push_right(b);
@@ -657,16 +697,20 @@ fn build_unitigs_dfa(
             if states.in_count(&next) != 1 {
                 break;
             }
-            if visited.contains(&canon) {
+            let ci = states.idx(&canon).expect("canon in classification states");
+            if visited[ci] == 1 {
                 circular = true;
                 break;
             }
             bb.push(number_to_base(b));
-            visited.insert(canon);
+            right_counts.push(states.count_canonical(&canon));
+            visited[ci] = 1;
             kmer = next;
         }
         // Extend left by reverse-complementing and extending right.
         let mut rc: Vec<u8> = rev_comp(&bb).collect();
+        let mut left_counts: Vec<u32> = Vec::with_capacity(rc.len() - k + 1);
+        left_counts.push(*seed_count); // first RC k-mer = rc(seed)
         let mut rkmer = rightmost_kmer(&rc, k);
         while let Some(b) = states.out_base(&rkmer) {
             let mut next = rkmer;
@@ -675,25 +719,31 @@ fn build_unitigs_dfa(
             if states.in_count(&next) != 1 {
                 break;
             }
-            if visited.contains(&canon) {
+            let ci = states.idx(&canon).expect("canon in classification states");
+            if visited[ci] == 1 {
                 circular = true;
                 break;
             }
             rc.push(number_to_base(b));
-            visited.insert(canon);
+            left_counts.push(states.count_canonical(&canon));
+            visited[ci] = 1;
             rkmer = next;
         }
         bb = rev_comp(&rc).collect();
         // Canonical orientation, like the contig mode.
-        if !canonical(&bb) {
+        let keep = canonical(&bb);
+        if !keep {
             bb = rev_comp(&bb).collect();
         }
-        let (coverage, min_cov, max_cov) = calc_coverage(&bb, table, k);
-        let abundances = if want_abundances {
-            calc_abundances(&bb, table, k)
+        let mut counts: Vec<u32> = left_counts[1..].iter().rev().copied().collect();
+        counts.extend_from_slice(&right_counts);
+        let counts = if keep {
+            counts
         } else {
-            Vec::new()
+            counts.into_iter().rev().collect()
         };
+        let (coverage, min_cov, max_cov) = cov_from_counts(&counts);
+        let abundances = if want_abundances { counts } else { Vec::new() };
         unitigs.push(Unitig {
             bases: bb,
             id: 0,
@@ -1102,6 +1152,23 @@ fn calc_coverage(bases: &[u8], table: &TadpoleTable, k: usize) -> (f32, usize, u
     } else {
         (sum as f32 / kmers as f32, min, max)
     }
+}
+
+/// Mean/min/max coverage from per-k-mer canonical counts already collected
+/// in output sequence order (unitig walk variant of `calc_coverage`).
+fn cov_from_counts(counts: &[u32]) -> (f32, usize, usize) {
+    if counts.is_empty() {
+        return (0.0, 0, 0);
+    }
+    let mut sum = 0u64;
+    let mut min = usize::MAX;
+    let mut max = 0usize;
+    for &c in counts {
+        sum += c as u64;
+        min = min.min(c as usize);
+        max = max.max(c as usize);
+    }
+    (sum as f32 / counts.len() as f32, min, max)
 }
 
 /// `Contig.calcScalarsFast`: gc fraction plus dimer-based hh/caga.
