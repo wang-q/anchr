@@ -38,8 +38,7 @@ cuttlefish-2.2.0/
 │   ├── Application.hpp            # 顶层调度：按奇数 k 递归实例化 CdBG / Read_CdBG
 │   ├── CdBG.hpp                   # ★ Cuttlefish 1 参考 dBG（构造 + 分类 + 输出）
 │   ├── Read_CdBG.hpp              # ★ Cuttlefish 2 读/参考 dBG
-│   ├── CdBG_Builder / Read_CdBG_Constructor / Read_CdBG_Extractor   # 构造/提取
-│   ├── CdBG_Writer / CdBG_GFA_Writer / CdBG_GFA_Reduced_Writer / CdBG_Plain_Writer
+│   ├── Read_CdBG_Constructor.hpp / Read_CdBG_Extractor.hpp   # 读模式构造/提取
 │   ├── Kmer.hpp / Directed_Kmer.hpp / Annotated_Kmer.hpp / Kmer_Utility.hpp
 │   ├── Directed_Vertex.hpp / Edge.hpp / Endpoint.hpp / Vertex.hpp
 │   ├── Kmer_Hash_Table.hpp / Kmer_Hash_Entry_API.hpp / Kmer_Hasher.hpp
@@ -58,7 +57,8 @@ cuttlefish-2.2.0/
 ├── src/
 │   ├── main.cpp / commands.cpp     # CLI（cxxopts）
 │   ├── Application.cpp             # Application<k,T_App>::execute 分派
-│   ├── CdBG.cpp / CdBG_Builder.cpp / CdBG_Writer.cpp / CdBG_GFA_*.cpp
+│   ├── CdBG.cpp / CdBG_Builder.cpp / CdBG_Writer.cpp /
+│   │   CdBG_GFA_Writer.cpp / CdBG_GFA_Reduced_Writer.cpp / CdBG_Plain_Writer.cpp
 │   ├── Read_CdBG.cpp / Read_CdBG_Constructor.cpp / Read_CdBG_Extractor.cpp
 │   ├── Kmer_Hash_Table.cpp / Kmer_Container.cpp / kmer_Enumerator.cpp ...
 │   └── test.cpp                    # 开发者自测（kseq 读 FASTA、k-mer 去重检查等）
@@ -120,7 +120,7 @@ extract_maximal_unitigs() Read_CdBG_Extractor：并行扫描顶点库提取最�
 ```
 
 - **边 → 顶点**：`enumerate_vertices` 用 `KMC::InputFileType::KMC` 把边库当输入，
-  让 KMC 直接输出其 (k-1)-投影即 k-mer 顶点（`Read_CdBG.cpp:147-151`）。
+  让 KMC 按新 k 重枚举，把 (k+1)-mer 边库投影成 k-mer 顶点库（`Read_CdBG.cpp:147-151`）。
 - 计算完 DFA 状态后删边库，提取完 unitig 后删顶点库（除非 `--save-vertices`）。
 - `--path-cover` 时提取"最大顶点不相交路径覆盖"而非最大 unitig（进度条与输出
   文案相应变化，`Read_CdBG_Extractor.cpp:39-40`）。
@@ -344,8 +344,8 @@ DCC 数）。输出经 `Character_Buffer` 缓冲后写 `Output_Sink`。
 | `--unrestrict-memory` | 放开内存限制（更快，MPHF gamma→max） |
 | `-f/--format` | Cuttlefish 1：0 FASTA / 1 GFA1 / 2 GFA2 / 3 GFA-reduced |
 | `--track-short-seqs` | 记录长度 < k 的序列到 JSON（Cuttlefish 1） |
-| `--poly-N-stretch` | GFA-reduced 输出中记录 polyN 段（Cuttlefish 1） |
-| `--read` / `--ref` | Cuttlefish 2 输入类型（FASTQ / FASTA）；两者都传 → 2，都不传 → 1 |
+| `--poly-N-stretch` | GFA / GFA-reduced 的拼贴（tiling）输出中记录 polyN 段（Cuttlefish 1） |
+| `--read` / `--ref` | Cuttlefish 2 输入类型（FASTQ / FASTA）；两者都传 → `is_valid` 校验失败退出，都不传 → Cuttlefish 1 |
 | `-c/--cutoff` | (k+1)-mer 频次阈值（默认 reads 2、refs 1） |
 | `--path-cover` | 提取最大顶点不相交路径覆盖而非最大 unitig |
 | `--save-mph` / `--save-buckets` / `--save-vertices` | 保存 MPHF / DFA 状态桶 / 顶点库（续跑） |
@@ -386,7 +386,7 @@ DCC 数）。输出经 `Character_Buffer` 缓冲后写 `Output_Sink`。
      `--save-mph/--save-buckets/--save-vertices` 分阶段落盘复用。
   6. **路径覆盖变体**（`--path-cover`）：最大顶点不相交路径覆盖可作 unitig 的
      对照/替代输出。
-  7. **验证器（`cuttlefish validate`）**：`Validator` 用另一份 BBHash 检查
+  7. **验证器（`cuttlefish validate`，Cuttlefish 1/参考图专用）**：`Validator` 用另一份 BBHash 检查
      "unitig 的 k-mer 集合 == KMC 库 k-mer 集合"（概率性，MPHF 可能把额外 k-mer
      映射到合法哈希值）+ 逐参考行走验证完整覆盖——anchr 的 `asm unitig` 与
      bcalm 做逐字节对照时可借鉴这套"集合相等 + 序列覆盖"双层校验。
