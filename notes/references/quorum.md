@@ -25,7 +25,7 @@
 | `quorum_error_correct_reads` | 读计数库 + FASTQ，逐 read 纠错，输出 FASTA |
 | `merge_mate_pairs` | 读**偶数个**文件，把偶/奇索引文件按位交错（配对保序），写 FASTQ 到 stdout；文件个数为**奇数**报 "Must give a even number files"、两流配对数不一致报 "Input files are not paired reads."（`merge_mate_pairs.cc:65-84`） |
 | `split_mate_pairs` | 从 stdin 读 FASTA，把相邻两行（`>header`+序列）交替写到 `<prefix>_1.fa`/`<prefix>_2.fa` |
-| `query_mer_database` / `histo_mer_database` | 调试工具（`check_PROGRAMS`，make check 构建、不随安装）：`query` 查单个 mer 的 (count, quality)，`histo` 输出 (count, 高质量/低质量) 双通道计数直方图 |
+| `query_mer_database` / `histo_mer_database` | 调试工具（`check_PROGRAMS`，make check 构建、不随安装）：`query` 对每个 mer canonicalize 后查 (count, quality) 并输出 `val:`/`qual:`（`query_mer_database.cc:20-21`）；`histo` 遍历全库，count 封顶 1000、按质量位分双通道计数，输出 `count 低质 高质` 三列（`histo_mer_database.cc:17-26`） |
 
 `Makefile.am` 里 4 个 `bin_PROGRAMS`；`all_tests`（`unit_tests/test_mer_database.cc`，gtest
 参数化测试 bits 与计数语义）、`query_mer_database`、`histo_mer_database` 归 `check_PROGRAMS`。
@@ -195,6 +195,16 @@ k 与 k/2）。输出日志：`pos:sub:from-to`、`pos:3_trunc`（3' 端）、
   "fasta or fastq" 已过时），命中即丢弃（或 `--trim-contaminant` 截断）；
   检查发生在 `find_starting_mer` 的每个 anchor 位置（`error_correct_reads.cc:618`）
   与 `extend` 每个有效碱基移入 k-mer 之后（`error_correct_reads.cc:400-406`）。
+- **输出缓冲与 skip 前缀透传**：`start()` 里 `input = seq_s + _ec.skip(); out = _buffer
+  + _ec.skip();`（`error_correct_reads.cc:266-267`），前 `skip` 个碱基完全不做检查；
+  而 `find_starting_mer`/`extend` 扫描过程中把经过的碱基一律 `*out++ = base` 原样
+  拷入输出缓冲（`error_correct_reads.cc:611-612`、`632-633`）。因此 anchor 之前的
+  低质量/错误区段也会**原样保留**在输出里（除非窗口错误数触发截断）；`skip` 只决定
+  "从哪开始找 anchor"，并不丢弃任何碱基。
+- **双端成对 flush**：`start()` 对 job 内每条 read，若索引 `i % 2 == 0` 先写一个
+  `jflib::endr`（`o_multiplexer` 的 flush 分隔哨兵，`error_correct_reads.cc:255-256`），
+  使输出按**两条一组**批量落盘——配对模式下 merge_mate_pairs 已把 mate 交错成相邻
+  两条，此成对 flush 与配对结构对齐；单端模式无实际影响，只改变批处理粒度。
 
 ### 4.5 k-mer 表示与方向抽象（`kmer.hpp` / `error_correct_reads.hpp`）
 
@@ -236,6 +246,10 @@ k 与 k/2）。输出日志：`pos:sub:from-to`、`pos:3_trunc`（3' 端）、
 > `--gzip`、`-M/--no-mmap`、`-v/--verbose`。因此上一版把 `-p` 记为 cutoff 是**错的**——
 > 那是 EC 二进制内部的 `-p`，而 quorum.in 的 `-p` 是输出前缀；cutoff 在 quorum.in 流程里
 > 只能靠 Poisson 自动估计，无法从脚本层显式指定。
+>
+> **尺寸后缀校验**：quorum.in 对 `-s` 做 `^\d+[kMGT]?$` 校验（`quorum.in:92-95`），
+> 只接受数字 + 单个 k/M/G/T 后缀，非法即报错退出；而 create_database 的 `-s`
+> （Yaggo `as_uint64_suffix`）本支持 k/M/G/T/P/E 更多后缀，脚本层反而更严格。
 
 ## 6. 与 pgr 的关联
 

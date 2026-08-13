@@ -147,9 +147,25 @@ GENERATE OUTPUTS(754)                findCircularContigs → setParentAndHang �
 - **BestOverlapGraph**（`AS_BAT_BestOverlapGraph.C:67` `findInitialEdges`）：
   每条 read 的 5'/3' 端各选一个 best edge（按质量/长度/误差率排序）；若 best
   edge 覆盖的 reads 比例不足 `minReadsBest`（默认 0.8），自动放宽误差率到
-  `erateMax` 重算（自适应阈值）。建图前的过滤链（都在 BestOverlapGraph 内）：
-  先 `findContains()` 剔除 contained，再按标签过滤 coverage gap / lopsided /
-  spur / high-error 四类"问题 reads"，最后才 `findEdges()`。
+  `erateMax` 重算（自适应阈值）——`findInitialEdges` 内 `:94` 检查
+  `_nReadsEF[0] >= _minReadsBest * _nReadsEP[0]`，不足则 `_errorLimit=_erateMax`
+  （`:99`）后整条重跑。建图前的过滤链（`BestOverlapGraph` 构造函数，
+  `:1652` 起）是**一条流水线**，每类可被 `-nofilter` 单独关闭：
+  1. `findInitialEdges()`（`:1652`，先 `findContains` 剔除 contained）
+  2. high-error：`findErrorRateThreshold:1660` 统计误差率分布定最终阈值
+     → `findContains` + `findEdges(true)`
+  3. covGap：`removeReadsWithCoverageGap:1687`（`covGapType`/`covGapOlap`）
+     → `findContains` + `findEdges(true)`
+  4. lopsided：`removeLopsidedEdges:1726` → `findEdges(false)`
+  5. spur：`removeSpannedSpurs`（`spurDepth` 回溯找死端分支）
+  其中注释强调（`:1754`）"Do NOT call findEdges() after this"——spur 之后不许
+  再 findEdges，否则会重置 removeSpannedSpurs 的成果。
+  `filterDeadEnds`（默认 true，`bogart.C:95`）是另一类，在 CLEANUP MISTAKES
+  阶段（`bogart.C:744`）补一轮 split+promote 清死端。
+- **`-stop` 调试**：`bogart.C` 支持 `-stop edges` / `-stop chunkgraph`
+  （`:426-429`，对应 `STOP_BEST_EDGES:511` / `STOP_CHUNK_GRAPH:516`），跑完
+  某步即退出并落盘中间产物（`asm.best.edges` 等），是复现布局中间态的好用
+  调试开关。
 - **OverlapCache**（`AS_BAT_OverlapCache.C`）：`loadOverlaps:485` 从 ovlStore
   读入后按 `_maxEvalue`（＝误差率）与 `_minOverlap` 过滤（`filterOverlaps:416`），
   再去重（`filterDuplicates:320`）并把 overlap 对称化（`symmetrizeOverlaps:635`）；
@@ -169,13 +185,16 @@ GENERATE OUTPUTS(754)                findCircularContigs → setParentAndHang �
   → `findConfusedEdges`（找"confused edge"：某 read 的 best edge 落在重复区，
   但存在强度相近的 near-best edge 指向 tig 外）
   → `buildBreakPoints` + `splitTigAtReadEnds`（打断）。
-  关键常量在文件顶：`MIN_ANCHOR_HANG=500`（重复区边界至少要锚定这么多碱基）、
+  关键常量在 `:41-44`：`MIN_ANCHOR_HANG=500`（重复区边界至少要锚定这么多碱基）、
   `REPEAT_OVERLAP_MIN=50`、`REPEAT_FRACTION=0.5`。**这是"外部 reads 证据 +
   无跨越则打断"的图级实现**——注意 Canu 2.3 并无固定的
   `SPURIOUS_COVERAGE_THRESHOLD`/`ISECT_NEEDED_TO_BREAK` 两个常量（那是 Celera
   8.3 bogart 血统的，见 §8.5），Canu 用 confused-edge + deviationRepeat 判定。
 - **气泡**（`mergeOrphans` 第二遍，`bogart.C:639`）：按相似度阈值
   `similarityBubble` 合并平行路径——正是用户裁定"不处理"的那种启发式。
+  内部 `mergeOrphans.C:925` 的相似度阈值参数为 `(isBubble) ? 0.01 : 0.99`：
+  孤儿遍（第一遍）要求 ≥0.99（`similarityBubble` 不用，`bogart.C:633` 传
+  `deviationGraph`），气泡遍（第二遍）才用 `similarityBubble=0.01`（`bogart.C:639`）。
 
 ### 5.1 关键参数默认值（`bogart.C:85-126`）
 
@@ -191,6 +210,10 @@ GENERATE OUTPUTS(754)                findCircularContigs → setParentAndHang �
 | `minOverlapLen` / `minIntersectLen` / `maxPlacements` | 500 / 500 / 2 | 最小 overlap / 最小交集（建 unitig）/ 最大放置数 |
 | `spurDepth` | 3 | spur 检测回溯深度 |
 | `lopsidedDiff` | 25.0 | 判定 lopsided read 的 5'/3' 百分比差 |
+| `covGapType` / `covGapOlap` | `uncovered` / 500 | coverage gap 检测类型（none/chimer/uncovered/deadend）/ 最少 overlap 碱基（`:97-98`） |
+| `percentileError` | 0.9 | 误差率中位为 0（如 HiFi）时回退到的百分位（帮助 `:399-401` 默认 0.9） |
+| `minOlapPercent` | 0.0 | 每对 overlap 最小长度 = f×min(lenA,lenB)；0=不启用（`:100`） |
+| `filterDeadEnds` | true | 死端 read 在 CLEANUP 阶段再 split+promote（`:95`） |
 | `fewReadsNumber` / `tooShortLength` / `spanFraction` / `lowcovFraction` / `lowcovDepth` | 2 / 0 / 1.0 / 0.5 / 3 | 未组装（unassembled）分类的覆盖/长度/跨度阈值（`classifyTigsAsUnassembled:681`） |
 
 → 对 pgr 的意义：`deviationGraph=6`（best-edge 用均值±6σ 的宽松窗口）、
@@ -212,11 +235,18 @@ consensus 算法字符分发：
      失败则降 min overlap、升误差率重试（`alignAgain` 标签，`:427` 起）。
   2. 所有 reads 用 edlib 重比对到模板（`alignEdLib:675`：band 递增、错误率
      递增重试；`ERROR_RATE_FACTOR=4`、`NUM_BANDS=2` ⇒ `MAX_RETRIES=8`，
-     见 `unitigConsensus.C:35-38`）。
+     见 `unitigConsensus.C:34-36`）。
   3. 比对建成 PacBio 的 AlnGraphBoost POA-DAG（`libpbutgcns/AlnGraphBoost.C`），
      `mergeNodes:188` 合并等价节点。
   4. `bestPath:490`（heaviest path）→ `consensusNoSplit:386`：沿 best path 取
      base，低于 `minCoverage` 的段截掉（Canu 的 min-coverage 修剪）。
+  → min-coverage 细节：`_minCoverage` 默认 **0**（`utgcns.H:97`，`-C` 选项设置，
+  `utgcns.C:94`），即**默认不做 min-coverage 裁剪**，需显式 `-C` 才启用；
+  `generatePBDAG:943` 调用时若 `_tig->_suggestNoTrim != 0` 会把 minCoverage 强制
+  为 0（该 tig 跳过修剪）。
+  → quirk：`abSequence` 构造函数 `assert` 序列碱基只能是 `ACGTN`
+  （`unitigConsensus.C:68-72`），含其它 IUPAC/小写之外的字符会直接 abort，
+  不报友好错误。
   → 对 pgr 的意义：Canu 的 template stitch 是"逐步缝合"，每一步只用一个
   局部 banded 对齐来决定接缝位置；pgr 的 `asm cns` 因 overlap 全精确，坐标
   已由 layout 对齐，缝合不需要 edlib——但 Canu 的"取期望 overlap 的局部窗口

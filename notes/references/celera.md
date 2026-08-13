@@ -22,7 +22,7 @@
   pbutgcns/pbdagcon/BLASR/FALCON 片段。
 - **流水线**：merTrim（k-mer 修剪）→ overlap（mer overlapper）→ overlap error
   correction → finalTrim → unitig（utg/bog/bogart 三选一）→ consensus
-  （cns/pbdagcon/pbutgcns）→ scaffold（CGW）→ 输出。
+  （cns/seqan/pbdagcon/pbutgcns）→ scaffold（CGW）→ 输出。
 
 ## 2. 仓库结构（`src/`）
 
@@ -72,29 +72,48 @@ wgs-8.3rc2/
 关键参数族（`runCA.pl`）：
 
 - `overlapper`（`:253`）：obt/ovl 共用，默认 **mer overlapper**——两阶段：
-  seed 查找（`merOverlapperSeedBatchSize`）+ 扩展（`merOverlapperExtendBatchSize`），
-  直接用 meryl 计数过滤（mer overlapper 读 meryl，`:2567`）。
+  seed 查找（`merOverlapperSeedBatchSize` 默认 100000，`:632`）+ 扩展
+  （`merOverlapperExtendBatchSize` 默认 75000，`:635`），直接用 meryl 计数过滤
+  （mer overlapper 读 meryl，`:2567`）。
 - `unitigger`（`:688`）：**utg（默认，非 SFF）/ bog（SFF，Best Overlap Graph）/
   bogart（AS_BAT）** 三选一；`getUnitigger()`（`:1389`）按 gkpStore 特征自动选
   utg/bog。
-- 误差率参数族：`utgErrorRate`（BOG/UTG）、`utgGraphErrorRate`/`utgMergeErrorRate`
-  （bogart）、`cgwErrorRate`（scaffold 合并）、`obtErrorRate`（finalTrim）。
-- `consensus`（`:820`）：默认 `cns`（AS_CNS），可选 pbdagcon/pbutgcns。
+- **误差率参数族（默认值，`runCA.pl`）**：`ovlErrorRate=0.06`（overlap 判定上界，
+  `:381`）、`utgErrorRate=0.015`（BOG/UTG 建 unitig，`:390`）、
+  `utgGraphErrorRate=0.030` / `utgMergeErrorRate=0.045`（bogart 图/合并，`:396/:402`）、
+  `cgwErrorRate=0.10`（scaffold 合并，`:411`）、`cnsErrorRate=0.06`（consensus 期望，
+  `:408`）、`obtErrorRate`（finalTrim，默认 undef，`:384`）。约束关系
+  （`:1165-1192`）：`cnsER ≤ cgwER`、`ovlER ≤ cgwER`、`utgER ≤ ovlER`，全部
+  ∈ [0.00, 0.40]——一条自洽的误差率阶梯：`ovl ≥ utg ≥ ...` 逐层放宽。
+- `consensus`（`:820`）：默认 `cns`（AS_CNS），可选 **cns / seqan / pbdagcon /
+  pbutgcns** 四选一（`:1061`；`findBlasr` 找不到时回退 `cns`，`:4548-4549`）。
 - `batOptions`（`:707`）：bogart 透传参数。
+- 其他：`frgCorrBatchSize=200000`（fragment 纠错批，`:660`）、merTrim/
+  OBT 的 k-mer 参数族 `obtMerSize=22`（`:592`，`≤31`）、`obtMerThreshold`/
+  `obtMerDistinct`/`obtMerTotal`（`:595-601`，可 auto 由 meryl 回填，`:2718-2720`）。
 
 ## 4. overlap：OlapFromSeedsOVL（Delcher，2007）
 
 `AS_OVL/OlapFromSeedsOVL.C`（5968 行）是 8.3rc2 唯一的 overlap 检测器：
 
-1. **seed 查找**（`Get_Seeds_From_Store` / `Read_Seeds`）：k-mer seed，默认
-   `DEFAULT_KMER_LEN=9`（`OlapFromSeedsOVL.H`），候选按位置存储。
-2. **扩展验证**（`Process_Seed`）：对每个 seed 候选做 **banded edit distance**
-   （`Edit_Array`/`Edit_Space`/`Edit_Match_Limit`，`EDIT_DIST_PROB_BOUND=1e-4`），
-   `Error_Bound[i] = i * MAXERROR_RATE` 判错；分类 dovetail / contain，
-   支持 partial overlaps（G 选项，`Doing_Partial_Overlaps`）。
-3. **454 homopolymer 纠错集成**（`Doing_Corrections`）：扩展同时输出
-   `Set_New_*_Votes`（homopolymer 投票系列），由后续 `CorrectOlapsOVL` /
-   `FragCorrectOVL` 消费。
+1. **seed 查找**（`Get_Seeds_From_Store:2623` / `Read_Seeds:4335`）：k-mer seed，
+   默认 `DEFAULT_KMER_LEN=9`（`OlapFromSeedsOVL.H:74`），候选按位置存储
+   （`Olap_Info_t`，含 `a_hang/b_hang/orient/k_count`，`:201-208`）。
+2. **扩展验证**（`Process_Seed:3868`）：对每个 seed 候选做 **banded edit distance**
+   （`Edit_Array`/`Edit_Space`/`Edit_Match_Limit`，`EDIT_DIST_PROB_BOUND=1e-4`
+   `OlapFromSeedsOVL.H:82`，对应 `NORMAL_DISTRIB_THOLD=3.62`、`ERRORS_FOR_FREE=1`），
+   `Error_Bound[i] = i * MAXERROR_RATE` 判错；先向 seed 左侧反向扩展定位起点、
+   再向右扩展（`Process_Seed:4016-4020`，`Prefix_Edit_Dist:3703`），分 dovetail /
+   contain，支持 partial overlaps（G 选项，`Doing_Partial_Overlaps`）。
+   - 最小可报告 overlap：`Min_Olap_Len = AS_OVERLAP_MIN_LEN`（`OlapFromSeedsOVL.H:325`）。
+   - 关键参数（`OlapFromSeedsOVL.H`）：`DEFAULT_DEGREE_THRESHOLD=2`（左/右 degree
+     低于此值视为可修剪端，`:70`）、`DEFAULT_END_EXCLUDE_LEN=3`（末端排除，`:72`）、
+     `DEFAULT_VOTE_QUALIFY_LEN=9`（SNP 投票邻域，`:78`）、`HOMOPOLY_LEN_VARIATION=3`
+     （homopolymer 长度差判错，`:96`）、`MIN_HAPLO_OCCURS=3`（等位基因计数，`:105`）。
+3. **454 homopolymer 纠错集成**（`Doing_Corrections`，默认开）：扩展同时输出
+   `Set_New_*_Votes`（homopolymer 投票系列，`Vote_Tally_t`/`New_Vote_t`），由后续
+   `CorrectOlapsOVL` / `FragCorrectOVL` 消费。`-w`（`Check_Correlated_Differences`）
+   可做相关差异确认以剔除 overlap，`-h`（`Use_Haplo_Ct`）可关闭单倍型计数。
 
 **注意**：8.3rc2 **没有** `overlapInCore`（Canu 里那个 k-mer 哈希实现是 Canu
 自己加的，不在 Celera 主干）。
@@ -139,10 +158,10 @@ cleanup(499)                splitDiscontinuous(499) + placeContains(502) + promo
 setParentAndHang(518) / 输出
 ```
 
-- **bubble/repeat 判定用覆盖度证据**（`AS_BAT_MergeSplitJoin.C:45-46`）：
+- **bubble/repeat 判定用覆盖度证据**（`AS_BAT_MergeSplitJoin.C:46-48`）：
   `SPURIOUS_COVERAGE_THRESHOLD=6`（非 unitig reads 覆盖 >6 才算 repeat 区）、
   `ISECT_NEEDED_TO_BREAK=15`（确认 repeat junction 的最少 reads 数，同文件
-  `REGION_END_WEIGHT=15` 在 repeat 区端点虚构的 intersections 数）——
+  `REGION_END_WEIGHT=15` 在 repeat 区端点虚构的 intersections 数，`:941/1396/1458`）——
   比 Canu 的相似度阈值更"证据驱动"。
 - 辅助程序：`splitUnitigs.C`、`markRepeatUnique.C`、`computeCoverageStat.C`、
   `classifyMates*.C`（mate 分类）、`petey.C`。
@@ -207,8 +226,9 @@ mate（paired-end）是原版 unitig/scaffold 的核心证据（Canu 长读版�
      模型。
 3. **精炼**：`AbacusRefine.C`（abacus）、`MergeMultiAligns.C`、`ApplyAlignment.C`、
    `RefreshMANode.C`。
-4. 可选 **pbdagcon / pbutgcns**（runCA `consensus` 参数）——PacBio 的
-   模板+DAG 共识作为外部选项已存在。
+4. 可选 **seqan / pbdagcon / pbutgcns**（runCA `consensus` 参数，`SeqAn_CNS.C` 为
+   seqan 变体；pbdagcon/pbutgcns 为 PacBio 的模板+DAG 共识）——"模板+DAG"共识
+   作为外部选项已存在，佐证主干演进方向。
 
 **与 Canu utgcns 对照**：老版 = 直接列投票（MA 从 overlap 方向构建，无重比对）；
 Canu = template stitch → edlib 重比对到模板 → AlnGraphBoost POA-DAG →
@@ -220,8 +240,12 @@ bestPath + min-coverage 修剪（为高噪声长读设计）。**pgr 完美匹�
 
 - `AS_CGW_main.C` + `ScaffoldGraph_CGW.C`：基于 **mate 链接**的 scaffold 图，
   `CIScaffoldT_*` 系列（biconnected 组件、merge、align scaffold、cleanup）。
-- 宏基因组参数先例：`cgwMergeMissingThreshold`（`:789`）——合并 scaffold 时
-  允许一定比例 missing mates，注释明确提到 metagenomics 菌株保守区场景。
+- 宏基因组参数先例：`cgwMergeMissingThreshold`（**`runCA.pl:788-789`**，默认 0，
+  注意不是 `AS_CGW_main.C`）——合并 scaffold 时允许一定比例 missing mates，
+  注释明确提到 metagenomics 菌株保守区场景；`-1` 表示合并时忽略所有 missing mates。
+  同族参数还有 `cgwMergeFilterLevel`（`:761`，默认 1，0/1/2/5 五档筛选）、
+  `cgwMinMergeWeight`（`:791`，默认 2，合并边的最小权重）、`cgwDistanceSampleSize`
+  （`:767`，默认 100，重估 insert size 所需 mate 数）。
 
 ## 9. 数据存储与核心数据结构 + 工程技巧
 
@@ -243,6 +267,10 @@ bestPath + min-coverage 修剪（为高噪声长读设计）。**pgr 完美匹�
   `AS_READ_MAX_NORMAL_LEN_BITS=18`，`AS_global.H:220-227`）、**Strobe**（预留）。
   记录体用编译期位域打包，packed 型恰为 32bit，配 `#error ... size wrong`
   静态断言（`gkFragment.H:125-127`）。
+  - **读长位数 quirks**（`AS_global.H:214-218`）：`AS_READ_MAX_NORMAL_LEN_BITS`
+    必须 ∈ [11,20]，否则无法编译；且源码注释明示"overlapper 在大 read 下工作
+    不好、consensus 会过度分配内存"——即读长上限是整套 OLC 的硬约束，pgr 做
+    长读需自行放宽位域布局。
 - 每条 read 固定字段：UID / IID / **mateIID** / **libraryIID** / **orientation** /
   deleted / nonrandom / seqLen / **clearBeg / clearEnd**；Normal 型额外存
   sequence/quality 的字节偏移（`seqOffset/qltOffset`）。

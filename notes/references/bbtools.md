@@ -71,6 +71,7 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../desig
 > 本节直接读 `BBTools-40.01/` 的 `*.sh` 脚本（usage help 即各工具默认值文档）与
 > `current/` Java 源码，给 anchr 各目标命令提供**调参与语义对照**。`*.sh` 的默认值
 > 是作者在脚本里写死的，比 README 更可信；Java 源码再确认算法语义。
+> 已覆盖：bbnorm、bbmap、tadpole、bbduk、clumpify、reformat、bbmerge（§4.5.1–4.5.7）。
 
 ### 4.5.1 bbnorm（`fq norm` 血统）——`jgi/KmerNormalize`
 
@@ -99,6 +100,14 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../desig
 - **错误检测**（可选，默认 `tossbadreads=f`）：按 kmer 深度高/低百分位（`hdp=90`/`ldp=25`）
   与 `errordetectratio=125` 判错 read。**纠错**（`ecc=f`，作者明示 "Tadpole is now preferred"）
   有 `ecclimit=3`、`errorcorrectratio=140` 等。
+  - 硬编码常量：`HIGH_PERCENTILE=0.90f`、`LOW_PERCENTILE=0.25f`（`KmerNormalize.java:3798-3800`）、
+    `ERROR_DETECT_RATIO=125`、`HTHRESH=12`、`LTHRESH=3`（:3807-3811）、
+    `ERROR_CORRECT_RATIO=140`（:3814）。
+  - 判错规则（`:3135`）：read 判为错误 read 当且仅当 `high<=LTHRESH`
+    （高深度 kmer ≤3）**或**（`high>=HTHRESH` **且** `low<=LTHRESH`）**或**
+    `high >= low*ERROR_DETECT_RATIO`（高/低深度比 ≥125）；其中 high/low 是该 read 的
+    kmer 深度数组在 `hdp`/`ldp` 百分位处的取值（HTHRESH 默认 12，见 :3135-3139 判定计数）。
+  - `percentile` 解析 `>1 且 ≤100` 时除以 100（`KmerNormalize.java:331`），hdp/ldp 同理（:335/:339）。
 - 硬编码：`bbnorm.sh:152` 启动命令固定追加 `bits=32`——这是脚本层写死的默认，
   与 usage 里的 `bits=32` 一致。
 
@@ -146,6 +155,17 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../desig
 > 内存模型：多字 `Kmer`（`Vec<u64>` 共 2k 位）镜像 BBTools long array，k 无上限——
 > 逐字节一致需复刻其 `-Xmx` 内存语义（详见 `asm-assemble.md`）。
 
+**延伸/分支（junction）判定**（`assemble/Tadpole.java`）：
+- 参数硬编码默认：`minExtension=2`、`minCoverage=1`、`minCountSeed=3`、`minCountExtend=2`、
+  `branchMult1=20`、`branchMult2=3`、`branchLowerConst=3`（`Tadpole.java:2689-2703`）；
+  `minContigLen=-1` 时自动取 `max(124, 2*k)`（:582-583）。
+- 分支判定 `isJunction(max, second)`（`Tadpole.java:2580`）：**不认为分支**（继续直行）当
+  `second<1` **或** `second*branchMult1 < max` **或**（`second<=branchLowerConst` 且
+  `max>=max(minCountExtend, second*branchMult2)`）；否则判为分支/断点。两条方向任一判分支
+  即算 junction（:2573-2576）。
+- `errorPath/errorMult1/errorMult2` 等纠错延伸阈值见 `Tadpole.java:2705-2709`，供 ec-kmer
+  扩展参考。
+
 ### 4.5.4 bbduk（`fq trim-adapter`/`trim` 血统）——`jgi/BBDuk`（39.38）/ `bbduk.BBDukS`（40.01）
 
 脚本默认值（`bbduk.sh` usage）：
@@ -167,6 +187,23 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../desig
 > bbduk 的 `--qtrim`/`trimq` 是 **BBDuk 质量修剪**模式（`r/l/rl/w/f`），**不是** cutadapt
 > 的 Mott（见 `cutadapt.md` §5.4 澄清）。
 
+**qtrim 质量修剪算法**（`bbduk.sh:208-217`，qtrim 取值 `rl/f/r/l/w`，默认 `f`；`trimq=6` 默认）：
+- 实际修剪委托 `shared/TrimRead.trimFast`（`bbduk/BBDukProcessorS.java:1297` 调用）。
+  `TrimRead.java` 有三种修剪器，由静态开关选择：
+  - **`optimalMode=true`（默认，`TrimRead.java:954`）**：走 `testOptimal`
+    （`TrimRead.java:348`）——这是一个 **Kadane 最大子数组**算法（源码注释 :354-357 明示）。
+    对每个碱基 `delta = avgErrorRate - probError`（`avgErrorRate = phredToProbError(trimq)`，
+    `probError` 查 `QualityTools.PROB_ERROR[q]`，N 或 q<1 用 `nprob`，见 :375）；累计和
+    非负则并入当前段，取累计和最大的连续区间为"保留段"，其左/右侧全部修剪
+    （`:398-404`，全坏 read 时 `maxScore=0 → left=0,right=len` 全剪）。
+  - **`windowMode=false`（`TrimRead.java:956`）**：`testRightWindow`（:438）滑动窗口，
+    `windowLength=4`（:961），窗口质量均值 <trimq 即剪。
+  - **朴素模式**：`testLeft`/`testRight`（:416/:457）要求 **`minGoodInterval=2`**（:949）个
+    连续 `q>trimq` 的好碱基，否则从最后一个坏碱基处修剪；质量数组为 null 时退化为按 N
+    修剪（`testLeftN`/`testRightN`，:477/:491）。
+- `anchr fq trim` 的质量修剪血统即此 `trimFast`，逐字节 golden 时注意默认走 **optimal
+  (Kadane)** 分支，而非朴素的"连续 2 好碱基"——两者结果不同。
+
 ### 4.5.5 clumpify（`fq clump` 血统）——`clump/Clumpify`
 
 脚本默认值（`clumpify.sh` usage）：
@@ -187,6 +224,17 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../desig
 > 注意：`dedupe` 脚本默认是 `f`（不开启去重）——需显式 `dedupe=t`。anchr `fq clump`
 > 的 `--dedupe --dupesubs 0` 整对去重语义即对应此处 `subs=0` 的精确去重。
 
+**去重判定算法**（`clump/Clump.java`）：
+- 默认 `maxSubstitutions=2`（`Clump.java:1398`）、`dupeSubRate=0`（:1400）；
+  `dupesubs` 若设则 `maxSubstitutions` 取 `max(subs, subrate*min(len1,len2))`。
+- 序列相等判定 `equals(a,b,maxSubs)`（`Clump.java:607`）：长度不等即非重复；逐位比较，
+  累计替换数 `subs>maxSubs` 即判非重复（:611-626）。**`allowNs=t` 时 N 视为通配**
+  （与任何碱基相等，:612-618）；`allowns=f` 则 N 也计为替换。
+- `scanlimit=5`（`Clump.java:1396`）遇非重复后仍继续扫描 N 个 read 提高近似检测，
+  与脚本 usage 一致。
+- 纠错阈值硬编码见 `Clump.java:1415-1429`（`minCountCorrect=4`、`minRatio=30.0`、
+  `minRatioMult=1.80`、`minRatioOffset=1.9` 等），供 clump 纠错扩展参考。
+
 ### 4.5.6 reformat（`fq sample` 血统）——`jgi/ReformatReads`
 
 脚本默认值（`reformat.sh` usage）：
@@ -201,6 +249,36 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../desig
 | `verifypaired`（vpair） | f | 校验 read 名是否配对 |
 
 > `pgr fq sample` 做确定性降采样时，`sampleseed` 正数即确定性语义的来源。
+
+### 4.5.7 bbmerge（`fq merge`/`fq overlap` 血统）——`jgi/BBMergeOverlapper`
+
+> §3 中 bbmerge 映射到 `fq merge`/`fq overlap`，此前 §4.5 未覆盖，此处补齐。
+
+脚本默认值（`bbmerge.sh` usage）：
+
+| 参数 | 默认 | 含义 |
+| :--- | :--- | :--- |
+| `mininsert` / `mininsert0` | 15 / 12 | 可合并的最小 insert size / 第一轮筛选下限（`bbmerge.sh:84-86`） |
+| `minoverlap` / `minoverlap0` | 12 / 8 | 可合并的最小重叠 bp / 预筛选下限（:87-89） |
+| `maxratio` | 0.09 | 最大错误率（越高合并越多，`:128`） |
+| `ratiomargin` | 5.5 | 比值判定裕度（越低合并越多，min=1，:129） |
+| `minsecondratio` | 0.1 | 次优重叠的比值下限（判是否歧义，:135） |
+| `maxexpectederrors`（mee） | 0 | 若 >0，期望错误超限的 read 不合并（:59） |
+| `ecco` | f | 只纠错重叠部分不合并（:79） |
+| `minprob` | 0.5 | 忽略正确概率低于此的 kmer（:191） |
+
+算法语义（`jgi/BBMergeOverlapper.java`）：
+- 主入口 `mateByOverlapRatio`（:98）→ 纯 Java 分支 `mateByOverlapRatioJava`（:411），
+  JNI 分支（`Shared.USE_JNI`，:114）两版本均禁用（anchr 用纯 Rust 移植）。
+- `mateByOverlapRatioJava`（:411）两阶段：
+  1. `findBestRatio`（:425）先在各 insert 位置打分，`x>maxRatio` 则直接判无合并（:429-433）；
+  2. 主循环（:460 起）按 insert 从大到小遍历，对每个重叠区累计 good（`gIncr`）与 bad（`bIncr`），
+     坏碱基数超 `badlimit = extraMult*(min(bestRatio,maxRatio)*margin*overlapLength)+1+extraBadlimit`
+     （:468）即提前终止；记录最优与次优，`minSecondRatio` 用于歧义判断。
+- 返回 `-1` 表示无有效合并；`rvector[2]/[4]` 记录失败原因（:430-432）。
+- `expectedMismatches(a,b,overlap)`（:1117）供 `maxexpectederrors` 判定用。
+- 无质量数组时走 `mateByOverlapRatioJava`（:125），有质量走
+  `mateByOverlapRatioJava_WithQualities`（:158），把质量转概率加权匹配/错配。
 
 ## 5. 版本差异与注意事项
 

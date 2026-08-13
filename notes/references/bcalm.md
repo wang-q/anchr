@@ -134,6 +134,28 @@ BCALM 2 把 cdBG 构建拆成三段：**分桶压缩（bcalm2）→ UF 全局拼
 > 用更高的 `-abundance` 复用重跑，无需重新数 k-mer（`bcalm_algo.cpp` 注释明说）。
 > 对 pgr 意义：若 `KmerTable` 做精确计数，把阈值过滤推迟到消费侧，可一次计数
 > 多次调阈值。
+>
+> 更多源码细节（`bcalm_algo.cpp` / `bcalm_algo.hpp`）：
+> - **一个 k-mer 可进多个桶**：`InsertIntoQueues::operator()`（`bcalm_algo.hpp#L182-223`）
+>   当 `leftMin != rightMin` 时，k-mer 既按 leftMin 入桶（若 `repart(leftMin)==p`）又按
+>   rightMin 入桶（若 `repart(rightMin)==p`）——同一 k-mer 可能被**多个 minimizer 桶重复
+>   压缩**（每个桶各产出一份 unitig），最终靠 bglue 的 lmark/rmark 标记再接起来。这也
+>   解释了为何 `nb_left_min_diff_right_min`（左右 minimizer 不同的 k-mer 计数）被单列统计。
+> - **traveller 落盘前置检查**（`bcalm_algo.hpp#L215-216`）：断言 `repart(max_minimizer) >=
+>   repart(min_minimizer)`，违反则打印错误并 `exit(1)`——这正是必须**按 minimizer 顺序迭代
+>   partition** 的原因：traveller 一定落在"更靠后"的 partition，等轮到时再读回
+>   （`bcalm_algo.cpp#L447-453` 注释详述了这一设计取舍）。
+> - **输入校验**（`bcalm_algo.cpp#L258-259`）：`nb_threads==0` 或 `minSize>kmerSize` 直接
+>   `exit(1)`；`nb_h5_partitions != nb_passes*nb_partitions` 也 `exit(1)`（`:302-307`）。
+> - **minimizer 频次表**：`rg = 4^m`（`:314`），`-minimizer-type 1` 时从 `minimizers` 组读
+>   `minimFrequency`（`uint32[4^m]`）作 `freq_order`（`:318-325`），喂给
+>   `ComparatorMinimizerFrequencyOrLex`；`freq_order` 在函数尾 `delete[]`（`:854-855`）。
+> - **flat bucket 的 tuple_t 布局**（`:396-398`）：`(minimizer, Type kmer, abundance,
+>   leftmin, rightmin)`——k-mer 以 `Kmer::Type`（数字，非字符串）存，直到 graph3 的
+>   `addtuple` 前才转回 ASCII（`:624-626`）。
+> - **glue comment 编码**（`:668-673`）：`comment = "<lmark><rmark> <ab_0> <ab_1> ..."`，
+>   lmark/rmark 为 '1'/'0'——bglue 解析 comment 前两字符即得端点标记，其后是按 k-mer
+>   顺序排列的丰度向量。
 
 ### 3.2 `bglue`：UF 全局拼接（`bglue_algo.cpp`）
 
@@ -165,6 +187,20 @@ BCALM 2 把 cdBG 构建拆成三段：**分桶压缩（bcalm2）→ UF 全局拼
 > 端点标记语义：glue 序列的 comment 前两字符是 `lmark rmark`（'1'/'0'）；凡
 > `lmark`/`rmark` 为 1 说明该端与桶 minimizer 不一致、**必然还有另一段要接**——
 > 这正是 bglue 判断"是否需拼接"的依据；两端都没标记的序列是完整 unitig，直接输出。
+>
+> 更多源码细节（`bglue_algo.cpp`）：
+> - `prepare_uf` 固定 **3 趟**（`nb_prepare_passes=3`，`:780`）；BooPHF MPHF 用 `gamma=3`
+>   （`:800`）。若去重后的端点哈希为空（`uf_hashes.size()==0`），会塞入一个 `0` 占位以
+>   避免 BooPHF 空输入报错（`:794-795`）。
+> - **UF 元素数上限**：`nb_uf_keys > UINT32_MAX` 时报错退出（`:816-820`）。
+> - **反链标记**：`determine_order_sequences` 用 `seq_idx_t` 的最高位（bit 63）标记"该序列
+>   以反链参与拼链"（`rev_index`/`is_rev_index`，`:244-249`），拼链时对应用 `rc(seq)`。
+> - **UF 饱和警示**：`uf_class_t` 是 32 位类号（`:68`），若大量 unitig 塌缩进同一 UF 类，
+>   会只剩一个巨大 glue partition 导致内存爆炸（`:69-71` 注释；"Top 10 glue partitions" 只剩
+>   一项即征兆，见 `:1084-1089`）。
+> - **拼链/切环实现**：`glue_sequences`（`:423-479`）按链顺序砍掉后续序列首 k-mer 拼接；
+>   环状 unitig 通过"rc → 去掉首碱基 → 再 rc"等价地切掉最后 1 个碱基避免自闭合（`:461-477`），
+>   因为"砍掉链末元素"的策略对长于 k-mer 的段不成立。
 
 ### 3.3 `graph3`：桶内压缩（`ograph.cpp`）
 
@@ -190,6 +226,20 @@ BCALM 2 把 cdBG 构建拆成三段：**分桶压缩（bcalm2）→ UF 全局拼
 > GATB `LargeInt`（`beg2int128`/`end2int128`/`rcb`），2-bit/碱基。`debruijn()` 里
 > 注释明确："先标记要压缩的对，再统一压缩，以保证所有 unitig 的 connection 信息
 > 正确"——但当前 `to_compact` 方案被注释掉，改为扫描时即时压缩。
+>
+> 更多源码细节（`ograph.cpp`）：
+> - **graph3 内部 k 是 k-1**：`bcalm_algo.cpp#L600` 用 `kmerSize-1` 构造 `graph3`，所以桶内
+>   "k-mer" 实为完整 k-mer 的首/尾 **(k-1)-mer**——`beg2int128`/`end2int128` 只取 `k` 个碱基。
+> - **`isNumber` 判定**（`:59`）：`c < 64` 即判为数字——ASCII '0'-'9'（48-57）都 < 64，故
+>   "压缩痕迹"数字字符串的首字符必被判为数字（这依赖 ASCII 数字 < 64 这一巧合）。
+> - **自回文 (k-1)-mer 特例**（`addtuple`，`:405-407`）：canonical 归属用 `kmer1<=kmer2` 与
+>   `kmer2<=kmer1` 两个**独立 if**（非 else），当 (k-1)-mer 等于自身反向互补时两分支都走、
+>   左右索引各登记一次；作者 TODO 注明"应改成 `kmer2<kmer1` 以正确处理自身反向互补的
+>   k-mer，但还没测"。
+> - **4 种拼接方向**（`compaction`，`:126-198`）：`beg1==end2`（正接）、`beg1==endrc2`（右反）、
+>   `end1==beg2`（左反）、`end1==begrc2`（双反），每种都带 `kmmer`/`RC` 一致性校验；被吸收端
+>   改写为 `to_string(iR)` 数字索引，并同步 `indexed_*`/`connected_*` 与丰度向量
+>   （`compact_abundances`，`:202-213`）。
 
 ### 3.4 `unionFind` 无锁并行并查集（`unionFind.hpp`）
 
@@ -200,6 +250,11 @@ BCALM 2 把 cdBG 构建拆成三段：**分桶压缩（bcalm2）→ UF 全局拼
 
 > 注意：UF 的键是**端点 k-mer 的 64 位哈希**（`uf_hashes_t`），不是 k-mer 本身——
 > 注释明说"有碰撞，但应该可以接受"；元素数受 `UINT32_MAX` 限制（超限报错退出）。
+>
+> 实现要点（`unionFind.hpp`）：`find` 内联路径压缩（`:34-46`），`union_` 按秩合并 + CAS
+> （`:59-90`，rank 相同取 id 小者作根）；每个元素 64 位 = 低 32 位 parent + 高 32 位 rank
+> （`rank()` 掩 `0x7FFFFFFF`，`:95-103`）；`normalize()` 需 3× 内存、默认关（`:136-152`）；
+> 文件末尾还保留了两套废弃实现（`#if 0` 的 unordered_map 版与更早的旧版），供对照历史设计。
 
 ### 3.5 `LinkTigs`：计算 unitig 间 `L:` 边（`debruijn/impl/LinkTigs.cpp`）
 
@@ -218,6 +273,20 @@ bglue 输出的 unitig **不带连接边**；`link_tigs` 重新扫描所有 unit
   把每条 unitig 的链接追加到头（可 `renumber_unitigs` 重排 ID）。
 - 最终 FASTA 头：`<id> LN:i:<len> KC:i:<sum> km:f:<mean> L:<sign>:<to>:<sign> ...`
   （`L:` 语义见 §5.1）。
+>
+> 更多源码细节（`LinkTigs.cpp`）：
+> - **k<4 检查与报错文案不一致**（`:59`）：代码检查 `kmerSize < 4` 即 `exit(1)`，但报错信息
+>   写的是 "doesn't support k<5"——以实际检查为准（k<4 即拒）。
+> - **分趟哈希上限 8**：`is_in_pass` 用 `normalized_smallmer`——只取端点 (k-1)-mer 的 4 个
+>   特征碱基编码成 0-255 后取 min(rev,forward)（`:218-238`），再 `% nb_passes` 分趟；`nb_passes`
+>   硬编码为 **8**（`:32`），即最多 8 趟（注释也自嘲 "TODO this is so un-even. should do more
+>   proper hashing"）。
+> - **方向判定与回文特例**：比较端点 (k-1)-mer 的 canonical 值与其实际序列是否同向
+>   （`beginInSameOrientation`/`endInSameOrientation`，`:302`、`:343`）；仅当 `(k-1)` 为偶数且
+>   端点 (k-1)-mer 是回文时放宽方向（`nevermindInOrientation`/`nevermindOutOrientation`，
+>   `:346-347`、`:410-411`）。
+> - **边方向 rc 位**：入边/出边的 rc 标记直接取 `e_in.pos == UNITIG_END` / `e_out.pos ==
+>   UNITIG_END`（`:377`、`:438`），作者注明这是处理"自反向互补 (k-1)-mer"的更稳妥公式。
 
 ## 4. 双向图模型（`bidirected-graphs-in-bcalm2.md`，核心）
 

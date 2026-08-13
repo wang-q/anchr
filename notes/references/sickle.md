@@ -35,19 +35,19 @@
 单条读段的处理流程：
 
 ```
-1. 若 seq.l < length_threshold → 返回 five=three=-1（丢弃整条）
-2. window_size = (int)(0.1 * seq.l)；若为 0（读长 <10bp）则取 seq.l（全长）
-3. 初始化窗口 [0, window_size) 的质量和 window_total
-4. 对每个窗口起点 i（0..=qual.l - window_size）：
-   a. window_avg = window_total / window_size
-   b. 5' 修剪（未禁用且尚未找到）：若 window_avg >= qual_threshold，
+1. 若 seq.l < length_threshold → 返回 five=three=-1（丢弃整条）        [sliding.c:49-54]
+2. window_size = (int)(0.1 * seq.l)；若为 0（读长 <10bp）则取 seq.l（全长） [sliding.c:37,58]
+3. 初始化窗口 [0, window_size) 的质量和 window_total                  [sliding.c:60-62]
+4. 对每个窗口起点 i（0..=qual.l - window_size）：                    [sliding.c:64]
+   a. window_avg = window_total / window_size                        [sliding.c:66]
+   b. 5' 修剪（未禁用且尚未找到）：若 window_avg >= qual_threshold，   [sliding.c:72-87]
       在窗口内找首个 >= threshold 的碱基位置作为 five_prime_cut
-   c. 3' 修剪（已找到 5' 或禁用 5'）：若 window_avg < threshold
+   c. 3' 修剪（已找到 5' 或禁用 5'）：若 window_avg < threshold       [sliding.c:92-104]
       或到达读段末端，在窗口内找首个 < threshold 的碱基位置作为
       three_prime_cut，然后 break
-   d. 滑动：window_total -= 窗口首碱基；window_total += 新进入碱基
-5. 若 -n 启用且序列含 N/n，three_prime_cut = 首个 N 的位置
-6. 若 (始终未找到 5' 且未禁用) 或 (three - five < length_threshold)
+   d. 滑动：window_total -= 窗口首碱基；window_total += 新进入碱基   [sliding.c:106-111]
+5. 若 -n 启用且序列含 N/n，three_prime_cut = 首个 N 的位置           [sliding.c:115-119]
+6. 若 (始终未找到 5' 且未禁用) 或 (three - five < length_threshold)  [sliding.c:124-129]
    → 两者置 -1（丢弃）
 ```
 
@@ -76,6 +76,31 @@ qual[five..three]
 - 输出长度 = `three_prime_cut - five_prime_cut`（已按 5' 切点偏移）。
 - `+` 行固定输出单个 `+`（丢弃原 header 内容）。
 - `print_record_N`（`-M` 模式）：整个记录替换为单碱基 `N`，质量取 `quality_constants[qualtype][Q_MIN]`（该编码最小值），header 保留原 name/comment。**用于保持配对**。
+
+### 2.4 关键参数与默认值
+
+| 参数 | 含义 | 默认值 | 源码位置 |
+| :--- | :--- | :--- | :--- |
+| `-t/--qual-type` | 质量编码类型（`solexa\|illumina\|sanger`） | **必填，无默认**（`qualtype=-1` 即报错） | `trim_single.c:93-104,161` / `trim_paired.c:148-156,235-237` |
+| `-q/--qual-threshold` | 滑动窗口平均质量阈值 | **20** | `trim_single.c:15` / `trim_paired.c:16`（全局量初始化）；`atoi` 解析且 `<0` 报错（`trim_single.c:112-117`） |
+| `-l/--length-threshold` | 修剪后最小保留长度 | **20** | `trim_single.c:16` / `trim_paired.c:17`；`<0` 报错（`trim_single.c:120-125`） |
+| `-x/--no-fiveprime` | 禁用 5' 修剪 | 关闭（默认启用 5'） | `trim_single.c:127-129` |
+| `-n/--trunc-n` | 在首个 N 处截断 | 关闭 | `trim_single.c:131-133` |
+| `-g/--gzip-output` | 输出 gzip | 关闭（默认普通输出） | `trim_single.c:135-137` |
+| `-z/--quiet` | 静默统计 | 关闭 | `trim_single.c:139-141` |
+| 窗口大小 | `(int)(0.1 × 读长)`，为 0 取全长 | 无 CLI 暴露，读长自适应 | `sliding.c:37,58` |
+
+> 注：`-q`/`-l` 的默认 20 由 `single_qual_threshold`/`single_length_threshold`（`trim_single.c:15-16`）与 `paired_qual_threshold`/`paired_length_threshold`（`trim_paired.c:16-17`）两组全局量分别承载，`se` 与 `pe` 互不影响。
+
+### 2.5 源码 quirks / 边界行为
+
+- **`atoi` 解析阈值，非数字静默归 0**：`-q`/`-l` 用 `atoi`（`trim_single.c:112,120`），传入非数字字符串（如 `-q abc`）会静默当作 `0` 处理（`atoi` 返回 0 且 `0 < 0` 为假、不报错）；负数才被拒绝。pgr 用 clap 的 `value_parser!(f64/usize)` 严格解析，不会出现该静默回退。
+- **`window_total` 为 `int`，理论可溢出**：对极长读段（窗口=全长、每碱基质量最高 ~93 时）`int` 可能溢出，但实际读长远达不到该量级，属理论风险而非现实 bug。pgr 用 `f64` 累积（`trim.rs:96`），无此隐患。
+- **`-n` 截断用两次 `strstr` 大小写分开搜**（`sliding.c:117`）：先搜大写 `"N"`，找不到才搜小写 `"n"`。因此对混合大小写的序列，只取"大写 N 首个位置（若存在，否则小写 n 首个位置）"，另一个大小写的更靠前 N 可能被忽略；且当 5' 未找到且未禁用时，第 6 步丢弃逻辑仍会覆盖 `three_prime_cut`，`-n` 实际只在 5' 已找到或 5' 被禁用时才生效。
+- **质量越界报错发生在滑动循环中途**：`get_quality_num`（`sliding.c:10`）在每个窗口迭代内被反复调用（初始化 `sliding.c:60-62`、滑动 `sliding.c:107-109`、5'/3' 内层 `sliding.c:77,96`），任一处越界即 `fprintf` + `exit(1)`（`sliding.c:21-28`），报错信息含读段名、质量串、越界字符与位置。pgr 的 `validate_quality`（`trim.rs:186`）改为对整个记录先行整体校验并返回 `anyhow` 错误。
+- **`print_record` 的 `%.*s` 长度参数为 `int` 差值**（`print_record.c:15,17`）：`three - five` 若为负（切点重叠）会把负精度传给 `%.*s`，属未定义行为；但调用方仅在 `three_prime_cut >= 0` 时才调用 `print_record`（`trim_single.c:201` / `trim_paired.c:389`），而丢弃路径会把两者都置 -1，故实际不会以负长度输出。
+- **`-d` 调试选项未出现在帮助文本里**：仅在 getopt 字符串 `"df:..."`（`trim_single.c:79` / `trim_paired.c:124`）与 switch 分支（`trim_single.c:143-145`）中存在，帮助文本未列出；`sliding.c` 内有多处 `if (debug) printf` 条件打印（`sliding.c:68,74,84,128,131`）。
+- **`pe` 模式交错输入时复用同一句柄**：`pec` 输入下 `fqrec2` 由 `malloc` 单独分配并共享 `fqrec1->f`（`trim_paired.c:362-363`），收尾时 `free(fqrec2)` 而非 `kseq_destroy`（`trim_paired.c:497`）；分离文件形态则各 `kseq_init`、`kseq_destroy`。这是 C 层 I/O 复用的实现细节，pgr 的 `run_paired` 用两个独立 `SeqReader`（`trim.rs:354-357`）不需此 hack。
 
 ## 3. 双端（`pe`）与单端（`se`）模式
 

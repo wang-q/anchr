@@ -22,7 +22,9 @@
   `skesa-rs-main/` 的 README 声称基于 **SKESA v2.4.0 / SAUTE v1.3.0 快照**
   （commit `27caba2ed...`，2024-10-11，见 `README.md:5,141`），crate 自身版本
   `0.2.2`（`Cargo.toml`）。即：仓库内 C++ 源码比 Rust 移植所依据的快照更新一档；
-  但 Rust CLI 的 about 文本也自报 "SKESA 2.5.1"（`cli.rs:58`，与更新的 C++ 对齐）。
+  但 Rust CLI 的 about 文本（`cli.rs:58`，写 "Original: SKESA 2.5.1"）与
+  `--version` 分支（`cli.rs:755` 打印 `SKESA 2.5.1`）都**自报 2.5.1**，与更新的
+  C++ 对齐——即 Rust 版"CLI 版本号跟新 C++、内部算法语义跟旧快照 2.4.0"。
   对比语义时以 **2.4.0 快照**为准（README 明示），C++ 2.5.1 仅作行为参考。
 - **语言/构建**：
   - C++：Boost + gcc，`make`（NGS 版）/ `make -f Makefile.nongs`（文件版）；
@@ -152,13 +154,28 @@ Rust `src/` 同名对应：`concurrent_hash.rs`、`sorted_counter.rs`/
   4. **strand 平衡问题**：存在 `min(plusf,minusf)>0.25` 的双链好节点时，剔掉
      `min(plusf,minusf) < 0.1×fraction×max(...)` 的偏链后继
      （`graphdigger.hpp:1861-1884`）。
-- **可逆性检查**（`GetReversibleNodeSuccessors`）：扩展前验证每个后继再回退
-  （对后继的 revcomp 求后继）能回到原节点，否则该 fork 不可逆、断裂
-  （`graphdigger.hpp:1739-1762`）。
-- **conservative 扩展**：沿唯一可逆路径延伸；遇到 fork/低置信即停，宁可断。
-- **`jump`/`max_snp_len`**（`--max_snp_len` 默认 150）：扩展时允许跨过一个
-  SNP 的"跳"以桥接多态区；`--allow_snps` 开 `check_repeats` 额外做 SNP 发现
-  （Rust `snp_discovery.rs`）。
+- **可逆性检查**（`GetReversibleNodeSuccessors`，`graphdigger.hpp:1740-1763`）：
+  扩展前验证每个后继再回退（对后继的 revcomp 求后继）能回到原节点，否则该
+  fork 不可逆、断裂。另有变体 `GetReversibleNodeSuccessorsF`（`:1710`）在过滤时
+  额外记录 `eRightFork/eLeftFork` 位（左右两向分别看 step_back.size()>1）。
+- **core 扩展 `ExtendToRight`**（`graphdigger.hpp:2273-…`）：从初始节点向右延申，
+  对当前节点的后继做 `FilterNeighbors` 后分三种情形：
+  1. `successors.empty()` → 无延伸，断；
+  2. `size()==1`（简单扩展，`:2285-2305`）→ 新节点须 `GoodNode`（丰度≥low_count），
+     且其前驱过滤后**恰好 1 个**、且该前驱的 revcomp 能**回到当前节点**（`:2289-2294`）
+     才步进——这是"只沿唯一、可回退路径"的强不变量；
+  3. `size()>1` 且未开 SNP → 断（宁可断在 fork）。
+  左右两向由 `ExtendToRight(initial,0)` 与 `ExtendToRight(revcomp(initial),0)`
+  分别调用（`:2448-2449`）。
+- **`ExtendableSuccessor`**（`graphdigger.hpp:1657-1708`）：判定某后继是否"可扩展"，
+  从它出发在图上至少走 `total_len=max(100,kmer_len)` 步（即**至少延伸到 100bp**）仍
+  有路可走才算可扩展；沿途每步用 `FilterLowAbundanceNeighbors` 剔噪。这是"not
+  extendable forks"过滤（`:1827`）的底层依据。
+- **`jump`/`max_snp_len`**（`--max_snp_len` 默认 150）：开 SNP 时
+  `max_extent=m_jump`（`:2276`），`DiscoverSNPCluster`（`:2170`）在 fork 处向前后
+  两个方向探测一个 SNP 簇，验证 `step==step_back` 且长度一致后"跳过"多态区桥接
+  （`:2324-2371`）；`--allow_snps` 开 `check_repeats` 额外做 SNP 发现（Rust
+  `snp_discovery.rs`）。
 
 ## 5. 迭代组装编排（`assembler.hpp` / Rust `assembler.rs`）
 
@@ -194,6 +211,30 @@ Rust `src/` 同名对应：`concurrent_hash.rs`、`sorted_counter.rs`/
 > `paired_insert_n50`（连接 mate 的 N50），**不是** insert 的 3×N50 上限；
 > 用错会把 (N50, 3×N50) 区间已组装的 contig 排除在 kmer→contig 映射外，导致
 > 陈旧 k-mer 残留（Rust `assembler.rs:400-407` 注释专门说明）。
+
+### 5.1 关键参数与默认值（`skesa.cpp:318-357` 的 boost::program_options）
+
+| 参数 | 默认 | 语义 |
+|---|---|---|
+| `--cores` | 0（=全部核） | 线程数；>硬件上限会 WARNING 并钳到硬件数（`skesa.cpp:445-456`） |
+| `--memory` | 32 | 内存预算（GB，**仅排序计数**用，决定外部归并轮数） |
+| `--kmer` | 21 | 最小 k（min_kmer，建首图的 k） |
+| `--min_count` | 自动 | 保留 k-mer 的最小计数；高覆盖时自动抬到 `coverage/50`（`assembler.hpp:971`） |
+| `--max_kmer` | 自动估计 | 最大 k；公式见 §5 第 4 步，clamp 到奇数 |
+| `--max_kmer_count` | 自动 | 估 max_kmer 用的最低平均计数；自动抬到 `coverage/10`（`assembler.hpp:973`） |
+| `--steps` | 11 | min→max k 的迭代轮数 |
+| `--fraction` | 0.1 | 扩展允许的最大 noise/signal 比（`FilterLowAbundanceNeighbors` 的 `m_fraction`） |
+| `--max_snp_len` | 150 | SNP 跳转的最大跨度（作为 digger 的 `jump`） |
+| `--min_contig` | 200 | 输出 contig 最短长度 |
+| `--vector_percent` | 0.05 | 含 19-mer 的 read 占比阈值，判定接头/载体（`1.` 关闭） |
+| `--insert_size` | 自动估计 | 期望 insert size；`paired_insert_limit = 3×N50`，N50 由首图连接抽样 10000 对估得（`assembler.hpp:205,256`） |
+| `--hash_count` | off | 用哈希计数（bloom + 分块表）取代排序计数；配套 `--estimated_kmers`（默认 100，百万）、`--skip_bloom_filter` |
+| `--allow_snps` | off | 多一轮 SNP 感知遍历（`ImproveContigs(kmer,true)`，`assembler.hpp:301-306`） |
+| `--use_paired_ends` | off | 单个 fasta/fastq 文件内即配对的 read（不逗号分隔） |
+
+> 注：`estimate_min_count`（Rust `assembler.rs:177`）默认 true，对应 C++ 的
+> `--min_count` 自动抬升逻辑；C++ 端该行为由 `GetGraph` 内的
+> `total_seq>0 && genome_size>0` 触发（`assembler.hpp:963`）。
 
 ## 6. SAUTE / 引导组装（`guidedassembler.hpp`、`saute.cpp`）
 
@@ -255,6 +296,11 @@ de Bruijn 图遍历启发式：
    bcalm 式哈希表切换到排序 DBG（kmer 表已走 radix 排序路线），
    total(32)+branch(8)+plus-fraction(16) 打包与 `Index()=m_node/2-1`
    是现成模式。
+5. **"只沿唯一可回退路径"的扩展不变量（`ExtendToRight`，`graphdigger.hpp:2285-2294`）→
+   layout 的唯一性约束**：SKESA 的简单扩展要求新节点前驱过滤后恰好 1 个、且其
+   revcomp 能回到当前节点才步进；`ExtendableSuccessor` 再以"至少延伸 100bp"兜底
+   （`:1659`）——这组"唯一 + 可回退 + 最小延伸长度"约束可直接映射 pgr `asm unitig`
+   的延伸语义（`cov=` 已在头部），比单纯的 top2 近等边近似多一道方向性验证。
 
 ## 8. 局限
 
@@ -265,6 +311,47 @@ de Bruijn 图遍历启发式：
 - SKESA 定位微生物短读组装；长读（HiFi/ONT）场景不在其路线（参照 metaMDBG）。
 - skesa-rs 是 LLM 中介的"忠实翻译"，README 明示**不可完全信任**、复刻 bug、
   需自行验证——参考其工程手法而非当作权威实现。
+
+## 9. 源码 quirks（异常/边界行为）
+
+- **越界访问无检查**：`CDBGraph` 多处注释明示 "for all access with Node there is
+  NO check that node is in range !!!!!!!!"（`DBGraph.hpp:173,425`）——调用方必须保证
+  Node 有效，否则 `Index()=m_node/2-1` 可能下溢；`Node(0)` 是"无效/未命中"哨兵
+  （`isValid()` 要求 `m_node>0`，`DBGraph.hpp:106`）。
+- **Node 编码与奇偶**：偶数=正链、奇数=负链；`ReverseComplement` 就是 ±1（`:109-114`），
+  `DropStrand` 归到偶数（`:115`）；`GetNode` 对图中不存在的 k-mer 返回 `Node(0)`
+  （`:156-164`）。
+- **`--cores` 边界**：负值直接 `exit(1)` 报错（`skesa.cpp:448-451`）；超过硬件上限只
+  WARNING 并钳到硬件数（`:451-455`）；0 表示用全部核（`thread::hardware_concurrency`）。
+- **输入去重**：`--reads`/`--fasta`/`--fastq`/`sra_run` 会 `sort+unique` 去重，有重复
+  时打印 WARNING（`skesa.cpp:414-441`）——同输入会因**顺序无关**而稳定。
+- **`--gz` 已废弃**：不再需要，自动识别 gzip，传了只打 WARNING（`skesa.cpp:384-385`）。
+- **k 一律取奇**：`kmer_len -= 1-kmer_len%2`（`assembler.hpp:267`；Rust `assembler.rs:327-329`），
+  保证 k 为奇数（回文 k-mer 无 canon 歧义）。
+- **迭代 k 的取整**：主迭代 k 由 `min_kmer+step*alpha+0.5` 四舍五入再取奇，若 ≤上一
+  张图的 k 则 `continue` 跳过（`assembler.hpp:264-269`）；长 insert 迭代固定用
+  `[1.25×max_kmer, (1.25×max_kmer+max_kmer_paired)/2, max_kmer_paired]` 三个 k
+  （`:286-289`）。
+- **`ExtendableSuccessor` 的"至少 100bp"**：`total_len=max(100,kmer_len)`（`graphdigger.hpp:1659`），
+  即使 k 很小也要求候选路径至少延伸 100bp 才算"可扩展"——对短读小 k 是保守阈值。
+- **`ExtendToRight` 接受未拥有的节点**：签名注释 "initial_node may be not owned"
+  （`graphdigger.hpp:2274`），且中途 `SetVisited` 失败即断（`:2297-2305`）。
+- **GGT 噪声明辨**：strand 特异剔噪仅在 `GraphIsStranded()` 时生效；正链按末 3 碱基
+  `== "GGT"` 找 target（`:1801`），负链按 `MostLikelySeq(suc,3)=="ACC"`（`:1845`，
+  即 GGT 的 revcomp）——两处丰度阈值用 `1-PlusFraction`/`PlusFraction` 分别归一到
+  对应链。
+- **低丰度尾巴删除的触发条件**：`LowCount()==1 && 首后继丰度>5` 时才删丰度==1 的
+  尾巴（`:1786-1789`），循环条件是 `j>0 && 当前末尾丰度==1`——避免过度删。
+- **count 打包的"未用"字节随图类型漂移**：`CDBGraph` 中 `[40:47]` 是 8 bit 未用
+  （`DBGraph.hpp:180`）；`CDBHashGraph` 把它改作 visited 控制位
+  （`eVisited/eTemp/eMulti=1<<40/41/42`，`DBGraph.hpp:454`）——同一定义在不同图
+  实现语义不同，移植/读码须留意。
+- **insert 估计用 2000bp 上限**：`long_insert_size=2000` 作为连接步长上限
+  （`assembler.hpp:240`），`m_insert_size=3×N50`（`:256`）。
+- **自动抬 `min_count` 的封顶差异**：排序计数版无上限（`assembler.hpp:971`），哈希
+  版封顶 `min(255,…)`（`:1010`，因哈希表计数是 8bit）；公式都带 `+0.5` 四舍五入。
+- **空组装抛异常**：首轮 `ImproveContigs` 后 contig 为空即
+  `throw runtime_error("Was not able to assemble anything")`（`assembler.hpp:182-183`）。
 
 ---
 

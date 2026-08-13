@@ -48,6 +48,11 @@ return (start, stop)
 - **区间判定**：`start >= stop` 时整段无效，返回 `(0,0)`（即不修剪，或全部丢弃由上层决定——注意这里**不是**丢弃整条，而是置空区间，`QualityTrimmer` 会返回空 read）。
 - **Cython 实现要点**：质量串要求为 ASCII，`quality_trim_index` 用 `PyUnicode_1BYTE_DATA` 直接取底层字节指针、逐字节读 `qual[i] - base` 累加（qualtrim.pyx:46-48, 53-70），避免逐字符 Python 对象开销；质量缺失抛 `HasNoQualities`。5'/3' 两端独立单遍扫描，O(n)、零额外内存。
 
+**边界行为 / quirks**（pgr 移植时需保持语义一致）：
+- **判定用严格 `>`（非 `>=`）**：`max_qual` 从 0 起，`s > max_qual` 才更新切点（qualtrim.pyx:57-59, 68-70）。当累积和到达**并列最大值**（plateau）时切点**不后移**——即多解时倾向取"最早（最 5'）的局部最大点"。pgr `mott_cut`（trim.rs:142, 154）同样用严格 `>`，语义一致。
+- **5' 端若首碱基即低于 cutoff**：`s` 首轮即 `< 0` 立即 `break`，`start` 保持 0，即 5' 端**不修剪**（整条保留起点的含意是"头部没有值得修剪的高质量区段终点"）。`max_qual` 初值 0，故只有累积和 `s > 0`（净正）才可能推进 `start`，保证剪点落在"质量净高于 cutoff"区段的末端之后。
+- **`s == 0` 不触发 break**：`s < 0` 才停（qualtrim.pyx:55-56），即"恰好等于 cutoff"的碱基视为中性，不终止扫描，但也不会更新最大点（需 `> max_qual`）。
+
 ### 2.2 与滑窗（sickle/Trimmomatic）的本质区别
 
 | 维度 | 滑窗（sickle） | Mott/BWA（cutadapt `-q`） |
@@ -64,6 +69,7 @@ return (start, stop)
 
 1. **`nextseq_trim_index`**（`--nextseq-trim`）：NextSeq 双色编码中"暗循环"（无颜色）通常被读成高质量 G，出现在读段 3' 端。算法与 `quality_trim_index` 的 3' 端相同，但把 **G 碱基的质量强制设为 `cutoff - 1`**（`qualtrim.pyx:107-108`）。效果与直觉相反：正常算法里高质量 G（`q >> cutoff`）会贡献强负值使 `s<0` 提前 break、从而把 G 尾**保住**；而把 G 的 `q` 设为 `cutoff-1` 后，每个 G 对累积和只贡献固定的 `+1`（`s += cutoff - (cutoff-1) = 1`），G 尾不再触发提前终止，累积和最大点落到 G 尾左缘，从而把 polyG 尾巴当低质量去掉。
 2. **`poly_a_trim_index`**（`--poly-a`）：poly-A/poly-T 尾巴检测，'A'(或'T') 得 +1，其他碱基 −2，累计 score 最大处为切点。错误率上限 0.2 的校验是**位置相关的**：5' 端（polyT head）为 `errors * 5 <= i+1`、3' 端（polyA tail）为 `errors * 5 <= n-i`（`qualtrim.pyx:147,161`），即错误按"当前已扫到的尾巴长度"而非整条读长计。长度 < 3 的尾巴忽略（`best_index < 3` → 0；`best_index > n-3` → n）。
+   - **quirk**：错误率约束 `errors * 5 <= ...` 只在 `score > best_score`（即要更新切点）**同一条 if 里**评估（qualtrim.pyx:147,161）。一旦某位置累积错误率超过 20%，`best_index` 便**冻结在之前的位置**不再后移，但扫描**继续**（不 break）——即"错误率超限后切点锁定，而非终止检测"。
 3. **`expected_errors`**（`--max-ee`）：用 Edgar et al. (2015) 公式从 Phred 质量计算期望错误数 `sum(10^(-Q/10))`，用于按总错误数过滤（非修剪）。C 实现 `expected_errors_from_phreds`（`qualtrim.pyx:15`）。
 
 ## 3. adapter 修剪算法：indel-aware 半全局比对
@@ -76,7 +82,8 @@ cutadapt 的接头去除核心是一个 Cython 实现的**混合 cost/score 半�
 - **`Match`**（抽象）→ `SingleMatch` → **`RemoveBeforeMatch`**（剪掉 match 之前的序列，用于 5'/front，保留 `read[rstop:]`）/ **`RemoveAfterMatch`**（剪掉 match 之后的序列，用于 3'/back，保留 `read[:rstart]`）；`LinkedMatch` 组合前后两段。
 
 `SingleAdapter` 关键参数（adapters.py:564）：`sequence`（自动转大写、U→T、I→N）、`max_errors=0.1`、`min_overlap=3`（与接头长度取 min）、`adapter_wildcards=True`、`read_wildcards=False`、`indels=True`。要点：
-- **max_errors ≥ 1 时按非 N 碱基数折算成比率**（`max_errors /= len - N`，adapters.py:580-581）。
+- **max_errors ≥ 1 时按非 N 碱基数折算成比率**（`max_errors /= len - N`，adapters.py:580-581）。**quirk**：折算有 all-N 保护——仅当 `sequence.count("N") != len(sequence)`（非全 N）时才除，避免全 N 接头除零（adapters.py:580-581）；且折算后即作为固定的 `max_error_rate`，不再随有效长度变化。
+- **序列校验**：空序列抛 `ValueError("Adapter sequence is empty")`（adapters.py:578-579）；`adapter_wildcards=True` 时序列字符须属于 IUPAC 集合 `ABCDGHKMNRSTUVWXY`，否则抛 `InvalidCharacter`（adapters.py:584-591）。**优化**：若序列仅含 ACGT，`adapter_wildcards` 自动降为 `False` 走非通配快速比较（adapters.py:593-595）。
 - **错误率 = 错误数 / 与接头比对的那段长度**（非整条 read），见 _align.pyx:144 的 `errors / (reference_stop - reference_start)`。
 - indel 通过 `_make_aligner` 把 `indel_cost` 设为 1（允许）或 100000（`--no-indels` 时，adapters.py:605），后者等价于禁止 indel。
 - 匹配类 `SingleMatch` 的 `score` 与 `errors` 分别记录比对得分与错误数（用于多接头竞争与报告）。
@@ -95,6 +102,7 @@ cutadapt 的接头去除核心是一个 Cython 实现的**混合 cost/score 半�
 - **字符表翻译与快速比较**：`_reference` 在初始化时通过 `_match_tables.py` 的查找表（`_upper_table`/`_acgt_table`/`_iupac_table`）一次性转成紧凑字节表示（`translate`，_align.pyx:43）；无通配时走 `compare_ascii` 直接按字节相等比较，有 IUPAC 通配时用**位掩码交集** `(s1[i-1] & s2[j-1]) != 0` 判断兼容（_align.pyx:322-328, 442-445）。用"空间换比较速度"，避免每次逐字符查通配表。
 - **精确匹配提前终止**：当候选满足 `cost == 0 且 origin >= 0`（零错误精确命中）时立即 `break` 跳过整条 read 的剩余扫描（_align.pyx:531-533）。
 - 返回 `(ref_start, ref_stop, query_start, query_stop, score, errors)`；无满足条件者返回 `None`。
+- **校验 quirk**：`__cinit__` 校验 `indel_cost < 1` 抛 `ValueError`（_align.pyx:217-218）——`--no-indels` 用 100000 绕过此限制；`PrefixComparer.__init__` 校验 `max_error_rate ∈ [0,1]` 且 `min_overlap ≥ 1`，越界抛 `ValueError`（_align.pyx:631-636）。`_set_reference` 中全 N 参考序列（`effective_length == 0`）抛 `ValueError("Cannot have only N wildcards in the sequence")`（_align.pyx:270-271）。
 
 > 配套的纯 Python 模块 `align.py` 提供 `edit_distance`（经典 O(mn) DP）、`hamming_environment`/`naive_edit_environment`/`slow_edit_environment` 等供测试对照的实现，`edit_environment` 的 Cython 版则在 §3.6 的 `AdapterIndex` 索引构建中实际使用。
 
@@ -136,6 +144,7 @@ cutadapt 的接头去除核心是一个 Cython 实现的**混合 cost/score 半�
 
 - **`MultipleAdapters.match_to`**（adapters.py:1265）：依次对每个 adapter 调 `match_to`，选 **score 最高、score 相同取 error 最少** 者为最佳匹配——这是多接头竞争的基本规则。
 - **`AdapterIndex`**（adapters.py:1289）：对**锚定**（Prefix/Suffix）适配器建索引加速。索引构建（`_make_index`，:1396）把每个 adapter 的错误数 ≤k 的**编辑环境**内所有字符串预先展开存入 dict：允许 indel 时用 `edit_environment(seq, k)`（_align.pyx:785，一个按 DP + Ukkonen 带状约束遍历 edit distance ≤k 的字符串、同时计数匹配数的生成器），不允许 indel 时用 `hamming_sphere`（_align.pyx:717，k=1/2 有专门展开、k>2 递归）。查询时直接 O(1) 查 read 的固定后缀/前缀。限制：k≤3、adapter 不允许通配、read 不允许通配、适配器须为锚定类型。多长度时按长→短依次查，用"匹配数不可能超过已找到的 `best_m`"提前终止（:1507）。出现歧义（两个 adapter 对同一字符串同分，`matches` 相等）的字符串会被**删除**——含歧义序列的 read 将**不修剪**（并有日志警告，:1444-1466）。k=3 且有 indel 时索引可能巨大，日志会提示 `--no-indels`/`--no-index`（:1407-1412）。
+   - **docstring/代码不一致 quirk**：类文档声称"allows at most 2 mismatches"（adapters.py:1297），但 `_accept` 实际只在 `k = int(len * max_error_rate) > 3` 时拒绝（adapters.py:1378-1379），即**允许到 3 个错误**。以代码为准。
 - **read 中 N 通配的兜底**：限制"不允许通配"指 adapter 序列；read 侧遇 N 时 `_lookup_with_n`（adapters.py:1535）先把 N 替换成 A 查索引，命中后**对该 affix 重跑一次真比对**（`adapter.match_to`）修正 errors/score——避免把 N 误算成匹配。
 - `AdapterCutter._regroup_into_indexed_adapters`（modifiers.py:127）把用户适配器里"可被索引的锚定"拆出来建 `IndexedPrefixAdapters` / `IndexedSuffixAdapters`，其余进 `MultipleAdapters`。
 
@@ -223,6 +232,8 @@ fn mott_cut(qual: &[u8], base: u8, cutoff_front: f64, cutoff_back: f64) -> (usiz
 ### 5.2 与滑窗共存（已实现）
 
 CLI 已提供 `--method sliding`（默认）与 `--method mott`（`trim_qual.rs:71-77`），对应 §2.2 的两类算法，验证了 [sickle.md](./sickle.md) §4.5 的结论。两者共用 `--qual-threshold`/`--length-threshold` 与长度过滤。
+
+> **来源澄清**：cutadapt **本身没有滑窗质量修剪**——`sliding` 方法继承自 [sickle.md](./sickle.md)（`sliding_cut`，trim.rs:216 调用），`mott` 才是 cutadapt 本文 §2 的算法。§2.2 的对比表仅用于阐明两者的取舍差异，不表示 cutadapt 提供滑窗。移植时不要把"滑窗"误记为 cutadapt 特性。
 
 ### 5.3 其余值得借鉴但尚未落地的点
 

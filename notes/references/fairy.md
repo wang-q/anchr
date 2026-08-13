@@ -14,8 +14,11 @@
   菌株分辨组装。
 - **依赖**：needletail（FASTA/Q 解析）、rayon（并行）、fxhash、
   serde+bincode（`.bcsp` 落盘）、scalable_cuckoo_filter（近似去重）、
-  statrs（泊松/伽马）、fastrand（bootstrap）、memory-stats（ram-barrier）；
-  musl 静态编译时切 jemalloc。
+  statrs（泊松/伽马）、fastrand（bootstrap）、memory-stats（ram-barrier）、
+  simple_logger（stderr 日志）、human-sort（输出样本列自然排序，
+  contain.rs:37）；musl 静态编译时切 jemalloc（main.rs:13-15）。
+  Cargo.toml 还声明了 flate2/zlib-ng、nalgebra、rand、regex，但 10 个源码
+  文件中未见直接使用，疑为历史遗留。
 - **入口**：`main.rs` 把 `coverage` 恒以 pseudotax=true 调用
   （`contain(args, true)`）→ 实际走 pseudotax 分支；sketch 的 dedup
   默认关闭（见 §8 quirk）。
@@ -61,6 +64,14 @@
   （默认 RandomState 哈希器），`from_enc`（types.rs:140）才真正构造 `FxHashMap`。
   另有一处易混淆的死代码 `_get_kmer_identity`（contain.rs:1180），它按
   `count==1` 的比例估计 read 的 kmer identity，与「反解 kmer」无关。
+- **`mm_hash`（usize 版，types.rs:62-72）**：与 `mm_hash64` 同构，先把字节
+  按 `usize::from_ne_bytes` 重解释再套同一串 murmur 变换；经 `MMHasher`/
+  `MMBuildHasher`（types.rs:74-99）供 `MMHashSet<u64>` 作 genome 去重
+  （sketch.rs:401）。注意 `MMHasher::write` 是**覆盖式**（`self.hash =
+  mm_hash(bytes)`），若被多次 write 会互相覆盖——u64 key 恰好只 write 一次
+  故无碍。表与哈希算法来自 Heng Li 的 miniprot（types.rs:1 头注释含
+  MIT 声明）。另有 `decode`/`print_string`（seeding.rs:54-76）调试函数，
+  `decode` 遇非 0-3 值直接 `panic!`，属死代码。
 - **采样**：`threshold = u64::MAX / c`；`hash < threshold` 才保留
   → 采样率 ≈ 1/c。默认 `c=50`（约 1/50，sylph 为 1/200）。
 - **滚动**：f 左移 2 位累积、r 右移 + 顶部补补链，与 pgr 现有滚动同构；
@@ -73,6 +84,9 @@
   落盘前转 `Vec<(u64, u32)>`（`SequencesSketchEncode`，序列化快一个量级）
   + 元数据（c、k、file_name、sample_name、paired、mean_read_length），
   bincode 写 `.bcsp`。每样本一张表，`threads`（默认 3）个样本并行。
+  输出文件名基于输入文件 basename（sketch.rs:296-303/352-355）：双端样本
+  **带 `.paired` 中缀**（`<name>.paired.bcsp`），单端为 `<name>.bcsp`；
+  有 sample_names 时以 sample name 取代文件名。
 - **去重（关键）**：
   - **pair marker**：固定 k=16（`Marker=u32`，`k = size_of::<Marker>()*4`），
     `pair_kmer` 对双端 read 各自取**偶数位**碱基拼成一个 16-mer、**奇数位**
@@ -138,10 +152,26 @@
 - **方差**：对 `full_covs` 前 95% 窗口算（`VAR_CUTOFF=10` 以下不剪）。
 - **CI**：100 次 bootstrap（`fastrand::seed(7)` 固定），5-95 分位，
   <50 次成功则输出 NA。
-- **pseudotax**（恒生效）：`winner_table` 把共享 kmer 按 ANI 最高的 genome
-  重新分配，二次 `get_stats`；`estimate_true_cov` 再乘
-  `read_length/(read_length-k+1)` 与 `1/((seq_id/100)^k)` 校正
-  （`seq_id` 默认 99.5，即 kmer identity ≈ `0.995^k`）。
+- **pseudotax**（恒生效）：`winner_table`（contain.rs:489-512）把共享 kmer
+  按 `final_est_ani` 最高的 genome 重新分配（共享/重复 kmer 只归属一个
+  genome，消除跨物种重复计数），再对每个 genome 二次 `get_stats`
+  （contain.rs:410-418）。两点关键：
+  - **round-1 校正不作用于 round-2 输出**：第一次 `estimate_true_cov`
+    （contain.rs:395，恒 `estimate_unknown=true`）把 `final_est_cov` 乘
+    `read_length/(read_length-k+1)` 与 `1/((seq_id/100)^k)`；但 winner
+    reassign 后的二次结果（`stats_vec_seq_2`）里，`estimate_true_cov` 被
+    注释（contain.rs:417）——**最终输出的 cov 矩阵是未经这两项校正的原始
+    λ/median**，而 `winner_table` 用的 ANI 又来自校正前的第一轮。短读下
+    这约低估 `read_length/(read_length-k+1) × 1/(seq_id/100)^k` 倍
+    （如 150bp/k=31/seq_id=99.5：≈1.25×1.167≈1.46×）。
+  - `winner_table` 的 bool 标记（`(ani, gn, changed)` 第三项）在
+    `get_stats` 里被注释（`// || map[kmer].2`，contain.rs:772），未使用。
+  - 被 `min-spacing` 过滤掉的 kmer 若开了 pseudotax，也会被收集进
+    `pseudotax_tracked_nonused_kmers`（sketch.rs:420-422）并参与二次分配。
+- **`-I/--read-seq-id`（默认 99.5，隐藏）**：kmer identity 按
+  `(seq_id/100)^k` 估计（contain.rs:375），`seq_id=99.5,k=31` 时 ≈0.857；
+  这是**固定假设**而非从数据估计（`_get_kmer_identity` 那个估计函数是
+  死代码），长读/高错配需手动调低。
 - **输出**：默认 MetaBAT2 格式（contigName/contigLen/totalAvgDepth + 每样本
   cov/var）。`--maxbin-format` 与 `--aemb-format` 均去掉 contigLen、
   totalAvgDepth、每样本 var 三列：`--maxbin-format`（注意：cmdline 里
@@ -157,6 +187,22 @@
   （warn "not a valid TSV file"）。一致性检查：所有 genome sketch 的 `k`
   必须一致；read sketch 的 `c` 不得大于 genome 的最小 `c`（`get_seq_sketch` 与
   `get_genome_sketches` 双处校验）；sketch 的 `k` 必须与 `-k` 匹配。
+  - **`.sylsample` 名不副实**：主循环判定 `is_sketch` 只认 `.bcsp`
+    （contain.rs:339），`.sylsample` 虽在初筛被分进样本 sketch 桶，运行时
+    却被当 raw fastq 走 `sketch_sequences_needle` 解析 bincode 二进制
+    → 大概率 warn "not a valid fasta/fastq" 或被 needletail 误解析。
+    相对地，`.sylqueries` 的 genome sketch 能被正确加载。这是
+    「接受 `.sylsample`」与「运行时只认 `.bcsp`」的不对称。
+  - **`lowest_genome_c` 命名误导**：`get_genome_sketches`（contain.rs:558-562）
+    实际取的是各 genome sketch `c` 的**最大值**（`existing < c → 替换`），
+    并非"最小"。随后用 `max < args.c` 判错——这比"min < args.c"更宽松，
+    多 genome 文件 `c` 不一致时可能漏报。主循环传给 `get_seq_sketch` 的
+    `genome_c` 是 `genome_sketches[0].c`（contain.rs:353，该文件第一个
+    contig 的 c）。
+  - **输出列排序**：contig 行按输入 fasta 顺序（`contig_list_sorted`
+    未排序）；样本列用 human-sort **自然排序**（`sort(&mut read_list_sorted)`,
+    contain.rs:37，非字典序）；`totalAvgDepth` 是该 contig 各样本 cov 的
+    算术平均（未命中记 0，contain.rs:69-77）。
 - **reads 检出比例日志**（`estimate_covered_bases`，仅 log）：估算
   `tentative_bases = c × Σkmer_counts × read_len/(read_len-k+1)` 与
   `covered = Σ gn_size × final_est_cov`，输出 `min(covered/tentative, 1)`
@@ -248,6 +294,16 @@
 - **AVX2 只支持 k=21/31**：`extract_markers` 一旦检测到 AVX2 即无条件调用
   avx2 版，k 非 21/31 时 `panic!()`（`use_40` 分支）；非 x86/无 AVX2 走标量
   `fmh_seeds` 则无此限制。
+- **AVX2 对短序列的行为分歧**：read 路径的 `extract_markers_avx2` 要求
+  `len ≥ k+1`（avx2_seeding.rs:42），标量版只要 `len ≥ k`（seeding.rs:93）——
+  长度为 k 的 read 在 AVX2 机器上不产出 kmer；contig 路径
+  `extract_markers_avx2_positions` 更需 `len ≥ 2k`（avx2_seeding.rs:160，
+  标量版 `fmh_seeds_positions` 只要 `≥k`，seeding.rs:156），故长度在
+  [k, 2k) 的 contig 在 AVX2 机器上会产出**空 sketch**（coverage 直接跳过），
+  标量机器则正常。这会造成同一输入在不同机器上结果不同。
+- **coverage 最终 cov 未做 round-2 校正**：见 §5 pseudotax——winner
+  reassign 后的 `estimate_true_cov` 被注释（contain.rs:417），输出 cov
+  未经 `read_length/(read_length-k+1)` 与 `1/(seq_id/100)^k` 校正。
 - **`.bcdb` 只读不写**：本版本 `sketch` 仅生成 `.bcsp`，contig sketch 需
   外部提供（兼容 sylph 的 `.sylqueries`）。
 - **`--maxbin-format` 命名错位**：clap 的对外 long 是 `maxbin-format`（README

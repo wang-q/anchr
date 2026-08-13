@@ -144,6 +144,40 @@ pgr 的 `pl` 管道若多轮组装可参考。
   重复位点并断开（`RepeatRemover`）。
 - `toBasespace`：`ToBasespace2`，见 §7。
 
+### 4.3 关键参数与默认值（`AssemblyPipeline.hpp:100-284`）
+
+`asm` 的可调参数集中在 `AssemblyPipeline` 构造函数里，均带 `args` 默认值：
+
+| 参数 | 默认 | 说明（源码行） |
+|---|---|---|
+| `--kmer-size` | 15 | minimizer 长度，**cap ≤ 16**（`:202`） |
+| `--density-assembly` | 0.005 | 组装 minimizer 采样密度（`:117`） |
+| `--density-correction` | 0.025 | 纠错 minimizer 密度（`:125`） |
+| `--max-k` | 0(=自动) | 覆盖 `computeLastK` 的结果（`:118,211-214`） |
+| `--min-abundance` | 0(=rescue) | k′-min-mer 最低丰度（`:119`） |
+| `--max-bubble-length` | 50000 | superbubble 弹出上限（`:120`） |
+| `--max-tip-length` | 50000 | tip 剪除上限（`:121`） |
+| `--min-read-quality` | 0.0 | read 平均质量过滤（`:106`） |
+| `--min-contig-length` | 50 | 输出 contig 最短长度（`:107`，floor 50 `:274`） |
+| `--min-contig-coverage` | 1 | 输出 contig 最低覆盖（`:108`，floor 1 `:275`） |
+| `--skip-correction` | off | 跳过 read 纠错（`:128`） |
+| `--max-memory` | 8GB | toBasespace 内存预算（见 §7.2，`ToBasespace2.hpp:226`） |
+| `-t/--threads` | 默认 | OpenMP 线程数 |
+
+**数据模式差异**（`getParamsHifi:292` / `getParamsNanopore:309`）：
+
+| 属性 | HiFi | Nanopore(ONT R10) |
+|---|---|---|
+| read 纠错 | 关 | **开** |
+| homopolymer 压缩 | **开** | 关 |
+| readCorrectionMinIdentity | 0.99 | 0.96 |
+| 抛光覆盖上限 `_usedCoverageForContigPolishing` | 50 | 100 |
+| minimap2 预设 | `-x map-hifi` | `-x map-ont` |
+
+**`--density-correction ≥ --density-assembly` 校验**：仅当 `_useReadCorrection`
+（即 ONT 模式且未 `--skip-correction`）时执行，违反则打印 parser 并 `exit(0)`
+（`:278-284`）。HiFi 默认不开纠错，故不受此限。
+
 ## 5. minimizer 提取（`ReadSelection` + `Kmer.hpp::MinimizerParser`）
 
 ### 5.1 编码与同聚体压缩
@@ -172,6 +206,15 @@ rust-mdbg 的 universal minimizer / FracMinHash 采样。这样 minimizer 是无
 > 与 pgr 的对照：pgr `asm map` 用全量 k-mer 索引（讨论过 minimizer/syncmer 但
 > 结论是不优化）；metaMDBG 的 minimizer 密度极低（0.5%），是**组装图节点**，
 > 不是比对种子，两者目的不同。
+
+### 5.3 读取边界与"可重复 minimizer"过滤
+
+- **首尾各丢弃一个 k-mer**（`Kmer.hpp:1395`）：`MinimizerParser::parse` 遍历
+  `pos=_trimBps(=1)` 到 `kmers.size()-_trimBps`，即**每条 read 的第一个和最后
+  一个 k-mer 不参与采样**（`_trimBps=1`，`:1362`），避免边界截断误差。
+- **可重复 minimizer 剔除**（`Kmer.hpp:1434-1437`）：哈希命中阈值后，若该
+  minimizer 出现在 `_isRepetitiveMinimizers`（全数据集上出现次数过高的低信息量
+  minimizer）集合中则跳过。该集合由上游构建，用于抑制高重复区域导致的图污染。
 
 ## 6. 建图 + 图简化（`CreateMdbg` + `ProgressiveAbundanceFilter`）
 
@@ -273,6 +316,21 @@ cutoff 倒序消费（见下）。
 - `--skip-correction` / `--min-contig-length 50` / `--min-contig-coverage 1`
   可过滤输出。
 
+**输出 FASTA 头格式**（`Commons.hpp:2212-2222` `createContigHeader`）：
+`>ctg<id> length=<len> coverage=<cov:两位小数> circular=yes|no`——与 pgr
+`asm unitig` 的 `cov=` 头同形，可直接被解析复用。coverage 由 `ContigPolisher`
+把 reads 映射回 contig、对每列算覆盖并**裁掉两端各 75 bp 后再平均**
+（`ContigPolisher.hpp:658-684`），是稳健覆盖度而非简单平均。
+
+**输出过滤**（`ContigPolisher.hpp:2785-2793`，三类之一即丢弃该 contig）：
+coverage ≤ `--min-contig-coverage`；或 length < `--min-contig-length`；或
+**length < 7500 且 coverage < 4**（一个额外的经验性低质量小 contig 剔除规则，
+`_minContigLength=50` 之外的隐式硬阈值）。
+
+**圆形闭合**：`GenerateContigs::generateContigs3` 对 `isCircular` 的 unitig
+路径做 `nbMinimizers += 1` 以在长度估算上闭合环
+（`GenerateContigs.hpp:642-644`），但 nodepath 本身不重复追加首节点。
+
 ## 8. 与 pgr 的对应/借鉴点
 
 1. **丰度过滤替代气泡解析**（最值得借鉴）：`ProgressiveAbundanceFilter` 的
@@ -331,8 +389,9 @@ cutoff 倒序消费（见下）。
 2. **RepeatRemover 的桥接 reads 证据 → OLC repeat breaking 的实现路径**：
    `RepeatRemover.hpp:283` 把 reads 映射回 contig（`ReadVsContigMapper`，
    minimizer 索引）→ 按比对边界分片算覆盖度与 `_nbBridgingReads`
-   （`:1195`）→ 无桥接的片段边界断开（判定在 `RepeatRemover.hpp:1257`，
-   `nbContigsFinal>1` 即 split）。这正是 `canu.md` §8.3 预言的"pgr
+   （`:1195`）→ 无桥接的片段边界断开（判定在 `RepeatRemover.hpp:1254`，
+   `nbContigsFinal > 1` 即把该 read 判为跨重复、`isCircular=0` 并拆分，`:1254-1257`）。
+   这正是 `canu.md` §8.3 预言的"pgr
    `asm map` + `sam to-rg` + `rg coverage` 回放"的成熟实现——pgr 设施
    齐全，v1 可直接照搬语义
    （桥接 reads = 覆盖度证据，对应 Celera 的 6/15 阈值）。
@@ -341,3 +400,40 @@ cutoff 倒序消费（见下）。
 4. **unitig 丰度中位数语义**：pgr `asm unitig` 的 `cov=` 是平均丰度；
    宏基因组场景若要稳健丰度，可参考"组成 k-min-mer 丰度向量取中位数、
    merge 时合并向量再取中位"（`Graph.hpp` `computeMedianAbundance`）。
+
+## 10. 源码 quirks / 边界行为汇总（2026-08-13 校对补充）
+
+这些是阅读源码时发现的、对理解行为或移植时有影响的细节，多数是隐式/硬编码：
+
+1. **`getMultikStep` 恒为 1，后面是死代码**（`Commons.hpp:1984-1996`）：
+   函数体第一行直接 `return 1;`，后续"k<20 → 1 / k<40 → 2 / else → 5"的分支
+   永不执行。故 1.4 每轮 `k += 1` 是硬编码事实，不要被注释里残留的多步逻辑误导。
+2. **`computeLastK` 用的是 N50 读长，不是平均读长**（`Commons.hpp:1726-1741`）：
+   `lastK = n50ReadLength * assemblyDensity * 2.0`，再 `max(lastK, firstK+2)`。
+   `--max-k` 直接覆盖该结果。注意 density 是组装密度 0.005（非纠错密度）。
+3. **`_snpmerSize = 21` 是死配置**（`AssemblyPipeline.hpp:207`）：初始化后仅写入
+   `parameters.gz`，从未被实际消费（snpmer 相关子命令调用全被注释，`:727` 等）。
+4. **minimizer 长度硬 cap ≤ 16**（`AssemblyPipeline.hpp:202`）：`--kmer-size` 超
+   过 16 会被静默截断，不报错。
+5. **`--density-correction` 校验只在纠错开启时生效**（`:278-284`）：HiFi 默认
+   关纠错，即使违反 `density-assembly > density-correction` 也不会报错。
+6. **每条 read 首尾各丢一个 k-mer**（`Kmer.hpp:1395`，`_trimBps=1`）：影响最
+   末端 minimizer 的采样，属边界截断设计而非 bug。
+7. **`.checkpoint` 断点文件不校验内容**（`AssemblyPipeline.hpp` `isCheckpoint`）：
+   只要文件存在即跳过该步，若上一步被用户中断但 checkpoint 已写入（或参数变更
+   后重跑），会得到不完整的中间结果。重跑同目录需手动清 `tmp/checkpoints/`。
+8. **`--min-abundance > 1` 时关闭 rescue**（`CreateMdbg.cpp:317`）：rescue 只在
+   `_minAbundance <= 1` 时执行；且 rescue 内部 `median*0.1 > 1` 或 read 全为
+   singleton（`allAbundanceOne`）时直接跳过（`CreateMdbg.hpp:4611-4613`）。
+9. **unitig 长度是期望值**（`Graph.hpp:222-224`）：`(nbMinimizers-1) *
+   _minimizerSpacingMean`，minimizer 空间没有真实碱基坐标，所有"长度"（含
+   `length=` 头）都是 minimizer 数乘期望间距的估计。
+10. **toBasespace 的 `--max-memory` floor 在 4GB**（`ToBasespace2.hpp:268`），
+    批大小 `= _maxMemoryGB/8` clamp 到 `[1,100]`（`:337-349`）——内存预算不是
+    上限而是"每批 reads 数"的缩放因子。
+11. **`removeAbundanceNoQueue` 里 `_maxAbundance = currentCutoff*2`**（
+    `ProgressiveAbundanceFilter.hpp:2203`）在每次抬升 cutoff 时重置，供下游
+    "高于 2×cutoff 的受保护"判定使用（对应 repeat solver 保护）。
+12. **大量 `exit(0)` 而非抛异常**：CLI 解析失败、参数校验失败均直接
+    `exit(0)`（`:152,159,282`），退出码为 0 而非非零——脚本里判断"成功"时
+    需以输出文件存在性为准，不能只看退出码。
