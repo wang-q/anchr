@@ -4,18 +4,21 @@
 # Benchmark unitig generation: `anchr asm unitig`, `anchr asm contig` and
 # `anchr asm contig --no-bubbles` (anchr's own k-mer graph compaction /
 # seeded traversal, with and without bubble popping) vs the raw bcalm and
-# Bifrost tools, on the G37 simulated E. coli reads.
+# Bifrost tools, plus cuttlefish 2 (KMC3 + MPHF + DFA-state route), on the
+# G37 simulated E. coli reads.
 #
 # All tools produce unitigs/contigs from solid k-mers, with these
 # parameter/default differences (kept as each tool is normally used):
 #   anchr asm unitig  --kmer 31 --min-count-seed 3 (like bcalm
-#                      -abundance-min 3), min-contig-len default
-#                      max(124, 2*k) = 124, single-threaded/deterministic
+#                      -abundance-min 3), min-contig-len default 0 (keep all
+#                      unitigs, bcalm lossless compaction), single-threaded
 #   anchr asm contig  --kmer 31 --no-bubbles (seeded traversal, parallel
 #   --no-bubbles      paths kept separate), same defaults, single-threaded
 #   anchr asm contig  --kmer 31 (seeded traversal, bubbles popped)
 #   bcalm             -kmer-size 31 -abundance-min 3 -nb-cores N
 #   Bifrost build     --kmer-length 31 --clip-tips --del-isolated -t N
+#   cuttlefish build  -k 31 -t N --ref -c 3 (FASTA reference mode; note it
+#                      filters (k+1)-mers while bcalm/anchr filter k-mers)
 #
 # Each configuration runs in a fresh mktemp directory. Wall time is
 # measured with hyperfine; peak RSS with /usr/bin/time -v; output
@@ -26,7 +29,7 @@
 #   G37=/path/to/g37 bash scripts/unitig-bench.sh full 5
 #
 # Requires in PATH: anchr (release preferred), bcalm, Bifrost, pgr,
-# hyperfine, /usr/bin/time.
+# hyperfine, /usr/bin/time; cuttlefish via PATH or CUTTLEFISH=... .
 
 set -euo pipefail
 
@@ -38,6 +41,7 @@ if [ -z "$ANCHR" ] && [ -x "$PWD/target/release/anchr" ]; then
 else
     ANCHR="${ANCHR:-$PWD/target/debug/anchr}"
 fi
+CUTTLEFISH="${CUTTLEFISH:-$PWD/cuttlefish-2.2.0/bin/cuttlefish}"
 
 G37="${G37:-$HOME/data/anchr/g37}"
 SCALE="${1:-small}"
@@ -94,6 +98,11 @@ case "\$cfg" in
             --del-isolated --threads $THREADS --fasta --no-compress-out \\
             --output-file bf >/dev/null 2>&1
         ;;
+    cuttlefish)
+        ulimit -n 4096
+        "$CUTTLEFISH" build -s pe.cor.fa -k $K -t $THREADS -o K$K -w . \\
+            --ref -c 3 >/dev/null 2>&1
+        ;;
     *)
         echo "unknown config: \$cfg" >&2
         exit 1
@@ -107,6 +116,7 @@ result_path() { # $1 = config
     case "$1" in
         bcalm)   echo "K$K.unitigs.fa" ;;
         bifrost) echo "bf.fasta" ;;
+        cuttlefish) echo "K$K.fa" ;;
         unitig)  echo "unitigs.fa" ;;
         *)       echo "contigs.fa" ;;
     esac
@@ -135,7 +145,7 @@ bench() { # $1 = config label, $2 = config id
 }
 
 echo "scale=$SCALE  k=$K  threads=$THREADS  runs=$RUNS  input=$IN"
-echo "note: anchr asm unitig / asm contig are single-threaded/deterministic; -p is ignored"
+echo "note: -p binds counting (+ --dfa classification); auto = all cores; walk is single-threaded/deterministic"
 echo
 printf "%-8s %-16s %10s  %-24s  %s\n" "scale" "config" "peak RSS" "wall (mean±σ)" "output (n50 sum avg esize count)"
 printf "%-8s %-16s %10s  %-24s  %s\n" "-----" "------" "--------" "----------------" "-----------------------------"
@@ -145,6 +155,7 @@ bench "anchr contig"        "contig"
 bench "anchr contig no-bub" "contig-nb"
 bench "bcalm"               "bcalm"
 bench "Bifrost"             "bifrost"
+bench "cuttlefish"          "cuttlefish"
 
 echo
 echo "workdir=$WORK"

@@ -1,5 +1,6 @@
 //! Tadpole-compatible contig assembly (contigMode).
 
+use crate::libs::asm::dfa::VertexStates;
 use crate::libs::asm::tadpole::{
     argmax2, base_code, base_defined, number_to_base, second_highest_position, Kmer, KmerFnvHasher,
     TadpoleTable,
@@ -60,6 +61,13 @@ pub struct AssembleOptions {
     /// Emit every k-mer abundance in the FASTA header (`ab:Z:`, BCALM
     /// `-all-abundance-counts`).
     pub all_abundance_counts: bool,
+    /// Experimental: classify vertices once (DFA state) and walk unitigs
+    /// from the state table instead of re-scanning extension buckets.
+    pub use_dfa: bool,
+    /// Worker threads for the whole k-mer pipeline (counting + DFA
+    /// classification); `0` uses the rayon global pool (all cores). The
+    /// walk stays deterministic single-threaded.
+    pub parallel: usize,
 }
 
 impl Default for AssembleOptions {
@@ -81,6 +89,8 @@ impl Default for AssembleOptions {
             emit_links: false,
             emit_gfa: false,
             all_abundance_counts: false,
+            use_dfa: false,
+            parallel: 0,
         }
     }
 }
@@ -185,7 +195,7 @@ pub fn assemble<W: Write>(
     let reads = read_records(infiles)?;
 
     // Pass 2: count k-mers from the canonicalized (phred) qualities.
-    let table = TadpoleTable::build(&reads, opts.k, opts.min_prob);
+    let table = TadpoleTable::build_threaded(&reads, opts.k, opts.min_prob, opts.parallel);
 
     // Pass 3: multi-pass seeding and contig building (BuildThread.run).
     let mut claimed: HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>> =
@@ -408,9 +418,14 @@ fn assemble_unitigs_core(
         opts.k
     );
     let reads = read_records(infiles)?;
-    let table = TadpoleTable::build(&reads, opts.k, opts.min_prob);
+    let table = TadpoleTable::build_threaded(&reads, opts.k, opts.min_prob, opts.parallel);
 
-    let mut unitigs = build_unitigs(&table, opts);
+    let mut unitigs = if opts.use_dfa {
+        let states = VertexStates::classify(&table, opts.min_count_seed as u32, opts.parallel);
+        build_unitigs_dfa(&table, opts, &states)
+    } else {
+        build_unitigs(&table, opts)
+    };
     unitigs.sort_by(unitig_cmp);
     let stats = AssembleStats {
         reads_in: reads.len() as u64,
@@ -565,6 +580,91 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
             next.push_right(b);
             let canon = next.canonical();
             if unique_solid_in(&next, table, threshold) != 1 {
+                break;
+            }
+            if visited.contains(&canon) {
+                circular = true;
+                break;
+            }
+            rc.push(number_to_base(b));
+            visited.insert(canon);
+            rkmer = next;
+        }
+        bb = rev_comp(&rc).collect();
+        // Canonical orientation, like the contig mode.
+        if !canonical(&bb) {
+            bb = rev_comp(&bb).collect();
+        }
+        let (coverage, min_cov, max_cov) = calc_coverage(&bb, table, k);
+        let abundances = if want_abundances {
+            calc_abundances(&bb, table, k)
+        } else {
+            Vec::new()
+        };
+        unitigs.push(Unitig {
+            bases: bb,
+            id: 0,
+            coverage,
+            min_cov,
+            max_cov,
+            circular,
+            abundances,
+        });
+    }
+    unitigs
+}
+
+/// DFA-state variant of `build_unitigs`: the classification pass computes
+/// every solid vertex's in/out degree once (parallelizable), then the walk
+/// uses O(1) state lookups instead of re-scanning the four extension
+/// buckets per step. The walk order/decisions are identical to
+/// `build_unitigs` (same seed scan, same visited/circular handling).
+fn build_unitigs_dfa(
+    table: &TadpoleTable,
+    opts: &AssembleOptions,
+    states: &VertexStates,
+) -> Vec<Unitig> {
+    let k = opts.k;
+    let threshold = opts.min_count_seed as u32;
+    let want_abundances = opts.all_abundance_counts || opts.emit_gfa;
+    let mut visited: HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>> =
+        HashSet::default();
+    let mut unitigs = Vec::new();
+    for (seed, count) in table.sorted_entries().iter() {
+        if *count < threshold || visited.contains(seed) {
+            continue;
+        }
+        // `base_at(0)` is the 3' end (last base pushed); rebuild 5'->3'.
+        let mut bb: Vec<u8> = (0..k)
+            .map(|i| number_to_base(seed.base_at(k - 1 - i)))
+            .collect();
+        visited.insert(*seed);
+        // Extend right while the path stays non-branching.
+        let mut circular = false;
+        let mut kmer = rightmost_kmer(&bb, k);
+        while let Some(b) = states.out_base(&kmer) {
+            let mut next = kmer;
+            next.push_right(b);
+            let canon = next.canonical();
+            if states.in_count(&next) != 1 {
+                break;
+            }
+            if visited.contains(&canon) {
+                circular = true;
+                break;
+            }
+            bb.push(number_to_base(b));
+            visited.insert(canon);
+            kmer = next;
+        }
+        // Extend left by reverse-complementing and extending right.
+        let mut rc: Vec<u8> = rev_comp(&bb).collect();
+        let mut rkmer = rightmost_kmer(&rc, k);
+        while let Some(b) = states.out_base(&rkmer) {
+            let mut next = rkmer;
+            next.push_right(b);
+            let canon = next.canonical();
+            if states.in_count(&next) != 1 {
                 break;
             }
             if visited.contains(&canon) {

@@ -1,4 +1,4 @@
-# Unitig 生成基准：anchr（unitig / contig / contig --no-bubbles）vs bcalm vs Bifrost
+# Unitig 生成基准：anchr（unitig / contig / contig --no-bubbles）vs bcalm vs Bifrost vs cuttlefish
 
 > 2026-08-13。hyperfine 1.19.0、`/usr/bin/time -v`（peak RSS）。
 > 输入为 G37（E. coli 模拟，ENA ERR486835）的 corrected reads：
@@ -9,16 +9,17 @@
 对比对象：`anchr asm unitig`（anchr 的 k-mer 图压缩实现，BCALM 2
 `ograph.cpp graph3` 语义）、`anchr asm contig`（种子化贪心遍历 + 弹泡，
 tadpole 兼容）、`anchr asm contig --no-bubbles`（同上但不弹泡）、bcalm 2、
-Bifrost 1.3.5。都从 solid k-mer 生成 unitig/contig，参数按各自常规用法
-（存在不对称，见备注）：
+Bifrost 1.3.5、cuttlefish 2.2.0（KMC3 + MPHF + DFA 状态路线）。都从
+solid k-mer 生成 unitig/contig，参数按各自常规用法（存在不对称，见备注）：
 
 | 工具 | 命令要点 | 固实阈值 | 长度过滤 | 线程 |
 | :--- | :--- | :--- | :--- | :--- |
-| `anchr asm unitig` | `--kmer 31 --min-count-seed 3` | ≥3 | `min_contig_len` 默认 124 | 单线程（确定性的） |
-| `anchr asm contig` | `--kmer 31`（种子化遍历 + 弹泡） | ≥3 | 同上 | 单线程（确定性的） |
-| `anchr asm contig --no-bubbles` | `--kmer 31`（种子化遍历，不弹泡） | ≥3 | 同上 | 单线程（确定性的） |
+| `anchr asm unitig` | `--kmer 31 --min-count-seed 3` | ≥3 | 默认 0（不过滤） | 计数 rayon 并行（默认全核）/ walk 单线程、确定性 |
+| `anchr asm contig` | `--kmer 31`（种子化遍历 + 弹泡） | ≥3 | 同上 | 同上 |
+| `anchr asm contig --no-bubbles` | `--kmer 31`（种子化遍历，不弹泡） | ≥3 | 同上 | 同上 |
 | bcalm | `-kmer-size 31 -abundance-min 3` | ≥3 | 无 | 8 |
 | Bifrost | `--kmer-length 31 --clip-tips --del-isolated` | 默认 1 | 无（只剪 tip） | 8 |
+| cuttlefish | `-k 31 -t 8 --ref -c 3` | (k+1)-mer ≥3 | 无 | 8 |
 
 ## 结果（warmup 1 / runs 3）
 
@@ -26,49 +27,56 @@ Bifrost 1.3.5。都从 solid k-mer 生成 unitig/contig，参数按各自常规�
 
 | 工具 | wall（mean ± σ） | peak RSS | 序列数 | N50 | 总长 |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| anchr asm unitig | 1.195 s ± 0.032 s | 267 MB | 1048 | 9032 | 606 566 |
-| anchr asm contig | 1.358 s ± 0.059 s | 267 MB | 77 | 14 203 | 561 887 |
-| anchr asm contig --no-bubbles | 1.288 s ± 0.019 s | 266 MB | 75 | 14 203 | 561 490 |
-| bcalm | 1.268 s ± 0.024 s | 237 MB | 1048 | 9032 | 606 566 |
-| Bifrost | 850 ms ± 41 ms | 29 MB | 1191 | 7745 | 612 634 |
+| anchr asm unitig | 1.127 s ± 0.045 s | 260 MB | 1048 | 9032 | 606 566 |
+| anchr asm contig | 1.393 s ± 0.024 s | 260 MB | 77 | 14 203 | 561 887 |
+| anchr asm contig --no-bubbles | 1.340 s ± 0.029 s | 261 MB | 75 | 14 203 | 561 490 |
+| bcalm | 1.332 s ± 0.004 s | 231 MB | 1048 | 9032 | 606 566 |
+| Bifrost | 899 ms ± 93 ms | 28 MB | 1191 | 7745 | 612 634 |
+| cuttlefish | 6.950 s ± 0.103 s | 1211 MB | 1018 | 9032 | 605 663 |
 
 ### medium：48 MB（Q0L0X80P000，80×）
 
 | 工具 | wall | peak RSS | 序列数 | N50 | 总长 |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| anchr asm unitig | 1.320 s ± 0.036 s | 473 MB | 1554 | 4677 | 626 022 |
-| anchr asm contig | — | — | 149 | 7633 | 561 886 |
-| anchr asm contig --no-bubbles | — | — | 145 | 7633 | 561 098 |
-| bcalm | 1.474 s ± 0.110 s | 273 MB | 1554 | 4677 | 626 022 |
-| Bifrost | 1.277 s ± 0.033 s | 29 MB | 1679 | 4656 | 631 026 |
+| anchr asm unitig | 1.361 s ± 0.041 s | 401 MB | 1554 | 4677 | 626 022 |
+| anchr asm contig | 1.583 s ± 0.019 s | 419 MB | 149 | 7633 | 561 886 |
+| anchr asm contig --no-bubbles | 1.456 s ± 0.083 s | 470 MB | 145 | 7633 | 561 098 |
+| bcalm | 1.556 s ± 0.025 s | 264 MB | 1554 | 4677 | 626 022 |
+| Bifrost | 1.090 s ± 0.013 s | 28 MB | 1679 | 4656 | 631 026 |
+| cuttlefish | 7.103 s ± 0.037 s | 1267 MB | 1526 | 4677 | 625 181 |
 
 ### full：144 MB（2_illumina/merge，全量 656k reads）
 
 | 工具 | wall | peak RSS | 序列数 | N50 | 总长 |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| anchr asm unitig | 2.112 s ± 0.048 s | 946 MB | 1482 | 8790 | 622 758 |
-| anchr asm contig | 2.375 s ± 0.046 s | 993 MB | 97 | 11 657 | 561 352 |
-| anchr asm contig --no-bubbles | 2.338 s ± 0.034 s | 947 MB | 96 | 11 657 | 561 163 |
-| bcalm | 2.378 s ± 0.030 s | 556 MB | 1482 | 8790 | 622 758 |
-| Bifrost | 2.982 s ± 0.275 s | 29 MB | 1505 | 8350 | 623 546 |
+| anchr asm unitig | 2.088 s ± 0.075 s | 909 MB | 1482 | 8790 | 622 758 |
+| anchr asm contig | 2.466 s ± 0.031 s | 916 MB | 97 | 11 657 | 561 352 |
+| anchr asm contig --no-bubbles | 2.397 s ± 0.030 s | 910 MB | 96 | 11 657 | 561 163 |
+| bcalm | 2.382 s ± 0.051 s | 541 MB | 1482 | 8790 | 622 758 |
+| Bifrost | 2.803 s ± 0.105 s | 28 MB | 1505 | 8350 | 623 546 |
+| cuttlefish | 7.685 s ± 0.082 s | 1697 MB | 1459 | 8790 | 622 067 |
 
 ## 分析
 
-- **速度**：full 上 anchr unitig 2.11 s、contig 2.44 s，**均快于 bcalm**
-  （2.38 s；unitig 0.89×）、也快于 Bifrost（2.81 s）。anchr 单线程
-  （计数对齐 pgr：per-chunk `count_keys` + 树状合并 + 增量 canonical +
-  前缀索引查询）；bcalm/Bifrost 多线程流式建图。长 k 下优势更大
-  （small k=64 0.47×、k=100 0.61× vs bcalm）；
+- **速度**：full k=31 上 anchr unitig 2.09 s vs bcalm 2.38 s（0.88×），
+  但这个优势来自**核数差**：anchr 计数用 rayon 全局池（32 逻辑核），
+  bcalm 只用了 8 线程。**同核数（1 线程）下 bcalm 反而快 ~10%**
+  （10.40 vs 11.46 s，full k=31）。cuttlefish 2.2.0（KMC3 + MPHF +
+  DFA 状态）7.69 s，约 anchr unitig 的 3.7×、bcalm 的 3.2×；其总并行
+  效率也很低（§11.2）。anchr 的计数实现（per-chunk `count_keys` + 树状
+  合并 + 增量 canonical + 前缀索引查询）真正的优势在**内存**而非速度；
 - **内存是最大短板**：anchr 峰值 RSS 随输入近似线性且基数很大——
-  24 MB 输入 267 MB、48 MB 473 MB、144 MB **0.95 GB**（分别为 bcalm 的
-  1.1×/1.7×/1.7×，Bifrost 的 9×/16×/33×）；per-chunk 去重 + 树状合并
+  24 MB 输入 260 MB、48 MB 473 MB、144 MB **0.91 GB**（分别为 bcalm 的
+  1.1×/1.7×/1.7×，Bifrost 的 9×/16×/33×）；cuttlefish full 为
+  **1.70 GB**（anchr 的 1.9×、bcalm 的 3.1×），KMC3 的 3 GB 内存预算
+  与 BBHash MPHF 是主要来源。per-chunk 去重 + 树状合并
   消除了含重复的全局 key 中间体后相对旧实现（1.24/2.9/5.3 GB）大幅
   改善，chunk 尺寸 4096 → 16384 再降 ~25%（根因与后续方向见
   [asm-assemble.md](../design/asm-assemble.md)
   §9）；
 - **contig vs unitig**：三种 anchr 模式共享同一 k-mer 表（RSS 几乎
   相同），种子化贪心遍历比严格压缩合并得更多——full 上 contig 97 条、
-  unitig 116 条，N50 11 657 vs 9627，耗时略高（13.6 vs 12.8 s）；
+  unitig 1482 条（无损压实，不过滤），N50 11 657 vs 8790；
 - **弹泡影响很小**：contig 与 --no-bubbles 的输出几乎一致（full 97 vs
   96 条、N50 相同 11 657，各档差异仅 1-4 条；耗时上 --no-bubbles 反而
   略慢（14.0 vs 13.6 s，保留路径后排序/处理略多）。对该数据集
@@ -76,25 +84,39 @@ Bifrost 1.3.5。都从 solid k-mer 生成 unitig/contig，参数按各自常规�
 - **产出一致性**：`anchr asm unitig` 默认不过滤（§10.5），输出与 bcalm
   **逐序列完全相同**（三档 1048/1554/1482 条，N50/总长全部一致，规范化
   集合双向相等）。contig 模式合并更多（full 97 条、N50 11 657）。
+  cuttlefish 输出与 bcalm **接近但不逐序列相同**：full 1459 条
+  （bcalm 1482）、总长 622 067（bcalm 622 758）、N50 相同 8790——差异
+  来自它按 (k+1)-mer 过滤（`-c 3`）且走边中心/DFA 语义，低覆盖端点和
+  环状 unitig 的表示与 bcalm 的 k-mer 过滤/压缩不完全一致；canonical
+  k-mer 集合核对几乎相等（578 297 vs 578 298，仅缺 1 个）。
   bcalm 保留全部 unitig 的语义分析（顶点分解、无损压实，含旧
   `contained` 的历史实测）见 [asm-assemble.md](../design/asm-assemble.md)
   §10；
-- **确定性与功能**：anchr 单线程换来扫描顺序无关的确定性输出，且原生
-  支持 gz 输入、FASTQ/FASTA、GFA 输出、`--links` 边信息——这些是
-  bcalm/Bifrost 命令行不具备的便利性，但性能/内存需要优化。
+- **确定性与功能**：anchr 的 walk 单线程、扫描顺序无关，输出确定性；
+  计数阶段并行但结果与并行度无关。原生支持 gz 输入、FASTQ/FASTA、
+  GFA 输出、`--links` 边信息——这些是 bcalm/Bifrost 命令行不具备的
+  便利性，但速度上并没有真正的单核优势。
 
 ## 备注
 
 - 复现：`bash scripts/unitig-bench.sh [small|medium|full] [runs]`
   （脚本自动用 `mktemp` 隔离每次运行，输出 wall/RSS/统计表）；
-- 本表三档在同一次批处理中测出（机器状态一致）；绝对时间随机器负载
-  漂移（相邻批次 unitig full 从 10.1 s 漂到 12.8 s），**相对比值**才是
-  稳定指标；
+- 本表 small/full 同批、medium 同批（各批内机器状态一致）；绝对时间随
+  机器负载漂移，**相对比值**才是稳定指标；
 - 参数不对称：anchr/bcalm 固实阈值 3，Bifrost 默认 1（无 `--min-abundance`
-  等价参数，保留低丰度 k-mer），后者 unitig 数略多；anchr 默认过滤
-  <124 bp 的序列，bcalm/Bifrost 全保留，数量不可直接比较；
+  等价参数，保留低丰度 k-mer），后者 unitig 数略多；anchr 默认不过滤
+  （与 bcalm 无损压实一致）；cuttlefish 用 `--ref -c 3`，
+  但它的阈值作用在 (k+1)-mer 上（bcalm/anchr 作用在 k-mer 上），因此
+  数量只可近似比较；
+- 单线程对拍（full k=31，runs 2）：anchr（`RAYON_NUM_THREADS=1`）
+  11.46 s / 331 MB，bcalm（`-nb-cores 1`）10.40 s / 654 MB；
+  anchr 的 32 核并行版本 2.09 s / 909 MB；
 - RSS 用 `/usr/bin/time -v` 单次测量，不是 hyperfine 均值；输入统一为
   明文 FASTA（脚本对 gz 先解压）。
+- cuttlefish 由源码构建（`cuttlefish-2.2.0/build`，依赖外部拉取的
+  KMC 3.2.1 与 jemalloc 5.2.1，GCC 15 下需补 `<stdexcept>`/`<cstdint>`
+  等头文件）；长 k 版用 `-DINSTANCE_COUNT=64` 重编（k 上限 127，cuttlefish
+  只支持奇数 k）；脚本通过 `CUTTLEFISH` 环境变量指定二进制路径。
 
 ## K 缩放（small 24 MB，runs 2；`K=64` / `K=100 bash scripts/unitig-bench.sh small 2`）
 
@@ -111,3 +133,34 @@ Bifrost 1.3.5。都从 solid k-mer 生成 unitig/contig，参数按各自常规�
 0.6×），各 k 输出与 bcalm 逐序列相同（1048/486/251 条）；k=64/100 与
 Bifrost 打平。内存各 k 均 ~0.3 GB。contig 模式在长 k 下合并优势更明显
 （k=100 N50：contig 36 028 vs unitig 14 304 vs Bifrost 37 787）。
+
+> 注：本节为较早批次的偶数 k 数据；下节是 2026-08-14 的奇数 k 重测
+> （含 cuttlefish），同批内 bcalm 在 k=99/127 更快，绝对数值以同批
+> 内相对比值为准。
+
+## 长 K（small 24 MB，runs 2，奇数 k 对齐 cuttlefish；`K=63|99|127 bash scripts/unitig-bench.sh small 2`）
+
+cuttlefish 只接受奇数 k，因此本组统一用 63/99/127 对比。anchr unitig 与
+bcalm 输出逐序列一致（各 k 计数相同）；cuttlefish 用 `--ref -c 3`
+（(k+1)-mer 阈值）。
+
+| 工具 | k=63 | k=99 | k=127 |
+| :--- | ---: | ---: | ---: |
+| anchr unitig wall | 1.70 s | 2.32 s | 2.49 s |
+| anchr unitig RSS | 341 MB | 345 MB | 242 MB |
+| anchr unitig 输出（条/N50/总长） | 495 / 11 496 / 610 751 | 249 / 14 057 / 604 449 | 5156 / 245 / 1 194 913 |
+| bcalm wall / RSS | 1.70 s / 217 MB | 2.16 s / 238 MB | 1.84 s / 235 MB |
+| bcalm 输出（条/N50/总长） | 同 anchr | 同 anchr | 同 anchr |
+| Bifrost wall / RSS | 1.08 s / 28 MB | 1.16 s / 28 MB | 0.43 s / 28 MB |
+| Bifrost 输出（条/N50/总长） | 449 / 18 957 / 608 642 | 105 / 37 785 / 589 056 | 1072 / 733 / 665 590 |
+| cuttlefish wall | 7.29 s | 7.80 s | 7.79 s |
+| cuttlefish RSS | 1204 MB | 1200 MB | 1194 MB |
+| cuttlefish 输出（条/N50/总长） | 486 / 11 496 / 610 188 | 250 / 14 303 / 604 543 | 6040 / 223 / 1 305 829 |
+
+分析：cuttlefish 耗时与 RSS 对 k 几乎**不敏感**（7.3-7.8 s、~1.2 GB，
+KMC 枚举 + MPHF 构建占大头），k=63/99 输出与 bcalm 接近（条数差 ≤1，
+N50 相同或近同）；k=127 时明显分化（6040 vs 5156 条、总长 1 305 829 vs
+1 194 913）——长 k 下 reads 相对 k 变短，(k+1)-mer 阈值与 k-mer 阈值、
+环状/端点语义的差异被放大。anchr 长 k 表现：k=63 与 bcalm 打平
+（1.70 vs 1.70 s），k=99/127 反而慢（2.32 vs 2.16 s、2.49 vs 1.84 s）；
+cuttlefish 全程约 anchr 的 3-4.5×。

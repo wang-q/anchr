@@ -52,13 +52,42 @@ Pass B 分波并行、`bucket_of`、每个桶的 `count_keys`。需要新增的�
 
 ## 3. 真实缺口：minimizer 分桶（代码库里没有）
 
-现有两个分桶都是 **hash 分桶**（目的只是内存有界化）。bcalm 的
-**minimizer 分桶**是另一个维度：按 minimizer 聚类，桶内排序比较量
-随 minimizer 之后的部分变短——这正是长 k 下 radix 成本（§9.5：
+现有两个分桶都是 **hash 分桶**（目的只是内存有界化）。bcalm/FastK 的
+**minimizer 分桶**是另一个维度：按 minimizer 聚类，桶内排序比较量随
+minimizer 之后的部分变短——这正是长 k 下 radix 成本（§9.5：
 k=31/64/100 = 1.89/2.42/2.86 s）的解法，**pgr/anchr 中不存在**，属于
 新的算法工作。它可以叠加在 §2 的落盘/分波机制上（把 `bucket_of` 换成
 minimizer 桶键），但 minimizer 的选择/窗口/桶键编码需要按 FastK/bcalm
 思路新写。
+
+### 3.1 FastK 实测与"MSD 排序"澄清（2026-08-14）
+
+G37 full（`pe.cor.fa.gz`，k=31，同机）：
+
+| 工具 | wall | RSS | 备注 |
+| :--- | ---: | ---: | ---: |
+| FastK `-t8` | **1.27 s** | **226 MB** | 只做计数 + profile，不做 unitig |
+| anchr asm unitig `auto` | 2.18 s | 929 MB | 计数 + unitig |
+| bcalm `-t8` | 2.38 s | 541 MB | unitig |
+| cuttlefish `-t8` | 8.20 s | 1819 MB | unitig |
+
+结论：
+
+* **真正的差距在计数层，不在组装**——FastK 只花 1.27 s / 226 MB 完成
+  计数，anchr 整套 2.18 s / 929 MB；
+* **我们已经在使用 MSD radix 排序**（`pgr::libs::ds::radix_sort`，从
+  Gene Myers FastGA `MSDsort.c` 移植、并行）；FastK 自己用的是 **LSD**
+  （`LSDsort.c`）——排序方向不是差距；
+* FastK 快的机制（`FastK.c`/`count.c` 注释）：
+  1. **minimizer 分桶分发**（novel minimizer-based distribution），任意
+     规模、磁盘友好；
+  2. **两段式 "super-mer 然后 weighted k-mer" 排序**——低错误率
+     （≤1%）数据下 super-mer 把待排序记录数压缩一个量级，这是关键；
+  3. 位打包记录 + 多线程 LSD + 磁盘流式。
+* 因此 §3 的"真实缺口"应明确为 **super-mer/minimizer 两段式计数**，
+  而不仅是 minimizer 桶键。已约定由 **pgr 项目实现**（2026-08-14），
+  anchr 侧待 pgr 计数接口更新后接入（阶段 A 的 k-way 合并 +
+  `TadpoleTable` 构建入口）。
 
 ## 4. 计划（先定需求再实施）
 
@@ -68,7 +97,7 @@ minimizer 桶键），但 minimizer 的选择/窗口/桶键编码需要按 FastK
 2. **阶段 A（复用 norm 分桶）**：TadpoleTable 构建加内存有界路径——
    分桶落盘 + 分波 `count_keys` + k-way 合并，输出与现内存路径逐字节
    一致（golden 全绿为准）；
-3. **阶段 B（minimizer，长 k 治本）**：在分桶机制上换 minimizer 桶键，
-   目标 k=100+ 的排序/比较量下降；先做小规模原型验证 minimizer 对
-   radix 成本的收益再全量接入；
+3. **阶段 B（super-mer/minimizer 两段式，长 k 治本，pgr 侧实现）**：
+   在分桶机制上换 minimizer 桶键 + super-mer 预压缩，目标 k=100+ 的
+   排序/比较量下降；先做小规模原型验证对 radix 成本的收益再全量接入；
 4. 每一步先更新本文档/§9，再动代码。

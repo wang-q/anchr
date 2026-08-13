@@ -52,8 +52,9 @@ anchr asm contig [OPTIONS] <infiles>...
 *   `--list-files`: Treat `<infiles>` as list files, one sequence file path
     per line (paths may be relative to the current directory; blank lines
     and `#` comments are ignored).
-*   `-p, --parallel <int|auto>`: Accepted for tadpole.sh compatibility;
-    ignored (processing is deterministic single-pass).
+*   `-p, --parallel <int|auto>`: Worker threads for k-mer counting
+    (default `auto` = all cores); the walk stays deterministic
+    single-pass.
 
 Input is one or more FASTA/FASTQ files, plain or gzipped. Pairing is
 irrelevant for assembly: every record from every file contributes its
@@ -121,10 +122,16 @@ anchr asm unitig [OPTIONS] <infiles>...
     bcalm `convertToGFA.py` output.
 *   `--all-abundance-counts`: Append `ab:Z:<c1> <c2> ...` to FASTA headers,
     one canonical k-mer count per position (bcalm `-all-abundance-counts`).
+*   `--dfa`: Experimental: classify every solid k-mer's in/out degree once
+    (cuttlefish-style DFA state) and walk unitigs from the state table;
+    output is byte-identical to the default engine. `-p/--parallel` now
+    actually parallelizes the classification pass (the walk stays
+    deterministic single-threaded).
 *   `--list-files`: Treat `<infiles>` as list files, one sequence file path
     per line (blank lines and `#` comments are ignored).
-*   `-p, --parallel <int|auto>`: Accepted for compatibility; ignored
-    (processing is deterministic).
+*   `-p, --parallel <int|auto>`: Worker threads for the whole pipeline
+    (k-mer counting + `--dfa` classification when enabled; default `auto`
+    = all cores). The walk stays deterministic single-threaded.
 
 Input is one or more FASTA/FASTQ files, plain or gzipped. Pairing is
 irrelevant for assembly (BCALM semantics): unpaired reads and files with an

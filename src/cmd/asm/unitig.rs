@@ -100,12 +100,18 @@ Examples:
                 .help("Emit every k-mer abundance in FASTA headers (ab:Z:, like bcalm -all-abundance-counts)"),
         )
         .arg(
+            Arg::new("dfa")
+                .long("dfa")
+                .action(ArgAction::SetTrue)
+                .help("Experimental: classify vertices once (DFA state) before walking unitigs"),
+        )
+        .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
                 .num_args(1)
                 .default_value("auto")
-                .help("Accepted for compatibility; ignored (deterministic processing)"),
+                .help("Worker threads: with --dfa, controls the classification pass (default: ignored)"),
         )
 }
 
@@ -124,7 +130,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // Reject `-o` that would overwrite an input file (the writer is opened
     // before the reads are consumed).
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
-    crate::cmd::args::parse_parallel_auto(args.get_one::<String>("parallel").unwrap())?;
+    let parallel =
+        crate::cmd::args::parse_parallel_auto(args.get_one::<String>("parallel").unwrap())?;
     let opts = AssembleOptions {
         k: *args.get_one::<usize>("kmer").unwrap(),
         min_contig_len: args
@@ -138,6 +145,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         emit_links: args.get_flag("links"),
         emit_gfa: args.get_flag("gfa"),
         all_abundance_counts: args.get_flag("all_abundance_counts"),
+        use_dfa: args.get_flag("dfa"),
+        parallel,
         ..AssembleOptions::default()
     };
 

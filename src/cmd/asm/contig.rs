@@ -107,7 +107,7 @@ Examples:
                 .short('p')
                 .num_args(1)
                 .default_value("auto")
-                .help("Accepted for tadpole.sh compatibility; ignored (deterministic single-pass)"),
+                .help("Worker threads for k-mer counting (default: auto = all cores); walk stays deterministic"),
         )
 }
 
@@ -128,7 +128,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
     // Validate the thread-count value; processing stays deterministic
     // single-pass (see the design notes), so the result is not used.
-    crate::cmd::args::parse_parallel_auto(args.get_one::<String>("parallel").unwrap())?;
+    let parallel =
+        crate::cmd::args::parse_parallel_auto(args.get_one::<String>("parallel").unwrap())?;
     let k = *args.get_one::<usize>("kmer").unwrap();
     let opts = AssembleOptions {
         k,
@@ -144,6 +145,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             .unwrap_or(3),
         min_coverage: args.get_one::<f32>("min_coverage").copied().unwrap_or(1.0),
         pop_bubbles: !args.get_flag("no_bubbles"),
+        parallel,
         ..AssembleOptions::default()
     };
 

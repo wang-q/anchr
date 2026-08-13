@@ -704,3 +704,111 @@ fn command_asm_unitig_all_abundance_counts() {
     let recs = parse_fa(&std::fs::read(&out_plain).unwrap());
     assert!(!recs[0].0.contains("ab:Z:"), "header: {}", recs[0].0);
 }
+
+/// The experimental DFA-state engine (cuttlefish-style classification)
+/// must produce byte-identical output to the default walk, at any worker
+/// count (parallelism only affects the read-only classification pass).
+#[test]
+fn command_asm_unitig_dfa_matches_default() {
+    for (name, fa, k, seed) in [
+        (
+            "linear",
+            {
+                let seq = "AAGCCCAATAAACCACTCTGACTGGCCGAATAGGGATATAGGCAACGACATGTGCGGCGA";
+                format!(">r1\n{seq}\n>r2\n{seq}\n>r3\n{seq}\n>r4\n{seq}\n")
+            },
+            "31",
+            "3",
+        ),
+        (
+            "circular",
+            ">random crap\nACTAAA\n>a perfectly circular unitig\nACTTAGCGGACTTAGC\n".to_string(),
+            "7",
+            "1",
+        ),
+    ] {
+        let out_dir = tempfile::tempdir().unwrap();
+        let infile = out_dir.path().join("in.fa");
+        let plain = out_dir.path().join("plain.fa");
+        let dfa = out_dir.path().join("dfa.fa");
+        std::fs::write(&infile, &fa).unwrap();
+        let base = [
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            plain.to_str().unwrap(),
+            "--kmer",
+            k,
+            "--min-count-seed",
+            seed,
+            "--min-contig-len",
+            "1",
+        ];
+        AnchrCmd::new().args(&base).assert().success();
+        let mut dfa_args = base.to_vec();
+        dfa_args[4] = dfa.to_str().unwrap();
+        dfa_args.extend(["--dfa", "--parallel", "8"]);
+        AnchrCmd::new().args(&dfa_args).assert().success();
+        assert_eq!(
+            std::fs::read(&plain).unwrap(),
+            std::fs::read(&dfa).unwrap(),
+            "dfa output differs from default for {name}"
+        );
+    }
+}
+
+/// `--parallel` binds the whole pipeline: 1 vs 8 workers must produce
+/// byte-identical output (counting is order-independent, walk is
+/// deterministic), with and without `--dfa`.
+#[test]
+fn command_asm_unitig_parallel_threads_identical() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let infile = out_dir.path().join("in.fa");
+    let out1 = out_dir.path().join("p1.fa");
+    let out8 = out_dir.path().join("p8.fa");
+    let out1d = out_dir.path().join("p1d.fa");
+    let out8d = out_dir.path().join("p8d.fa");
+    let seq = "AAGCCCAATAAACCACTCTGACTGGCCGAATAGGGATATAGGCAACGACATGTGCGGCGA";
+    let mut fa = String::new();
+    for i in 0..4 {
+        fa.push_str(&format!(">r{i}\n{seq}\n"));
+    }
+    std::fs::write(&infile, fa).unwrap();
+    for (out, p, dfa) in [
+        (&out1, "1", false),
+        (&out8, "8", false),
+        (&out1d, "1", true),
+        (&out8d, "8", true),
+    ] {
+        let mut args = vec![
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "31",
+            "--min-count-seed",
+            "3",
+            "--min-contig-len",
+            "1",
+            "--parallel",
+            p,
+        ];
+        if dfa {
+            args.push("--dfa");
+        }
+        AnchrCmd::new().args(&args).assert().success();
+    }
+    assert_eq!(
+        std::fs::read(&out1).unwrap(),
+        std::fs::read(&out8).unwrap(),
+        "different --parallel counts changed the output"
+    );
+    assert_eq!(
+        std::fs::read(&out1d).unwrap(),
+        std::fs::read(&out8d).unwrap(),
+        "different --parallel counts changed the --dfa output"
+    );
+}

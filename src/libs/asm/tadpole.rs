@@ -154,6 +154,18 @@ impl TadpoleTable {
     /// Builds the table from reads (bases, phred qualities) with `minprob`
     /// quality filtering, mirroring `KmerTableSetU.addKmersToTable`.
     pub fn build(reads: &[(Vec<u8>, Vec<u8>)], k: usize, min_prob: f32) -> Self {
+        Self::build_threaded(reads, k, min_prob, 0)
+    }
+
+    /// `build` with an explicit worker count: `threads == 0` uses the
+    /// rayon global pool (all cores); otherwise a private pool of exactly
+    /// `threads` workers runs the per-chunk emission + merge.
+    pub(crate) fn build_threaded(
+        reads: &[(Vec<u8>, Vec<u8>)],
+        k: usize,
+        min_prob: f32,
+        threads: usize,
+    ) -> Self {
         let (prob_correct, prob_correct_inv) = prob_tables();
         if reads.is_empty() {
             return Self {
@@ -172,35 +184,46 @@ impl TadpoleTable {
         // result is deterministic.
         let chunk_size = 16384usize;
         let key_bytes = k.div_ceil(4);
-        let table: pgr::libs::kmer::KmerTable = reads
-            .par_chunks(chunk_size)
-            .map(|chunk| {
-                let cap = chunk
-                    .iter()
-                    .map(|(b, _)| b.len().saturating_sub(k - 1) * key_bytes)
-                    .sum();
-                let mut raw = Vec::with_capacity(cap);
-                for (bases, quals) in chunk {
-                    count_read_kmers_packed(
-                        &mut raw,
-                        bases,
-                        quals,
+        let build = |reads: &[(Vec<u8>, Vec<u8>)]| -> pgr::libs::kmer::KmerTable {
+            reads
+                .par_chunks(chunk_size)
+                .map(|chunk| {
+                    let cap = chunk
+                        .iter()
+                        .map(|(b, _)| b.len().saturating_sub(k - 1) * key_bytes)
+                        .sum();
+                    let mut raw = Vec::with_capacity(cap);
+                    for (bases, quals) in chunk {
+                        count_read_kmers_packed(
+                            &mut raw,
+                            bases,
+                            quals,
+                            k,
+                            min_prob,
+                            &prob_correct,
+                            &prob_correct_inv,
+                        );
+                    }
+                    pgr::libs::kmer::count::count_keys(raw, k)
+                })
+                .reduce(
+                    || pgr::libs::kmer::KmerTable {
                         k,
-                        min_prob,
-                        &prob_correct,
-                        &prob_correct_inv,
-                    );
-                }
-                pgr::libs::kmer::count::count_keys(raw, k)
-            })
-            .reduce(
-                || pgr::libs::kmer::KmerTable {
-                    k,
-                    keys: Vec::new(),
-                    counts: Vec::new(),
-                },
-                merge_tables,
-            );
+                        keys: Vec::new(),
+                        counts: Vec::new(),
+                    },
+                    merge_tables,
+                )
+        };
+        let table = if threads > 0 {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .expect("failed to build counting thread pool");
+            pool.install(|| build(reads))
+        } else {
+            build(reads)
+        };
         Self {
             table,
             prefix_index: OnceLock::new(),
