@@ -138,11 +138,62 @@ pgr 的 `pl` 管道若多轮组装可参考。
 
 ### 4.2 最终后处理（isFinalPass）
 
-- `derepSmallContigs`：去小 contig 重复（`DerepSmallContigs`）。
-- `removeOverlaps`：去除 contig 间 overlap（`OverlapRemover2`）。
-- `removeRepeats`：`ReadVsContigMapper` 把 reads 映射回 contig，找未桥接的
-  重复位点并断开（`RepeatRemover`）。
-- `toBasespace`：`ToBasespace2`，见 §7。
+调用链（`AssemblyPipeline.hpp:1111-1145`）：`generateContigs → toMinspaceContigs →
+derepSmallContigs → removeOverlaps → removeRepeats → toBasespace`。后三步是**纯碱基
+空间**的 contig 后处理，不依赖 minimizer 图：
+
+- **`derepSmallContigs`**（`DerepSmallContigs.hpp`）：候选小 contig 与其余 contig
+  做 minimap2 比对，**若被更高覆盖的 contig 完全包含则丢弃**。宏基因组里低丰度
+  物种常被高丰度物种的 contig 片段包含，这一步是"包含去重"。
+- **`removeOverlaps`**（`OverlapRemover2.hpp`）：contig 两两 minimap2 比对
+  （`countContigs → indexContigs → mapContigs`），找首尾互相覆盖的 overlap，**截断
+  较长 contig 被覆盖的重叠部分**（不删整条）。粒度粗、不需要 reads 证据。
+- **`removeRepeats`**（`RepeatRemover.hpp`）★：`ReadVsContigMapper` 把 reads 映射
+  回 contig，找未桥接的重复位点并断开。完整流水线见下：
+
+#### 4.2.1 `removeRepeats`（`RepeatRemover`）—— 桥接 reads 证据 ★
+
+核心流水线（`RepeatRemover.hpp:220-233`）：
+
+```
+alignReads → fragmentContigs → computeFragmentsCoverage → breakUnbridgedRepeats
+```
+
+1. **`alignReads`**：`ReadVsContigMapper` 把 reads 映射回 contig（见 4.2.2），产出
+   `(contigIndex, contigStart, contigEnd)` 对齐列表。
+2. **`fragmentContigs`**（`RepeatRemover.hpp:557-580`）：把每条 contig 按"组成
+   k-min-mer 所属 unitig 是否变化"切成**片段**（`FragmentFunctor`，
+   `RepeatRemover.hpp:682-703`）——片段边界 = 图里 unitig 的边界，等价于把 contig
+   拆回"unitig 串"。
+3. **`computeFragmentsCoverage`**（`RepeatRemover.hpp:761-785`）：每片段 coverage =
+   组成 k-min-mer 丰度的**均值**（注意：这里用均值，unitig 丰度用中位数，两处
+   语义不同，见 §10.14）。
+4. **`breakUnbridgedRepeats`**（`RepeatRemover.hpp:950-`）：
+   - **`computeBridgingReads`**（`RepeatRemover.hpp:1328-1370`）：对每条 reads 对齐，
+     若该对齐同时覆盖 **≥2 个相邻 fragment**（三种情况：contained / 左叠到右 /
+     右叠到左），则这些 fragment 两两之间 `_nbBridgingReads++`——"这条 read 把两个
+     片段连起来"的证据。
+   - **`getCovPath` 双向延伸**（`RepeatRemover.hpp:1374-1462`）：从每个 source
+     fragment 出发，`minRepeatCoverage = sourceCoverage * 2.0`；延伸规则：下一片段
+     coverage ≥ 2×source 视作重复片段跳过；相邻片段直接相连；否则**必须有桥接
+     reads（`nbBridgingReads != 0`）才连**，否则路径在此断开。
+   - 路径分配 `_finalContigIndex`，`nbContigsFinal > 1` → `isCircular=0` 并沿
+     finalContigIndex 边界切分 contig（`RepeatRemover.hpp:1256-1323`）。
+
+#### 4.2.2 `ReadVsContigMapper`（桥接证据的来源，`ReadVsContigMapper.hpp`）
+
+- contig 建 **minimizer 索引**：每个 contig 的 minimizer 哈希 → `MinimizerPosition`
+  （含 contig 内坐标），排序后建 `_minimizerLookupTable`（哈希 → 位置区间）。
+- `mapRead2`：对 read 的每个 k-min-mer 查表得候选锚点 → 按 `(contigIndex, 方向)`
+  分组 → `chainAnchors` 做 chaining（按坐标排序、重叠过滤）→ 输出
+  `ReadMapping2(contigIndex, contigStart, contigEnd)`。
+- **内存/精度取舍**：低密度 minimizer（0.5%）锚点少、链短，比全 k-mer 索引省内存，
+  适合"证据回放"这类不要求逐碱基精度的用途。
+
+> 对 pgr 的意义：`removeRepeats` 的"read 同时覆盖多片段 → 连接证据；无证据且覆盖
+> 异常 → 断开"正是 `design/asm-olc.md` 待决的 repeat breaking 成熟实现（见 §9.2）；
+> `ReadVsContigMapper` 的 minimizer chaining 则可作为 pgr `asm map`（全 k-mer 完美
+> 匹配）在容错/长读场景下的对照（pgr 不引新依赖，仅作语义参考）。
 
 ### 4.3 关键参数与默认值（`AssemblyPipeline.hpp:100-284`）
 
@@ -242,8 +293,16 @@ rust-mdbg 的 universal minimizer / FracMinHash 采样。这样 minimizer 是无
   `_abundance`（float）、`_abundances`（每个组成 k-min-mer 的丰度向量）、
   `_unitigMerge`。
 - **丰度语义**：unitig 丰度 = 组成 k-min-mer 丰度向量的**中位数**
-  （`computeMedianAbundance`）；`recompact` 合并两个 unitig 时把两个丰度向量
-  merge 后再取中位。
+  （`computeMedianAbundance`，`Graph.hpp:252-287`）；`recompact` 合并两个 unitig
+  时把两个丰度向量 merge 后再取中位（`mergeWith`，`Graph.hpp:293-321`）。
+  - **"向量始终有序"是硬不变量**：`computeMedianAbundance` 内部的 `sort` 被注释
+    掉，中位数正确性依赖 `_abundances` 始终升序。三个保证点：`createEdgeNode`
+    先 `std::sort(_abundances)` 再取中位（`CreateMdbg.cpp:5026-5027`）；图加载后
+    `AbundanceSortFunctor` 统一排序（`Graph.hpp:651-653`）；`mergeWith` 用
+    `std::merge`（要求两输入已排序）合并后重新中位数。**Rust 移植时须显式维护
+    排序，或改用无需排序的顺序统计量**（详见 §10.13）。
+  - 初始值：每个 k-min-mer 若不在 solid 表（`abundance==1`，可能是测序错误）
+    记 1，否则记实际丰度——中位数对少数低覆盖读的污染不敏感。
 - 长度估计 `getLength = (nbMinimizers-1) * _minimizerSpacingMean`（minimizer
   空间里没有碱基坐标，长度是期望值）。
 
@@ -270,24 +329,49 @@ while(true){
 - `TipRemover`：按 `_nbMinimizers` 升序队列删 tip。
 - final 轮额外挂 `_repeatSolver`（`GenerateContigGraph`）做嵌合 unitig 清理。
 
-**`removeAbundanceNoQueue`**（丰度渐进过滤，核心）：
+**`removeAbundanceNoQueue`**（丰度渐进过滤，核心，`ProgressiveAbundanceFilter.hpp:2183-2343`）：
 
 ```cpp
-float t = 1.1;
+float t = 1.1;                       // 阈值从 1.1x 起步
 while(t < abundanceCutoff_min){
     currentCutoff = t;
-    移除所有 abundance < t 的 unitig（记录前驱/后继）；
-    对受影响的邻接 unitig 排序后 recompact（合并成更长 unitig）；
-    t = t * (1 + 0.1);            // 每次约 +10%
-    increaseStep = min(t_new - t, 10);
+    _maxAbundance = currentCutoff*2; // 每轮重置，供下游"高于 2×cutoff 受保护"判定
+    // 遍历 _validNodes2（当前全部有效 unitig）：
+    for(node : _validNodes2){
+        if(node->_abundance >= t) continue;
+        // 收集受影响邻居：前驱(正向) 与 后继(取反向) → recompactNodes
+        recompactNodes.insert(前驱节点);
+        recompactNodes.insert(后继节点的反向索引);
+        removeNode(node);            // 真删除（标记而非物理释放）
+    }
+    // recompactNodes 按 BubbleSideComparatorRev 排序后逐个 recompact
+    //   → 单前驱+单后继的邻居合并成更长 unitig，丰度向量 std::merge 后重取中位
+    float newT = t * (1 + 0.1);            // 每次约 +10%
+    float increaseStep = min(newT - t, 10);// 步长封顶 10
+    t += increaseStep;
+    if(_usingFunctor){               // functor 模式(contig 生成路径)
+        if(isCutoffProcessed2 未含 currentCutoff){
+            记录 currentCutoff; return 1;  // 每个新 cutoff 只删一轮，回外层再 simplify
+        }
+    }
+    if(nbErrorsRemoved > 0) break;   // 有删除即退出，等外层 simplifyProgressive 循环
 }
 ```
 
 即**从丰度 1.1x 起步、按 ~10% 的步长逐步抬升阈值，每次移除低于阈值的 unitig
-并重新压实图**。这是论文里 "local progressive abundance filter" 的实现：它不
-试图区分菌株气泡里的正确路径，而是用丰度把低覆盖分支逐级删掉，让高丰度物种
-的主路径自然收敛——**与 pgr 讨论中"气泡经常引入不确定性、不如不处理"的直觉
-一致**。
+并对受影响邻居重新压实**。关键设计：
+
+- **删除是"标记 + 收集邻居"而非就地重连**：一次遍历收集所有受波及的前驱/后继，
+  排序后统一 recompact，避免一边删一边改邻接表造成的顺序依赖。
+- **合并方向**：删掉的 unitig 的前驱直接参与压实，后继取**反向索引**参与——因为
+  压实总是在节点"另一端"进行，反向表示保证合并方向一致。
+- **交替收敛**：外层 `simplifyProgressive` 每轮先 `simplify()`（结构）再
+  `removeAbundanceNoQueue`（丰度），两者都无改动才退出；functor 模式每新 cutoff
+  只删一轮就返回，让外层重新 simplify——保证"删一批 → 简化一批"的节奏。
+
+这是论文里 "local progressive abundance filter" 的实现：它不试图区分菌株气泡里的
+正确路径，而是用丰度把低覆盖分支逐级删掉，让高丰度物种的主路径自然收敛——**与
+pgr 讨论中"气泡经常引入不确定性、不如不处理"的直觉一致**。
 
 **cutoff 快照（`dumpUnitigs`）**：每个新 cutoff 把当前 unitig 图导出到
 `filter/unitigs_<idx>.bin`（node path + circular/repeat 标记 + 丰度），
@@ -296,14 +380,27 @@ cutoff 倒序消费（见下）。
 
 ## 7. contig 生成 + 碱基空间重建
 
-### 7.1 `GenerateContigs::generateContigs3`
+### 7.1 `GenerateContigs::generateContigs3`（`GenerateContigs.hpp:549-757`）
 
-- 从 `_cutoffIndexes` **最后一个（最高 cutoff）倒序**读快照：
-  `_minUnitigAbundance = cutoff / 0.5`，跳过 `contigAbundance < _minUnitigAbundance`
-  的路径、已组装过的 unitig（`_processedNodeNames`）、final 轮的重复 unitig。
-- 圆形 contig 特殊处理（`isCircular` 标记，`nbMinimizers += 1` 以闭合）。
-- 输出 `contigs.nodepath`（unitig index 路径）+ `_nodeNameAbundances` →
-  `unitigGraph.nodes.refined_abundances.bin`（供下一轮复用）。
+- 从 `_cutoffIndexes` **最后一个（最高 cutoff）倒序**读快照
+  `filter/unitigs_<idx>.bin`：每个快照条目 = `{size, isCircular, isRepeatSide,
+  contigAbundance(float), nbMinimizers, nodePath[]}`。
+- 逐条判定是否接受（`GenerateContigs.hpp:575-641`）：
+  - `_minUnitigAbundance = cutoff / 0.5`，`contigAbundance < _minUnitigAbundance`
+    的路径跳过（`isValidContigAbundance`）；
+  - `isContigAssembled(nodePath)`（`GenerateContigs.hpp:484-495`）：路径上**任一**
+    unitig 已在 `_processedNodeNames`（被更高 cutoff 快照组装过）→ 整条路径跳过，
+    避免重复输出；
+  - final 轮 `_repeatedUnitigNames`（repeat solver 判定的重复 unitig）跳过。
+- 圆形 contig 特殊处理：`isCircular` 时 `nbMinimizers += 1` 以在长度估算上闭合环
+  （`GenerateContigs.hpp:642-644`），但 nodepath 本身不重复追加首节点。
+- 组装成功后将路径上所有 unitig 写入 `_processedNodeNames`，并记录
+  `_nodeNameAbundances[unitigName] = {contigAbundance, nbMinimizers}`
+  （`GenerateContigs.hpp:725-733`）。
+- 输出 `contigs.nodepath` + 写 `unitigGraph.nodes.refined_abundances.bin`
+  （`dumpUnitigAbundances`，`GenerateContigs.hpp:759-777`）：refined abundance 取
+  `ceil`，长 unitig（`nbNodes-kminmerSize+1 > kminmerSize`）保底 ≥ 2 —— 供下一轮
+  `graph` 的 `loadRefinedAbundances`（`CreateMdbg.cpp:391`）复用。
 
 ### 7.2 `ToBasespace2`（minimizer → 碱基）
 
@@ -370,11 +467,25 @@ coverage ≤ `--min-contig-coverage`；或 length < `--min-contig-length`；或
    `_maxMemoryGB/8`，clamp `[1,100]`）决定 minimap2 一次读入多少 reads
    （`ToBasespace2.hpp:337`）——峰值内存预算显式控制批大小。pgr 若加长读抛光，
    可把内存预算作为一等参数。
+10. **fragment = unitig 边界切分**（新增，2026-08-14）：把 contig 按"组成
+    k-min-mer 所属 unitig"切回片段再逐片算覆盖——"先按图结构分片、再回放 reads"
+    的模式与 pgr `asm map` 输出天然对齐（`to-rg` 后按 rg 边界即片段），是
+    RepeatRemover 桥接证据的地基（见 §4.2.1）。
+11. **read 桥接证据 = 图类型无关的 repeat breaking**（新增，2026-08-14）：
+    "read 同时覆盖 ≥2 片段 → 连接证据；无证据且覆盖异常 → 断开" 可复用到任何
+    "用 reads 验证连接"的场景，不限于 OLC（见 §4.2.1、§9.2）。
+12. **minimizer chaining 比对的取舍**（新增，2026-08-14）：低密度 minimizer 锚点 +
+    按 contig 分组 + chaining 过滤（`ReadVsContigMapper`），内存友好、容忍错误；
+    与 pgr `asm map` 的全 k-mer 完美匹配是不同取舍——pgr 精度优先，metaMDBG
+    内存/速度优先（见 §4.2.2）。
 
-> 结论：metaMDBG 对 pgr 的最大价值是**§6.3 的渐进丰度过滤**——它给出了
-> "不解析菌株气泡、用丰度逐级简化"的成熟实现，正好验证用户对气泡处理的直觉；
-> 其次是 unitig 丰度中位数语义与多 cutoff 快照输出。其余（minimizer-space、
-> minimap2 抛光）与 pgr 短读+完美匹配的路线距离较远，暂不借鉴。
+> 结论：metaMDBG 对 pgr 的价值分三层（2026-08-14 更新）：
+> - **直接可移植**：§6.3 渐进丰度过滤（含交替收敛节奏、`2×cutoff` 保护、删后压实）、
+>   unitig 丰度中位数、多 cutoff 快照倒序输出、RepeatRemover 桥接 reads 阈值
+>   （`2×source` 与 `nbBridgingReads != 0`）。
+> - **架构参考**：multi-k 反馈、外部分区计数、内存驱动批分片、checkpoint 断点续跑。
+> - **语义对照**：minimizer-space 节点、minimap2+POA 抛光，与 pgr 短读+完美匹配
+>   路线距离较远，暂不借鉴但已知差距。
 
 ## 9. OLC v1 借鉴映射（2026-08-12）
 
@@ -395,6 +506,9 @@ coverage ≤ `--min-contig-coverage`；或 length < `--min-contig-length`；或
    `asm map` + `sam to-rg` + `rg coverage` 回放"的成熟实现——pgr 设施
    齐全，v1 可直接照搬语义
    （桥接 reads = 覆盖度证据，对应 Celera 的 6/15 阈值）。
+   **具体阈值**（2026-08-14 补充，见 §4.2.1）：`minRepeatCoverage =
+   sourceCoverage * 2.0` 判重复片段；`nbBridgingReads != 0` 才有连接证据；
+   `isCircular=0` + 沿 `_finalContigIndex` 切分。
 3. **cutoff 快照倒序输出 → 宏基因组 contig 分级输出**：多个 cutoff 的图
    快照、从高丰度往低丰度补——适合"先出高置信 contig、再补低丰度"策略。
 4. **unitig 丰度中位数语义**：pgr `asm unitig` 的 `cov=` 是平均丰度；
@@ -437,3 +551,12 @@ coverage ≤ `--min-contig-coverage`；或 length < `--min-contig-length`；或
 12. **大量 `exit(0)` 而非抛异常**：CLI 解析失败、参数校验失败均直接
     `exit(0)`（`:152,159,282`），退出码为 0 而非非零——脚本里判断"成功"时
     需以输出文件存在性为准，不能只看退出码。
+13. **`computeMedianAbundance` 内部 `sort` 被注释**（`Graph.hpp:252-287`）：
+    中位数正确性完全依赖 `_abundances` 向量"始终有序"不变量——建图时
+    `createEdgeNode` 排序、图加载后 `AbundanceSortFunctor` 排序、`mergeWith`
+    用 `std::merge` 保持有序。**Rust 移植时若直接用 `Vec<u32>` 需显式维护
+    排序**，或改用无需排序的 quickselect（见 §6.2）。
+14. **丰度统计两处语义不同**：unitig 丰度 = **中位数**（`Graph.hpp`
+    `computeMedianAbundance`，稳健、抗低覆盖污染）；**片段覆盖度 = 均值**
+    （`RepeatRemover.hpp:761-785`，对覆盖突变敏感）——metaMDBG 用均值做 repeat
+    判定、用中位数做过滤阈值，移植时不要混用（见 §4.2.1）。

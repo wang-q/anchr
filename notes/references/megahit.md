@@ -269,16 +269,33 @@ buildlib → (count | read2sdbg[kmin-1pass]) → build_graph[kmin] → assemble[
 ### 4.5 local：本地组装（`main_local_assemble.cpp` + `localasm/`）
 
 对上一轮 contig 的**端点**做局部延伸（默认 `kmin=11, kmax=41, step=6,
-seed_kmer=31, sparsity=8, similarity=0.8, min_mapping_len=75`）：
+seed_kmer=31, sparsity=8, similarity=0.8, min_mapping_len=75`），完整流程：
 
-1. `HashMapper` 把 reads 回帖到 contigs（`hash_mapper.cpp`，seed-and-extend）；
-   `EstimateInsertSize` 抽样 2^18 对双端 read 估 insert 分布（`local_assemble.cpp:83-138`）。
-2. 按 insert 估 `LocalRange`（paired 取 `min(2*mean, mean+3*sd)`，封顶 650，
-   `local_assemble.cpp:140-153`），把落在 contig 端点局部区间的 read 收集起来。
-3. 用 **IDBA-UD 内核**（`src/idba/`）在局部 read 上做多 k 迭代组装
-   （`LaunchIDBA`：`HashGraph` 逐 k 插入 k-mer → 覆盖度直方图定阈值 →
-   `Assemble` → `ContigGraph` `RemoveDeadEnd/RemoveBubble/IterateCoverage`，
-   `local_assemble.cpp:28-81`），产出延伸后的 `local.fa`。
+1. `HashMapper` 建索引 + 回帖（`hash_mapper.cpp`）：
+   - `LoadAndBuild`：contig 每 `sparsity=8` 取一个 seed k-mer（长度 `seed_kmer=31`）
+     建 `index_`（canonical key → `EncodeContigOffset(contig_id, offset, strand)`，
+     `hash_mapper.cpp:56-101`）；**同一 seed k-mer 出现多处时把 value 高位置 1 标记
+     "多定位"**，回帖时跳过——只允许唯一回帖。
+   - `TryMap`（`hash_mapper.cpp:135-268`）：`len<50` 或 `len<seed_kmer` 直接丢弃；
+     逐碱基滑 seed（fwd/rc 同步），命中唯一索引后推出 query 在 contig 上的
+     `[contig_from, contig_to]`，被剪贴（clip）的对齐要求长度 `>= min_mapped_len=75`；
+     对所有候选做 `Match`（16-mer 批量比对 + POPCNT 数错配，相似度 `>= 0.8`，
+     `hash_mapper.cpp:103-133`），取**唯一最佳**——并列最佳视为不可靠丢弃。
+2. `EstimateInsertSize`（`local_assemble.cpp:83-138`）：抽样最多 2^18 对双端 read，
+   只统计"配对双方回帖到**同一 contig 且不同链**"的对，且 `insert >= 两 read 长度`
+   才入直方图；`Trim(0.01)` 去尾后取 mean/sd。
+3. `LocalRange`（`local_assemble.cpp:140-153`）：基线 `max_read_len-1`；仅当 paired
+   且 `mean >= max_read_len` 时取 `min(2*mean, mean+3*sd)`；一律封顶 `kMaxLocalRange=650`。
+4. `MapToContigs` + `AssembleAndOutput`（`local_assemble.cpp:166-302`）：按 contig ×
+   strand 收集落在端点局部区间的 read（`AddSingle`/`AddMate`）；`min_num_reads =
+   local_range/max_read_len` 以下不值得组装；**同一映射位置最多取 3 条 read**
+   （`pos_count<=3`，防覆盖度虚高）；`contig_end` = contig 端点 `local_range` 的序列。
+5. `LaunchIDBA`（`local_assemble.cpp:28-81`）：对局部 read + `contig_end` 做多 k
+   迭代组装（k 从 `kmin` 到 `min(kmax, max_read_len)`，`step` 递增）；每 k 用
+   `HashGraph` 插入 k-mer，覆盖度直方图 `percentile(1 - local_range/num_vertices)`
+   定阈值，`Assemble` 后经 `ContigGraph::RemoveDeadEnd(k*2)` → `RemoveBubble` →
+   `IterateCoverage(k*2, 1, threshold)` 清洗；若只剩 1 条 contig 提前终止。
+   产出延伸后的 `local.fa`。
 
 ### 4.6 iterate：迭代边提取（`main_iterate.cpp` + `iterate/`）
 
@@ -334,15 +351,27 @@ unitig 入度 1、出度 1，且都汇到同一右节点（`right.b() == possibl
 
 ### Weak link（`weak_link_remover.cpp`）
 
-`DisconnectWeakLinks`：对出度 ≥ 2 的 unitig，把"深度 ≤ `local_ratio`（0.1）×
-总深度"的邻居 `SetToDisconnect`（断开而非删除，`weak_link_remover.cpp:8-37`）。
+`DisconnectWeakLinks`：对出度 ≥ 2 的 unitig（跳过 standalone/回文），在**正反两
+条链**上各看一遍，把"深度 ≤ `local_ratio`（0.1）× 邻居总深度"的邻居
+`SetToDisconnect`（断开而非删除，`weak_link_remover.cpp:8-37`）。
+
+断开后的实际处理在 `UnitigGraph::RefreshDisconnected`（`unitig_graph.cpp:140-208`）：
+对每个 `to_disconnect` 的端点，`new_start = NextSimplePathEdge(old_start)`（沿出边走
+**一格**）并把旧端点边 `SetInvalidEdge`；`new_length = old_length - 断开端数`，
+`new_total_depth = lround(avg_depth × new_length)`；若 `length <= 断开端数` 则直接
+`SetToDelete`——即断开是"**截短一格**"而非删整条，且维持平均深度不变。
 
 ### Low depth（`low_depth_remover.cpp`）
 
 - `RemoveLocalLowDepth`：对长度 ≤ `max_len`、非 standalone 的 unitig，用
-  `LocalDepth`（两端局部宽度 `local_width`（默认 1000）内邻居的深度加权均值）
-  当参照，深度 `< max(min_depth, mean*local_ratio)` 就删；迭代时（
-  `IterateLocalLowDepth`）`min_depth *= 1.1` 递增（`low_depth_remover.cpp:39-102`）。
+  `LocalDepth`（两端局部宽度 `local_width`（默认 1000）内**邻居**的深度加权均值，
+  含反向互补，`low_depth_remover.cpp:10-35`）当参照。阈值取
+  `min(min_depth, mean*local_ratio)`（代码写法：先 `threshold=min_depth`，若
+  `min_depth < mean*local_ratio` 保持 `min_depth`、否则 `threshold=mean*local_ratio`，
+  `low_depth_remover.cpp:63-68`）——即删 `depth < min(min_depth, mean*local_ratio)`
+  的 unitig；且仅当 `indegree<=1 && outdegree<=1` 或入/出度为 0 时才考虑
+  （`low_depth_remover.cpp:58`）。迭代时（`IterateLocalLowDepth`）`min_depth *= 1.1`
+  递增，直到 `min_depth >= kMaxMul` 或一轮无变化（`low_depth_remover.cpp:88-102`）。
 - `RemoveLowDepth`（prune_level≥3 的 excessive pruning）：全图删 `avg depth <
   min_depth` 的 unitig（`low_depth_remover.cpp:104-117`）。
 
@@ -494,6 +523,33 @@ anchr 现状：`asm contig/unitig` 用 pgr 的 `KmerTable`（canonical 2-bit u12
 > 从"内存大小受限"里解放出来）。每一块的**成功判据**都建议先写测试：清洗对照
 > MEGAHIT 默认值（tip=2k、disconnect-ratio=0.1、low-local-ratio=0.2，§6）在
 > `tests/` 小数据集上对比；外部排序计数与 `KmerTable` 精确计数**逐 k-mer 一致**。
+
+### 8.2 移植注意事项（本次精读确认，Rust 端）
+
+- **"断开"是截短一格，不是删整条**：`DisconnectWeakLinks` 只标 `to_disconnect`，
+  真正生效在 `RefreshDisconnected`（`unitig_graph.cpp:140-208`）——端点沿
+  `NextSimplePathEdge` 走一格、旧端点边标 invalid、`length-1`、`total_depth =
+  lround(avg × new_len)`（保持平均深度）。Rust 端若用可变图，需同时支持"删顶点"
+  与"截短端点"两种操作，且截短时别把 total_depth 当新深度覆盖。
+- **low depth 阈值是 `min` 不是 `max`**（易写反）：`depth < min(min_depth,
+  mean*local_ratio)` 才删；且只在 `indeg+outdeg` 小的节点上判（`low_depth_remover
+  .cpp:58`）。移植时对照 §5 Low depth 的实现写法。
+- **SdBG 只读结构不必照搬**：MEGAHIT 因图是紧凑只读的，清洗只能靠位标记 + 每轮
+  `Refresh` 全图重扫两遍（disconnect 一遍 + delete 一遍）。anchr 的 `assemble.rs`
+  用可变 `HashMap`/`Vec`，可"原地标删 + 惰性清理"，比照搬 Refresh 更简单——只借
+  清洗**判据与阈值**，不借重构机制。
+- **local 回帖复用 `map.rs`**：`HashMapper` 丢弃多定位（value `>>63` 标记）与并列
+  最佳（视为不可靠），本质是"只信唯一最佳"；anchr `map.rs` 完美回帖更严格，本地
+  组装应复用 `map.rs` 而非照搬 seed-and-extend。可直接借的技巧：`sparsity=8` 抽样
+  建索引、`pos_count<=3` 防覆盖度虚高、insert 只统计"同 contig 不同链"配对、
+  `insert>=len` 入直方图、`Trim(0.01)` 去尾（§4.5）。
+- **k 上限**：MEGAHIT 255 vs anchr `Kmer::MAX_K=128`——iterate 的 `k+step≤128`、
+  所有 k/step 校验按 128。
+- **多重度精度**：MEGAHIT 饱和 uint16（`kMaxMul`），anchr 是精确 u64 计数，更优；
+  清洗阈值语义按 anchr 精确计数**重算默认值**，不照搬饱和行为。
+- **unitig 判据交叉验证**：`NextSimplePathEdge`（唯一出边 + 该出边唯一入边，
+  `sdbg.h`）与 `assemble.rs` 的 `unique_solid_out + unique_solid_in==1` 语义一致，
+  可加"同一 k-mer 图两引擎产出相同 unitigs"的等价性测试锁定。
 
 > 一句话：MEGAHIT 的**算法语义**（unitig 压缩判据、清洗阈值族、多 k 引导、本地
 > 延伸）直接服务 anchr `asm` 的未来演进；它的**工程路线**（外部排序、位向量图、

@@ -127,6 +127,11 @@ anchr asm unitig [OPTIONS] <infiles>...
     output is byte-identical to the default engine. `-p/--parallel` now
     actually parallelizes the classification pass (the walk stays
     deterministic single-threaded).
+*   `--supermer`: Experimental: FastK-style super-mer two-stage counting
+    (pgr `kmer::supermer`, fixed minimizer m=12). Output is byte-identical
+    on FASTA / no-quality input; counts without quality gating. Currently
+    not faster than the direct path on the G37 workload (see
+    `notes/design/asm-assemble.md` §12).
 *   `--list-files`: Treat `<infiles>` as list files, one sequence file path
     per line (blank lines and `#` comments are ignored).
 *   `-p, --parallel <int|auto>`: Worker threads for the whole pipeline

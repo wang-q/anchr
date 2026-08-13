@@ -106,6 +106,12 @@ Examples:
                 .help("Experimental: classify vertices once (DFA state) before walking unitigs"),
         )
         .arg(
+            Arg::new("supermer")
+                .long("supermer")
+                .action(ArgAction::SetTrue)
+                .help("Experimental: FastK-style super-mer two-stage counting (pgr kmer::supermer); counts without quality gating"),
+        )
+        .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
@@ -146,6 +152,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         emit_gfa: args.get_flag("gfa"),
         all_abundance_counts: args.get_flag("all_abundance_counts"),
         use_dfa: args.get_flag("dfa"),
+        use_supermer: args.get_flag("supermer"),
         parallel,
         ..AssembleOptions::default()
     };

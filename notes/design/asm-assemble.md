@@ -620,3 +620,57 @@ Lambda（k=31）与 G37 full（k=31/99）上，`--dfa --parallel 1/4/8` 的输�
 * **与分桶路径结合**：分类要求全局顶点表（类似 cuttlefish 的 KMC 全局
   枚举）；hash 分桶下 unitig 跨桶，仍需要 bcalm 式的 glue 阶段，状态
   分类应放在"全局排序/MPHF 之后"这一层。
+
+## 12. supermer 两段计数接入（2026-08-14）
+
+pgr 侧完成 FastK 式 super-mer/minimizer 两段计数
+（`pgr::libs::kmer::supermer`，固定 m=12；stage 1 折叠 + 排序 +
+stage 2 加权展开，输出与直接路径逐字节一致，测试覆盖 k=3..40、
+重复/反向互补/N 处理）。anchr 以 `asm unitig --supermer` 接入
+（`TadpoleTable::build_supermer`，无质量门控），Cargo.toml 的 pgr rev
+升至 `769f82f`。
+
+正确性：Lambda + G37 full（k=31/99）与默认引擎**逐字节一致**。
+
+性能（G37 full，runs 2，`auto`）：
+
+| 引擎 | k=31 wall | k=31 RSS | k=99 wall | k=99 RSS |
+| :--- | ---: | ---: | ---: | ---: |
+| 默认（直接排序） | 1.75 s | 976 MB | 2.61 s | 2010 MB |
+| `--supermer` | 1.87 s | 999 MB | 3.62 s | 1442 MB |
+
+结论：
+
+* 输出一致；k=31 总耗时与默认**相当**（本批 +6%，噪声内），k=99 明显
+  更慢（+39%）但 RSS 降 **28%**（2010 → 1442 MB）；
+* pgr 自测（mg1655 663k reads）k=31 lib 计时 0.87 vs 1.74 s 的收益在
+  anchr 端到端**没有兑现**：计数只是总耗时一部分，且本接入需克隆 reads
+  序列、固定 m=12 对短读折叠有限；
+* 与 pgr 结论一致：**super-mer 不是长 k 短读的解**（k=100 折叠仅
+  ~1.1×）；k=31 的收益依赖数据冗余度；
+* 后续：pgr 若支持质量门控与按数据自适应 minimizer，再重新评估；当前
+  `--supermer` 作为实验开关保留，默认路径不变。
+
+### 12.1 尝试背景与暂缓原因（记录）
+
+* **动机**：FastK G37 实测 1.27 s / 226 MB（仅计数）vs anchr
+  2.18 s / 929 MB（计数 + unitig）；[unitig-bucket.md](unitig-bucket.md)
+  §3.1 确认差距在计数层，且我们已在用 MSD radix（FastK 用的是 LSD），
+  缺口是 **super-mer/minimizer 两段式**，不是排序方向。
+* **尝试**：pgr 实现 `supermer` 模块（commit `769f82f`，固定 m=12，
+  stage 1 折叠 + 排序 + stage 2 加权展开，输出与直接路径逐字节一致，
+  测试覆盖 k=3..40、重复/反向互补/N）→ anchr 以 `asm unitig --supermer`
+  接入并验证（Lambda + G37 full k=31/99 逐字节一致），Cargo.toml pgr
+  rev 同步升到 `769f82f`。
+* **结果**：端到端无收益——k=31 与默认相当（±6%，噪声内），k=99
+  +39% 但 RSS -28%；pgr 自测的 lib 级收益（mg1655 k=31：0.87 vs
+  1.74 s）未兑现。原因：计数只是总耗时一部分、接入需克隆 reads 序列、
+  固定 m=12 对短读折叠有限。
+* **暂缓条件（重新评估的触发条件）**：
+  1. pgr 在 supermer 路径支持**质量门控**——当前它无质量过滤，FASTQ
+     语义与默认引擎不一致（FASTA 才等价）；有门控后才能无差别用于
+     FASTQ；
+  2. pgr 支持**按数据自适应 minimizer**——FastK 按输入训练 PAD_LEN，
+     固定 m=12 未必匹配数据集；注意长 k + 短读时折叠本身只有 ~1.1×，
+     自适应只能改善、不能根治。
+  两者任一落地后重跑 §12 的基准表，再决定 `--supermer` 是否转正。

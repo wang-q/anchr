@@ -231,6 +231,19 @@ impl TadpoleTable {
         }
     }
 
+    /// FastK-style super-mer two-stage counting (pgr `kmer::supermer`).
+    /// Counts every N-free k-mer without quality gating (byte-identical to
+    /// the direct path on FASTA / no-quality input).
+    pub(crate) fn build_supermer(reads: &[(Vec<u8>, Vec<u8>)], k: usize) -> anyhow::Result<Self> {
+        let seqs: Vec<Vec<u8>> = reads.iter().map(|(s, _)| s.clone()).collect();
+        let table = pgr::libs::kmer::supermer::build_table(&seqs, k)?;
+        Ok(Self {
+            table,
+            prefix_index: OnceLock::new(),
+            sorted: OnceLock::new(),
+        })
+    }
+
     /// Sorted-start offsets per 1- or 2-byte key prefix (bucket `p` spans
     /// `[offs[p], offs[p+1])`), built lazily in one O(n) scan.
     fn prefix_index(&self) -> &[u32] {

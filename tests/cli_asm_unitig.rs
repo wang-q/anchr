@@ -812,3 +812,55 @@ fn command_asm_unitig_parallel_threads_identical() {
         "different --parallel counts changed the --dfa output"
     );
 }
+
+/// The experimental super-mer two-stage counter (pgr `kmer::supermer`)
+/// must produce byte-identical output to the direct path on FASTA input.
+#[test]
+fn command_asm_unitig_supermer_matches_default() {
+    for (name, fa, k, seed) in [
+        (
+            "linear",
+            {
+                let seq = "AAGCCCAATAAACCACTCTGACTGGCCGAATAGGGATATAGGCAACGACATGTGCGGCGA";
+                format!(">r1\n{seq}\n>r2\n{seq}\n>r3\n{seq}\n>r4\n{seq}\n")
+            },
+            "31",
+            "3",
+        ),
+        (
+            "circular",
+            ">random crap\nACTAAA\n>a perfectly circular unitig\nACTTAGCGGACTTAGC\n".to_string(),
+            "7",
+            "1",
+        ),
+    ] {
+        let out_dir = tempfile::tempdir().unwrap();
+        let infile = out_dir.path().join("in.fa");
+        let plain = out_dir.path().join("plain.fa");
+        let sm = out_dir.path().join("sm.fa");
+        std::fs::write(&infile, &fa).unwrap();
+        let base = [
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            plain.to_str().unwrap(),
+            "--kmer",
+            k,
+            "--min-count-seed",
+            seed,
+            "--min-contig-len",
+            "1",
+        ];
+        AnchrCmd::new().args(&base).assert().success();
+        let mut sm_args = base.to_vec();
+        sm_args[4] = sm.to_str().unwrap();
+        sm_args.push("--supermer");
+        AnchrCmd::new().args(&sm_args).assert().success();
+        assert_eq!(
+            std::fs::read(&plain).unwrap(),
+            std::fs::read(&sm).unwrap(),
+            "supermer output differs from default for {name}"
+        );
+    }
+}

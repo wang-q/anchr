@@ -64,6 +64,9 @@ pub struct AssembleOptions {
     /// Experimental: classify vertices once (DFA state) and walk unitigs
     /// from the state table instead of re-scanning extension buckets.
     pub use_dfa: bool,
+    /// Experimental: use pgr's FastK-style super-mer two-stage counter
+    /// instead of the direct emission + sort path (no quality gating).
+    pub use_supermer: bool,
     /// Worker threads for the whole k-mer pipeline (counting + DFA
     /// classification); `0` uses the rayon global pool (all cores). The
     /// walk stays deterministic single-threaded.
@@ -90,6 +93,7 @@ impl Default for AssembleOptions {
             emit_gfa: false,
             all_abundance_counts: false,
             use_dfa: false,
+            use_supermer: false,
             parallel: 0,
         }
     }
@@ -418,7 +422,11 @@ fn assemble_unitigs_core(
         opts.k
     );
     let reads = read_records(infiles)?;
-    let table = TadpoleTable::build_threaded(&reads, opts.k, opts.min_prob, opts.parallel);
+    let table = if opts.use_supermer {
+        TadpoleTable::build_supermer(&reads, opts.k)?
+    } else {
+        TadpoleTable::build_threaded(&reads, opts.k, opts.min_prob, opts.parallel)
+    };
 
     let mut unitigs = if opts.use_dfa {
         let states = VertexStates::classify(&table, opts.min_count_seed as u32, opts.parallel);

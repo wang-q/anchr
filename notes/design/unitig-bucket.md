@@ -85,9 +85,11 @@ G37 full（`pe.cor.fa.gz`，k=31，同机）：
      （≤1%）数据下 super-mer 把待排序记录数压缩一个量级，这是关键；
   3. 位打包记录 + 多线程 LSD + 磁盘流式。
 * 因此 §3 的"真实缺口"应明确为 **super-mer/minimizer 两段式计数**，
-  而不仅是 minimizer 桶键。已约定由 **pgr 项目实现**（2026-08-14），
-  anchr 侧待 pgr 计数接口更新后接入（阶段 A 的 k-way 合并 +
-  `TadpoleTable` 构建入口）。
+  而不仅是 minimizer 桶键。**pgr 已实现**（commit `769f82f`，
+  `pgr::libs::kmer::supermer`，固定 m=12，输出与直接路径逐字节一致），
+  anchr 已以 `asm unitig --supermer` 接入（`TadpoleTable::build_supermer`，
+  无质量门控）；接入实测见 [asm-assemble.md](../design/asm-assemble.md)
+  §12。
 
 ## 4. 计划（先定需求再实施）
 

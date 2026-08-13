@@ -46,6 +46,9 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
 - 基准：`fq_assemble`/`asm_map`/`covered` benchmarks +
   `bbtools-vs-anchr.md`（[benchmarks](benchmarks/bbtools-vs-anchr.md)）；
 - 双轨核对 22/22：`scripts/verify-migrate.sh`（[verify-migrate.sh](../../scripts/verify-migrate.sh)）。
+- supermer 两段计数接入评估：`asm unitig --supermer`（pgr commit
+  `769f82f`），输出与默认逐字节一致、端到端无收益，暂缓
+  （[asm-assemble.md](design/asm-assemble.md) §12）。
 
 ## 2. 待实现
 
@@ -83,6 +86,9 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
   的"待补全"条目逐项销账；
 - **audit 文档增量**：`notes/audit/audit-fq.md`/`audit-asm.md` 是迁移时
   的审计快照；后续 anchr 侧对 fq/asm 的修改应更新审计记录而非 pgr 侧。
+- **pgr supermer 再评估**：pgr 支持质量门控 + 按数据自适应 minimizer
+  后，重跑 `asm unitig --supermer` 基准并决定是否转正；当前作为实验
+  开关保留（[asm-assemble.md](design/asm-assemble.md) §12.1）。
 
 ## 4. 待验证 / 等数据或场景到位
 
