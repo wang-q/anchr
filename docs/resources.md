@@ -137,7 +137,7 @@ for STRAIN in \
     find ../assembly/${STRAIN}/ -name "*_genomic.fna.gz" |
         grep -v "_from_" |
         xargs gzip -dcf |
-        hnsm filter -N -s stdin -o ${STRAIN}/genome.fa
+        pgr fa filter -N --simplify stdin -o ${STRAIN}/genome.fa
 
 done
 
@@ -189,7 +189,7 @@ for STRAIN in \
     g37 mg1655 dh5alpha \
     ; do
     cat e_coli/Results/${STRAIN}/${STRAIN}.multi.fas |
-        hnsm filter -N -d stdin \
+        pgr fa filter -N -d stdin \
         > ../ref/${STRAIN}/paralogs.fa
 done
 
@@ -210,7 +210,7 @@ for STRAIN in \
     Bcer Mabs Rsph Vcho \
     ; do
     cat gage_b/Results/${STRAIN}/${STRAIN}.multi.fas |
-        hnsm filter -N -d stdin \
+        pgr fa filter -N -d stdin \
         > ../ref/${STRAIN}/paralogs.fa
 done
 
@@ -231,7 +231,7 @@ for STRAIN in \
     s288c \
     ; do
     cat yeast/Results/${STRAIN}/${STRAIN}.multi.fas |
-        hnsm filter -N -d stdin \
+        pgr fa filter -N -d stdin \
         > ../ref/${STRAIN}/paralogs.fa
 done
 
@@ -253,7 +253,7 @@ for STRAIN in \
     kat sect -t 4 -o ${STRAIN} -F ../ref/${STRAIN}/genome.fa ../ref/${STRAIN}/genome.fa
 
     cat ${STRAIN}-repetitive.fa |
-        hnsm filter -N -d -a 100 stdin \
+        pgr fa filter -N -d --min-len 100 stdin \
         > ../ref/${STRAIN}/repetitive.fa
 
 done

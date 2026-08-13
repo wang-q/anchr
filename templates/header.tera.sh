@@ -68,7 +68,7 @@ save () {
 }
 
 stat_format () {
-    echo $(hnsm n50 -H -N 50 -S -C $@) |
+    echo $(pgr fa n50 -H -N 50 -S -C $@) |
         perl -nla -MNumber::Format -e '
             printf qq(%d\t%s\t%d\n), $F[0], Number::Format::format_bytes($F[1], base => 1000,), $F[2];
         '
@@ -76,8 +76,8 @@ stat_format () {
 
 stat_format_fq () {
     echo $(
-            hnsm fq2fa $@ |
-                hnsm n50 -H -N 50 -S -C stdin
+            pgr fq to-fa $@ |
+                pgr fa n50 -H -N 50 -S -C stdin
         ) |
         perl -nla -MNumber::Format -e '
             printf qq(%d\t%s\t%d\n), $F[0], Number::Format::format_bytes($F[1], base => 1000,), $F[2];

@@ -9,7 +9,7 @@ mkdir -p 1_genome/repetitive
 cd 1_genome/repetitive
 
 if [ ! -s repetitive.fa ]; then
-    hnsm size ../genome.fa > chr.sizes
+    pgr fa size ../genome.fa > chr.sizes
 
     FastK -v -p -k21 ../genome
 
@@ -33,8 +33,8 @@ if [ ! -s repetitive.fa ]; then
     Fastrm ../genome
 
     spanr convert repetitive.json > region.txt
-    hnsm range ../genome.fa -r region.txt |
-        hnsm filter -N -d -a 100 stdin \
+    pgr fa range ../genome.fa -r region.txt |
+        pgr fa filter -N -d --min-len 100 stdin \
         > repetitive.fa
 
     spanr stat chr.sizes repetitive.json |

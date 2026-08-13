@@ -50,19 +50,19 @@ for PREFIX in R S T; do
     bash mergeread.sh
 
     # Create .cor.fa.gz
-    hnsm interleave \
-        --fq --prefix unmerged \
+    pgr fq interleave \
+        --fq --name-prefix unmerged \
         ${PREFIXU}1.fq.gz \
         ${PREFIXU}2.fq.gz \
         > ${PREFIXM}.interleave.fa
 
-    hnsm interleave \
-        --fq --prefix single \
+    pgr fq interleave \
+        --fq --name-prefix single \
         ${PREFIXU}s.fq.gz \
         >> ${PREFIXM}.interleave.fa
 
-    hnsm interleave \
-        --fq --prefix merged \
+    pgr fq interleave \
+        --fq --name-prefix merged \
         ${PREFIXM}1.fq.gz \
         >> ${PREFIXM}.interleave.fa
 
@@ -159,8 +159,8 @@ else
     mv M.cor.fa.gz pe.cor.fa.gz
 fi
 
-log_debug "Reads stats with hnsm"
-SUM_OUT=$( hnsm n50 -H -N 0 -S pe.cor.fa.gz )
+log_debug "Reads stats with pgr fa"
+SUM_OUT=$( pgr fa n50 -H -N 0 -S pe.cor.fa.gz )
 save SUM_OUT
 
 cat statMergeReads.tsv |

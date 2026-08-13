@@ -155,7 +155,7 @@ cat \
     8_mr_megahit/megahit.non-contained.fasta \
 {% endif -%}
     | anchr dazzname --no-replace stdin \
-    | hnsm filter -a 1000 stdin -o 7_extend_anchors/contigs.2GS.fasta
+    | pgr fa filter --min-len 1000 stdin -o 7_extend_anchors/contigs.2GS.fasta
 
 if [ -e 0_script/7_glue_anchors.sh ]; then
     bash 0_script/7_glue_anchors.sh 7_merge_anchors/anchor.merge.fasta 7_extend_anchors/contigs.2GS.fasta 3

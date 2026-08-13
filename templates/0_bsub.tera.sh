@@ -165,7 +165,7 @@ bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) {% if opt
         8_mr_megahit/megahit.non-contained.fasta \
 {% endif -%}
         | anchr dazzname --no-replace stdin \
-        | hnsm filter -a 1000 stdin -o 7_extend_anchors/contigs.2GS.fasta
+        | pgr fa filter --min-len 1000 stdin -o 7_extend_anchors/contigs.2GS.fasta
     '
 
 bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-contigs_2GS)" \

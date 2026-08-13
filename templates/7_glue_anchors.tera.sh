@@ -80,7 +80,7 @@ dazz group \
     anchorLong.ovlp.tsv \
     --oa anchor.ovlp.tsv \
     --parallel {{ opt.parallel }} \
-    --range "1-$(hnsm n50 -H -N 0 -C anchor.fasta)" \
+    --range "1-$(pgr fa n50 -H -N 0 -C anchor.fasta)" \
     --len 1000 --idt 0.999 --max "-{{ opt.gluemin }}" -c ${GAP_COV}
 
 log_info "Processing each groups"
@@ -129,7 +129,7 @@ log_info "Build contigs"
 cat \
    group/non_grouped.fasta \
    group/*.contig.fasta |
-   hnsm filter -a 1000 stdin -o contig.fasta
+   pgr fa filter --min-len 1000 stdin -o contig.fasta
 
 log_info Done.
 

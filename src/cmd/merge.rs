@@ -210,7 +210,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     run_cmd!(info "==> Write non-overlapped sequences")?;
     let file = abs_infile.clone();
     run_cmd!(
-        hnsm some -i ${file} overlapped.list -o non-overlapped.fasta
+        pgr fa some -i ${file} overlapped.list -o non-overlapped.fasta
     )?;
 
     run_cmd!(info "==> Merge")?;
@@ -277,7 +277,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     run_cmd!(info "==> Outputs")?;
     run_cmd!(
         cat non-overlapped.fasta merged.fasta |
-            hnsm filter stdin -o ${abs_outfile}
+            pgr fa filter stdin -o ${abs_outfile}
     )?;
 
     //----------------------------

@@ -40,7 +40,7 @@ anchr overlap2 \
 
 cd 7_fill_anchors
 
-CONTIG_COUNT=$(hnsm n50 -H -N 0 -C anchor.fasta)
+CONTIG_COUNT=$(pgr fa n50 -H -N 0 -C anchor.fasta)
 log_debug "contigs: ${CONTIG_COUNT}"
 
 log_info "group: anchor-long"
@@ -84,7 +84,7 @@ log_info "Build contigs"
 cat \
    group/non_grouped.fasta \
    group/*.contig.fasta |
-   hnsm filter -a 1000 stdin -o contig.fasta
+   pgr fa filter --min-len 1000 stdin -o contig.fasta
 
 log_info Done.
 

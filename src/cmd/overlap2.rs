@@ -166,13 +166,13 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         ${anchr} dazzname ${file1} --prefix ${opt_p1} -o ${opt_p1}.fasta
     )?;
     let first_sum = run_fun!(
-        hnsm n50 -H -N 0 -S ${opt_p1}.fasta
+        pgr fa n50 -H -N 0 -S ${opt_p1}.fasta
     )
     .unwrap()
     .parse::<usize>()
     .unwrap();
     let first_count = run_fun!(
-        hnsm n50 -H -N 0 -C ${opt_p1}.fasta
+        pgr fa n50 -H -N 0 -C ${opt_p1}.fasta
     )
     .unwrap()
     .parse::<usize>()
@@ -182,7 +182,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     {
         let second_start = first_count + 1;
         run_cmd!(
-            hnsm filter -u -a ${opt_min_len} ${file2} |
+            pgr fa filter -u --min-len ${opt_min_len} ${file2} |
                 ${anchr} dazzname stdin --prefix ${opt_p2} --start ${second_start} -o ${opt_p2}.fasta
         )?;
     }

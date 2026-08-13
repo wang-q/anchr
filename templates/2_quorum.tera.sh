@@ -90,7 +90,7 @@ for Q in 0 {{ opt.qual }}; do
 
         rm env.json
         log_debug "Reads stats"
-        SUM_OUT=$( hnsm n50 -H -N 0 -S pe.cor.fa.gz )
+        SUM_OUT=$( pgr fa n50 -H -N 0 -S pe.cor.fa.gz )
         save SUM_OUT
 
         save START_TIME

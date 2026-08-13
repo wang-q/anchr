@@ -12,7 +12,7 @@ if [ ! -e UT.fasta ]; then
 fi
 
 log_debug "UT sizes"
-hnsm size UT.fasta > ut.chr.sizes
+pgr fa size UT.fasta > ut.chr.sizes
 spanr genome ut.chr.sizes -o ut.chr.json
 
 #----------------------------#
@@ -279,8 +279,8 @@ spanr convert others.json -o others.regions.txt
 #----------------------------#
 log_info "pe.anchor.fa & pe.others.fa"
 
-hnsm range UT.fasta -r anchor.regions.txt -o pe.anchor.fa
-hnsm range UT.fasta -r others.regions.txt -o pe.others.fa
+pgr fa range UT.fasta -r anchor.regions.txt -o pe.anchor.fa
+pgr fa range UT.fasta -r others.regions.txt -o pe.others.fa
 
 #----------------------------#
 # Merging anchors

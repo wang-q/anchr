@@ -27,7 +27,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
     # actual sampling
     mkdir -p 4_down_sampling/Q{1}L{2}X{3}
-    hnsm split about -e -c \$(( {{ opt.genome }} * {3} )) \
+    pgr fa split about -e -c \$(( {{ opt.genome }} * {3} )) \
         2_illumina/Q{1}L{2}/pe.cor.fa.gz \
         -o 4_down_sampling/Q{1}L{2}X{3}
 

@@ -31,11 +31,11 @@ for Q in 0 {{ opt.qual }}; do
             fi
 
             log_info "Qual-Len: Q${Q}L${L}.${PREFIX}"
-            log_info "    hnsm interleave"
+            log_info "    pgr fq interleave"
 
             # Create .cor.fa.gz
-            hnsm interleave \
-                --fq --prefix pe \
+            pgr fq interleave \
+                --fq --name-prefix pe \
                 ${PREFIX}1.fq.gz \
 {% if opt.se == "0" -%}
                 ${PREFIX}2.fq.gz \
@@ -43,8 +43,8 @@ for Q in 0 {{ opt.qual }}; do
                 > ${PREFIX}.interleave.fa
 
             if [ -e ${PREFIX}s.fq.gz ]; then
-                hnsm interleave \
-                    --fq --prefix se \
+                pgr fq interleave \
+                    --fq --name-prefix se \
                     ${PREFIX}s.fq.gz \
                     >> ${PREFIX}.interleave.fa
             fi
@@ -85,8 +85,8 @@ for Q in 0 {{ opt.qual }}; do
         fi
 
         rm -f env.json
-        log_debug "Reads stats with hnsm"
-        SUM_OUT=$( hnsm n50 -H -N 0 -S pe.cor.fa.gz )
+        log_debug "Reads stats with pgr fa"
+        SUM_OUT=$( pgr fa n50 -H -N 0 -S pe.cor.fa.gz )
         save SUM_OUT
 
         save START_TIME

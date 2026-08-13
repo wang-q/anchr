@@ -14,25 +14,25 @@ export PATH="$(readlinkf "$(which masurca)" | xargs dirname):$PATH"
 log_info 'Processing pe and/or se library reads'
 
 {% if args | length == 2 -%}
-hnsm interleave \
-    --fq --prefix pe \
+pgr fq interleave \
+    --fq --name-prefix pe \
     '{{ args.0 }}' \
     '{{ args.1 }}' \
     > 'pe.renamed.fastq'
 {% elif args | length == 3 -%}
-hnsm interleave \
-    --fq --prefix pe \
+pgr fq interleave \
+    --fq --name-prefix pe \
     '{{ args.0 }}' \
     '{{ args.1 }}' \
     > 'pe.renamed.fastq'
 
-hnsm interleave \
-    --fq --prefix se \
+pgr fq interleave \
+    --fq --name-prefix se \
     '{{ args.2 }}' \
     > 'se.renamed.fastq'
 {% else -%}
-hnsm interleave \
-    --fq --prefix pe \
+pgr fq interleave \
+    --fq --name-prefix pe \
     '{{ args.0 }}' \
     > 'pe.renamed.fastq'
 {% endif -%}
@@ -164,7 +164,7 @@ cat {{ opt.prefix }}.cor.sub.fa |
     perl -nl -e '/^>([\w\/]+)/ and print $1' \
     >> {{ opt.prefix }}.discard.lst
 
-hnsm some -i {{ opt.prefix }}.cor.sub.fa {{ opt.prefix }}.discard.lst -o {{ opt.prefix }}.cor.fa
+pgr fa some -i {{ opt.prefix }}.cor.sub.fa {{ opt.prefix }}.discard.lst -o {{ opt.prefix }}.cor.fa
 
 rm {{ opt.prefix }}.cor.sub.fa
 
@@ -188,10 +188,10 @@ save ESTIMATED_GENOME_SIZE
 log_debug "You set ESTIMATED_GENOME_SIZE of $ESTIMATED_GENOME_SIZE"
 {% endif -%}
 {# Keep a blank line #}
-log_debug "Reads stats with hnsm"
-SUM_IN=$( hnsm n50 -H -N 0 -S pe.renamed.fastq {% if args | length == 3 %}se.renamed.fastq {% endif %})
+log_debug "Reads stats with pgr fa"
+SUM_IN=$( pgr fa n50 -H -N 0 -S pe.renamed.fastq {% if args | length == 3 %}se.renamed.fastq {% endif %})
 save SUM_IN
-SUM_OUT=$( hnsm n50 -H -N 0 -S {{ opt.prefix }}.cor.fa )
+SUM_OUT=$( pgr fa n50 -H -N 0 -S {{ opt.prefix }}.cor.fa )
 save SUM_OUT
 
 #----------------------------#

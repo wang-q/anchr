@@ -44,16 +44,16 @@ create_k_unitigs_large_k \
     > superreads-81.fasta
 
 
-hnsm n50 -S -C -g 4641652 Bf-31.fasta
-hnsm n50 -S -C -g 4641652 Bf-81.fasta
+pgr fa n50 -S -C -g 4641652 Bf-31.fasta
+pgr fa n50 -S -C -g 4641652 Bf-81.fasta
 
-hnsm n50 -S -C -g 4641652 bcalm-31.unitigs.fa
-hnsm n50 -S -C -g 4641652 bcalm-81.unitigs.fa
+pgr fa n50 -S -C -g 4641652 bcalm-31.unitigs.fa
+pgr fa n50 -S -C -g 4641652 bcalm-81.unitigs.fa
 
-hnsm n50 -S -C -g 4641652 tadpole-31.fasta
-hnsm n50 -S -C -g 4641652 tadpole-81.fasta
+pgr fa n50 -S -C -g 4641652 tadpole-31.fasta
+pgr fa n50 -S -C -g 4641652 tadpole-81.fasta
 
-hnsm n50 -S -C -g 4641652 superreads-31.fasta
-hnsm n50 -S -C -g 4641652 superreads-81.fasta
+pgr fa n50 -S -C -g 4641652 superreads-31.fasta
+pgr fa n50 -S -C -g 4641652 superreads-81.fasta
 
 ```

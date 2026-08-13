@@ -29,7 +29,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
     # actual sampling
     mkdir -p 6_down_sampling/MRX{}
-    hnsm split about -e -c \$(( {{ opt.genome }} * {} )) \
+    pgr fa split about -e -c \$(( {{ opt.genome }} * {} )) \
         2_illumina/merge/pe.cor.fa.gz \
         -o 6_down_sampling/MRX{}
 

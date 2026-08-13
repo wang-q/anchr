@@ -32,7 +32,7 @@ else
     cd 8_spades
 
     mkdir -p re-pair
-    hnsm filter -a 60 ${DIR_READS}/pe.cor.fa.gz |
+    pgr fa filter --min-len 60 ${DIR_READS}/pe.cor.fa.gz |
         repair.sh \
             in=stdin.fa \
             out=re-pair/R1.fa \
@@ -54,7 +54,7 @@ else
         contigs.fasta \
         --len 1000 --idt 0.98 --ratio 0.99999 --parallel {{ opt.parallel }} \
         -o stdout |
-        hnsm filter -a 1000 stdin -o spades.non-contained.fasta
+        pgr fa filter --min-len 1000 stdin -o spades.non-contained.fasta
 
     log_info "Clear intermediate files"
     find . -type d -not -name "anchor" | parallel --no-run-if-empty -j 1 rm -fr

@@ -26,7 +26,7 @@ cd ~/data/dazz/dazzler
 
 gzip -dcf ../ref/iso_1/GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna.gz |
     dazz dazzname stdin -o stdout |
-    hnsm filter stdin -o renamed.fasta
+    pgr fa filter stdin -o renamed.fasta
 
 ```
 
@@ -60,7 +60,7 @@ cd ~/data/dazz/dazzler
 DBshow -n myDB 5-10 102 100-101
 
 # sequences from the original file
-hnsm some renamed.fasta <(DBshow -n myDB 5-10 102 100-101 | sed 's/^>//')
+pgr fa some renamed.fasta <(DBshow -n myDB 5-10 102 100-101 | sed 's/^>//')
 
 ```
 
@@ -147,13 +147,13 @@ cd ~/data/dazz/dazzler2
 
 cat ~/data/dazz/e_coli/4_kunitigs/Q20L60X80P000/anchor/anchor.fasta |
     dazz dazzname --prefix first stdin -o stdout |
-    hnsm filter stdin -o first.fasta
+    pgr fa filter stdin -o first.fasta
 mv stdout.replace.tsv first.replace.tsv
 
 gzip -dcf ~/data/dazz/e_coli/3_long/L.X80.trim.fasta.gz |
     head -n 20000 |
     dazz dazzname --prefix second stdin -o stdout |
-    hnsm filter -a 1000 stdin -o second.fasta
+    pgr fa filter --min-len 1000 stdin -o second.fasta
 mv stdout.replace.tsv second.replace.tsv
 
 echo "Make the dazzler DB"

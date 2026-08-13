@@ -163,7 +163,7 @@ Fastrm R1-21 R2-21
 ```shell
 cd ~/data/anchr/mg1655/1_genome/
 
-hnsm size genome.fa > chr.sizes
+pgr fa size genome.fa > chr.sizes
 
 FastK -v -p -k17 genome
 
@@ -187,8 +187,8 @@ cat chr.sizes |
 Fastrm genome
 
 spanr convert repetitive.json > region.txt
-hnsm range genome.fa -r region.txt |
-    hnsm filter -N -d -a 100 stdin \
+pgr fa range genome.fa -r region.txt |
+    pgr fa filter -N -d --min-len 100 stdin \
     > repetitive.fa
 
 spanr stat chr.sizes repetitive.json
@@ -196,10 +196,10 @@ spanr stat chr.sizes repetitive.json
 #NC_000913,4641652,92892,0.0200
 #all,4641652,92892,0.0200
 
-hnsm size repetitive.fa | tsv-summarize --sum 2
+pgr fa size repetitive.fa | tsv-summarize --sum 2
 #92892
 
-hnsm size paralogs.fa | tsv-summarize --sum 2
+pgr fa size paralogs.fa | tsv-summarize --sum 2
 #187300
 
 ```
@@ -220,7 +220,7 @@ java -jar ~/bin/readseq.jar -f fa Libraries/RepeatMaskerLib.embl
 
 mv Libraries/RepeatMaskerLib.embl.fasta repeat.fa
 
-hnsm size
+pgr fa size
 
 FastK -v -t -k21 repeat
 FastK -v -p:repeat -k21 genome
@@ -306,8 +306,8 @@ cat self.filter.tsv |
 rm self.*.tsv
 
 spanr convert paralogs.json > region.txt
-hnsm range genome.fa -r region.txt |
-    hnsm filter -N -d -a 100 stdin \
+pgr fa range genome.fa -r region.txt |
+    pgr fa filter -N -d --min-len 100 stdin \
     > paralogs.fa
 
 spanr stat chr.sizes paralogs.json

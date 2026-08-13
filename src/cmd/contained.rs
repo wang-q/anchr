@@ -136,7 +136,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let mut infiles = vec![];
     for (i, infile) in abs_infiles.iter().enumerate() {
         run_cmd!(
-            hnsm filter -a ${min_len} ${infile} |
+            pgr fa filter --min-len ${min_len} ${infile} |
                 ${anchr} dazzname --no-replace --prefix ${prefix}_${i} stdin -o infile.${i}.fasta
         )?;
         infiles.push(format!("infile.{}.fasta", i));
@@ -224,7 +224,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let files = infiles.clone();
     run_cmd!(
         cat $[files] |
-            hnsm some -i stdin discard.list -o ${abs_outfile}
+            pgr fa some -i stdin discard.list -o ${abs_outfile}
     )?;
 
     //----------------------------
