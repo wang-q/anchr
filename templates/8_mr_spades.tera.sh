@@ -27,6 +27,9 @@ else
     cd 8_mr_spades
 
     mkdir -p re-pair
+    # pe.cor.fa.gz is fully shuffled by 2_merge (tsv-sample), so use the
+    # name-indexed "repair" (rp) mode; "fint" only fixes partially-broken
+    # interleaving and cannot pair fully shuffled reads.
     pgr fa filter --min-len 60 ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz |
         repair.sh \
             in=stdin.fa \
@@ -34,7 +37,7 @@ else
             out2=re-pair/R2.fa \
             outs=re-pair/Rs.fa \
             threads={{ opt.parallel }} \
-            fint overwrite
+            repair overwrite
 
     # spades seems ignore non-properly paired reads
     spades.py \
