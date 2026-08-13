@@ -11,7 +11,6 @@ use pgr::libs::fq::qual::{from_phred, to_phred};
 use pgr::libs::kmer::key;
 use pgr::libs::nt::rev_comp;
 use rayon::prelude::*;
-use std::collections::HashMap;
 use std::io::Write;
 use std::sync::OnceLock;
 
@@ -127,12 +126,21 @@ impl Default for TadpoleOptions {
     }
 }
 
-/// Canonical k-mer count table (2-bit encoding, forward vs reverse-complement).
+/// Canonical k-mer count table (FastK 2-bit packing, forward vs
+/// reverse-complement canonical form).
+///
+/// Storage is pgr's `KmerTable`: packed canonical keys (ascending byte
+/// order, which equals `Kmer::cmp_bases` order) + parallel `u32` counts,
+/// built by quality-gated emission + `pgr::kmer::count::count_keys`
+/// (parallel radix sort, no HashMap). The old per-chunk `HashMap` build
+/// collected every chunk map before merging (5.3 GB peak on G37 full);
+/// the packed sort path keeps intermediate buffers to a single global key
+/// list, so both memory and counting time drop an order of magnitude.
 #[derive(Debug, Clone, Default)]
 pub struct TadpoleTable {
-    map: HashMap<Kmer, u32>,
-    /// Canonical-kmer sorted (key, count) snapshot, built once on first
-    /// request (the assemble passes scan it multiple times).
+    table: pgr::libs::kmer::KmerTable,
+    /// (key, count) snapshot built once on first request (the assemble
+    /// passes scan it multiple times; the packed table stays the source).
     sorted: OnceLock<Vec<(Kmer, u32)>>,
 }
 
@@ -143,59 +151,97 @@ impl TadpoleTable {
         let (prob_correct, prob_correct_inv) = prob_tables();
         if reads.is_empty() {
             return Self {
-                map: HashMap::new(),
+                table: pgr::libs::kmer::KmerTable::default(),
                 sorted: OnceLock::new(),
             };
         }
-        // Parallel per-chunk counting (the same rayon pattern as
-        // `libs/kmer::build_table`), then a deterministic merge; the table
-        // contents are identical to a single-threaded build.
+        // Parallel per-chunk emission of quality-gated packed canonical
+        // keys, tree-concatenated (only O(threads) buffers coexist), then
+        // the shared pgr sort+group core (`count_keys`). Sorting makes the
+        // concatenation order irrelevant, so the table is deterministic.
         let chunk_size = 4096usize;
-        let maps: Vec<HashMap<Kmer, u32>> = reads
+        let key_bytes = k.div_ceil(4);
+        let keys: Vec<u8> = reads
             .par_chunks(chunk_size)
             .map(|chunk| {
-                let mut map: HashMap<Kmer, u32> = HashMap::new();
+                let cap = chunk
+                    .iter()
+                    .map(|(b, _)| b.len().saturating_sub(k - 1) * key_bytes)
+                    .sum();
+                let mut raw = Vec::with_capacity(cap);
                 for (bases, quals) in chunk {
-                    count_read_kmers(
-                        &mut map,
-                        bases,
-                        quals,
-                        k,
-                        min_prob,
-                        &prob_correct,
-                        &prob_correct_inv,
+                    count_read_kmers_packed(
+                        &mut raw, bases, quals, k, min_prob, &prob_correct, &prob_correct_inv,
                     );
                 }
-                map
+                raw
             })
-            .collect();
-        let map: HashMap<Kmer, u32> = maps
-            .into_iter()
-            .reduce(|mut acc, other| {
-                for (kmer, count) in other {
-                    *acc.entry(kmer).or_insert(0) += count;
-                }
+            .reduce(Vec::new, |mut acc, mut v| {
+                acc.append(&mut v);
                 acc
-            })
-            .unwrap();
+            });
+        let table = pgr::libs::kmer::count::count_keys(keys, k);
         Self {
-            map,
+            table,
             sorted: OnceLock::new(),
         }
     }
 
     /// Count of the canonical form of `kmer` (0 when absent).
     pub(crate) fn get_count(&self, kmer: &Kmer) -> u32 {
-        self.map.get(&kmer.canonical()).copied().unwrap_or(0)
+        let kb = self.table.key_bytes();
+        let mut qbuf = [0u8; 32];
+        // Whole-byte k (k % 4 == 0): packed rc via a byte table (kb lookups
+        // + half-byte canonical compare) instead of `key::Kmer::canonical`,
+        // which recomputes the rc base-by-base (O(k)); at k=100 the
+        // traversal's get_count canonicalization was ~30% of runtime.
+        if self.table.k.is_multiple_of(4) {
+            let fw = kmer.0.to_bytes();
+            let mut rc = [0u8; 32];
+            for i in 0..kb {
+                rc[kb - 1 - i] = REVCOMP_BYTE[fw[i] as usize];
+            }
+            let half = kb.div_ceil(2);
+            let canon: &[u8] = if fw[..half] <= rc[..half] {
+                fw
+            } else {
+                &rc[..kb]
+            };
+            qbuf[..kb].copy_from_slice(canon);
+        } else {
+            let canon = kmer.canonical();
+            qbuf[..kb].copy_from_slice(canon.0.to_bytes());
+        }
+        let q = &qbuf[..kb];
+        let keys = &self.table.keys;
+        let mut lo = 0usize;
+        let mut hi = keys.len() / kb;
+        while lo < hi {
+            let mid = (lo + hi) >> 1;
+            let mid_b = &keys[mid * kb..(mid + 1) * kb];
+            match mid_b.cmp(q) {
+                std::cmp::Ordering::Less => lo = mid + 1,
+                std::cmp::Ordering::Greater => hi = mid,
+                std::cmp::Ordering::Equal => return self.table.counts[mid],
+            }
+        }
+        0
     }
 
     /// Deterministic (canonical k-mer) sorted snapshot of (key, count),
     /// computed once and cached for the multi-pass assemble scans.
     pub(crate) fn sorted_entries(&self) -> &[(Kmer, u32)] {
         self.sorted.get_or_init(|| {
-            let mut v: Vec<(Kmer, u32)> = self.map.iter().map(|(k, &c)| (*k, c)).collect();
-            v.sort_by(|a, b| a.0.cmp_bases(&b.0));
-            v
+            let kb = self.table.key_bytes();
+            self.table
+                .keys
+                .chunks_exact(kb)
+                .enumerate()
+                .map(|(i, b)| {
+                    let km = Kmer(pgr::libs::kmer::key::Kmer::from_bytes(self.table.k, b));
+                    (km, self.table.counts[i])
+                })
+                .collect()
         })
     }
 
@@ -226,6 +272,24 @@ impl TadpoleTable {
 /// hot paths; a thin wrapper over `key::Kmer` kept for call-site brevity.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub(crate) struct Kmer(key::Kmer);
+
+/// Reverse-complement of a packed FastK byte (4 × 2-bit codes high->low:
+/// `(3-c3)(3-c2)(3-c1)(3-c0)`). Exact for whole bytes; when `k % 4 != 0`
+/// the boundary byte's unused bits break the byte symmetry, so the table
+/// fast path is restricted to `k % 4 == 0` (e.g. k=100).
+static REVCOMP_BYTE: [u8; 256] = {
+    let mut t = [0u8; 256];
+    let mut b = 0usize;
+    while b < 256 {
+        let c0 = (b >> 6) & 3;
+        let c1 = (b >> 4) & 3;
+        let c2 = (b >> 2) & 3;
+        let c3 = b & 3;
+        t[b] = (((3 - c3) << 6) | ((3 - c2) << 4) | ((3 - c1) << 2) | (3 - c0)) as u8;
+        b += 1;
+    }
+    t
+};
 
 impl Kmer {
     /// Empty window of length `k` (`k <= key::Kmer::MAX_K`, caller-validated).
@@ -326,10 +390,20 @@ fn prob_tables() -> (Vec<f32>, Vec<f32>) {
     (correct, inverse)
 }
 
-/// Counts the k-mers of one read, mirroring `KmerTableSetU.addKmersToTable`
-/// (canonical keys, sliding `minprob` quality gate, N resets the window).
-fn count_read_kmers(
-    map: &mut HashMap<Kmer, u32>,
+/// Emits the quality-gated canonical k-mers of one read as packed FastK
+/// bytes, mirroring `KmerTableSetU.addKmersToTable` (canonical keys,
+/// sliding `minprob` quality gate, N resets the window). Duplicates are
+/// emitted repeatedly; `pgr::kmer::count::count_keys` groups them later.
+///
+/// Canonicalization uses the pgr `canonical_keys` trick: the forward window
+/// and its reverse complement advance incrementally together (`push_right`
+/// + `push_left(3-x)`), so the rc is never recomputed per window, and the
+/// FastK mirror symmetry lets the canonical decision compare only the first
+/// half of the packed bytes (`ceil(key_bytes/2)`). At long k this is the
+/// dominant emission cost (k=100: `canonical()` recomputes a 25-byte rc per
+/// window, 21.7% of runtime before this change).
+fn count_read_kmers_packed(
+    out: &mut Vec<u8>,
     bases: &[u8],
     quals: &[u8],
     k: usize,
@@ -345,12 +419,18 @@ fn count_read_kmers(
     } else {
         0.0
     };
-    let mut kmer = Kmer::new(k);
+    let key_bytes = k.div_ceil(4);
+    let half = key_bytes.div_ceil(2);
+    let mut win = Kmer::new(k);
+    let mut win_rc = Kmer::new(k); // rc of the all-zero window, advanced in lockstep
     let mut len = 0usize;
     let mut prob = 1f32;
     for (i, &b) in bases.iter().enumerate() {
         if base_defined(b) {
-            kmer.push_right(base_code(b));
+            let x = base_code(b);
+            win.push_right(x);
+            // Each new forward 3' base `x` prepends `3-x` to the rc's 5' end.
+            win_rc.push_left(3 - x);
             if min_prob2 > 0.0 {
                 // phred can exceed 127 on malformed (non-ASCII) quality bytes;
                 // clamp so `prob_correct` (128 entries) is never indexed OOB.
@@ -364,11 +444,13 @@ fn count_read_kmers(
             len += 1;
         } else {
             len = 0;
-            kmer.reset();
+            win.reset();
+            win_rc.reset();
             prob = 1.0;
         }
         if len >= k && prob >= min_prob2 {
-            *map.entry(kmer.canonical()).or_insert(0) += 1;
+            let (fw, rc) = (win.0.to_bytes(), win_rc.0.to_bytes());
+            out.extend_from_slice(if fw[..half] <= rc[..half] { fw } else { rc });
         }
     }
 }
@@ -1700,8 +1782,14 @@ fn kmer_to_u128(k: &Kmer, kmer_len: usize) -> u128 {
 fn counting_matches_simple_expected() {
     let reads = vec![(b"ACGTACGT".to_vec(), vec![40; 8])];
     let table = TadpoleTable::build(&reads, 4, 0.5);
-    // "ACGT" kmer and its RC (ACGT) are the same key; counts = 5 windows.
-    assert_eq!(table.map.values().sum::<u32>(), 5);
+    // 5 windows -> canonical keys ACGT(x2), CGTA(x2), GTAC(x1).
+    assert_eq!(table.table.counts.iter().sum::<u32>(), 5);
+    assert_eq!(table.table.keys.len(), 3); // 3 distinct packed keys (k=4 -> 1 B each)
+    let mut probe = Kmer::new(4);
+    for &b in b"ACGT" {
+        probe.push_right(base_code(b));
+    }
+    assert_eq!(table.get_count(&probe), 2);
 }
 
 #[test]

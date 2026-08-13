@@ -207,7 +207,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
   `BBTools-40.01/`，仅作参考，被 gitignore）；
 - **dazzler 工具链**（fasta2DB/DBsplit/daligner/LAshow）与 **hnsm**：
   流程命令的外部依赖（系统 PATH）；
-- **bcalm/canu/celera/metaMDBG/skesa/quorum**：asm 与纠错的源码参考
+- **bcalm/canu/celera/metaMDBG/megahit/skesa/quorum**：asm 与纠错的源码参考
   （笔记见 `notes/references/`）。
 
 ## 8. 关键风险与技术债
@@ -256,7 +256,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `bbtools.md` | fq/asm 主参考（tadpole/bbduk/bbmap/clumpify 等） |
 | `bcalm.md` | `asm unitig` 移植来源 |
 | `canu.md` / `celera.md` | `asm olc` 参考 |
-| `metaMDBG.md` / `skesa.md` | OLC v1 素材 |
+| `metaMDBG.md` / `skesa.md` / `megahit.md` | OLC v1 素材 / 多 k 迭代与图清洗参考 |
 | `cutadapt.md` / `sickle.md` | `fq trim-qual` 算法来源 |
 | `fairy.md` | `fq norm` 大数据方案调研 |
 | `quorum.md` | read 纠错参考（`fq ec-kmer`） |

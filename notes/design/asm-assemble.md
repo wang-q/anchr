@@ -241,3 +241,113 @@ unitigs 组装）影响可忽略。
   71245 unitig → 其 rc 方向邻居），已回退。结论：`--links` 保持现有
   简化语义（`asm-assemble.md` §8.1 方向规则），逐边对齐需 bcalm 链接
   实现源码（或读取其 L: 过滤逻辑），暂不立项。
+
+## 9. 大规模性能基准与优化方向（2026-08-13）
+
+基准（G37 full 144 MB / 656k reads，k=31）：`anchr asm unitig` 12.8 s /
+5.3 GB，bcalm 2.2 s / 554 MB，Bifrost 2.7 s / 29 MB（详见
+[unitig-bench.md](../benchmarks/unitig-bench.md)）。
+
+### 9.1 时间分布（perf，full k=31）
+
+* k-mer 计数循环（`TadpoleTable::build` per-chunk 计数）：**65.5%**
+* 串行 map 合并：**15.9%**
+* SipHash（RandomState 对 40 B key）：**~8.3%**
+* rehash 1.4%、canonical 0.8%；真正压缩遍历（build_unitigs/排序）**<1%**
+
+瓶颈是**计数 + 哈希**，不是组装算法本身。
+
+### 9.2 内存 5.3 GB 根因（已确认）
+
+`par_chunks(4096)` 把 656k reads 切成 160 块各建一个 `HashMap<Kmer,u32>`，
+然后 `collect()` 全部 160 个 map 到 Vec 再串行 reduce——峰值就是 160 个
+map 同时驻留（各 ~30 MB，合计 ~4.8 GB）。distinct k-mer 实测仅 113 万
+（最终表 ~110 MB），reads 双份拷贝 ~0.65 GB。
+
+诊断实验（临时把 chunk 调到 16384，40 个 map）：同一 full 输入
+**RSS 5.28 → 2.86 GB（-46%），wall 12.8 → 6.1 s（-52%）**。
+
+注意：§7 曾称 `TadpoleTable::build` 是"`pgr::libs::kmer::build_table`
+同款模式"——实际并不同款：pgr 是 per-seq 打包 key + 并行基数排序 +
+分组计数（FastK/Myers 骨架），anchr 是 HashMap + collect/reduce。
+§7 的 radix 评估（20k Lambda 下 radix 更慢）是小规模结论，本节的
+5.3 GB 根因说明**大规模下需要回到 pgr 模式**，两者不矛盾。
+
+### 9.3 改进方向（按性价比）
+
+> **前提**：pgr 的 k-mer 基础设施（`libs/kmer/key.rs`、`count.rs`、
+> `mod.rs::canonical_keys`、`libs/ds/radix_sort.rs`）借鉴 Myers 的 FastK
+> 项目，长期打磨，**不改 pgr 侧**；anchr 侧对齐/复用其模式。
+
+1. **计数对齐 pgr（治本，首选）**：`TadpoleTable` 弃用
+   `HashMap<Kmer,u32>`，改用打包 key 模式——per-seq 并行滚动窗口
+   （`canonical_keys` 增量正/反互补 + `ceil(key_bytes/2)` 比较）+ 质量
+   门控（tadpole 特性；pgr 的 `canonical_keys` 无质量过滤，门控留在
+   anchr 的发射循环里）+ 全局并行基数排序 + 分组计数。一次性消除
+   9.1 的三个热点与 5.3 GB 内存（打包 key 每条目 `ceil(k/4)` 字节 vs
+   40 B，且无 collect 全部 map）；
+2. **查询结构**：排序后的打包 key + 二分查找足够（遍历 <1%）；若将来
+   遍历成瓶颈再加紧凑开放寻址索引；
+3. **reads 双份拷贝减一份**（-0.65 GB）；
+4. **算法级：minimizer 分桶**（bcalm 方案，长 k 大数据方向）：minimizer
+   裁剪效果随 k 增强、桶可落盘——第二阶段，工作量最大；
+5. 遍历并行化：收益小（<1%），不做。
+
+> 分桶基础设施调研与计划见 [unitig-bucket.md](unitig-bucket.md)：anchr
+> 已有 hash 分桶实现（`fq norm`/`fq clump` 外部分桶），minimizer 分桶
+> 才是真实缺口。
+
+过渡止血（可选，不改变方向）：`collect`+串行 reduce 换成 rayon 树状
+reduce 即可立减 ~50% 内存/时间。
+
+### 9.4 长 k 视角（规划是长 k，不止 31）
+
+`key::Kmer` 固定 `k(8B)+[u8;32]` = 40 B（k≤128 恒定），条目内存不随
+k 增长；滚动窗口 `push_right` 与哈希成本与 k 基本无关。k 缩放实测
+（small 24 MB）：anchr unitig RSS 1245→1192→667 MB、wall 3.03→2.74→
+2.45 s（k=31/64/100），bcalm 时间随 k 略升——**长 k 下差距收窄**
+（anchr/bcalm 2.7× → 1.5×）。9.3 的对齐收益在长 k 下同样成立，且
+内存问题相对更轻。
+
+### 9.5 实施状态（2026-08-13）
+
+9.3 第 1 项（计数对齐 pgr）已实施：`TadpoleTable` 存储改为
+`pgr::libs::kmer::KmerTable`（打包 canonical key + u32 计数），构建改
+为 per-chunk 质量门控发射打包字节 + rayon 树状拼接 + `count_keys`
+（并行 MSD radix + 分组计数）。pgr 侧零改动；`get_count` 改为打包 key
+二分，`sorted_entries` 惰性重建 `(Kmer, u32)` 快照（顺序与旧版一致：
+`Kmer` 的 `Ord` 即 `to_bytes()` 字节序）。
+
+验证与结果：
+
+* 339 测试全绿；G37 full 的 unitig/contig 输出与旧实现**逐字节一致**
+  （三档 N50/条数/总长全部相同）；
+* full k=31：unitig 12.8 s / 5.3 GB → **4.4 s / 2.46 GB**（-65% /
+  -54%）；small 3.03 s / 1.24 GB → 1.89 s / 547 MB；medium 5.1 s /
+  2.9 GB → 2.3 s / 989 MB（详见 [unitig-bench.md](../benchmarks/unitig-bench.md)）；
+* **长 k 新发现**：radix 排序成本随 key_bytes 增长（MSD 每字节一级），
+  small 上 anchr unitig k=31/64/100 = 1.89/2.42/2.86 s，而旧 HashMap
+  实现是随 k 下降（k-mer 变少）。k=100 比值回到 1.6×（vs bcalm）。
+  长 k 的进一步优化走 minimizer 分桶（9.3 第 4 项，详见
+  [unitig-bucket.md](unitig-bucket.md)），可同时降低有效排序长度与
+  中间 key 总量。
+
+### 9.6 发射与查询优化（2026-08-13 续）
+
+perf 定位 k=100 的真实热点不在 radix（~8%）而在**发射循环与遍历查询**：
+
+* 发射：`count_read_kmers_packed` 弃用每窗口 `canonical()`（重算 25 B
+  rc，O(k)），改用 pgr `canonical_keys` 的增量模式——`win` 与 `win_rc`
+  同步推进（`push_right(x)` + `push_left(3-x)`），canonical 判定只比
+  前 `ceil(key_bytes/2)` 字节（FastK 镜像对称）；N 复位两者归零，空窗
+  填充 k 步后自然对齐（已由 golden 验证）。发射热点 37.7% → 11.2%；
+* 遍历查询：`get_count` 对 `k % 4 == 0`（整字节，如 k=100）用
+  `REVCOMP_BYTE[256]` 表算打包 rc（kb 次查表 + 半字节比较），替代
+  `key::Kmer::canonical` 的逐碱基 rc（O(k)）；`k % 4 != 0` 保持原路径
+  （小 k 下遍历 <1%，无需优化）。遍历 canonical 热点 ~30% 消除。
+
+结果（small，同批 runs 3）：k=31/64/100 = 1.85/1.86/1.98 s（原先
+1.89/2.42/2.86 s），比值 vs bcalm 1.5×/1.2×/**1.1×**；内存 ~0.5 GB
+持平。339 测试全绿，G37 输出逐字节一致。k 缩放基本拉平后，
+minimizer 分桶（unitig-bucket.md）的优先级降低——内存有界化（阶段 A）
+成为更相关的下一步。
