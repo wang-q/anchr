@@ -98,9 +98,11 @@ fq/asm 迁移阶段 1-4 完成（pgr 侧 `ace4ee8` 已删除对应代码/文档�
   walk 覆盖度已改为扩展时累积；**DFA 状态表内嵌计数**后默认组合到
   k31 1.34 s/670 MB、k99 1.69 s/~1.6 GB；**分类条目复用 + visited
   字节数组**后再到 full k31 1.21 s/663 MB、k99 1.63 s/1348 MB
-  （small/medium 亦 -31~-51%）。剩余：计数（pgr，~0.9 vs FastK
-  0.68 s）——是否设 supermer 默认仍待定
-  （[asm-assemble.md](design/asm-assemble.md) §12.2）。
+  （small/medium 亦 -31~-51%）。**pgr §12.3 落地（commit b31af11）**：
+  supermer k31 lib 0.595 s，anchr 已接入 slices API 并把 supermer 设为
+  **FASTA 默认计数**（FASTQ 自动回退 direct；`--no-supermer` 强制），
+  新默认 half(8) 基线 k31 1.36 s/597 MB、k99 2.19 s/1131 MB
+  （[asm-assemble.md](design/asm-assemble.md) §12.2/§12.3）。
 - **并行安全（2026-08-14）**：并行 walk 实验（`--parallel-walk`）因计数
   + 分类 + walk 多层线程池叠加导致系统卡死，已整体移除；`--parallel`
   默认改为 **min(逻辑核/2, 8)**（自适应，auto 仍可显式指定吃满）。

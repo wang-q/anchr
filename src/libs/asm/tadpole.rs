@@ -235,13 +235,12 @@ impl TadpoleTable {
         m: Option<usize>,
     ) -> anyhow::Result<Self> {
         let t0 = std::time::Instant::now();
-        // Move the sequence buffers out of the (seq, phred) pairs instead of
-        // cloning: the super-mer path does not use qualities, and keeping a
-        // second byte copy costs ~0.65 GB on G37 full.
-        let seqs: Vec<Vec<u8>> = reads.into_iter().map(|(s, _)| s).collect();
+        // Borrow the sequence buffers (slices API): the super-mer path does
+        // not use qualities, and no `Vec<Vec<u8>>` is materialized.
+        let seqs: Vec<&[u8]> = reads.iter().map(|(s, _)| s.as_slice()).collect();
         let table = match m {
-            Some(m) => pgr::libs::kmer::supermer::build_table_with_m(&seqs, k, m)?,
-            None => pgr::libs::kmer::supermer::build_table(&seqs, k)?,
+            Some(m) => pgr::libs::kmer::supermer::build_table_slices_with_m(&seqs, k, m)?,
+            None => pgr::libs::kmer::supermer::build_table_slices(&seqs, k)?,
         };
         if std::env::var_os("ANCHR_SM_TIMING").is_some() {
             eprintln!(

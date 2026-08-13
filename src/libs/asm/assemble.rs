@@ -400,7 +400,27 @@ fn assemble_unitigs_core(
         key::Kmer::MAX_K,
         opts.k
     );
-    let (table, reads_in) = if opts.use_supermer {
+    // `--supermer` is the default for FASTA input (no quality scores, so
+    // counting without quality gating is equivalent); FASTQ falls back to
+    // the direct path to keep `min_prob` semantics.
+    let fasta_input = if opts.use_supermer {
+        let mut reader = SeqReader::new(&infiles[0])?;
+        let mut rec = SeqRecord::new();
+        if reader.read_record(&mut rec)? {
+            rec.quality_scores().is_empty()
+        } else {
+            true
+        }
+    } else {
+        false
+    };
+    if opts.use_supermer && !fasta_input {
+        eprintln!(
+            "note: --supermer requires FASTA input (no quality scores); falling back to direct counting"
+        );
+    }
+    let use_supermer = opts.use_supermer && fasta_input;
+    let (table, reads_in) = if use_supermer {
         let t0 = std::time::Instant::now();
         let reads = read_records(infiles)?;
         if std::env::var_os("ANCHR_SM_TIMING").is_some() {

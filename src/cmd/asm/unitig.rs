@@ -115,7 +115,13 @@ Examples:
             Arg::new("supermer")
                 .long("supermer")
                 .action(ArgAction::SetTrue)
-                .help("Experimental: FastK-style super-mer two-stage counting (pgr kmer::supermer); counts without quality gating"),
+                .help("Use FastK-style super-mer two-stage counting (default for FASTA; kept for compatibility)"),
+        )
+        .arg(
+            Arg::new("no_supermer")
+                .long("no-supermer")
+                .action(ArgAction::SetTrue)
+                .help("Disable super-mer counting (use the direct streamed counter)"),
         )
         .arg(
             Arg::new("supermer_m")
@@ -151,7 +157,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
     let parallel = crate::cmd::args::parse_parallel(args.get_one::<String>("parallel").unwrap())?;
     let k = *args.get_one::<usize>("kmer").unwrap();
-    let use_supermer = args.get_flag("supermer");
+    let use_supermer = !args.get_flag("no_supermer");
     let opts = AssembleOptions {
         k,
         min_contig_len: args

@@ -129,10 +129,10 @@ anchr asm unitig [OPTIONS] <infiles>...
     output); kept as an explicit flag for compatibility.
 *   `--no-dfa`: Disable the DFA-state walk and use the bucket-scan walk.
 *   `--supermer`: Experimental: FastK-style super-mer two-stage counting
-    (pgr `kmer::supermer`, fixed minimizer m=12). Output is byte-identical
-    on FASTA / no-quality input; counts without quality gating. Currently
-    not faster than the direct path on the G37 workload (see
-    `notes/design/asm-assemble.md` §12).
+    (pgr `kmer::supermer`, adaptive minimizer `min(12, max(5, ceil(k/4)))`).
+    **Default for FASTA input** (no quality scores → equivalent to direct
+    counting); FASTQ automatically falls back to the direct quality-gated
+    counter. `--no-supermer` forces the direct streamed counter.
 *   `--supermer-m <int>`: Minimizer length for `--supermer` (experimental
     sweep; m=8 is best on G37 k=31, m=12 on k=99).
 *   `--list-files`: Treat `<infiles>` as list files, one sequence file path

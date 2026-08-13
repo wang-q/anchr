@@ -683,7 +683,7 @@ stage 2 加权展开，输出与直接路径逐字节一致，测试覆盖 k=3..
      自适应只能改善、不能根治。
   两者任一落地后重跑 §12 的基准表，再决定 `--supermer` 是否转正。
 
-### 12.3 pgr 计数优化交接（2026-08-14）
+### 12.3 pgr 计数优化落地与 FASTA 默认切换（2026-08-14）
 
 anchr 侧已收敛（DFA 默认 walk、流式 direct 计数、状态表内嵌计数、
 单池复用、`--parallel` 默认 `min(逻辑核/2, 8)`）。剩余最大单一差距在
@@ -718,6 +718,15 @@ pgr 计数：G37 full k=31 约 **0.9 s** vs FastK **0.68 s**（同机、纯计�
 目标：pgr supermer k=31 端到端 ≤ 0.7 s、内存 ≤ 800 MB（当前 1.01 s /
 854 MB，见 `notes/benchmarks/bench-supermer-vs-fastk.md`）。
 
+**落地（pgr commit `b31af11`，2026-08-14）**：§12.3 清单全部完成——
+自适应 minimizer（`min(12, max(5, ceil(k/4)))`）、stage-1 连续打包、
+借用切片 API（`build_table_slices*`）、stage-2 group/expand 并行；
+k=31 lib 0.87 → **0.595 s**（-32%）。anchr 接入新 API（bump rev +
+slices 调用），并把 supermer 设为 **FASTA 默认计数**（FASTQ 自动回退
+direct 保质量门控；`--no-supermer` 强制 direct）。G37 full half(8)：
+k31 **1.358 s / 597 MB**（vs direct 2.103 s / 602 MB，-35%）、k99
+**2.187 s / 1131 MB**（-13%）；`--parallel auto` k31 可到 1.056 s。
+
 ### 12.2 效率攻坚：walk 瓶颈与组合优化（2026-08-14）
 
 分阶段计时（G37 full k=31，`--supermer --dfa -p8`）：
@@ -746,8 +755,11 @@ pgr 计数：G37 full k=31 约 **0.9 s** vs FastK **0.68 s**（同机、纯计�
   **1.43 s / 694 MB**（vs 内存路径 1.32 s / 948 MB：墙钟 +8%、内存
   -27%）；k99 **1.88 s / 1455 MB**（vs 1.88 s / 1998 MB：墙钟持平、
   内存 -27%）。`ANCHR_STREAM_CHUNK`/`ANCHR_STREAM_CAP` 可调
-  （16384/cap2 更省内存但墙钟 +20%）。supermer 路径仍走 `read_records`
-  （pgr API 需要全量 seqs）。
+  （16384/cap2 更省内存但墙钟 +20%）。
+* **supermer 成为 FASTA 默认计数（2026-08-14）**：pgr §12.3 落地后
+  half(8) 下 k31 1.36 s vs direct 2.10 s（-35%）、k99 2.19 s vs
+  2.52 s（-13%）；FASTQ 自动回退 direct 保 `min_prob` 语义，
+  `--no-supermer` 强制 direct（见 §12.3）。
 * **DFA 状态表内嵌计数（2026-08-14）**：分类时把 canonical 计数也存入
   `VertexStates.counts`，walk 的覆盖度/`ab:Z` 从 O(1) 索引取，不再每
   k-mer 重做 `get_count` 的 canonical + 二分。G37 full 默认组合进一步
