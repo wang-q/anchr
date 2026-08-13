@@ -1,6 +1,7 @@
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
+use std::path::Path;
 
 pub fn read_fasta(input: &str) -> anyhow::Result<BTreeMap<String, String>> {
     let mut reader = SeqReader::new(input)?;
@@ -37,7 +38,7 @@ pub fn ucfirst(s: &str) -> String {
     }
 }
 
-pub fn file_exists(dir: &std::path::PathBuf, filename: &str) -> bool {
+pub fn file_exists(dir: &Path, filename: &str) -> bool {
     let path = dir.join(filename);
 
     // Check if the file exists
@@ -103,8 +104,6 @@ mod tests_str {
 
 #[cfg(test)]
 mod tests_file {
-    use super::*;
-
     #[test]
     fn test_file_exists() {
         // Create a temporary directory

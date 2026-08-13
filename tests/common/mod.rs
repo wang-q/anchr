@@ -79,6 +79,7 @@ pub fn assert_close(actual: f64, expected: f64, epsilon: f64) {
 /// Locate the `pgr` binary (PATH or the sibling checkout), used by tests
 /// that compose pgr commands (`sam to-rg`, `rg coverage`) around anchr
 /// output. Returns `None` when pgr is unavailable; callers skip the test.
+#[allow(dead_code)]
 pub fn pgr_cmd() -> Option<Command> {
     for candidate in [
         "pgr",

@@ -16,10 +16,6 @@ use std::path::PathBuf;
 
 /// 62-bit k-mer mask for k=31 (2*k bits).
 const KMER_MASK: i64 = (1i64 << 62) - 1;
-/// Default BBTools k-mer size.
-pub const DEFAULT_K: usize = 31;
-/// Default BBTools comparator seed.
-pub const DEFAULT_SEED: u64 = 1;
 /// Default BBTools hash count.
 const DEFAULT_HASHES: usize = 4;
 /// Default BBTools border size.

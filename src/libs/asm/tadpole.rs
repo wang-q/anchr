@@ -51,8 +51,10 @@ pub struct TadpoleOptions {
     /// K-mers to verify after an error in reassembly (errorextensionreassemble).
     pub error_extension_reassemble: usize,
     /// K-mers to verify in pincer mode (errorextensionpincer).
+    #[allow(dead_code)]
     pub error_extension_pincer: usize,
     /// K-mers to verify in tail mode (errorextensiontail).
+    #[allow(dead_code)]
     pub error_extension_tail: usize,
     /// Do not correct bases within this distance of read ends (deadzone).
     pub dead_zone: usize,
@@ -139,6 +141,10 @@ impl Default for TadpoleOptions {
 #[derive(Debug, Clone, Default)]
 pub struct TadpoleTable {
     table: pgr::libs::kmer::KmerTable,
+    /// 2-byte-prefix bucket offsets into `table.keys` (65537 entries, or
+    /// 257 for k < 8): `get_count` binary-searches within the bucket, so a
+    /// long-k query costs ~4-5 compares instead of log2(n) ≈ 20.
+    prefix_index: OnceLock<Vec<u32>>,
     /// (key, count) snapshot built once on first request (the assemble
     /// passes scan it multiple times; the packed table stays the source).
     sorted: OnceLock<Vec<(Kmer, u32)>>,
@@ -152,16 +158,21 @@ impl TadpoleTable {
         if reads.is_empty() {
             return Self {
                 table: pgr::libs::kmer::KmerTable::default(),
+                prefix_index: OnceLock::new(),
                 sorted: OnceLock::new(),
             };
         }
         // Parallel per-chunk emission of quality-gated packed canonical
-        // keys, tree-concatenated (only O(threads) buffers coexist), then
-        // the shared pgr sort+group core (`count_keys`). Sorting makes the
-        // concatenation order irrelevant, so the table is deterministic.
-        let chunk_size = 4096usize;
+        // keys; each chunk is deduplicated in place by the shared pgr
+        // sort+group core (`count_keys`), then the sorted per-chunk tables
+        // are merged pairwise (rayon tree reduce). Only O(threads) chunk
+        // buffers coexist and the duplicate-containing global key list
+        // (~1 GB at G37 full) never materializes; the merged output is the
+        // sorted deduplicated table regardless of merge order, so the
+        // result is deterministic.
+        let chunk_size = 16384usize;
         let key_bytes = k.div_ceil(4);
-        let keys: Vec<u8> = reads
+        let table: pgr::libs::kmer::KmerTable = reads
             .par_chunks(chunk_size)
             .map(|chunk| {
                 let cap = chunk
@@ -171,20 +182,61 @@ impl TadpoleTable {
                 let mut raw = Vec::with_capacity(cap);
                 for (bases, quals) in chunk {
                     count_read_kmers_packed(
-                        &mut raw, bases, quals, k, min_prob, &prob_correct, &prob_correct_inv,
+                        &mut raw,
+                        bases,
+                        quals,
+                        k,
+                        min_prob,
+                        &prob_correct,
+                        &prob_correct_inv,
                     );
                 }
-                raw
+                pgr::libs::kmer::count::count_keys(raw, k)
             })
-            .reduce(Vec::new, |mut acc, mut v| {
-                acc.append(&mut v);
-                acc
-            });
-        let table = pgr::libs::kmer::count::count_keys(keys, k);
+            .reduce(
+                || pgr::libs::kmer::KmerTable {
+                    k,
+                    keys: Vec::new(),
+                    counts: Vec::new(),
+                },
+                merge_tables,
+            );
         Self {
             table,
+            prefix_index: OnceLock::new(),
             sorted: OnceLock::new(),
         }
+    }
+
+    /// Sorted-start offsets per 1- or 2-byte key prefix (bucket `p` spans
+    /// `[offs[p], offs[p+1])`), built lazily in one O(n) scan.
+    fn prefix_index(&self) -> &[u32] {
+        self.prefix_index.get_or_init(|| {
+            let kb = self.table.key_bytes();
+            let keys = &self.table.keys;
+            let n = keys.len() / kb;
+            let entries = if kb >= 2 { 65537 } else { 257 };
+            let mut offs = vec![0u32; entries];
+            let mut i = 0usize;
+            for (p, slot) in offs.iter_mut().take(entries - 1).enumerate() {
+                let lo = i;
+                while i < n {
+                    let b0 = keys[i * kb];
+                    let pref = if kb >= 2 {
+                        ((b0 as usize) << 8) | keys[i * kb + 1] as usize
+                    } else {
+                        b0 as usize
+                    };
+                    if pref > p {
+                        break;
+                    }
+                    i += 1;
+                }
+                *slot = lo as u32;
+            }
+            offs[entries - 1] = n as u32;
+            offs
+        })
     }
 
     /// Count of the canonical form of `kmer` (0 when absent).
@@ -213,9 +265,16 @@ impl TadpoleTable {
             qbuf[..kb].copy_from_slice(canon.0.to_bytes());
         }
         let q = &qbuf[..kb];
+        // Bucket by the 1-2 byte key prefix, then binary search inside it.
+        let offs = self.prefix_index();
+        let p = if kb >= 2 {
+            ((q[0] as usize) << 8) | q[1] as usize
+        } else {
+            q[0] as usize
+        };
         let keys = &self.table.keys;
-        let mut lo = 0usize;
-        let mut hi = keys.len() / kb;
+        let mut lo = offs[p] as usize;
+        let mut hi = offs[p + 1] as usize;
         while lo < hi {
             let mid = (lo + hi) >> 1;
             let mid_b = &keys[mid * kb..(mid + 1) * kb];
@@ -268,10 +327,96 @@ impl TadpoleTable {
     }
 }
 
+/// Merge two sorted, deduplicated k-mer tables into one (combining equal
+/// keys' counts). Associative, so rayon tree reduction order doesn't affect
+/// the result.
+fn merge_tables(
+    a: pgr::libs::kmer::KmerTable,
+    b: pgr::libs::kmer::KmerTable,
+) -> pgr::libs::kmer::KmerTable {
+    debug_assert_eq!(a.k, b.k);
+    let kb = a.key_bytes();
+    let (na, nb) = (a.keys.len() / kb, b.keys.len() / kb);
+    let mut keys = Vec::with_capacity(a.keys.len() + b.keys.len());
+    let mut counts = Vec::with_capacity(na + nb);
+    let (mut i, mut j) = (0usize, 0usize);
+    while i < na && j < nb {
+        let ka = &a.keys[i * kb..(i + 1) * kb];
+        let kbk = &b.keys[j * kb..(j + 1) * kb];
+        match ka.cmp(kbk) {
+            std::cmp::Ordering::Less => {
+                keys.extend_from_slice(ka);
+                counts.push(a.counts[i]);
+                i += 1;
+            }
+            std::cmp::Ordering::Greater => {
+                keys.extend_from_slice(kbk);
+                counts.push(b.counts[j]);
+                j += 1;
+            }
+            std::cmp::Ordering::Equal => {
+                keys.extend_from_slice(ka);
+                counts.push(a.counts[i] + b.counts[j]);
+                i += 1;
+                j += 1;
+            }
+        }
+    }
+    while i < na {
+        keys.extend_from_slice(&a.keys[i * kb..(i + 1) * kb]);
+        counts.push(a.counts[i]);
+        i += 1;
+    }
+    while j < nb {
+        keys.extend_from_slice(&b.keys[j * kb..(j + 1) * kb]);
+        counts.push(b.counts[j]);
+        j += 1;
+    }
+    pgr::libs::kmer::KmerTable {
+        k: a.k,
+        keys,
+        counts,
+    }
+}
+
 /// FastK byte k-mer key (2 bits/base, bytes 5'->3') used by the assembly
 /// hot paths; a thin wrapper over `key::Kmer` kept for call-site brevity.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub(crate) struct Kmer(key::Kmer);
+
+/// FNV-1a hasher for `HashSet<Kmer>` claim/visited sets (the derived
+/// `Hash` uses `RandomState`/SipHash13, which was ~7% of runtime at k=100).
+#[derive(Clone, Copy)]
+pub(crate) struct KmerFnvHasher(u64);
+
+impl Default for KmerFnvHasher {
+    fn default() -> Self {
+        Self(0xcbf29ce484222325)
+    }
+}
+
+impl std::hash::Hasher for KmerFnvHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        let mut h = self.0;
+        let mut chunks = bytes.chunks_exact(8);
+        for c in &mut chunks {
+            h ^= u64::from_ne_bytes(c.try_into().unwrap());
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        let rem = chunks.remainder();
+        if !rem.is_empty() {
+            let mut buf = [0u8; 8];
+            buf[..rem.len()].copy_from_slice(rem);
+            h ^= u64::from_ne_bytes(buf);
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        self.0 = h;
+    }
+
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
 
 /// Reverse-complement of a packed FastK byte (4 × 2-bit codes high->low:
 /// `(3-c3)(3-c2)(3-c1)(3-c0)`). Exact for whole bytes; when `k % 4 != 0`
@@ -398,10 +543,10 @@ fn prob_tables() -> (Vec<f32>, Vec<f32>) {
 /// Canonicalization uses the pgr `canonical_keys` trick: the forward window
 /// and its reverse complement advance incrementally together (`push_right`
 /// + `push_left(3-x)`), so the rc is never recomputed per window, and the
-/// FastK mirror symmetry lets the canonical decision compare only the first
-/// half of the packed bytes (`ceil(key_bytes/2)`). At long k this is the
-/// dominant emission cost (k=100: `canonical()` recomputes a 25-byte rc per
-/// window, 21.7% of runtime before this change).
+///   FastK mirror symmetry lets the canonical decision compare only the first
+///   half of the packed bytes (`ceil(key_bytes/2)`). At long k this is the
+///   dominant emission cost (k=100: `canonical()` recomputes a 25-byte rc per
+///   window, 21.7% of runtime before this change).
 fn count_read_kmers_packed(
     out: &mut Vec<u8>,
     bases: &[u8],

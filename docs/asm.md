@@ -49,8 +49,16 @@ anchr asm contig [OPTIONS] <infiles>...
     (tadpole `mincoverage`, default 1.0).
 *   `--no-bubbles`: Keep parallel-path contigs separate; disable bubble
     popping (default: bubble popping on, matching tadpole `popbubbles=t`).
+*   `--list-files`: Treat `<infiles>` as list files, one sequence file path
+    per line (paths may be relative to the current directory; blank lines
+    and `#` comments are ignored).
 *   `-p, --parallel <int|auto>`: Accepted for tadpole.sh compatibility;
     ignored (processing is deterministic single-pass).
+
+Input is one or more FASTA/FASTQ files, plain or gzipped. Pairing is
+irrelevant for assembly: every record from every file contributes its
+k-mers in order, so unpaired reads and files with an odd number of records
+work fine (BCALM semantics).
 
 ### Examples
 
@@ -67,6 +75,11 @@ anchr asm contig [OPTIONS] <infiles>...
 3.  **Raise the minimum contig length**:
     ```bash
     anchr asm contig in.fq -o out.fasta --min-contig-len 500
+    ```
+
+4.  **Assemble from a list of files**:
+    ```bash
+    anchr asm contig files.list -o contigs.fasta --list-files
     ```
 
 ---
@@ -96,16 +109,26 @@ anchr asm unitig [OPTIONS] <infiles>...
 *   `-k, --kmer <int>`: K-mer length (default 31; up to 128, the k-mer key
     table limit — k > 64 uses multi-word k-mers).
 *   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
-*   `--min-contig-len <int>`: Minimum unitig length (default:
-    `max(124, 2*k)`).
+*   `--min-contig-len <int>`: Minimum unitig length (default: 0 — keep all
+    unitigs, matching bcalm's lossless compaction; pass a positive value to
+    filter).
 *   `--min-count-seed <int>`: Solid k-mer count threshold (default 3, like
     bcalm `-abundance-min`).
 *   `--links`: Append BCALM-style `L:+:<to>:<sign>` links to unitig FASTA
     headers (links connect unitigs sharing an endpoint (k-1)-mer).
 *   `--gfa`: Emit a GFA 1.0 graph (`H`/`S`/`L` lines, overlap `(k-1)M`)
-    instead of FASTA.
+    instead of FASTA; `S` rows carry `LN:i:`/`KC:i:`/`km:f:` tags like the
+    bcalm `convertToGFA.py` output.
+*   `--all-abundance-counts`: Append `ab:Z:<c1> <c2> ...` to FASTA headers,
+    one canonical k-mer count per position (bcalm `-all-abundance-counts`).
+*   `--list-files`: Treat `<infiles>` as list files, one sequence file path
+    per line (blank lines and `#` comments are ignored).
 *   `-p, --parallel <int|auto>`: Accepted for compatibility; ignored
     (processing is deterministic).
+
+Input is one or more FASTA/FASTQ files, plain or gzipped. Pairing is
+irrelevant for assembly (BCALM semantics): unpaired reads and files with an
+odd number of records work fine.
 
 ### Examples
 
@@ -132,6 +155,12 @@ anchr asm unitig [OPTIONS] <infiles>...
 5.  **Emit the unitig graph as GFA**:
     ```bash
     anchr asm unitig in.fq -o unitigs.gfa --gfa
+    ```
+
+6.  **Assemble from a list of files with per-k-mer abundances**:
+    ```bash
+    anchr asm unitig files.list -o unitigs.fa --list-files \
+        --all-abundance-counts
     ```
 
 ---
@@ -327,6 +356,10 @@ and reproducible. Overlaps are exact (error-free unitigs), layouts stop at
 ambiguous junctions and non-reciprocal edges, and no bubble heuristics are
 applied.
 
+Input is one or more FASTA/FASTQ files, plain or gzipped; pairing is
+irrelevant for assembly (BCALM semantics), and `--list-files` accepts a
+one-path-per-line list.
+
 ```bash
 anchr asm olc [OPTIONS] <infiles>...
 ```
@@ -347,6 +380,8 @@ anchr asm olc [OPTIONS] <infiles>...
     for debugging and inspection (the names there omit the `stem:` prefix
     the standalone ovlp/layout/cns commands derive, so the files are not
     directly re-runnable through those commands as-is).
+*   `--list-files`: Treat `<infiles>` as list files, one sequence file path
+    per line (blank lines and `#` comments are ignored).
 
 ### Examples
 
@@ -359,4 +394,9 @@ anchr asm olc [OPTIONS] <infiles>...
     ```bash
     anchr asm olc R1.fq.gz R2.fq.gz -o contigs.fa \
         --kmer 21,51,81 --min-contig-len 1000 --keep-dir stage/
+    ```
+
+3.  **Assemble from a list of files**:
+    ```bash
+    anchr asm olc files.list -o contigs.fa --kmer 21,51,81 --list-files
     ```

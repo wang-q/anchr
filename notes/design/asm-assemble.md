@@ -229,18 +229,77 @@ unitigs 组装）影响可忽略。
 
 * **unitig 序列 100% 一致**（2403/2403，canonical 方向归一后逐条相同，
   聚合统计完全相同：总数/总长/N50/最长）——`asm unitig` 本体验证通过；
-* **L: 边集部分一致**：anchr 无向边 3801 条 vs bcalm 3331 条，共同 2577
-  （bcalm 边的 77%），anchr 多 1224、缺 754。**深层定位（2026-08-12）**：
-  bcalm 的边 = "canonical 端点 (k-1)-mer 共享图"（5019 条）的**子集**
-  （3325/3331 在图内），多出的 1694 条图边 bcalm 不发——过滤条件不在
-  README、也不在本地源码（`bcalm/` 无 LinkTigs 实现；安装的
-  `/home/wangq/.cbp/bin/bcalm` 可能带补丁）。曾尝试按 README
-  outcoming-edge 语义（源最后/rc 最后 k-mer → 目标第一个 k-mer）重写
-  `compute_links`：边集未对齐（共同 2512）且因 anchr 存 canonical 方向、
-  同一物理端在两工具中可能是前缀或后缀，**回归丢失真实边**（如
-  71245 unitig → 其 rc 方向邻居），已回退。结论：`--links` 保持现有
-  简化语义（`asm-assemble.md` §8.1 方向规则），逐边对齐需 bcalm 链接
-  实现源码（或读取其 L: 过滤逻辑），暂不立项。
+* **L: 边集对齐（2026-08-14，已解决）**：早前的 2026-08-12 对照（无向边
+  3801 vs 3331、共同 2577）用的是简化语义与错误的对照口径。仓库里的
+  bcalm v2.2.3 源码（`gatb-core/.../LinkTigs.cpp`）含完整 LinkTigs 实现，
+  已按它精确重写 `compute_links`：**双侧 in/out（`L:-:` 从 begin、
+  `L:+:` 从 end）各 4 种方向情形 + 偶数 `(k-1)` 回文特判 + 自连边**
+  （bcalm 对首尾共享同一 (k-1)-mer 的 unitig 连到自己，如 poly-C）。
+  G37 full 验证：**边集 0/1482 mismatch**；把 bcalm 的链向按各自 unitig
+  存储方向（bcalm 为遍历方向、anchr 为 canonical 方向）规范化后，
+  **链向编码也 0/1482 一致**；总 `L:` 条目 3974 = 3974。字节级差异仅剩
+  unitig 编号/排序（bcalm 遍历序 vs anchr 长度序）与存储方向约定，
+  图结构（unitigs + 边 + 链向）完全等价。`--links`/`--gfa` 现与 bcalm
+  LinkTigs 语义一致。
+
+### 8.2 GFA 版本支持分析（2026-08-14）
+
+**结论：不需要主动支持其他版本，维持 GFA 1.0。** 当前输出恰好落在 1.0
+的**核心子集**：`H`（`VN:Z:1.0` + `ks`）、`S`（id + seq）、`L`（overlap
+`(k-1)M`），无 P/C/W/J 行。S 行带 `LN:i:`/`KC:i:`/`km:f:` 可选标签
+（2026-08-14 起，与 bcalm `convertToGFA.py` 一致，见 §8.3）。
+
+各版本差异与影响：
+
+* **1.0 → 1.1**：只新增 `W` 行（walk，pangenome 用途）；S/L 行语法完全
+  相同，可选字段（`LN`/`RC`/`FC`/`KC`/`SH`/`UR` 等）1.0 就存在，不需要
+  升版本即可使用。因此声明 `VN:Z:1.1` 是**零成本切换**（S/L 一行不改），
+  但目前没有下游工具要求它，切换无收益。
+* **1.2**：新增 `J` 行（gap/距离连接）、P 行 `;` 分隔跳转与 `SC:i:1`
+  快捷标签。anchr 没有 gap/scaffold 概念，`asm unitig` 是纯重叠图；
+  只有未来 `asm cns/layout` 需要表达 gap 才需要。
+* **2.0**：为 pangenome 语义重写的版本（W 行体系、行结构不同），unitig
+  压实图不是它的目标场景；主流工具对 2.0 的适配也明显少于 1.x，不需要
+  支持。
+
+生态与对齐依据：
+
+* GFA-spec 的 README 确认 Bandage、gfatools、vg、GraphAligner 等主流工具
+  对 1.x 兼容；1.1/1.2 是向后兼容的扩展版 1，不会破坏 1.0 消费者。
+* bcalm 的 `convertToGFA.py` 同样**写死 `VN:Z:1.0`**，并把 FASTA 头里的
+  `LN:i:`/`KC:i:`/`km:f:` 原样带进 S 行。我们的 `--gfa` 现在输出相同的
+  S 行标签（§8.3），保持与它的字段对齐。
+
+触发升级的判据：未来引入 gap/scaffold 表达（需要 `J` 行）或明确要面向
+pangenome 工作流时，再按下游工具实测选 1.1/1.2；在那之前保持 1.0。
+
+### 8.3 bcalm 功能迁移清单（2026-08-14）
+
+对照 bcalm 全部公开选项与 `scripts/` 的结论，需要迁移的三块已完成，
+其余由 pgr/既有设计覆盖或暂不需要：
+
+* **输入模式（已迁移）**：bcalm 的 `-in` 接受任意 FASTA/FASTQ（可 gz）
+  且"不关心 paired"。`read_records` 改为**任意多文件顺序读取、不要求
+  配对**，`asm unitig`/`asm contig`/`asm olc` 放开为 1 个以上文件，并加
+  `--list-files`（每行一个序列文件路径，pgr `resolve_paths` 语义）。
+  单文件奇数记录（如 bcalm `circular_unitigs_unittests/test1.fa`）不再
+  报 `unpaired trailing read`。
+* **环状 unitig（回归锚定）**：bcalm 有专门回归例
+  `circular_unitigs_unittests`。实测 test1（单条 16 nt 环）输出
+  `AAGTCCGCTAAGTCC` 与 bcalm **逐字节一致**；test3（环 + 一条短随机
+  读）bcalm 输出 `GTCCGCTAAGTCCGC`、anchr 输出 `AAGTCCGCTAAGTCC`，
+  长度相同、canonical k-mer 集相同（图等价），但旋转/切口不同——bcalm
+  本身也不保证 orientation/切口稳定，测试以图等价为准。
+* **丰度输出（已迁移）**：`--all-abundance-counts` 在 FASTA 头追加
+  `ab:Z:<c1> <c2> ...`（序列顺序的逐 k-mer canonical 计数，bcalm
+  `-all-abundance-counts` 格式）；`--gfa` 的 S 行输出
+  `LN:i:`/`KC:i:`/`km:f:`（bcalm `convertToGFA.py` 字段）。
+* **不需要搬**：`-histo`/`-histo2D`（pgr `kmer hist`/`plot spectra` 已
+  覆盖）；`-nb-cores`/`-max-memory`/磁盘分桶（外部分桶见
+  [unitig-bucket.md](unitig-bucket.md)，规模到了再上）；
+  `split_unitigs.py`/`pufferize.py`（除非接 pufferfish/参考锚定图）；
+  `unitigEvaluator.cpp`（bcalm 对照基准已承担验证职责）；
+  minimizer/bloom/mphf 与 debug skip/redo 均为实现细节，不暴露。
 
 ## 9. 大规模性能基准与优化方向（2026-08-13）
 
@@ -351,3 +410,135 @@ perf 定位 k=100 的真实热点不在 radix（~8%）而在**发射循环与遍
 持平。339 测试全绿，G37 输出逐字节一致。k 缩放基本拉平后，
 minimizer 分桶（unitig-bucket.md）的优先级降低——内存有界化（阶段 A）
 成为更相关的下一步。
+
+### 9.7 中间 key 消除与流式读取（2026-08-13 续）
+
+9.6 后 full 峰值仍 2.23 GB：reads 双份拷贝 ~0.6 GB + 含重复的全局
+中间 key ~1 GB（132M 窗口 × 8 B）。两项改动：
+
+* **流式读取**（`read_records` 直出 `(seq, phred)`）：只保留一个
+  `SeqRecord` 缓冲，去掉全量 `Vec<SeqRecord>` 与二次拷贝（-0.25 GB）；
+* **per-chunk 去重 + 树状合并**：每个 chunk 发射后立即 `count_keys`
+  （排序去重成小表），rayon `reduce` 两两 `merge_tables`（合并相等
+  key 的计数）——**含重复的全局 key 列表不再物化**；合并顺序与结果
+  无关（确定性保持）。此即 unitig-bucket.md 阶段 A 的无盘版本，k-way
+  合并正是其中标为"需要新增"的那块。
+
+结果（full k=31）：2.23 GB / 4.1 s → **1.28 GB / 2.77 s**（内存 -43%，
+时间反而更快——每 chunk 的排序工作总量小于全局排序）。339 测试全绿，
+输出逐字节一致。最终对比：
+
+| 指标 | 初始 | 现在 | bcalm |
+| :--- | ---: | ---: | ---: |
+| full wall | 12.8 s | **2.77 s** | 2.38 s（1.16×） |
+| full RSS | 5.3 GB | **1.28 GB** | 555 MB（2.3×） |
+| small k=64 比值 | — | **0.7×**（反超） | — |
+| small k=100 比值 | — | **1.0×** | — |
+
+剩余内存构成（1.28 GB）：reads ~0.29 GB、排序期 chunk 缓冲 ~0.4 GB、
+最终表 + 快照 ~0.07 GB、其余为 contig 结构/分配器。进一步有界化走
+unitig-bucket.md 阶段 A 的磁盘分桶（norm 机制），当前规模无需。
+
+chunk 尺寸实测（full k=31，gz 输入）：2048/4096/8192/16384/32768/
+65536 = 3.06/2.93/3.00/**2.87**/2.90/2.86 s、1393/1294/1160/**945**/
+1119/1142 MB——**16384 为最优点**（排序总量与并发缓冲的折中），已设为
+默认。perf 显示排序（partition+msd ≈ 48%）是当前最大项；若后续要再压
+时间，方向是减少 per-chunk 排序总量（更大 chunk 或换排序结构），但
+内存收益会回吐，需按目标规模权衡。
+
+### 9.8 查询加速与 G37 序列级验证（2026-08-14）
+
+遍历查询（`get_count` + claim 集合）在长 k 下占 ~32%（k=100），两项
+改动：
+
+* **前缀索引**：`TadpoleTable` 增加惰性 1-2 字节前缀桶偏移表（65537 /
+  257 项，O(n) 一次扫描），`get_count` 在桶内二分——长 k 查询从
+  log2(n) ≈ 20 次 25 B 比较降到 ~5 次；
+* **FNV claim 集合**：`HashSet<Kmer>` 的 SipHash13 → 自带的 FNV-1a
+  hasher（`KmerFnvHasher`，8 字节块乘法），visited/claimed 哈希
+  6.6% → ~2%。
+
+结果（small 同批 runs 3）：k=31/64/100 = 1.20/1.08/1.40 s，**全 k 反超
+bcalm**（0.9×/0.4×/0.7×），k=64/100 与 Bifrost 打平；full k=31
+2.05 s / 0.94 GB（vs bcalm 2.38 s / 555 MB，0.86×）。339 测试全绿，
+输出逐字节一致。
+
+**G37 全量序列级对照（2026-08-14）**：`anchr asm unitig` 默认输出
+**1482 条 unitig，与 bcalm 全部输出规范化集合完全一致**（总长 622 758
+相同）——无损等价（MG1655 的 2403/2403 对照之外的第二个数据集确认）。
+此前默认 `min_contig_len = max(124, 2k)` 会把短 unitig 滤掉（只余
+116 条），与 bcalm 无损压实语义冲突，已改为**默认不过滤**（见 §10.5）。
+
+性能收官：初始 12.8 s / 5.3 GB → **2.05 s / 0.94 GB**（6.2× / 5.6×），
+时间与内存均反超 bcalm。剩余：内存硬上限（阶段 A 磁盘分桶）仅在目标
+规模更大时需要；遍历并行化因 BCALM claim 竞态需谨慎设计，收益有限，
+暂缓。
+
+## 10. bcalm 后处理语义分析（2026-08-14，`anchr asm unitig` 设计参考）
+
+> 旧 `anchr contained` 与 `unitigs` 模板是**遗留物**（见 §10.4），本节
+> 只分析 bcalm 语义本身，作为 `anchr asm unitig` 的对照；遗留组件的
+> 实测仅作历史背景。
+
+问题：清理被完全包含的 unitig 很简单，bcalm 为什么保留全部？
+
+### 10.1 bcalm 的流程与输出契约（源码 + 形式化文档确认）
+
+bcalm 2（仓库 `bcalm/`，GATB/bcalm）流程：`bcalm`（计数 + 按 minimizer
+分区压实）→ `bglue`（分区 unitig 合并）→ `links`（输出 `L:` 边）。
+**没有任何"清理被包含 unitig"的步骤**。
+
+形式化定义（`bidirected-graphs-in-bcalm2.md`）：
+* unitig = 图中不可扩展、不重复顶点的行走（最大非分支路径）；
+* **"Maximal unitigs should be a vertex decomposition of the graph; in
+  particular, two maximal unitigs should not share a vertex"**——两条
+  unitig 不共享 k-mer 顶点；
+* 因此**同链精确包含在语义上不可能**（若 A 的序列是 B 的子串，A 的
+  k-mer 就是 B 路径的顶点，A 就不是最大 unitig）。
+
+G37 实证：bcalm 1482 条中 ≥124 bp 的 116 条之间，精确包含对（同链或
+rc）**为 0**。
+
+### 10.2 bcalm 为什么留着"看起来被包含"的 unitig
+
+1. **精确被包含的 unitig 根本不存在**（顶点分解性质，10.1）；
+2. 对齐上"看起来被包含"的其实是两类，都不是图冗余：
+   * **近相同重复拷贝**：k-mer 不同 → 图顶点不同 → 都是合法 unitig
+     （bcalm 的顶点分解只约束精确 k-mer）；
+   * **短 unitig**（如 <1000 bp）：不是被包含，只是短；
+3. **输出契约 = 无损压实图**：每个 solid k-mer 恰好出现在一条 unitig。
+   删除任何一条都会破坏顶点分解、丢失 k-mer 信息（有损）。删冗余是
+   **组装层的决策**（组装要唯一长序列；pan-genome/图工具要全部节点），
+   不是图压缩操作——bcalm 正确停留在无损层。
+
+### 10.3 历史背景（旧 `anchr contained` 实测，不计入方向）
+
+遗留模板在 bcalm 之后跑 `anchr contained`（`--len 1000 --idt 0.9999
+--ratio 0.99999`），把 G37 的 1482 条砍到 84 条。实测其包含过滤
+（idt/ratio）对 bcalm 输出**零删除**——1482 → 116 全由 `--len 124`、
+116 → 84 全由 `--len 1000`。即旧步骤的实际作用只是长度过滤；该组件
+属遗留物，不参与方向决策。
+
+### 10.4 对方向的启示
+
+* `anchr asm unitig` 与 bcalm 逐序列一致（§9.8）＝ 正确的无损压实语义，
+  不内置任何有损清理（顶点分解契约）；
+* 旧 `anchr contained`/`unitigs` 模板是遗留物，**不作为方向**——若要
+  精简 unitig 供组装，是独立的新决策，语义（有损组装精简）与无损
+  压实分开设计，不沿用旧命令；
+* 方向以 `anchr asm unitig` / `asm contig` 为准（§8-§9），下游是否需要
+  "精简输入"待定，不预设。
+
+### 10.5 默认长度过滤的移除（2026-08-14）
+
+随 §10 结论落地：`anchr asm unitig` 的默认 `min_contig_len` 从
+`max(124, 2k)` 改为 **0（不过滤）**——与 bcalm 一致，输出完整的顶点
+分解（G37 full：1482 条，与 bcalm 逐序列等价，§9.8）。
+
+* `asm contig` 保留 tadpole 的 `mincontiglen` 自动默认 `max(124, 2k)`
+  （tadpole 兼容语义，§2；由 contig 命令显式传入）；
+* `asm olc`（多 k unitig OLC）随共享默认变为不过滤（unitig 无损输入）；
+* `--min-contig-len` 选项保留：需要组装精简输出的用户可显式指定
+  （`0` 以外的值即过滤）；
+* 339 测试全绿（unitig/contig/olc 测试均显式传 `--min-contig-len`，
+  不依赖旧默认）。

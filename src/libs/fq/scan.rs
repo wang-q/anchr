@@ -81,5 +81,4 @@ mod tests {
         assert_eq!(r2.qual, b"####");
         assert!(next_record(data, &mut pos).is_none());
     }
-
 }

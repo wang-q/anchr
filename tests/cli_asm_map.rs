@@ -346,7 +346,7 @@ fn command_asm_map_coverage_pipeline() {
     let Some(mut pgr) = common::pgr_cmd() else {
         return;
     };
-    pgr.args(&[
+    pgr.args([
         "rg",
         "coverage",
         rg_file.to_str().unwrap(),

@@ -219,7 +219,15 @@ fn command_asm_unitig_gfa() {
     for line in gfa.lines() {
         match line.as_bytes().first() {
             Some(b'H') => headers += 1,
-            Some(b'S') => segments += 1,
+            Some(b'S') => {
+                segments += 1;
+                assert!(
+                    line.contains("\tLN:i:")
+                        && line.contains("\tKC:i:")
+                        && line.contains("\tkm:f:"),
+                    "S row missing bcalm tags: {line}"
+                );
+            }
             Some(b'L') => {
                 links += 1;
                 assert!(line.ends_with("\t30M"), "overlap: {line}");
@@ -476,4 +484,223 @@ fn command_asm_unitig_circular() {
         recs.len()
     );
     assert!(recs[0].0.contains("circular"), "header: {}", recs[0].0);
+}
+
+/// Canonical k-mer set of a sequence (used to compare circular unitigs,
+/// whose linear cut/rotation is not guaranteed by bcalm).
+fn canonical_kmer_set(seq: &str, k: usize) -> std::collections::BTreeSet<String> {
+    fn rc(s: &str) -> String {
+        s.chars()
+            .rev()
+            .map(|c| match c {
+                'A' => 'T',
+                'C' => 'G',
+                'G' => 'C',
+                'T' => 'A',
+                _ => c,
+            })
+            .collect()
+    }
+    let mut set = std::collections::BTreeSet::new();
+    for i in 0..=seq.len().saturating_sub(k) {
+        let kmer = &seq[i..i + k];
+        let r = rc(kmer);
+        set.insert(if kmer < r.as_str() {
+            kmer.to_string()
+        } else {
+            r
+        });
+    }
+    set
+}
+
+/// A single-record FASTA (odd record count) assembles fine, and the pure
+/// circular unitig matches bcalm's `circular_unitigs_unittests/test1.fa`
+/// output byte-for-byte (`AAGTCCGCTAAGTCC`).
+#[test]
+fn command_asm_unitig_single_unpaired_record_bcalm_circular() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let infile = out_dir.path().join("in.fa");
+    let out = out_dir.path().join("out.fa");
+    std::fs::write(
+        &infile,
+        ">a perfectly circular unitig, k=7; is same as test3 but without the random crap\nACTTAGCGGACTTAGC\n",
+    )
+    .unwrap();
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "7",
+            "--min-count-seed",
+            "1",
+            "--min-contig-len",
+            "1",
+        ])
+        .assert()
+        .success();
+    let recs = parse_fa(&std::fs::read(&out).unwrap());
+    assert_eq!(recs.len(), 1, "expected one unitig, got {}", recs.len());
+    assert!(recs[0].0.contains("circular"), "header: {}", recs[0].0);
+    assert_eq!(recs[0].1, "AAGTCCGCTAAGTCC", "got {}", recs[0].1);
+}
+
+/// bcalm's `test3.fa` (circular read + one short random read) assembles to
+/// the same canonical k-mer set as bcalm's `GTCCGCTAAGTCCGC`, although the
+/// linear cut/rotation may differ (bcalm does not guarantee it either).
+#[test]
+fn command_asm_unitig_bcalm_circular_kmer_set() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let infile = out_dir.path().join("in.fa");
+    let out = out_dir.path().join("out.fa");
+    std::fs::write(
+        &infile,
+        ">random crap somehow makes the kmer counting put everything into the same bucket\nACTAAA\n>a perfectly circular unitig\nACTTAGCGGACTTAGC\n",
+    )
+    .unwrap();
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "7",
+            "--min-count-seed",
+            "1",
+            "--min-contig-len",
+            "1",
+        ])
+        .assert()
+        .success();
+    let recs = parse_fa(&std::fs::read(&out).unwrap());
+    assert_eq!(recs.len(), 1, "expected one unitig, got {}", recs.len());
+    assert!(recs[0].0.contains("circular"), "header: {}", recs[0].0);
+    assert_eq!(
+        canonical_kmer_set(&recs[0].1, 7),
+        canonical_kmer_set("GTCCGCTAAGTCCGC", 7),
+        "got {}",
+        recs[0].1
+    );
+}
+
+/// Multiple positional files and a `--list-files` list give identical
+/// output; records are read sequentially with no pairing requirement.
+#[test]
+fn command_asm_unitig_multiple_files_and_list() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let a = out_dir.path().join("a.fa");
+    let b = out_dir.path().join("b.fa");
+    let list = out_dir.path().join("files.list");
+    let out_direct = out_dir.path().join("direct.fa");
+    let out_list = out_dir.path().join("list.fa");
+    let seq1 = "AAGCCCAATAAACCACTCTGACTGGCCGAATAGGGATATAGGCAACGACATGTGCGGCGA";
+    let seq2 = "TGCCCAAGTTAGTTGCTCGGTAGGTCGAAACTATCCCGGACCGTAACGCACCGAAACGT";
+    let seq3 = "GATCGCAAATGGCCGGTACTGTCAGCTGACCTAAGCTTTCGAGCGGTATGACCTAGCTA";
+    // No pairing requirement: file a has an odd record count, and the total
+    // across both files is odd too. Three copies of each sequence keep every
+    // k-mer solid (count >= 3).
+    std::fs::write(&a, format!(">a1\n{seq1}\n>a2\n{seq1}\n>a3\n{seq1}\n")).unwrap();
+    std::fs::write(
+        &b,
+        format!(">b1\n{seq2}\n>b2\n{seq2}\n>b3\n{seq2}\n>b4\n{seq3}\n>b5\n{seq3}\n>b6\n{seq3}\n"),
+    )
+    .unwrap();
+    std::fs::write(&list, format!("{}\n{}\n", a.display(), b.display())).unwrap();
+    for (out, extra) in [
+        (&out_direct, Vec::<&str>::new()),
+        (&out_list, vec!["--list-files"]),
+    ] {
+        let mut args = vec![
+            "asm",
+            "unitig",
+            if extra.is_empty() {
+                a.to_str().unwrap()
+            } else {
+                list.to_str().unwrap()
+            },
+        ];
+        if extra.is_empty() {
+            args.push(b.to_str().unwrap());
+        }
+        args.extend([
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "31",
+            "--min-contig-len",
+            "1",
+        ]);
+        args.extend(extra);
+        AnchrCmd::new().args(&args).assert().success();
+    }
+    assert_eq!(
+        std::fs::read(&out_direct).unwrap(),
+        std::fs::read(&out_list).unwrap(),
+        "direct files and --list-files outputs differ"
+    );
+    let recs = parse_fa(&std::fs::read(&out_direct).unwrap());
+    assert_eq!(recs.len(), 3, "expected 3 unitigs, got {}", recs.len());
+}
+
+/// `--all-abundance-counts` appends the bcalm `ab:Z:` vector (one canonical
+/// k-mer count per position, in sequence order).
+#[test]
+fn command_asm_unitig_all_abundance_counts() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let infile = out_dir.path().join("in.fa");
+    let out = out_dir.path().join("out.fa");
+    let seq = "AAGCCCAATAAACCACTCTGACTGGCCGAATAGGGATATAGGCAACGACATGTGCGGCGA";
+    let fa = format!(">r1\n{seq}\n>r2\n{seq}\n>r3\n{seq}\n>r4\n{seq}\n");
+    std::fs::write(&infile, fa).unwrap();
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "31",
+            "--min-contig-len",
+            "1",
+            "--all-abundance-counts",
+        ])
+        .assert()
+        .success();
+    let recs = parse_fa(&std::fs::read(&out).unwrap());
+    assert_eq!(recs.len(), 1, "expected one unitig, got {}", recs.len());
+    let header = &recs[0].0;
+    let pos = header.find("ab:Z:").expect("missing ab:Z: in header");
+    let tail = &header[pos + 5..];
+    let values: Vec<&str> = tail.split(',').next().unwrap().split_whitespace().collect();
+    assert_eq!(values.len(), seq.len() - 31 + 1, "vector: {values:?}");
+    assert!(
+        values.iter().all(|&v| v == "4"),
+        "expected all counts 4, got {values:?}"
+    );
+
+    // Without the flag the header has no ab:Z: field.
+    let out_plain = out_dir.path().join("plain.fa");
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "unitig",
+            infile.to_str().unwrap(),
+            "-o",
+            out_plain.to_str().unwrap(),
+            "--kmer",
+            "31",
+            "--min-contig-len",
+            "1",
+        ])
+        .assert()
+        .success();
+    let recs = parse_fa(&std::fs::read(&out_plain).unwrap());
+    assert!(!recs[0].0.contains("ab:Z:"), "header: {}", recs[0].0);
 }

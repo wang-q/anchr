@@ -1,6 +1,7 @@
 use std::fmt;
 
 #[derive(Default, Clone)]
+#[allow(dead_code)]
 pub struct Overlap {
     pub f_id: String,
     pub g_id: String,
@@ -20,6 +21,7 @@ pub struct Overlap {
     pub contained: String,
 }
 
+#[allow(dead_code)]
 impl Overlap {
     pub fn is_empty(&self) -> bool {
         self.f_id.is_empty()

@@ -23,7 +23,9 @@ behavior). Unitigs are best suited to high-coverage or error-corrected input,
 such as the anchr `unitigs` step's `pe.cor.fa`.
 
 Notes:
-* Input is 1 interleaved file or 2 paired files; FASTA and FASTQ both work
+* Input is one or more FASTA/FASTQ files (plain or gzipped); pairing is
+  irrelevant for assembly (BCALM semantics), and `--list-files` reads a
+  one-path-per-line list
 * Unitigs are written longest-first with a `unitig_<id>` FASTA header
   carrying length, coverage, GC, and dimer composition fields
 * Processing is ordered and deterministic, independent of scan order
@@ -39,11 +41,15 @@ Examples:
 
 3. Raise the solid k-mer threshold (like bcalm `-abundance-min`):
    anchr asm unitig in.fq -o out.fasta --min-count-seed 5
+
+4. Assemble from a list of files and emit every k-mer abundance:
+   anchr asm unitig files.list -o out.fasta --list-files \
+       --all-abundance-counts
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
-            "Input file(s): 1 interleaved or 2 paired (R1, R2)",
-            1..=2,
+            "Input file(s): FASTA/FASTQ, plain or gzipped; use --list-files for a one-path-per-line list",
+            1..,
         ))
         .arg(crate::cmd::args::outfile_arg())
         .arg(
@@ -60,7 +66,7 @@ Examples:
                 .long("min-contig-len")
                 .num_args(1)
                 .value_parser(value_parser!(usize))
-                .help("Minimum unitig length (default: max(124, 2*k))"),
+                .help("Minimum unitig length (default: keep all unitigs, matching bcalm's lossless compaction)"),
         )
         .arg(
             Arg::new("min_count_seed")
@@ -82,6 +88,18 @@ Examples:
                 .help("Emit a GFA graph instead of FASTA"),
         )
         .arg(
+            Arg::new("list_files")
+                .long("list-files")
+                .action(ArgAction::SetTrue)
+                .help("Treat infiles as list files, one sequence file path per line"),
+        )
+        .arg(
+            Arg::new("all_abundance_counts")
+                .long("all-abundance-counts")
+                .action(ArgAction::SetTrue)
+                .help("Emit every k-mer abundance in FASTA headers (ab:Z:, like bcalm -all-abundance-counts)"),
+        )
+        .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
@@ -93,11 +111,15 @@ Examples:
 
 /// Execute the unitig command.
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
-    let infiles: Vec<String> = args
-        .get_many::<String>("infiles")
-        .unwrap()
-        .cloned()
-        .collect();
+    let is_list = args.get_flag("list_files");
+    let mut infiles: Vec<String> = Vec::new();
+    for f in args.get_many::<String>("infiles").unwrap() {
+        infiles.extend(pgr::libs::par::resolve_paths(f, is_list)?);
+    }
+    anyhow::ensure!(
+        !infiles.is_empty(),
+        "--list-files resolved to no input files"
+    );
     let outfile = crate::cmd::args::get_outfile(args);
     // Reject `-o` that would overwrite an input file (the writer is opened
     // before the reads are consumed).
@@ -115,6 +137,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             .unwrap_or(3),
         emit_links: args.get_flag("links"),
         emit_gfa: args.get_flag("gfa"),
+        all_abundance_counts: args.get_flag("all_abundance_counts"),
         ..AssembleOptions::default()
     };
 

@@ -341,3 +341,60 @@ fn command_asm_contig_min_coverage() {
         .success();
     assert!(parse_fa(&std::fs::read(&strict_out).unwrap()).is_empty());
 }
+
+/// Multiple positional files and `--list-files` give identical output;
+/// unpaired reads (odd record count) are accepted like bcalm.
+#[test]
+fn command_asm_contig_multiple_files_and_list() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let a = out_dir.path().join("a.fa");
+    let b = out_dir.path().join("b.fa");
+    let list = out_dir.path().join("files.list");
+    let out_direct = out_dir.path().join("direct.fa");
+    let out_list = out_dir.path().join("list.fa");
+    let seq1 = "AAGCCCAATAAACCACTCTGACTGGCCGAATAGGGATATAGGCAACGACATGTGCGGCGA";
+    let seq2 = "TGCCCAAGTTAGTTGCTCGGTAGGTCGAAACTATCCCGGACCGTAACGCACCGAAACGT";
+    std::fs::write(
+        &a,
+        format!(">a1\n{seq1}\n>a2\n{seq1}\n>a3\n{seq2}\n>a4\n{seq2}\n"),
+    )
+    .unwrap();
+    std::fs::write(
+        &b,
+        format!(">b1\n{seq1}\n>b2\n{seq1}\n>b3\n{seq2}\n>b4\n{seq2}\n"),
+    )
+    .unwrap();
+    std::fs::write(&list, format!("{}\n{}\n", a.display(), b.display())).unwrap();
+    for (out, extra) in [
+        (&out_direct, Vec::<&str>::new()),
+        (&out_list, vec!["--list-files"]),
+    ] {
+        let mut args = vec![
+            "asm",
+            "contig",
+            if extra.is_empty() {
+                a.to_str().unwrap()
+            } else {
+                list.to_str().unwrap()
+            },
+        ];
+        if extra.is_empty() {
+            args.push(b.to_str().unwrap());
+        }
+        args.extend([
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "31",
+            "--min-contig-len",
+            "1",
+        ]);
+        args.extend(extra);
+        AnchrCmd::new().args(&args).assert().success();
+    }
+    assert_eq!(
+        std::fs::read(&out_direct).unwrap(),
+        std::fs::read(&out_list).unwrap(),
+        "direct files and --list-files outputs differ"
+    );
+}

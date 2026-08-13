@@ -27,7 +27,9 @@ impl std::fmt::Display for BaseGroup {
 /// Replicates fastqc `BaseGroup.makeBaseGroups(max_length)`.
 pub fn make_base_groups(max_length: u32) -> Vec<BaseGroup> {
     if max_length <= 75 {
-        return (1..=max_length).map(|i| BaseGroup { start: i, end: i }).collect();
+        return (1..=max_length)
+            .map(|i| BaseGroup { start: i, end: i })
+            .collect();
     }
 
     let interval = linear_interval(max_length);
@@ -69,7 +71,10 @@ fn linear_interval(length: u32) -> u32 {
             }
         }
         multiplier *= 10;
-        assert!(multiplier < 10_000_000, "no sensible interval for length {length}");
+        assert!(
+            multiplier < 10_000_000,
+            "no sensible interval for length {length}"
+        );
     }
 }
 
@@ -91,8 +96,20 @@ mod tests {
         assert_eq!(groups[0], BaseGroup { start: 1, end: 1 });
         assert_eq!(groups[8], BaseGroup { start: 9, end: 9 });
         assert_eq!(groups[9], BaseGroup { start: 10, end: 11 });
-        assert_eq!(groups[57], BaseGroup { start: 106, end: 107 });
-        assert_eq!(groups[58], BaseGroup { start: 108, end: 108 });
+        assert_eq!(
+            groups[57],
+            BaseGroup {
+                start: 106,
+                end: 107
+            }
+        );
+        assert_eq!(
+            groups[58],
+            BaseGroup {
+                start: 108,
+                end: 108
+            }
+        );
     }
 
     #[test]
@@ -100,7 +117,13 @@ mod tests {
         let groups = make_base_groups(150);
         assert_eq!(groups.len(), 38);
         assert_eq!(groups[9], BaseGroup { start: 10, end: 14 });
-        assert_eq!(groups[37], BaseGroup { start: 150, end: 150 });
+        assert_eq!(
+            groups[37],
+            BaseGroup {
+                start: 150,
+                end: 150
+            }
+        );
     }
 
     #[test]
@@ -109,6 +132,12 @@ mod tests {
         assert_eq!(groups.len(), 50);
         assert_eq!(groups[9], BaseGroup { start: 10, end: 49 });
         assert_eq!(groups[10], BaseGroup { start: 50, end: 99 });
-        assert_eq!(groups[49], BaseGroup { start: 2000, end: 2000 });
+        assert_eq!(
+            groups[49],
+            BaseGroup {
+                start: 2000,
+                end: 2000
+            }
+        );
     }
 }

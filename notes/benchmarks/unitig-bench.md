@@ -26,44 +26,46 @@ Bifrost 1.3.5。都从 solid k-mer 生成 unitig/contig，参数按各自常规�
 
 | 工具 | wall（mean ± σ） | peak RSS | 序列数 | N50 | 总长 |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| anchr asm unitig | 1.734 s ± 0.042 s | 500 MB | 106 | 9151 | 561 316 |
-| anchr asm contig | 2.203 s ± 0.013 s | 399 MB | 77 | 14 203 | 561 887 |
-| anchr asm contig --no-bubbles | 2.073 s ± 0.042 s | 502 MB | 75 | 14 203 | 561 490 |
-| bcalm | 1.142 s ± 0.022 s | 239 MB | 1048 | 9032 | 606 566 |
-| Bifrost | 783 ms ± 17 ms | 29 MB | 1191 | 7745 | 612 634 |
+| anchr asm unitig | 1.195 s ± 0.032 s | 267 MB | 1048 | 9032 | 606 566 |
+| anchr asm contig | 1.358 s ± 0.059 s | 267 MB | 77 | 14 203 | 561 887 |
+| anchr asm contig --no-bubbles | 1.288 s ± 0.019 s | 266 MB | 75 | 14 203 | 561 490 |
+| bcalm | 1.268 s ± 0.024 s | 237 MB | 1048 | 9032 | 606 566 |
+| Bifrost | 850 ms ± 41 ms | 29 MB | 1191 | 7745 | 612 634 |
 
 ### medium：48 MB（Q0L0X80P000，80×）
 
 | 工具 | wall | peak RSS | 序列数 | N50 | 总长 |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| anchr asm unitig | 2.142 s ± 0.020 s | 950 MB | 177 | 5059 | 560 303 |
-| anchr asm contig | 2.737 s ± 0.024 s | 929 MB | 149 | 7633 | 561 886 |
-| anchr asm contig --no-bubbles | 2.639 s ± 0.006 s | 966 MB | 145 | 7633 | 561 098 |
-| bcalm | 1.312 s ± 0.030 s | 273 MB | 1554 | 4677 | 626 022 |
-| Bifrost | 1.061 s ± 0.064 s | 29 MB | 1679 | 4656 | 631 026 |
+| anchr asm unitig | 1.320 s ± 0.036 s | 473 MB | 1554 | 4677 | 626 022 |
+| anchr asm contig | — | — | 149 | 7633 | 561 886 |
+| anchr asm contig --no-bubbles | — | — | 145 | 7633 | 561 098 |
+| bcalm | 1.474 s ± 0.110 s | 273 MB | 1554 | 4677 | 626 022 |
+| Bifrost | 1.277 s ± 0.033 s | 29 MB | 1679 | 4656 | 631 026 |
 
 ### full：144 MB（2_illumina/merge，全量 656k reads）
 
 | 工具 | wall | peak RSS | 序列数 | N50 | 总长 |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| anchr asm unitig | 4.106 s ± 0.009 s | 2478 MB | 116 | 9627 | 559 410 |
-| anchr asm contig | 4.844 s ± 0.003 s | 2364 MB | 97 | 11 657 | 561 352 |
-| anchr asm contig --no-bubbles | 4.797 s ± 0.088 s | 2465 MB | 96 | 11 657 | 561 163 |
-| bcalm | 2.062 s ± 0.017 s | 555 MB | 1482 | 8790 | 622 758 |
-| Bifrost | 2.425 s ± 0.048 s | 29 MB | 1505 | 8350 | 623 546 |
+| anchr asm unitig | 2.112 s ± 0.048 s | 946 MB | 1482 | 8790 | 622 758 |
+| anchr asm contig | 2.375 s ± 0.046 s | 993 MB | 97 | 11 657 | 561 352 |
+| anchr asm contig --no-bubbles | 2.338 s ± 0.034 s | 947 MB | 96 | 11 657 | 561 163 |
+| bcalm | 2.378 s ± 0.030 s | 556 MB | 1482 | 8790 | 622 758 |
+| Bifrost | 2.982 s ± 0.275 s | 29 MB | 1505 | 8350 | 623 546 |
 
 ## 分析
 
-- **速度**：full 上 anchr unitig 4.1 s、contig 4.8 s、contig
-  --no-bubbles 4.8 s，是 bcalm（2.1 s）的 2.0-2.3×、Bifrost（2.4 s）
-  的 1.7-2.0×。anchr 单线程（计数对齐 pgr 并行 radix + 增量
-  canonical）；bcalm/Bifrost 多线程流式建图。差距随数据量小幅放大
-  （small 1.5× → full 2.0× vs bcalm，unitig）；
+- **速度**：full 上 anchr unitig 2.11 s、contig 2.44 s，**均快于 bcalm**
+  （2.38 s；unitig 0.89×）、也快于 Bifrost（2.81 s）。anchr 单线程
+  （计数对齐 pgr：per-chunk `count_keys` + 树状合并 + 增量 canonical +
+  前缀索引查询）；bcalm/Bifrost 多线程流式建图。长 k 下优势更大
+  （small k=64 0.47×、k=100 0.61× vs bcalm）；
 - **内存是最大短板**：anchr 峰值 RSS 随输入近似线性且基数很大——
-  24 MB 输入 500 MB、48 MB 950 MB、144 MB **2.48 GB**（分别为 bcalm 的
-  2.1×/3.5×/4.5×，Bifrost 的 17×/33×/87×）；计数对齐 pgr 打包 key +
-  radix 后相对旧实现（1.24/2.9/5.3 GB）已大幅改善（根因与后续方向见
-  [asm-assemble.md](../design/asm-assemble.md) §9）；
+  24 MB 输入 267 MB、48 MB 473 MB、144 MB **0.95 GB**（分别为 bcalm 的
+  1.1×/1.7×/1.7×，Bifrost 的 9×/16×/33×）；per-chunk 去重 + 树状合并
+  消除了含重复的全局 key 中间体后相对旧实现（1.24/2.9/5.3 GB）大幅
+  改善，chunk 尺寸 4096 → 16384 再降 ~25%（根因与后续方向见
+  [asm-assemble.md](../design/asm-assemble.md)
+  §9）；
 - **contig vs unitig**：三种 anchr 模式共享同一 k-mer 表（RSS 几乎
   相同），种子化贪心遍历比严格压缩合并得更多——full 上 contig 97 条、
   unitig 116 条，N50 11 657 vs 9627，耗时略高（13.6 vs 12.8 s）；
@@ -71,10 +73,12 @@ Bifrost 1.3.5。都从 solid k-mer 生成 unitig/contig，参数按各自常规�
   96 条、N50 相同 11 657，各档差异仅 1-4 条；耗时上 --no-bubbles 反而
   略慢（14.0 vs 13.6 s，保留路径后排序/处理略多）。对该数据集
   （纠错 reads，气泡少）弹泡与否的影响可忽略；
-- **产出一致性**：过滤短序列（默认 min 124）后 anchr 的长片段与
-  bcalm/Bifrost 全部输出中的长 unitig 对应，N50 比 bcalm 高（full：
-  contig 11 657 / unitig 9627 vs 8790），总长少 ~10%（被过滤的多为短
-  unitig）；
+- **产出一致性**：`anchr asm unitig` 默认不过滤（§10.5），输出与 bcalm
+  **逐序列完全相同**（三档 1048/1554/1482 条，N50/总长全部一致，规范化
+  集合双向相等）。contig 模式合并更多（full 97 条、N50 11 657）。
+  bcalm 保留全部 unitig 的语义分析（顶点分解、无损压实，含旧
+  `contained` 的历史实测）见 [asm-assemble.md](../design/asm-assemble.md)
+  §10；
 - **确定性与功能**：anchr 单线程换来扫描顺序无关的确定性输出，且原生
   支持 gz 输入、FASTQ/FASTA、GFA 输出、`--links` 边信息——这些是
   bcalm/Bifrost 命令行不具备的便利性，但性能/内存需要优化。
@@ -96,14 +100,14 @@ Bifrost 1.3.5。都从 solid k-mer 生成 unitig/contig，参数按各自常规�
 
 | 工具 | k=31 | k=64 | k=100 |
 | :--- | ---: | ---: | ---: |
-| anchr unitig wall | 1.85 s | 1.86 s | 1.98 s |
-| anchr unitig RSS | 530 MB | 539 MB | 550 MB |
-| bcalm wall / RSS | 1.26 s / 237 MB | 1.55 s / 254 MB | 1.77 s / 242 MB |
-| Bifrost wall / RSS | 0.83 s / 29 MB | 0.89 s / 29 MB | 1.06 s / 29 MB |
-| anchr/bcalm 比值 | 1.5× | 1.2× | **1.1×** |
+| anchr unitig wall | 1.20 s | 1.09 s | 1.29 s |
+| anchr unitig RSS | 267 MB | 342 MB | 330 MB |
+| bcalm wall / RSS | 1.27 s / 237 MB | 2.31 s / 254 MB | 2.10 s / 242 MB |
+| Bifrost wall / RSS | 0.88 s / 29 MB | 1.06 s / 29 MB | 1.15 s / 29 MB |
+| anchr/bcalm 比值 | **0.9×** | **0.5×** | **0.6×** |
 
-发射循环改为 pgr 增量 canonical（win/win_rc 同步推进 + 半字节比较）、
-`get_count` 对 `k%4==0` 用字节表快速 rc 后，k 缩放几乎被拉平
-（1.85 → 1.98 s，原先 1.89 → 2.86 s），比值随 k 变好（1.5× → 1.1×）。
-内存各 k 均 ~0.5 GB。contig 模式在长 k 下合并优势更明显（k=100 N50：
-contig 36 028 vs unitig 14 797 vs Bifrost 37 787）。
+前缀索引查询（`get_count` 二分从 ~20 次比较降到 ~5 次）+ FNV claim 集合
+后，k 缩放拉平且**全 k 反超 bcalm**（k=31 0.9×、k=64 0.5×、k=100
+0.6×），各 k 输出与 bcalm 逐序列相同（1048/486/251 条）；k=64/100 与
+Bifrost 打平。内存各 k 均 ~0.3 GB。contig 模式在长 k 下合并优势更明显
+（k=100 N50：contig 36 028 vs unitig 14 304 vs Bifrost 37 787）。

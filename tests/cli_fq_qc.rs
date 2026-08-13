@@ -20,9 +20,7 @@ fn run_qc() -> tempfile::TempDir {
 }
 
 fn data_line(dir: &tempfile::TempDir, module: &str, key: &str) -> String {
-    let path = dir
-        .path()
-        .join("R1.2k.fq.gz_fastqc/fastqc_data.txt");
+    let path = dir.path().join("R1.2k.fq.gz_fastqc/fastqc_data.txt");
     let text = fs::read_to_string(path).unwrap();
     let mut in_module = false;
     for line in text.lines() {
@@ -40,10 +38,7 @@ fn data_line(dir: &tempfile::TempDir, module: &str, key: &str) -> String {
 #[test]
 fn command_fq_qc_basic_statistics() {
     let dir = run_qc();
-    let text = fs::read_to_string(
-        dir.path().join("R1.2k.fq.gz_fastqc/fastqc_data.txt"),
-    )
-    .unwrap();
+    let text = fs::read_to_string(dir.path().join("R1.2k.fq.gz_fastqc/fastqc_data.txt")).unwrap();
     assert!(text.contains("##FastQC\t0.12.1"));
     assert!(text.contains("Filename\tR1.2k.fq.gz"));
     assert!(text.contains("Encoding\tSanger / Illumina 1.9"));
@@ -62,7 +57,7 @@ fn command_fq_qc_per_base_quality_matches_golden() {
     let mean: f64 = fields[1].parse().unwrap();
     assert!((mean - 32.65).abs() < 1e-3, "mean: {mean}");
     assert_eq!(fields[2], "33.0"); // median
-    // Final single position 108
+                                   // Final single position 108
     let last = data_line(&dir, "Per base sequence quality", "108\t");
     assert!(last.starts_with("108\t30.444"), "last: {last}");
 }
@@ -70,8 +65,14 @@ fn command_fq_qc_per_base_quality_matches_golden() {
 #[test]
 fn command_fq_qc_sequence_quality_matches_golden() {
     let dir = run_qc();
-    assert_eq!(data_line(&dir, "Per sequence quality scores", "37\t"), "37\t603.0");
-    assert_eq!(data_line(&dir, "Per sequence quality scores", "13\t"), "13\t1.0");
+    assert_eq!(
+        data_line(&dir, "Per sequence quality scores", "37\t"),
+        "37\t603.0"
+    );
+    assert_eq!(
+        data_line(&dir, "Per sequence quality scores", "13\t"),
+        "13\t1.0"
+    );
 }
 
 #[test]
@@ -111,10 +112,7 @@ fn command_fq_qc_gc_n_length_match_golden() {
 #[test]
 fn command_fq_qc_summary_statuses() {
     let dir = run_qc();
-    let summary = fs::read_to_string(
-        dir.path().join("R1.2k.fq.gz_fastqc/summary.txt"),
-    )
-    .unwrap();
+    let summary = fs::read_to_string(dir.path().join("R1.2k.fq.gz_fastqc/summary.txt")).unwrap();
     assert!(summary.contains("PASS\tBasic Statistics\tR1.2k.fq.gz"));
     assert!(summary.contains("PASS\tPer base sequence quality\tR1.2k.fq.gz"));
     assert!(summary.contains("PASS\tPer base N content\tR1.2k.fq.gz"));
@@ -140,7 +138,11 @@ fn command_fq_qc_stdin() {
 #[test]
 fn command_fq_qc_duplication_matches_golden() {
     let dir = run_qc();
-    let dup = data_line(&dir, "Sequence Duplication Levels", "#Total Deduplicated Percentage");
+    let dup = data_line(
+        &dir,
+        "Sequence Duplication Levels",
+        "#Total Deduplicated Percentage",
+    );
     let pct: f64 = dup.split('\t').nth(1).unwrap().parse().unwrap();
     assert!((pct - 97.3).abs() < 1e-9, "dedup pct: {pct}");
     let level1: f64 = data_line(&dir, "Sequence Duplication Levels", "1\t")
@@ -176,11 +178,11 @@ fn command_fq_qc_adapter_matches_golden() {
     let universal: f64 = fields[1].parse().unwrap();
     assert!((universal - 1.85).abs() < 1e-9, "universal: {universal}");
     // No Kmer Content section on the Lambda golden (2% kmer sampling)
-    let text = fs::read_to_string(
-        dir.path().join("R1.2k.fq.gz_fastqc/fastqc_data.txt"),
-    )
-    .unwrap();
-    assert!(!text.contains(">>Kmer Content"), "kmer section should be absent");
+    let text = fs::read_to_string(dir.path().join("R1.2k.fq.gz_fastqc/fastqc_data.txt")).unwrap();
+    assert!(
+        !text.contains(">>Kmer Content"),
+        "kmer section should be absent"
+    );
 }
 
 #[test]
@@ -189,7 +191,13 @@ fn command_fq_qc_empty_input_fails() {
     let empty = dir.path().join("empty.fq");
     std::fs::write(&empty, "").unwrap();
     AnchrCmd::new()
-        .args(&["fq", "qc", empty.to_str().unwrap(), "-o", dir.path().to_str().unwrap()])
+        .args(&[
+            "fq",
+            "qc",
+            empty.to_str().unwrap(),
+            "-o",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicates::str::contains("no reads found"));
@@ -202,7 +210,13 @@ fn command_fq_qc_single_read() {
     let fq = dir.path().join("one.fq");
     std::fs::write(&fq, input).unwrap();
     AnchrCmd::new()
-        .args(&["fq", "qc", fq.to_str().unwrap(), "-o", dir.path().to_str().unwrap()])
+        .args(&[
+            "fq",
+            "qc",
+            fq.to_str().unwrap(),
+            "-o",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .success();
     let data = fs::read_to_string(dir.path().join("one.fq_fastqc/fastqc_data.txt")).unwrap();
@@ -217,7 +231,13 @@ fn command_fq_qc_variable_lengths() {
     let fq = dir.path().join("var.fq");
     std::fs::write(&fq, input).unwrap();
     AnchrCmd::new()
-        .args(&["fq", "qc", fq.to_str().unwrap(), "-o", dir.path().to_str().unwrap()])
+        .args(&[
+            "fq",
+            "qc",
+            fq.to_str().unwrap(),
+            "-o",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .success();
     let data = fs::read_to_string(dir.path().join("var.fq_fastqc/fastqc_data.txt")).unwrap();
@@ -234,11 +254,20 @@ fn command_fq_qc_long_reads_grouping() {
     let fq = dir.path().join("long.fq");
     std::fs::write(&fq, input).unwrap();
     AnchrCmd::new()
-        .args(&["fq", "qc", fq.to_str().unwrap(), "-o", dir.path().to_str().unwrap()])
+        .args(&[
+            "fq",
+            "qc",
+            fq.to_str().unwrap(),
+            "-o",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .success();
     let data = fs::read_to_string(dir.path().join("long.fq_fastqc/fastqc_data.txt")).unwrap();
     assert!(data.contains("Sequence length\t1000"));
-    assert!(data.contains("10-19\t"), "interval>10 special group (interval 20)");
+    assert!(
+        data.contains("10-19\t"),
+        "interval>10 special group (interval 20)"
+    );
     assert!(data.contains("980-999"), "later interval groups");
 }

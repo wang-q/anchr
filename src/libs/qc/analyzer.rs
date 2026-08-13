@@ -131,15 +131,15 @@ impl GcModel {
         let mut claiming = vec![0usize; GC_BINS];
         for pos in 0..=read_length {
             let (lp, hp) = Self::percent_range(read_length, pos);
-            for p in lp..=hp {
-                claiming[p] += 1;
+            for c in claiming.iter_mut().take(hp + 1).skip(lp) {
+                *c += 1;
             }
         }
         let mut models = vec![Vec::new(); read_length as usize + 1];
         for pos in 0..=read_length {
             let (lp, hp) = Self::percent_range(read_length, pos);
-            for p in lp..=hp {
-                models[pos as usize].push((p, 1.0 / claiming[p] as f64));
+            for (p, &c) in claiming.iter().enumerate().take(hp + 1).skip(lp) {
+                models[pos as usize].push((p, 1.0 / c as f64));
             }
         }
         GcModel { models }
@@ -296,9 +296,7 @@ impl QcStats {
                 let v = BASE_TABLE[$b as usize] as usize;
                 if v & 7 != 7 {
                     unsafe {
-                        *pc_arr
-                            .get_unchecked_mut($i)
-                            .get_unchecked_mut(v & 7) += 1;
+                        *pc_arr.get_unchecked_mut($i).get_unchecked_mut(v & 7) += 1;
                     }
                     let cs = v >> 3;
                     if cs != 7 {
@@ -332,7 +330,12 @@ impl QcStats {
         }
         // remaining positions (beyond trunc_gc): no GC counting
         while i + 2 <= n {
-            process_pos!(unsafe { *seq_p.add(i) }, unsafe { *qual_p.add(i) }, i, false);
+            process_pos!(
+                unsafe { *seq_p.add(i) },
+                unsafe { *qual_p.add(i) },
+                i,
+                false
+            );
             process_pos!(
                 unsafe { *seq_p.add(i + 1) },
                 unsafe { *qual_p.add(i + 1) },
@@ -342,7 +345,12 @@ impl QcStats {
             i += 2;
         }
         if i < n {
-            process_pos!(unsafe { *seq_p.add(i) }, unsafe { *qual_p.add(i) }, i, false);
+            process_pos!(
+                unsafe { *seq_p.add(i) },
+                unsafe { *qual_p.add(i) },
+                i,
+                false
+            );
         }
         for (i, &b) in seq[n..].iter().enumerate() {
             let pc = &mut self.per_base_content[n + i];
@@ -423,24 +431,45 @@ impl QcStats {
             let p1 = unsafe { read_u32_un(seq, i + 2) };
             let a = adapter_at(table, p0 as u16);
             if a != 0xF {
-                verify_adapter(a as usize, i, l, seq, sigs, ads, &mut found, &mut mask);
+                verify_adapter((a as usize, i, l), seq, sigs, ads, &mut found, &mut mask);
             }
             if mask != 0 {
                 let a = adapter_at(table, (p0 >> 8) as u16);
                 if a != 0xF {
-                    verify_adapter(a as usize, i + 1, l, seq, sigs, ads, &mut found, &mut mask);
+                    verify_adapter(
+                        (a as usize, i + 1, l),
+                        seq,
+                        sigs,
+                        ads,
+                        &mut found,
+                        &mut mask,
+                    );
                 }
             }
             if mask != 0 {
                 let a = adapter_at(table, p1 as u16);
                 if a != 0xF {
-                    verify_adapter(a as usize, i + 2, l, seq, sigs, ads, &mut found, &mut mask);
+                    verify_adapter(
+                        (a as usize, i + 2, l),
+                        seq,
+                        sigs,
+                        ads,
+                        &mut found,
+                        &mut mask,
+                    );
                 }
             }
             if mask != 0 {
                 let a = adapter_at(table, (p1 >> 8) as u16);
                 if a != 0xF {
-                    verify_adapter(a as usize, i + 3, l, seq, sigs, ads, &mut found, &mut mask);
+                    verify_adapter(
+                        (a as usize, i + 3, l),
+                        seq,
+                        sigs,
+                        ads,
+                        &mut found,
+                        &mut mask,
+                    );
                 }
             }
             i += 4;
@@ -450,12 +479,19 @@ impl QcStats {
             let p = unsafe { read_u32_un(seq, i) };
             let a = adapter_at(table, p as u16);
             if a != 0xF {
-                verify_adapter(a as usize, i, l, seq, sigs, ads, &mut found, &mut mask);
+                verify_adapter((a as usize, i, l), seq, sigs, ads, &mut found, &mut mask);
             }
             if mask != 0 {
                 let a = adapter_at(table, (p >> 8) as u16);
                 if a != 0xF {
-                    verify_adapter(a as usize, i + 1, l, seq, sigs, ads, &mut found, &mut mask);
+                    verify_adapter(
+                        (a as usize, i + 1, l),
+                        seq,
+                        sigs,
+                        ads,
+                        &mut found,
+                        &mut mask,
+                    );
                 }
             }
             i += 2;
@@ -464,7 +500,7 @@ impl QcStats {
         if i + 2 <= l && mask != 0 {
             let a = adapter_at(table, u16::from_le_bytes([seq[i], seq[i + 1]]));
             if a != 0xF {
-                verify_adapter(a as usize, i, l, seq, sigs, ads, &mut found, &mut mask);
+                verify_adapter((a as usize, i, l), seq, sigs, ads, &mut found, &mut mask);
             }
         }
         for (a, pos) in found.iter().enumerate() {
@@ -477,7 +513,7 @@ impl QcStats {
 
         // 7-mer position counts: fastqc samples every 50th read (2%) and
         // skips kmers containing Ns
-        if (global_index + 1) % 50 == 0 && seq.len() >= 7 {
+        if (global_index + 1).is_multiple_of(50) && seq.len() >= 7 {
             let seq = if seq.len() > 500 { &seq[..500] } else { seq };
             let l = seq.len();
             if self.total_kmer_per_pos.len() < l - 6 {
@@ -515,7 +551,7 @@ impl QcStats {
         // (field 2) header
         if !self.tile_ignore && !qual.is_empty() {
             self.tile_total_count += 1;
-            if self.tile_total_count > 10_000 && self.tile_total_count % 10 != 0 {
+            if self.tile_total_count > 10_000 && !self.tile_total_count.is_multiple_of(10) {
                 // skip sampling
             } else if let Some(tile) = self.detect_tile(name) {
                 let entry = self.tile_quality.entry(tile).or_default();
@@ -609,15 +645,27 @@ impl QcStats {
             self.per_base_content
                 .resize(other.per_base_content.len(), [0u32; 5]);
         }
-        for (a, b) in self.per_base_quality.iter_mut().zip(&other.per_base_quality) {
+        for (a, b) in self
+            .per_base_quality
+            .iter_mut()
+            .zip(&other.per_base_quality)
+        {
             a.merge(b);
         }
-        for (a, b) in self.per_base_content.iter_mut().zip(&other.per_base_content) {
+        for (a, b) in self
+            .per_base_content
+            .iter_mut()
+            .zip(&other.per_base_content)
+        {
             for k in 0..5 {
                 a[k] += b[k];
             }
         }
-        for (a, &b) in self.seq_quality_hist.iter_mut().zip(&other.seq_quality_hist) {
+        for (a, &b) in self
+            .seq_quality_hist
+            .iter_mut()
+            .zip(&other.seq_quality_hist)
+        {
             *a += b;
         }
         if other.seq_qual_min != u8::MAX {
@@ -635,7 +683,11 @@ impl QcStats {
                 .resize(other.adapter_positions.len(), [0u64; 6]);
             self.longest_seq = other.longest_seq;
         }
-        for (a, b) in self.adapter_positions.iter_mut().zip(&other.adapter_positions) {
+        for (a, b) in self
+            .adapter_positions
+            .iter_mut()
+            .zip(&other.adapter_positions)
+        {
             for k in 0..6 {
                 a[k] += b[k];
             }
@@ -643,7 +695,11 @@ impl QcStats {
         if other.total_kmer_per_pos.len() > self.total_kmer_per_pos.len() {
             self.ensure_kmer_positions(other.total_kmer_per_pos.len());
         }
-        for (a, &b) in self.total_kmer_per_pos.iter_mut().zip(&other.total_kmer_per_pos) {
+        for (a, &b) in self
+            .total_kmer_per_pos
+            .iter_mut()
+            .zip(&other.total_kmer_per_pos)
+        {
             *a += b;
         }
         // row-major grids: add each key's overlapping positions in place
@@ -725,8 +781,8 @@ impl QcStats {
         let mut out = vec![[0u32; 5]; groups.len()];
         for (i, g) in groups.iter().enumerate() {
             for p in (g.start - 1)..g.end {
-                for k in 0..5 {
-                    out[i][k] += self.per_base_content[p as usize][k];
+                for (k, slot) in out[i].iter_mut().enumerate().take(5) {
+                    *slot += self.per_base_content[p as usize][k];
                 }
             }
         }
@@ -738,10 +794,6 @@ impl QcStats {
             .iter()
             .map(|g| g.to_string())
             .collect()
-    }
-
-    fn total_acgtn(&self) -> u64 {
-        self.base_counts.iter().sum()
     }
 
     /// Render `fastqc_data.txt` (fastqc 0.12.1 compatible).
@@ -765,11 +817,7 @@ impl QcStats {
         writeln!(w, "Sequence length\t{}", len_str)?;
         let at = self.base_counts[0] + self.base_counts[3];
         let gc = self.base_counts[2] + self.base_counts[1];
-        let gc_pct = if at + gc > 0 {
-            (gc * 100) / (at + gc)
-        } else {
-            0
-        };
+        let gc_pct = (gc * 100).checked_div(at + gc).unwrap_or(0);
         writeln!(w, "%GC\t{}", gc_pct)?;
         writeln!(w, ">>END_MODULE")?;
 
@@ -789,13 +837,7 @@ impl QcStats {
             writeln!(
                 w,
                 "{}\t{}\t{:.1}\t{:.1}\t{:.1}\t{:.1}\t{:.1}",
-                label,
-                q.mean,
-                q.median,
-                q.lq,
-                q.uq,
-                q.p10,
-                q.p90,
+                label, q.mean, q.median, q.lq, q.uq, q.p10, q.p90,
             )?;
         }
         writeln!(w, ">>END_MODULE")?;
@@ -864,17 +906,17 @@ impl QcStats {
         for (i, label) in self.group_labels().iter().enumerate() {
             let [a, c, g, t, n] = contents[i];
             let total = a + c + g + t + n;
-            let pct = if total > 0 { 100.0 * n as f64 / total as f64 } else { 0.0 };
+            let pct = if total > 0 {
+                100.0 * n as f64 / total as f64
+            } else {
+                0.0
+            };
             writeln!(w, "{}\t{}", label, pct)?;
         }
         writeln!(w, ">>END_MODULE")?;
 
         // Sequence Length Distribution
-        writeln!(
-            w,
-            ">>Sequence Length Distribution\t{}",
-            self.grade_length()
-        )?;
+        writeln!(w, ">>Sequence Length Distribution\t{}", self.grade_length())?;
         writeln!(w, "#Length\tCount")?;
         for (len, &count) in self.len_hist.iter().enumerate().filter(|(_, &c)| c != 0) {
             writeln!(w, "{}\t{:.1}", len, count as f64)?;
@@ -935,13 +977,7 @@ impl QcStats {
             writeln!(
                 w,
                 "{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                g,
-                row[0],
-                row[1],
-                row[2],
-                row[3],
-                row[4],
-                row[5],
+                g, row[0], row[1], row[2], row[3], row[4], row[5],
             )?;
         }
         writeln!(w, ">>END_MODULE")?;
@@ -978,13 +1014,7 @@ impl QcStats {
                     for p in (g.start - 1)..g.end {
                         q.merge(&quals[p as usize]);
                     }
-                    writeln!(
-                        w,
-                        "{}\t{}\t{}",
-                        tile,
-                        g,
-                        q.mean() - global_mean
-                    )?;
+                    writeln!(w, "{}\t{}\t{}", tile, g, q.mean() - global_mean)?;
                 }
             }
             writeln!(w, ">>END_MODULE")?;
@@ -1001,13 +1031,25 @@ impl QcStats {
         let overrep = self.overrep_rows();
         let rows = [
             ("Basic Statistics", "pass"),
-            ("Per base sequence quality", self.grade_per_base_quality(&qualities)),
-            ("Per sequence quality scores", self.grade_per_sequence_quality()),
-            ("Per base sequence content", self.grade_per_base_content(&contents)),
+            (
+                "Per base sequence quality",
+                self.grade_per_base_quality(&qualities),
+            ),
+            (
+                "Per sequence quality scores",
+                self.grade_per_sequence_quality(),
+            ),
+            (
+                "Per base sequence content",
+                self.grade_per_base_content(&contents),
+            ),
             ("Per sequence GC content", self.grade_per_sequence_gc()),
             ("Per base N content", self.grade_per_base_n(&contents)),
             ("Sequence Length Distribution", self.grade_length()),
-            ("Sequence Duplication Levels", self.grade_duplication(dedup_pct)),
+            (
+                "Sequence Duplication Levels",
+                self.grade_duplication(dedup_pct),
+            ),
             ("Overrepresented sequences", self.grade_overrep(&overrep)),
             (
                 "Adapter Content",
@@ -1047,7 +1089,7 @@ impl QcStats {
         };
         let at = self.base_counts[0] + self.base_counts[3];
         let gc = self.base_counts[2] + self.base_counts[1];
-        let gc_pct = if at + gc > 0 { (gc * 100) / (at + gc) } else { 0 };
+        let gc_pct = (gc * 100).checked_div(at + gc).unwrap_or(0);
         let basic: Vec<serde_json::Value> = [
             ("Filename", self.filename.clone()),
             ("File type", "Conventional base calls".to_string()),
@@ -1064,27 +1106,15 @@ impl QcStats {
         ctx.insert("basic", &basic);
 
         ctx.insert("basic_grade", "pass");
-        ctx.insert(
-            "pbq_grade",
-            self.grade_per_base_quality(&qualities),
-        );
-        ctx.insert(
-            "psq_grade",
-            self.grade_per_sequence_quality(),
-        );
-        ctx.insert(
-            "pbc_grade",
-            self.grade_per_base_content(&contents),
-        );
+        ctx.insert("pbq_grade", self.grade_per_base_quality(&qualities));
+        ctx.insert("psq_grade", self.grade_per_sequence_quality());
+        ctx.insert("pbc_grade", self.grade_per_base_content(&contents));
         ctx.insert("gc_grade", self.grade_per_sequence_gc());
         ctx.insert("n_grade", self.grade_per_base_n(&contents));
         ctx.insert("len_grade", self.grade_length());
         ctx.insert("dup_grade", self.grade_duplication(dedup_pct));
         ctx.insert("overrep_grade", self.grade_overrep(&overrep));
-        ctx.insert(
-            "adapter_grade",
-            self.grade_adapter(&adapter_groups),
-        );
+        ctx.insert("adapter_grade", self.grade_adapter(&adapter_groups));
 
         let offset = self.encoding_offset;
         let n_groups = qualities.len().max(1);
@@ -1109,7 +1139,12 @@ impl QcStats {
         ctx.insert("per_base_quality", &pbq);
 
         let psq: Vec<serde_json::Value> = (self.seq_qual_min..=self.seq_qual_max)
-            .map(|q| json!([q as i32 - offset as i32, self.seq_quality_hist[q as usize] as f64]))
+            .map(|q| {
+                json!([
+                    q as i32 - offset as i32,
+                    self.seq_quality_hist[q as usize] as f64
+                ])
+            })
             .collect();
         ctx.insert("per_seq_quality", &psq);
 
@@ -1174,9 +1209,7 @@ impl QcStats {
 
         let overrep_rows: Vec<serde_json::Value> = overrep
             .iter()
-            .map(|(s, c, p, src)| {
-                json!([String::from_utf8_lossy(s), *c, *p, src])
-            })
+            .map(|(s, c, p, src)| json!([String::from_utf8_lossy(s), *c, *p, src]))
             .collect();
         ctx.insert("overrep", &overrep_rows);
         ctx.insert("adapter_names", &adapter_names);
@@ -1354,7 +1387,11 @@ impl QcStats {
             slots[dup_slot(level)] += corr * level as f64;
         }
         for v in slots.iter_mut() {
-            *v = if raw_total > 0.0 { *v / raw_total * 100.0 } else { 0.0 };
+            *v = if raw_total > 0.0 {
+                *v / raw_total * 100.0
+            } else {
+                0.0
+            };
         }
         let dedup_pct = if raw_total > 0.0 {
             dedup_total / raw_total * 100.0
@@ -1384,7 +1421,7 @@ impl QcStats {
                 rows.push((seq.to_vec(), count, pct, match_source(seq)));
             }
         }
-        rows.sort_by(|a, b| b.1.cmp(&a.1));
+        rows.sort_by_key(|b| std::cmp::Reverse(b.1));
         rows
     }
 
@@ -1407,12 +1444,12 @@ impl QcStats {
         for (g, grp) in groups.iter().enumerate() {
             let span = (grp.end - grp.start + 1) as f64;
             for p in (grp.start - 1)..grp.end.min(self.adapter_positions.len() as u32) {
-                for a in 0..6 {
-                    out[g][a] += self.adapter_positions[p as usize][a] as f64 * 100.0 / total;
+                for (a, slot) in out[g].iter_mut().enumerate().take(6) {
+                    *slot += self.adapter_positions[p as usize][a] as f64 * 100.0 / total;
                 }
             }
-            for a in 0..6 {
-                out[g][a] /= span;
+            for slot in out[g].iter_mut().take(6) {
+                *slot /= span;
             }
         }
         out
@@ -1475,8 +1512,7 @@ impl QcStats {
                     continue;
                 }
                 let obs_exp = group_hits as f64 / predicted;
-                let p = (1.0 - binomial_cdf(group_hits, group_count, expected_prop))
-                    * 16384.0; // 4^7
+                let p = (1.0 - binomial_cdf(group_hits, group_count, expected_prop)) * 16384.0; // 4^7
                 if p < 0.01 && obs_exp > 5.0 {
                     let better = match &best {
                         Some((bp, _bo, _bg)) => p < *bp,
@@ -1529,7 +1565,7 @@ impl QcStats {
 /// fastqc duplication level slot from the observed count.
 fn dup_slot(level: u64) -> usize {
     let t = level as i64 - 1;
-    if t > 9999 || t < 0 {
+    if !(0..=9999).contains(&t) {
         15
     } else if t > 4999 {
         14
@@ -1609,8 +1645,7 @@ unsafe fn read_u64_un(seq: &[u8], i: usize) -> u64 {
 /// After the pairwise-distinct 2-byte dispatch, these verify the remaining
 /// 10 bp with two loads + compares instead of a libc memcmp. Entries with
 /// other lengths are `None` and fall back to the general slice comparison.
-static ADAPTER_SIGS: std::sync::OnceLock<[Option<(u16, u64)>; 6]> =
-    std::sync::OnceLock::new();
+static ADAPTER_SIGS: std::sync::OnceLock<[Option<(u16, u64)>; 6]> = std::sync::OnceLock::new();
 
 fn adapter_sigs() -> &'static [Option<(u16, u64)>; 6] {
     ADAPTER_SIGS.get_or_init(|| {
@@ -1635,8 +1670,7 @@ fn adapter_sigs() -> &'static [Option<(u16, u64)>; 6] {
 /// index (0xF = none), packed two per byte. 32 KB fits L1 on modern x86
 /// (the 64 KB u8 version sat at the L1/L2 boundary), and the sentinel
 /// encoding keeps the whole lookup to one load + shift/mask.
-static ADAPTER_PAIR_TABLE: std::sync::OnceLock<[u8; 1 << 15]> =
-    std::sync::OnceLock::new();
+static ADAPTER_PAIR_TABLE: std::sync::OnceLock<[u8; 1 << 15]> = std::sync::OnceLock::new();
 
 fn adapter_pair_table() -> &'static [u8; 1 << 15] {
     ADAPTER_PAIR_TABLE.get_or_init(|| {
@@ -1677,15 +1711,14 @@ fn adapter_at(table: &[u8; 1 << 15], pair: u16) -> u8 {
 /// via the precomputed signature; generic slice fallback for other lengths).
 #[inline(always)]
 fn verify_adapter(
-    a: usize,
-    i: usize,
-    l: usize,
+    pos: (usize, usize, usize),
     seq: &[u8],
     sigs: &[Option<(u16, u64)>; 6],
     ads: &[(&str, &str)],
     found: &mut [Option<usize>; 6],
     mask: &mut u8,
 ) {
+    let (a, i, l) = pos;
     if *mask & (1 << a) == 0 {
         return;
     }
@@ -1792,7 +1825,9 @@ fn contaminant_match(subject: &[u8], query: &[u8]) -> Option<(usize, usize)> {
                     if len > 20 {
                         let id = ((len - (mismatch_count as i64 - 1)) * 100) / len;
                         let better = match best {
-                            Some((bl, bi)) => len as usize > bl || (len as usize == bl && id as usize > bi),
+                            Some((bl, bi)) => {
+                                len as usize > bl || (len as usize == bl && id as usize > bi)
+                            }
                             None => true,
                         };
                         if better {
@@ -1850,9 +1885,7 @@ fn find_subseq(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     let rest = &needle[2..];
     let mut i = 0;
     while i + needle.len() <= haystack.len() {
-        let Some(off) = haystack[i..].iter().position(|&b| b == first) else {
-            return None;
-        };
+        let off = haystack[i..].iter().position(|&b| b == first)?;
         i += off;
         if i + 2 + rest.len() > haystack.len() {
             return None;
@@ -1919,10 +1952,7 @@ fn binomial_cdf(k: u64, n: u64, p: f64) -> f64 {
     let a = (n - k) as f64;
     let b = (k + 1) as f64;
     let x = 1.0 - p;
-    let mut bt = (gammaln(a + b) - gammaln(a) - gammaln(b)
-        + a * x.ln()
-        + b * (1.0 - x).ln())
-    .exp();
+    let bt = (gammaln(a + b) - gammaln(a) - gammaln(b) + a * x.ln() + b * (1.0 - x).ln()).exp();
     if x < (a + 1.0) / (a + b + 2.0) {
         bt * betacf(x, a, b) / a
     } else {
@@ -1939,12 +1969,12 @@ fn gammaln(xx: f64) -> f64 {
         0.1208650973866179e-2,
         -0.5395239384953e-5,
     ];
-    let mut x = xx;
+    let x = xx;
     let mut y = xx;
     let mut tmp = x + 5.5;
     tmp -= (x + 0.5) * tmp.ln();
     let mut ser = 1.000000000190015;
-    for (i, &c) in cof.iter().enumerate() {
+    for &c in &cof {
         y += 1.0;
         ser += c / y;
     }
@@ -1986,8 +2016,7 @@ fn betacf(x: f64, a: f64, b: f64) -> f64 {
         }
         d = 1.0 / d;
         h *= d * c;
-        aa = -(a + m as f64) * (qab + m as f64) * x
-            / ((a + m2 as f64) * (qap + m2 as f64));
+        aa = -(a + m as f64) * (qab + m as f64) * x / ((a + m2 as f64) * (qap + m2 as f64));
         d = 1.0 + aa * d;
         if d.abs() < FPMIN {
             d = FPMIN;

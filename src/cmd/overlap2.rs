@@ -1,6 +1,5 @@
 use clap::*;
 use cmd_lib::*;
-use std::collections::HashMap;
 
 // Create clap subcommand arguments
 pub fn make_subcommand() -> Command {

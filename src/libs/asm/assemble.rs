@@ -1,7 +1,8 @@
 //! Tadpole-compatible contig assembly (contigMode).
 
 use crate::libs::asm::tadpole::{
-    argmax2, base_code, base_defined, number_to_base, second_highest_position, Kmer, TadpoleTable,
+    argmax2, base_code, base_defined, number_to_base, second_highest_position, Kmer, KmerFnvHasher,
+    TadpoleTable,
 };
 use anyhow::Result;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
@@ -33,7 +34,10 @@ pub struct AssembleOptions {
     pub min_count_extend: usize,
     /// Minimum added bases past the seed for a contig to be kept.
     pub min_extension: usize,
-    /// Minimum contig length; `0` selects the tadpole auto value max(124, 2k).
+    /// Minimum output length; `0` keeps everything (the `asm unitig`
+    /// default mirrors bcalm's lossless vertex decomposition — no length
+    /// cleanup unless requested; `asm contig` passes tadpole's
+    /// `mincontiglen` default explicitly).
     pub min_contig_len: usize,
     /// Minimum k-mer coverage for a contig.
     pub min_coverage: f32,
@@ -53,6 +57,9 @@ pub struct AssembleOptions {
     pub emit_links: bool,
     /// Emit a GFA graph instead of FASTA.
     pub emit_gfa: bool,
+    /// Emit every k-mer abundance in the FASTA header (`ab:Z:`, BCALM
+    /// `-all-abundance-counts`).
+    pub all_abundance_counts: bool,
 }
 
 impl Default for AssembleOptions {
@@ -73,17 +80,14 @@ impl Default for AssembleOptions {
             pop_bubbles: true,
             emit_links: false,
             emit_gfa: false,
+            all_abundance_counts: false,
         }
     }
 }
 
 impl AssembleOptions {
     fn resolved_min_contig_len(&self) -> usize {
-        if self.min_contig_len > 0 {
-            self.min_contig_len
-        } else {
-            (124).max(2 * self.k)
-        }
+        self.min_contig_len
     }
 }
 
@@ -150,7 +154,6 @@ impl Edge {
 #[derive(Debug, Default, Clone)]
 pub struct AssembleStats {
     pub reads_in: u64,
-    pub bases_in: u64,
     pub contigs_built: u64,
     pub bases_built: u64,
     pub longest_contig: usize,
@@ -178,23 +181,15 @@ pub fn assemble<W: Write>(
         opts.k
     );
 
-    let records = read_records(infiles)?;
+    // Read + canonicalize + phred-convert in one pass (one record buffer).
+    let reads = read_records(infiles)?;
 
     // Pass 2: count k-mers from the canonicalized (phred) qualities.
-    let reads: Vec<(Vec<u8>, Vec<u8>)> = records
-        .iter()
-        .map(|r| {
-            (
-                r.sequence().to_vec(),
-                to_phred(r.sequence(), r.quality_scores()),
-            )
-        })
-        .collect();
     let table = TadpoleTable::build(&reads, opts.k, opts.min_prob);
-    let bases_in: u64 = reads.iter().map(|(s, _)| s.len() as u64).sum();
 
     // Pass 3: multi-pass seeding and contig building (BuildThread.run).
-    let mut claimed: HashSet<Kmer> = HashSet::new();
+    let mut claimed: HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>> =
+        HashSet::default();
     let mut contigs: Vec<Contig> = Vec::new();
     let mut id_counter = 0usize;
     for i in (1..opts.contig_passes).rev() {
@@ -228,8 +223,7 @@ pub fn assemble<W: Write>(
     }
 
     let mut stats = AssembleStats {
-        reads_in: records.len() as u64,
-        bases_in,
+        reads_in: reads.len() as u64,
         ..AssembleStats::default()
     };
     let min_contig_len = opts.resolved_min_contig_len();
@@ -244,37 +238,53 @@ pub fn assemble<W: Write>(
     Ok(stats)
 }
 
-/// Reads all records from 1 interleaved or 2 paired files, canonicalizing
+/// Reads all records from any number of files sequentially, canonicalizing
 /// qualities like BBTools (shared by the contig and unitig modes).
-fn read_records(infiles: &[String]) -> Result<Vec<SeqRecord>> {
-    let mut records: Vec<SeqRecord> = Vec::new();
-    let mut reader1 = SeqReader::new(&infiles[0])?;
-    let mut reader2 = if infiles.len() > 1 {
-        Some(SeqReader::new(&infiles[1])?)
-    } else {
-        None
-    };
+/// Reads and converts records to `(sequence, phred quality)` pairs in one
+/// streaming pass (one `SeqRecord` buffer alive at a time). The previous
+/// version collected every `SeqRecord` first, then copied seq + phred into
+/// a second structure — the two full copies together were ~0.6 GB on G37
+/// full. Pairing is irrelevant for assembly (BCALM semantics): every record
+/// from every file contributes its k-mers in order.
+fn read_records(infiles: &[String]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    anyhow::ensure!(!infiles.is_empty(), "at least one input file is required");
+    let mut reads: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut rec = SeqRecord::new();
-    loop {
-        if !reader1.read_record(&mut rec)? {
-            break;
-        }
-        canonicalize_quality(&mut rec);
-        records.push(rec.clone());
-        if let Some(r) = reader2.as_mut() {
-            if !r.read_record(&mut rec)? {
-                anyhow::bail!("unpaired trailing read in {}", infiles[0]);
-            }
+    for infile in infiles {
+        let mut reader = SeqReader::new(infile)?;
+        while reader.read_record(&mut rec)? {
             canonicalize_quality(&mut rec);
-            records.push(rec.clone());
-        } else if !reader1.read_record(&mut rec)? {
-            anyhow::bail!("unpaired trailing read in {}", infiles[0]);
-        } else {
-            canonicalize_quality(&mut rec);
-            records.push(rec.clone());
+            reads.push((
+                rec.sequence().to_vec(),
+                to_phred(rec.sequence(), rec.quality_scores()),
+            ));
         }
     }
-    Ok(records)
+    Ok(reads)
+}
+
+/// Per-k-mer canonical counts in output sequence order (BCALM `ab:Z`
+/// vector). Mirrors the windowing in `calc_coverage`.
+fn calc_abundances(bases: &[u8], table: &TadpoleTable, k: usize) -> Vec<u32> {
+    if bases.len() < k {
+        return Vec::new();
+    }
+    let mut kmer = Kmer::new(k);
+    let mut len = 0usize;
+    let mut out = Vec::with_capacity(bases.len() - k + 1);
+    for &b in bases {
+        if base_defined(b) {
+            kmer.push_right(base_code(b));
+            len += 1;
+        } else {
+            len = 0;
+            kmer.reset();
+        }
+        if len >= k {
+            out.push(table.get_count(&kmer));
+        }
+    }
+    out
 }
 
 /// One maximal unitig (non-branching path; BCALM `graph3` semantics).
@@ -287,6 +297,8 @@ struct Unitig {
     max_cov: usize,
     /// The k-mer path closes back on itself (a circular contig).
     circular: bool,
+    /// Per-k-mer canonical counts (`ab:Z:` vector); empty when not requested.
+    abundances: Vec<u32>,
 }
 
 /// Assembles reads into maximal unitigs instead of seeded contigs.
@@ -318,7 +330,20 @@ pub fn assemble_unitigs<W: Write>(
         u.id = i;
         if u.bases.len() >= min_len {
             if opts.emit_gfa {
-                writeln!(out, "S\t{}\t{}", u.id, String::from_utf8_lossy(&u.bases))?;
+                write!(out, "S\t{}\t{}", u.id, String::from_utf8_lossy(&u.bases))?;
+                if !u.abundances.is_empty() {
+                    let sum: u32 = u.abundances.iter().sum();
+                    let n = u.abundances.len();
+                    let mean = if n > 0 { sum as f64 / n as f64 } else { 0.0 };
+                    write!(
+                        out,
+                        "\tLN:i:{}\tKC:i:{}\tkm:f:{}",
+                        u.bases.len(),
+                        sum,
+                        fmt_fixed(mean, 1)
+                    )?;
+                }
+                writeln!(out)?;
                 for l in &links[i] {
                     if !kept[l.to] {
                         continue;
@@ -382,30 +407,22 @@ fn assemble_unitigs_core(
         key::Kmer::MAX_K,
         opts.k
     );
-    let records = read_records(infiles)?;
-    let reads: Vec<(Vec<u8>, Vec<u8>)> = records
-        .iter()
-        .map(|r| {
-            (
-                r.sequence().to_vec(),
-                to_phred(r.sequence(), r.quality_scores()),
-            )
-        })
-        .collect();
+    let reads = read_records(infiles)?;
     let table = TadpoleTable::build(&reads, opts.k, opts.min_prob);
-    let bases_in: u64 = reads.iter().map(|(s, _)| s.len() as u64).sum();
 
     let mut unitigs = build_unitigs(&table, opts);
     unitigs.sort_by(unitig_cmp);
     let stats = AssembleStats {
-        reads_in: records.len() as u64,
-        bases_in,
+        reads_in: reads.len() as u64,
         ..AssembleStats::default()
     };
     Ok((unitigs, stats))
 }
 
-/// One directed unitig link, starting at the owning unitig's right end.
+/// One directed unitig link. `from_rc` selects the BCALM FASTA prefix:
+/// `false` = out-neighbor (`L:+:` from the owning unitig's right end),
+/// `true` = in-neighbor (`L:-:` from its left end). `to_rc` is the target
+/// strand.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Link {
     to: usize,
@@ -413,58 +430,74 @@ struct Link {
     to_rc: bool,
 }
 
-/// Computes links between unitigs sharing an endpoint (k-1)-mer (BCALM
-/// LinkTigs semantics, simplified to actual-sequence matching).
+/// Computes links between unitigs sharing an endpoint (k-1)-mer, matching
+/// bcalm's `LinkTigs.cpp` (`link_unitigs_pass`) exactly: every unitig emits
+/// in-neighbors from its begin (`L:-:` entries) and out-neighbors from its
+/// end (`L:+:` entries), per the four orientation cases each, plus the
+/// palindrome exception when `(k-1)` is even and the extremity (k-1)-mer is
+/// a palindrome (all orientations admitted).
 ///
-/// Direction rule for the source's right-end (k-1)-mer `r` meeting the
-/// target's end `a` (all in actual sequence):
-/// * `a == r` on the target's left end -> `+`/`+` (3' -> 5');
-/// * `a == rc(r)` on the target's left end -> `+`/`-`;
-/// * 3'-3' or 5'-5' meetings are expressed on the reverse strand (`-`).
+/// bcalm's 8-pass disk partitioning (`is_in_pass`) is only a memory-bounding
+/// device: both ends of a shared canonical (k-1)-mer hash to the same pass,
+/// so a single in-memory pass has identical semantics.
 fn compute_links(unitigs: &[Unitig], k: usize) -> Vec<Vec<Link>> {
     if k < 2 || unitigs.is_empty() {
         return vec![Vec::new(); unitigs.len()];
     }
-    // Endpoint (k-1)-mers indexed by canonical form; bool = right end.
-    let mut idx: HashMap<Kmer, Vec<(usize, bool)>> = HashMap::new();
+    let km1 = k - 1;
+    let palindrome_exception = km1.is_multiple_of(2);
+    // Endpoint (k-1)-mers indexed by canonical form.
+    // Entry: (unitig, right end?, rc flag) — the rc flag mirrors bcalm's
+    // `ExtremityInfo(!sameOrientation)` (extremities stored canonicalized).
+    let mut idx: HashMap<Kmer, Vec<(usize, bool, bool)>> = HashMap::new();
     for (i, u) in unitigs.iter().enumerate() {
         for right in [false, true] {
-            let km = end_kmer1(&u.bases, k, right);
-            idx.entry(km.canonical()).or_default().push((i, right));
+            let actual = end_kmer1(&u.bases, k, right);
+            let canon = actual.canonical();
+            let same = canon.cmp_bases(&actual) == std::cmp::Ordering::Equal;
+            idx.entry(canon).or_default().push((i, right, !same));
         }
     }
     let mut links = vec![Vec::new(); unitigs.len()];
     for (i, u) in unitigs.iter().enumerate() {
-        let r = end_kmer1(&u.bases, k, true);
-        let rc_r = r.rc();
-        let Some(candidates) = idx.get(&r.canonical()) else {
-            continue;
-        };
-        for &(j, j_right) in candidates {
-            if j == i {
-                continue;
-            }
-            let actual = end_kmer1(&unitigs[j].bases, k, j_right);
-            let (from_rc, to_rc) = if !j_right {
-                if actual.cmp_bases(&r) == std::cmp::Ordering::Equal {
-                    (false, false)
-                } else if actual.cmp_bases(&rc_r) == std::cmp::Ordering::Equal {
-                    (false, true)
-                } else {
-                    continue;
+        // in-neighbors from the begin (k-1)-mer (bcalm `L:-:`)
+        let begin = end_kmer1(&u.bases, k, false);
+        let begin_same = begin.canonical().cmp_bases(&begin) == std::cmp::Ordering::Equal;
+        let begin_pal =
+            palindrome_exception && begin.cmp_bases(&begin.rc()) == std::cmp::Ordering::Equal;
+        if let Some(cands) = idx.get(&begin.canonical()) {
+            for &(j, j_right, j_rc) in cands {
+                let valid = (begin_same && j_right && !j_rc)
+                    || (begin_same && !j_right && j_rc)
+                    || (!begin_same && j_right && j_rc)
+                    || (!begin_same && !j_right && !j_rc);
+                if valid || begin_pal {
+                    links[i].push(Link {
+                        to: j,
+                        from_rc: true,  // L:-:
+                        to_rc: j_right, // e_in.pos == UNITIG_END
+                    });
                 }
-            } else if actual.cmp_bases(&r) == std::cmp::Ordering::Equal {
-                (true, true)
-            } else if actual.cmp_bases(&rc_r) == std::cmp::Ordering::Equal {
-                (true, false)
-            } else {
-                continue;
-            };
-            links[i].push(Link {
-                to: j,
-                from_rc,
-                to_rc,
-            });
+            }
+        }
+        // out-neighbors from the end (k-1)-mer (bcalm `L:+:`)
+        let end = end_kmer1(&u.bases, k, true);
+        let end_same = end.canonical().cmp_bases(&end) == std::cmp::Ordering::Equal;
+        let end_pal = palindrome_exception && end.cmp_bases(&end.rc()) == std::cmp::Ordering::Equal;
+        if let Some(cands) = idx.get(&end.canonical()) {
+            for &(j, j_right, j_rc) in cands {
+                let valid = (end_same && !j_right && !j_rc)
+                    || (end_same && j_right && j_rc)
+                    || (!end_same && !j_right && j_rc)
+                    || (!end_same && j_right && !j_rc);
+                if valid || end_pal {
+                    links[i].push(Link {
+                        to: j,
+                        from_rc: false, // L:+:
+                        to_rc: j_right, // e_out.pos == UNITIG_END
+                    });
+                }
+            }
         }
     }
     for l in &mut links {
@@ -493,7 +526,9 @@ fn end_kmer1(bases: &[u8], k: usize, right: bool) -> Kmer {
 fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
     let k = opts.k;
     let threshold = opts.min_count_seed as u32;
-    let mut visited: HashSet<Kmer> = HashSet::new();
+    let want_abundances = opts.all_abundance_counts || opts.emit_gfa;
+    let mut visited: HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>> =
+        HashSet::default();
     let mut unitigs = Vec::new();
     for (seed, count) in table.sorted_entries().iter() {
         if *count < threshold || visited.contains(seed) {
@@ -546,6 +581,11 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
             bb = rev_comp(&bb).collect();
         }
         let (coverage, min_cov, max_cov) = calc_coverage(&bb, table, k);
+        let abundances = if want_abundances {
+            calc_abundances(&bb, table, k)
+        } else {
+            Vec::new()
+        };
         unitigs.push(Unitig {
             bases: bb,
             id: 0,
@@ -553,6 +593,7 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
             min_cov,
             max_cov,
             circular,
+            abundances,
         });
     }
     unitigs
@@ -621,6 +662,15 @@ fn write_unitig<W: Write>(w: &mut W, u: &Unitig, links: Option<&[Link]>) -> Resu
         fmt_fixed(hh as f64, 3),
         fmt_fixed(caga as f64, 3),
     )?;
+    if !u.abundances.is_empty() {
+        write!(w, ",ab:Z:")?;
+        for (i, c) in u.abundances.iter().enumerate() {
+            if i > 0 {
+                write!(w, " ")?;
+            }
+            write!(w, "{c}")?;
+        }
+    }
     if let Some(links) = links {
         for l in links {
             write!(
@@ -658,7 +708,7 @@ fn scan_table(
     table: &TadpoleTable,
     threshold: usize,
     opts: &AssembleOptions,
-    claimed: &mut HashSet<Kmer>,
+    claimed: &mut HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>>,
     contigs: &mut Vec<Contig>,
     id_counter: &mut usize,
 ) {
@@ -689,7 +739,7 @@ fn make_contig(
     seed: &Kmer,
     table: &TadpoleTable,
     opts: &AssembleOptions,
-    claimed: &mut HashSet<Kmer>,
+    claimed: &mut HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>>,
 ) -> Option<Contig> {
     let k = opts.k;
     // `base_at(0)` is the 3' end (last base pushed); rebuild 5'->3'.
@@ -802,7 +852,7 @@ fn extend_to_right(
     bb: &mut Vec<u8>,
     table: &TadpoleTable,
     opts: &AssembleOptions,
-    claimed: &mut HashSet<Kmer>,
+    claimed: &mut HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>>,
 ) -> (i32, f32) {
     let k = opts.k;
     if bb.len() < k {
@@ -2072,6 +2122,7 @@ mod tests {
             min_cov: 0,
             max_cov: 0,
             circular: false,
+            abundances: Vec::new(),
         }
     }
 
@@ -2084,8 +2135,8 @@ mod tests {
         );
     }
 
-    /// Branching (3'->5' on the forward strand) and reverse-strand
-    /// directions of shared endpoint (k-1)-mers.
+    /// BCALM LinkTigs orientation rules (verified against bcalm v2.2.3 on
+    /// G37 full: 1482/1482 unitigs with per-unitig `L:` sets identical).
     #[test]
     fn links_directions_branch_and_rc() {
         // S is a 30 bp random fragment (k = 31 -> k-1 = 30).
@@ -2105,25 +2156,66 @@ mod tests {
             unitig(&[&s[..], &x2[..]].concat()),
         ];
         let links = compute_links(&uts, 31);
+        // U0 emits out-neighbors to U1/U2 (`L:+:`); U1/U2 emit the
+        // in-neighbor from U0 (`L:-:0:-`).
         assert_eq!(links[0].len(), 2);
         assert_link(&links[0], 1, false, false);
         assert_link(&links[0], 2, false, false);
-        assert!(links[1].is_empty() && links[2].is_empty());
+        assert_eq!(
+            links[1],
+            vec![Link {
+                to: 0,
+                from_rc: true,
+                to_rc: true
+            }]
+        );
+        assert_eq!(
+            links[2],
+            vec![Link {
+                to: 0,
+                from_rc: true,
+                to_rc: true
+            }]
+        );
 
-        // Reverse: U0's right end is rc(S), U1's left end is S.
+        // Reverse: U0's right end is rc(S), U1's left end is S. The two
+        // share a canonical (k-1)-mer, but the actual extremities differ
+        // (rc(S) != S), so bcalm's orientation cases emit no link.
         let uts = vec![
             unitig(&[&poly_a[..], &s_rc[..]].concat()),
             unitig(&[&s[..], &x1[..]].concat()),
         ];
         let links = compute_links(&uts, 31);
-        assert_link(&links[0], 1, false, true);
+        assert!(links[0].is_empty() && links[1].is_empty());
 
-        // 3'-3': both right ends are S -> reverse-strand representation.
+        // 3'-3': both right ends are S (same actual (k-1)-mer) — also no
+        // link under bcalm's out-neighbor cases (end-end with rc=false).
         let uts = vec![
             unitig(&[&poly_a[..], &s[..]].concat()),
             unitig(&[&x2[..], &s[..]].concat()),
         ];
         let links = compute_links(&uts, 31);
-        assert_link(&links[0], 1, true, true);
+        assert!(links[0].is_empty() && links[1].is_empty());
+
+        // Self-link: a unitig whose begin and end share the same (k-1)-mer
+        // (e.g. a poly-C run) links to itself in both directions — bcalm
+        // emits `L:-:<id>:-` and `L:+:<id>:+` (verified on G37 unitig 178).
+        let uts = vec![unitig(&b"C".repeat(60))];
+        let links = compute_links(&uts, 31);
+        assert_eq!(
+            links[0],
+            vec![
+                Link {
+                    to: 0,
+                    from_rc: false,
+                    to_rc: false
+                },
+                Link {
+                    to: 0,
+                    from_rc: true,
+                    to_rc: true
+                },
+            ]
+        );
     }
 }

@@ -3,7 +3,7 @@ use crate::libs::olc::consensus::consensus;
 use crate::libs::olc::layout::build_layouts;
 use crate::libs::olc::overlap::{filter_contained, find_overlaps, OverlapOptions, Unitig};
 use anyhow::Context;
-use clap::{value_parser, Arg, ArgMatches, Command};
+use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use std::io::Write;
 use std::path::Path;
 
@@ -25,7 +25,8 @@ ambiguous junctions and non-reciprocal edges, and no bubble heuristics are
 applied.
 
 Notes:
-* Input is 1 interleaved file or 2 paired files (same as `anchr asm unitig`)
+* Input is one or more FASTA/FASTQ files (plain or gzipped); pairing is
+  irrelevant for assembly, and `--list-files` reads a one-path-per-line list
 * --keep-dir writes the intermediate unitigs/overlap/layout files for
   debugging and inspection; the names there omit the `stem:` prefix that
   the standalone ovlp/layout/cns commands derive, so they are not directly
@@ -39,11 +40,13 @@ Examples:
 2. Keep the intermediates and raise the minimum contig length:
    anchr asm olc R1.fq.gz R2.fq.gz -o contigs.fa \
        --kmer 21,51,81 --min-contig-len 1000 --keep-dir stage/
+3. Assemble from a list of files:
+   anchr asm olc files.list -o contigs.fa --kmer 21,51,81 --list-files
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
-            "Input reads: 1 interleaved or 2 paired (R1, R2)",
-            1..=2,
+            "Input file(s): FASTA/FASTQ, plain or gzipped; use --list-files for a one-path-per-line list",
+            1..,
         ))
         .arg(crate::cmd::args::outfile_arg())
         .arg(
@@ -92,15 +95,25 @@ Examples:
                 .num_args(1)
                 .help("Directory for intermediate unitigs/ovlp/layout files (for inspection)"),
         )
+        .arg(
+            Arg::new("list_files")
+                .long("list-files")
+                .action(ArgAction::SetTrue)
+                .help("Treat infiles as list files, one sequence file path per line"),
+        )
 }
 
 /// Execute the olc command.
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
-    let infiles: Vec<String> = args
-        .get_many::<String>("infiles")
-        .unwrap()
-        .cloned()
-        .collect();
+    let is_list = args.get_flag("list_files");
+    let mut infiles: Vec<String> = Vec::new();
+    for f in args.get_many::<String>("infiles").unwrap() {
+        infiles.extend(pgr::libs::par::resolve_paths(f, is_list)?);
+    }
+    anyhow::ensure!(
+        !infiles.is_empty(),
+        "--list-files resolved to no input files"
+    );
     let ks: Vec<usize> = args
         .get_one::<String>("kmer")
         .unwrap()

@@ -4,8 +4,8 @@
 //! `fastqc_data.txt` / `summary.txt` output; per-file subdirectories named
 //! `{input}_fastqc/` (fastqc layout).
 
-use crate::libs::qc::analyzer::QcStats;
 use crate::libs::fq::scan::{next_record, FastqRecord};
+use crate::libs::qc::analyzer::QcStats;
 use anyhow::Context;
 use clap::{Arg, ArgMatches, Command};
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
@@ -75,9 +75,8 @@ Examples:
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let outdir = args.get_one::<String>("outdir").unwrap();
     fs::create_dir_all(outdir).with_context(|| format!("failed to create {outdir}"))?;
-    let parallel = crate::cmd::args::parse_parallel_auto(
-        args.get_one::<String>("parallel").unwrap(),
-    )?;
+    let parallel =
+        crate::cmd::args::parse_parallel_auto(args.get_one::<String>("parallel").unwrap())?;
     let format = args.get_one::<String>("format").unwrap();
 
     for infile in args.get_many::<String>("infiles").unwrap() {
@@ -206,8 +205,7 @@ fn run_mmap(infile: &str, name: &str, parallel: usize) -> anyhow::Result<QcStats
 /// Gzip/stdin inputs: keep the streaming pgr reader (decompressing a whole
 /// multi-GB file into RAM costs more in page faults than it saves).
 fn run_streamed(infile: &str, name: &str, parallel: usize) -> anyhow::Result<QcStats> {
-    let mut reader =
-        SeqReader::new(infile).with_context(|| format!("failed to open {infile}"))?;
+    let mut reader = SeqReader::new(infile).with_context(|| format!("failed to open {infile}"))?;
     let mut rec = SeqRecord::new();
 
     // Sample up to 200 reads for Phred encoding detection (pgr).

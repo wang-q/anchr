@@ -17,7 +17,8 @@ directions, stopping at branches and dead ends. This replaces the tadpole
 assembly steps of the anchr `2_insert_size` and `unitigs` flows.
 
 Notes:
-* Input is 1 interleaved file or 2 paired files; FASTA and FASTQ both work
+* Input is one or more FASTA/FASTQ files (plain or gzipped); pairing is
+  irrelevant for assembly, and `--list-files` reads a one-path-per-line list
 * Contigs are written longest-first with a `contig_<id>` FASTA header carrying
   length, coverage, GC, and dimer composition fields (BBTools SHORT_NAMES)
 * Processing is ordered and deterministic (equivalent to `threads=1`)
@@ -46,11 +47,14 @@ Examples:
 
 5. Drop low-coverage contigs (tadpole `mincoverage`):
    anchr asm contig in.fq -o out.fasta --min-coverage 5
+
+6. Assemble from a list of files:
+   anchr asm contig files.list -o contigs.fasta --list-files
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
-            "Input file(s): 1 interleaved or 2 paired (R1, R2)",
-            1..=2,
+            "Input file(s): FASTA/FASTQ, plain or gzipped; use --list-files for a one-path-per-line list",
+            1..,
         ))
         .arg(crate::cmd::args::outfile_arg())
         .arg(
@@ -92,6 +96,12 @@ Examples:
                 .help("Keep parallel-path contigs separate (disable bubble popping)"),
         )
         .arg(
+            Arg::new("list_files")
+                .long("list-files")
+                .action(ArgAction::SetTrue)
+                .help("Treat infiles as list files, one sequence file path per line"),
+        )
+        .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
@@ -103,11 +113,15 @@ Examples:
 
 /// Execute the contig command.
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
-    let infiles: Vec<String> = args
-        .get_many::<String>("infiles")
-        .unwrap()
-        .cloned()
-        .collect();
+    let is_list = args.get_flag("list_files");
+    let mut infiles: Vec<String> = Vec::new();
+    for f in args.get_many::<String>("infiles").unwrap() {
+        infiles.extend(pgr::libs::par::resolve_paths(f, is_list)?);
+    }
+    anyhow::ensure!(
+        !infiles.is_empty(),
+        "--list-files resolved to no input files"
+    );
     let outfile = crate::cmd::args::get_outfile(args);
     // Reject `-o` that would overwrite an input file (the writer is opened
     // before the reads are consumed).
@@ -115,12 +129,15 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // Validate the thread-count value; processing stays deterministic
     // single-pass (see the design notes), so the result is not used.
     crate::cmd::args::parse_parallel_auto(args.get_one::<String>("parallel").unwrap())?;
+    let k = *args.get_one::<usize>("kmer").unwrap();
     let opts = AssembleOptions {
-        k: *args.get_one::<usize>("kmer").unwrap(),
+        k,
         min_contig_len: args
             .get_one::<usize>("min_contig_len")
             .copied()
-            .unwrap_or(0),
+            // tadpole `mincontiglen` auto default (kept: contig mode is
+            // tadpole-compatible; unitig mode deliberately has no filter)
+            .unwrap_or_else(|| (124).max(2 * k)),
         min_count_seed: args
             .get_one::<usize>("min_count_seed")
             .copied()
