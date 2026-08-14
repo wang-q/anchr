@@ -61,3 +61,22 @@
 **8 个 relocation 全部消除**（错连 unitig 在合并前被切分），N50 反升、
 Lambda/20k 环状不回归。剩余 366 条 <500 bp 碎片（dropped）是输出策略
 问题，与错连无关。
+
+## 更新（2026-08-14，v8 严格链唯一性）
+
+借鉴 SKESA "前驱恰好 1" 不变量（`skesa.md` §7.2）：`merge_chains` /
+`recompact_graph` 从"先到先得占用"改为**严格两端唯一**（含对称 link 去重
+修正，见 `asm-multik.md` §4.13）后：
+
+| 指标 | 层次 3 后（v7） | v8 严格唯一 |
+|---|---:|---:|
+| # misassemblies | 0 | **0** |
+| N50 | 26,562 | 24,445（-8%，宁断勿嵌合） |
+| Genome fraction | 95.99% | 95.86% |
+| # mismatches / 100 kbp | — | **27.67（历史最佳）** |
+| # indels / 100 kbp | — | 2.52 |
+| # N's / 100 kbp | 0 | 0 |
+| Largest contig | 52,807 | 56,183 |
+
+正确性优先的取舍：汇点不再被吞进链，主路径碎片化略升（N50 -8%），但
+错连归零、mismatches 历史最低、内容基本不丢（Genome fraction -0.13pp）。

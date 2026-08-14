@@ -16,6 +16,7 @@ use super::tadpole::{base_code, Kmer as TdKmer, TadpoleTable};
 use anyhow::Result;
 use pgr::libs::kmer::key::Kmer;
 use pgr::libs::nt::rev_comp;
+use std::collections::HashSet;
 
 /// Options for [`assemble_multik`].
 #[derive(Debug, Clone)]
@@ -693,6 +694,48 @@ fn progressive_filter(
     dropped
 }
 
+/// Resolves a directed link into its oriented chain segment `(left node,
+/// left rev, right node, right rev)` by matching the actual extremity
+/// (k_build-1)-mers (the same matching `bridge_kmer` uses, without building
+/// a k-mer). Returns `None` when the extremities do not overlap or a unitig
+/// is shorter than the overlap window.
+fn oriented_segment(
+    i: usize,
+    l: &Link,
+    unitigs: &[Unitig],
+    k_build: usize,
+) -> Option<(usize, bool, usize, bool)> {
+    let u = &unitigs[i];
+    let v = &unitigs[l.to];
+    if u.bases.len() < k_build - 1 || v.bases.len() < k_build - 1 {
+        return None;
+    }
+    let (li, lrev, ri, rrev) = if !l.from_rc {
+        let u_ext = &u.bases[u.bases.len() - (k_build - 1)..];
+        let vb = &v.bases[..k_build - 1];
+        let ve = &v.bases[v.bases.len() - (k_build - 1)..];
+        if u_ext == vb {
+            (i, false, l.to, false)
+        } else if u_ext == rev_comp(ve).collect::<Vec<u8>>().as_slice() {
+            (i, false, l.to, true)
+        } else {
+            return None;
+        }
+    } else {
+        let u_ext = &u.bases[..k_build - 1];
+        let vb = &v.bases[..k_build - 1];
+        let ve = &v.bases[v.bases.len() - (k_build - 1)..];
+        if u_ext == ve {
+            (l.to, false, i, false)
+        } else if u_ext == rev_comp(vb).collect::<Vec<u8>>().as_slice() {
+            (l.to, true, i, false)
+        } else {
+            return None;
+        }
+    };
+    Some((li, lrev, ri, rrev))
+}
+
 /// In-graph recompaction: merge unique chains into longer unitigs and
 /// relink the chain endpoints (metaMDBG `UnitigGraph2::recompact`). The
 /// merged unitig keeps the chain head's begin (from_rc=true) links and the
@@ -706,39 +749,43 @@ fn recompact_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, k_buil
     let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
     let mut right_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
     let mut left_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
+    // Strict end uniqueness (SKESA's "predecessor == 1" invariant): a chain
+    // segment joins only when BOTH oriented ends have exactly one link.
+    // First-pass degree counting replaces first-come-first-served
+    // occupancy, so a convergence node (two predecessors) is never
+    // swallowed into a chain — the abundance filter, not the link iteration
+    // order, decides which predecessor survives.
+    let mut out_deg = vec![0usize; 2 * n];
+    let mut in_deg = vec![0usize; 2 * n];
+    // Deduplicate segments: compute_links emits the same junction from both
+    // endpoints (u's out-link and v's in-link), so per-link degree counting
+    // would double-count a unique chain segment.
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
     for (i, ls) in links.iter().enumerate() {
         for l in ls {
-            let u = &unitigs[i];
-            let v = &unitigs[l.to];
-            if u.bases.len() < k_build - 1 || v.bases.len() < k_build - 1 {
+            let Some((li, lrev, ri, rrev)) = oriented_segment(i, l, unitigs, k_build) else {
                 continue;
-            }
-            let (li, lrev, ri, rrev) = if !l.from_rc {
-                let u_ext = &u.bases[u.bases.len() - (k_build - 1)..];
-                let vb = &v.bases[..k_build - 1];
-                let ve = &v.bases[v.bases.len() - (k_build - 1)..];
-                if u_ext == vb {
-                    (i, false, l.to, false)
-                } else if u_ext == rev_comp(ve).collect::<Vec<u8>>().as_slice() {
-                    (i, false, l.to, true)
-                } else {
-                    continue;
-                }
-            } else {
-                let u_ext = &u.bases[..k_build - 1];
-                let vb = &v.bases[..k_build - 1];
-                let ve = &v.bases[v.bases.len() - (k_build - 1)..];
-                if u_ext == ve {
-                    (l.to, false, i, false)
-                } else if u_ext == rev_comp(vb).collect::<Vec<u8>>().as_slice() {
-                    (l.to, true, i, false)
-                } else {
-                    continue;
-                }
             };
             let ln = node_of(li, lrev);
             let rn = node_of(ri, rrev);
-            if right_of[ln].is_some() || left_of[rn].is_some() {
+            if seen.insert((ln, rn)) {
+                out_deg[ln] += 1;
+                in_deg[rn] += 1;
+            }
+        }
+    }
+    for (i, ls) in links.iter().enumerate() {
+        for l in ls {
+            let Some((li, lrev, ri, rrev)) = oriented_segment(i, l, unitigs, k_build) else {
+                continue;
+            };
+            let ln = node_of(li, lrev);
+            let rn = node_of(ri, rrev);
+            if out_deg[ln] != 1
+                || in_deg[rn] != 1
+                || right_of[ln].is_some()
+                || left_of[rn].is_some()
+            {
                 continue;
             }
             right_of[ln] = Some((ri, rrev));
@@ -846,42 +893,42 @@ fn merge_chains(
     let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
     let mut right_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
     let mut left_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
+    // Strict end uniqueness (SKESA's "predecessor == 1" invariant), same as
+    // recompact_graph: only segments whose oriented ends both have exactly
+    // one link join a chain, so a convergence node is never swallowed into
+    // a chain by link iteration order.
+    let mut out_deg = vec![0usize; 2 * n];
+    let mut in_deg = vec![0usize; 2 * n];
+    // Deduplicate segments: compute_links emits the same junction from both
+    // endpoints (u's out-link and v's in-link), so per-link degree counting
+    // would double-count a unique chain segment.
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
     for (i, ls) in links.iter().enumerate() {
         for l in ls {
-            let u = &unitigs[i];
-            let v = &unitigs[l.to];
-            // Unitigs shorter than the shared overlap cannot join a chain.
-            if u.bases.len() < k_build - 1 || v.bases.len() < k_build - 1 {
+            let Some((li, lrev, ri, rrev)) = oriented_segment(i, l, unitigs, k_build) else {
                 continue;
-            }
-            // Resolve the oriented segment by actual extremity matching.
-            let (li, lrev, ri, rrev) = if !l.from_rc {
-                let u_ext = &u.bases[u.bases.len() - (k_build - 1)..];
-                let vb = &v.bases[..k_build - 1];
-                let ve = &v.bases[v.bases.len() - (k_build - 1)..];
-                if u_ext == vb {
-                    (i, false, l.to, false)
-                } else if u_ext == rev_comp(ve).collect::<Vec<u8>>().as_slice() {
-                    (i, false, l.to, true)
-                } else {
-                    continue; // extremity mismatch: skip (conservative)
-                }
-            } else {
-                let u_ext = &u.bases[..k_build - 1];
-                let vb = &v.bases[..k_build - 1];
-                let ve = &v.bases[v.bases.len() - (k_build - 1)..];
-                if u_ext == ve {
-                    (l.to, false, i, false)
-                } else if u_ext == rev_comp(vb).collect::<Vec<u8>>().as_slice() {
-                    (l.to, true, i, false)
-                } else {
-                    continue;
-                }
             };
             let ln = node_of(li, lrev);
             let rn = node_of(ri, rrev);
-            if right_of[ln].is_some() || left_of[rn].is_some() {
-                continue; // already occupied: bubble, not a unique chain
+            if seen.insert((ln, rn)) {
+                out_deg[ln] += 1;
+                in_deg[rn] += 1;
+            }
+        }
+    }
+    for (i, ls) in links.iter().enumerate() {
+        for l in ls {
+            let Some((li, lrev, ri, rrev)) = oriented_segment(i, l, unitigs, k_build) else {
+                continue;
+            };
+            let ln = node_of(li, lrev);
+            let rn = node_of(ri, rrev);
+            if out_deg[ln] != 1
+                || in_deg[rn] != 1
+                || right_of[ln].is_some()
+                || left_of[rn].is_some()
+            {
+                continue;
             }
             right_of[ln] = Some((ri, rrev));
             left_of[rn] = Some((li, lrev));
@@ -1186,5 +1233,73 @@ mod tests {
         // A(60) + B[20..](60) + C[20..](40) = 160.
         assert_eq!(unitigs.len(), 1);
         assert_eq!(unitigs[0].bases.len(), 160);
+    }
+
+    /// A convergence node (two predecessors) is not swallowed into either
+    /// chain: strict end uniqueness, not link iteration order, decides chain
+    /// membership (SKESA's "predecessor == 1" invariant).
+    #[test]
+    fn merge_chains_keeps_convergence_split() {
+        let s1 = "ACGTACGTACGTACGTACGT";
+        let s2 = "GATCGATCGATCGATCGATC";
+        // u's end == v's begin == w's end: v has two predecessors.
+        let u = mk_unitig(&format!("{}{}", "A".repeat(40), s1), 30.0);
+        let v = mk_unitig(&format!("{}{}", s1, "G".repeat(40)), 30.0);
+        let w = mk_unitig(&format!("{}{}", s2, s1), 30.0);
+        let mut unitigs = vec![u, v, w];
+        let mut links = vec![
+            vec![Link {
+                to: 1,
+                from_rc: false,
+                to_rc: false,
+            }],
+            Vec::new(),
+            vec![Link {
+                to: 1,
+                from_rc: false,
+                to_rc: false,
+            }],
+        ];
+        let out = merge_chains(&unitigs, &links, 21).unwrap();
+        assert_eq!(out.len(), 3, "v must not merge with either predecessor");
+        let total: usize = out.iter().map(|u| u.bases.len()).sum();
+        assert_eq!(total, 60 + 60 + 40, "no unitig is fused at the junction");
+        drop(links);
+        drop(unitigs);
+    }
+
+    /// Recompaction applies the same strict end uniqueness: the convergence
+    /// node survives as its own unitig instead of being merged into the
+    /// first-visited chain.
+    #[test]
+    fn recompact_keeps_convergence_split() {
+        let s1 = "ACGTACGTACGTACGTACGT";
+        let s2 = "GATCGATCGATCGATCGATC";
+        let u = mk_unitig(&format!("{}{}", "A".repeat(40), s1), 30.0);
+        let v = mk_unitig(&format!("{}{}", s1, "G".repeat(40)), 30.0);
+        let w = mk_unitig(&format!("{}{}", s2, s1), 30.0);
+        let mut unitigs = vec![u, v, w];
+        let mut links = vec![
+            vec![Link {
+                to: 1,
+                from_rc: false,
+                to_rc: false,
+            }],
+            Vec::new(),
+            vec![Link {
+                to: 1,
+                from_rc: false,
+                to_rc: false,
+            }],
+        ];
+        recompact_graph(&mut unitigs, &mut links, 21);
+        // v keeps both incoming links (it was not absorbed), so the merged
+        // graph still has three segments and v's begin retains two edges.
+        assert_eq!(unitigs.len(), 3);
+        let v_in: usize = links
+            .iter()
+            .map(|ls| ls.iter().filter(|l| l.to == 1 && !l.from_rc).count())
+            .sum();
+        assert_eq!(v_in, 2, "convergence node must keep both predecessors");
     }
 }

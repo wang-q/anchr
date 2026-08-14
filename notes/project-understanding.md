@@ -263,7 +263,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `bbtools.md` | fq/asm 主参考（tadpole/bbduk/bbmap/clumpify 等） |
 | `bcalm.md` | `asm unitig` 移植来源 |
 | `canu.md` / `celera.md` | `asm olc` 参考 |
-| `metaMDBG.md` / `skesa.md` / `megahit.md` | multi-k 迭代（metaMDBG 首要借鉴，见 `asm-multik.md`）/ OLC v1 素材 / 图清洗参考 |
+| `metaMDBG.md` / `skesa.md` / `megahit.md` | multi-k 迭代（metaMDBG 首要借鉴，见 `asm-multik.md`）/ 保守扩展 + 多 k 迭代本体与 Rust 移植（含与 multik 的对比，见 skesa.md §7.2）/ 图清洗参考 |
 | `cutadapt.md` / `sickle.md` | `fq trim-qual` 算法来源 |
 | `fairy.md` | `fq norm` 大数据方案调研 |
 | `quorum.md` | read 纠错参考（`fq ec-kmer`） |

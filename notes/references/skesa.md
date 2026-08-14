@@ -10,6 +10,11 @@
 > **与 OLC 的连接（2026-08-12）**：pgr 的 `asm olc`（多 k unitig 层 OLC，
 > `design/asm-olc.md`）已落地，SKESA 的 fork 过滤 / 可逆性 / 迭代多 k 语义
 > 直接映射其 v1 待决项（见 §7.1）。
+> **与 asm multik 的连接（2026-08-14）**：`asm multik`（metaMDBG 式 unitig
+> 反馈，`design/asm-multik.md`）已实现并过 G37。SKESA 与它是"多 k 迭代"的
+> 两个不同实现族——SKESA 每轮**重建图 + contig 引导 + 移除已用 reads**，
+> multik 是**全量 reads + unitig 序列反馈**；两者的 fork/bubble 语义对比
+> 见 §7.2（本次重读补充）。
 
 ## 1. 概况
 
@@ -301,6 +306,56 @@ de Bruijn 图遍历启发式：
    revcomp 能回到当前节点才步进；`ExtendableSuccessor` 再以"至少延伸 100bp"兜底
    （`:1659`）——这组"唯一 + 可回退 + 最小延伸长度"约束可直接映射 pgr `asm unitig`
    的延伸语义（`cov=` 已在头部），比单纯的 top2 近等边近似多一道方向性验证。
+
+### 7.2 与 asm multik 的多 k 迭代对比（2026-08-14 重读补充）
+
+本次重读 `assembler.hpp`（主流程）+ `graphdigger.hpp`（扩展）+ skesa-rs
+对应文件（`assembler.rs` / `graph_digger.rs`），确认 SKESA 的迭代语义与
+`asm multik`（metaMDBG 式）是**同一目标（大 k 解小 k 的重复）下的两个不同
+实现族**。逐轮差异如下（行号均以本次阅读为准）：
+
+| 维度 | SKESA / skesa-rs | `asm multik`（metaMDBG 式） |
+|---|---|---|
+| 每轮建图输入 | **清理后的未用 reads**（`CleanReads`，`assembler.hpp:685`；阈值 `max(max_kmer, paired_insert_n50)` + margin `max_kmer+50`）——read 集逐轮递减 | **全部 reads + 上一轮 unitig 序列**（metaMDBG §4.1.1）——数据只增不减 |
+| 上一轮结果的反馈 | **contig 序列**：`ConverToSContigAndMarkVisited` 把旧 contig 的 k-mer 标记 visited（`assembler.hpp:730`），`GenerateNewSeeds` 只从**未 visited** 节点组装（`graphdigger.hpp:2871`），`ExtendContigsJob` 再从旧 contig 边缘 k-mer 扩展（`graphdigger.hpp:3226`） | **unitig 图 + 序列**：unitig 进计数表改 solid 集，图结构经跨接验证/回灌参与下一轮 |
+| k 序列 | min→max 等距（`steps` 默认 11，`assembler.hpp:263-268`），长 insert 另加 `[1.25×max_kmer, 中点, insert_N50]` 三轮（`:286-289`） | metaMDBG 式逐 +1（k′-min-mer）或 `--kmer auto` 按读长 N50 生成 |
+| bubble/fork 处理 | 默认 **断在 fork**（`ExtendToRight` 的非 SNP 分支即 break，`graphdigger.hpp:2308`）；开 `--allow_snps` 才用 `DiscoverSNPCluster` 前后双向探测、`step==step_back` 一致才跨过（`:2325-2371`） | `bridge_kmer` 跨接验证（跨 unitig 的 k-mer ≥2 才保留边）+ `progressive_filter` 中位 25% cutoff（直链保护）+ v6 **被删分支回灌**（低丰度分支继续参与） |
+| 嵌合清理 | 无显式"整条删"，靠扩展不变量前置预防：简单扩展要求新节点前驱恰好 1 且可回退（`graphdigger.hpp:2285-2294`） | `remove_unsupported`：unitig 内部 k-mer 缺失率 >2% 则整条删 |
+| 防 misassembly | 四层后继过滤：低丰度 fork（`≤fraction×Σ`）、GGT/ACC strand 噪音、不可扩展 fork（<100bp）、strand 平衡（`graphdigger.hpp:1769-1887`） | 最终阶段 `bridge_filter` + `split_by_bridge`（unitig 间/内 60-mer 探针 ≥2 验证） |
+| 每轮产出 | contigs（SContig 链：connectors/extenders 通过 `m_left_link/m_right_link` 链回父 contig，`graphdigger.hpp:1287`） | unitig 图（unitigs + 跨接边） |
+
+**两个关键共识**（也是 multik 设计里已吸收的）：
+
+1. **宁断勿嵌合**：SKESA 默认断在 fork、扩展要求"唯一 + 可回退"；multik
+   剪低丰度分支、删除无支撑跨接——都把正确性放在连通性前面，这是"无 N
+   但不是无嵌合"的取舍（G37 misassemblies 8→0 的路线与此同源）。
+2. **大 k 只解决小 k 未解决的部分**：SKESA 用 visited 标记让新种子只出现在
+   旧 contig 之外、multik 的 unitig 反馈让已覆盖区天然有更高支持——都避免
+   每轮从头重拼，计算量随轮次收敛（实测 multik 图结构逐轮递减：unitigs
+   1345→396、edges 346→12，见 `benchmarks/multik-complexity.md`）。
+
+**SKESA 细节的吸收情况（2026-08-14 实现验证）**：
+
+- **"前驱恰好 1 + 可回退"不变量 → 已吸收（严格链唯一性）**：`merge_chains`
+  / `recompact_graph` 原来用"先到先得"的端点占用检查（`right_of/left_of`
+  `is_some()`），汇点（两个前驱）会被吞进先遍历到的链；改为**严格两端唯一**
+  ——只有链段两端的定向度数都恰为 1 才合并（SKESA "predecessor == 1" 的
+  unitig 图对应）。实现时发现一个易错点：`compute_links` 对同一 junction
+  从两端各发一条 link，方向解析后是**同一条链段**，逐 link 度数统计会把
+  对称 link 翻倍，必须用 HashSet 去重后再计度数。G37 回归：misassemblies
+  保持 0、mismatches 27.7/100kbp（历史最佳）、N50 24.4K（-8%，宁断勿嵌合
+  的正确性代价）、Genome fraction 95.86%（-0.13pp）。
+- **read 清理（`CleanReads`）→ 确认不做**：与 multik 的 `remove_unsupported`
+  机制冲突——multik 的 unitig 反馈以 1× 进计数表，剔除"完全落在 unitig 内"
+  的 reads 后，已覆盖区内部 k-mer 计数降到 1×（< `min_count_extend`=2），
+  `remove_unsupported` 会把真实 unitig 整条误删；而提高 unitig 反馈权重到
+  ≥ threshold 又会让嵌合 unitig 自我支撑、嵌合清理失效。SKESA 能清理是因为
+  它没有"内部 k-mer 必须 ≥ threshold"这一环（靠保守扩展不变量防嵌合）。
+  且 multik 的耗时瓶颈是 `remove_unsupported` 的 O(总长×k)，不在计数输入量。
+- **`allow_snps` 的双向 SNP 簇验证**（`DiscoverSNPCluster`）→ **暂缓**：
+  multik v6 回灌保留低丰度分支但不合并成多态表示；SKESA 是"前后一致才合并
+  为变体 chunk"。要表达菌株/单倍型多态需要引入 `CContigSequence` 的
+  chunk+variants 表示，属输出表示层大改，等有真实菌株/宏基因组数据再定。
 
 ## 8. 局限
 

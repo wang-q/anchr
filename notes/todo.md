@@ -103,6 +103,12 @@
 - **megahit 借鉴待续**（`megahit.md` §8 差距清单）：low depth 局部窗口
   判定（宏基因组覆盖不均）、本地组装（contig 端点 reads 延伸）——
   有真实宏基因组数据后再定优先级；
+- **SKESA 借鉴落地**（`skesa.md` §7.2，2026-08-14 重读本体 + Rust
+  移植）："前驱恰好 1"不变量已吸收为 **merge/recompact 严格两端唯一**
+  （`multik.rs`，含对称 link 去重修正）；read 清理确认不做（与
+  `remove_unsupported` 机制冲突，详 §7.2）；SNP 簇变体表示暂缓（等菌株/
+  宏基因组数据）。G37 回归：misassemblies 0、N50 24.4K（-8%）、
+  mismatches 27.7/100kbp 历史最佳；
 - **大规模真实数据**：Lambda 20k/40k reads 之外，用真实染色体数据跑
   `fq → asm → map → template` 全链，核对统计（覆盖量/unitig 数/PSL 行数）；
 - **多线程与内存**：`fq norm` 外部 hash-bucket 路径（`--mem`）、
