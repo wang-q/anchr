@@ -1,5 +1,5 @@
 use crate::libs::olc::layout::build_layouts;
-use crate::libs::olc::overlap::{Overlap, OverlapType};
+use crate::libs::olc::overlap::{filter_contained, Overlap, OverlapType};
 use anyhow::Context;
 use clap::{Arg, ArgMatches, Command};
 use pgr::libs::paf::parser::parse_paf;
@@ -18,6 +18,12 @@ longest-first, and chains grow in both directions through mutual-best
 junctions. Ambiguous junctions (two near-equal best partners, e.g. repeats)
 and non-reciprocal edges stop the chain, so branches stay separate and no
 heuristic picks a bubble path.
+
+With `--filter-contained` unitigs fully contained in a longer unitig are
+dropped before layout (the same redundancy reduction the `asm olc` driver
+runs internally): identical regions assembled at several k / from several
+coverage sets collapse to their longest representative, shrinking the graph
+and preventing contained fragments from being emitted as separate contigs.
 
 The unitig FASTA files must be the same files passed to `anchr asm ovlp` (the
 `stem:name` prefixes are re-derived here and must match the PAF names).
@@ -48,6 +54,12 @@ Examples:
                 .help("Unitig FASTA file(s), same as passed to ovlp"),
         )
         .arg(crate::cmd::args::outfile_arg())
+        .arg(
+            Arg::new("filter_contained")
+                .long("filter-contained")
+                .action(clap::ArgAction::SetTrue)
+                .help("Drop unitigs fully contained in a longer unitig before layout (same as the asm olc driver)"),
+        )
 }
 
 /// Execute the layout command.
@@ -110,6 +122,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         });
     }
 
+    let (unitigs, overlaps) = if args.get_flag("filter_contained") {
+        filter_contained(&unitigs, &overlaps)
+    } else {
+        (unitigs, overlaps)
+    };
     let layouts = build_layouts(&unitigs, &overlaps)?;
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;

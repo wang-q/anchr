@@ -203,6 +203,113 @@ fn command_asm_layout_chains_unitigs() {
     );
 }
 
+/// `asm olc --unitigs` merges pre-assembled unitigs across files: dovetail
+/// overlaps are chained, contained unitigs are filtered, and file stems tag
+/// names so identical `unitig_<id>` names across files stay distinct.
+#[test]
+fn command_asm_olc_unitigs_merges_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = dir.path().join("a.fa");
+    let b = dir.path().join("b.fa");
+    // a:unitig_1 = A*12 + ACGTACGT; a:unitig_2 = A*12 (contained in unitig_1).
+    // b:unitig_1 = ACGTACGT + C*12; dovetails with a:unitig_1 over ACGTACGT.
+    fs::write(
+        &a,
+        ">unitig_1\nAAAAAAAAAAAAACGTACGT\n>unitig_2\nAAAAAAAAAAAA\n",
+    )
+    .unwrap();
+    fs::write(&b, ">unitig_1\nACGTACGTCCCCCCCCCCCC\n").unwrap();
+    let out = dir.path().join("out.fa");
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "olc",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "--unitigs",
+            "--overlap-k",
+            "5",
+            "--min-overlap",
+            "8",
+            "--min-contig-len",
+            "1",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    let data = fs::read_to_string(&out).unwrap();
+    let mut seqs: Vec<String> = data
+        .lines()
+        .filter(|l| !l.starts_with('>') && !l.is_empty())
+        .map(|l| l.to_string())
+        .collect();
+    seqs.dedup();
+    let merged = seqs.join("");
+    // A*12 + ACGTACGT + C*12 = 32 bp; the contained A*12 must be dropped.
+    assert_eq!(
+        merged.len(),
+        32,
+        "dovetail chain merged, contain filtered: {merged}"
+    );
+    assert!(merged.starts_with("AAAAAAAAAAAAACGTACGTCCCCCCCCCCCC"));
+}
+
+/// `asm layout --filter-contained` drops contained unitigs before layout:
+/// the contained A*12 must not appear as its own layout step, while the
+/// dovetail chain between the two files still forms.
+#[test]
+fn command_asm_layout_filter_contained() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = dir.path().join("a.fa");
+    let b = dir.path().join("b.fa");
+    fs::write(
+        &a,
+        ">unitig_1\nAAAAAAAAAAAAACGTACGT\n>unitig_2\nAAAAAAAAAAAA\n",
+    )
+    .unwrap();
+    fs::write(&b, ">unitig_1\nACGTACGTCCCCCCCCCCCC\n").unwrap();
+    let ovlp = dir.path().join("ovlp.paf");
+    let layout = dir.path().join("layout.tsv");
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "ovlp",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "--overlap-k",
+            "5",
+            "--min-overlap",
+            "8",
+            "-o",
+            ovlp.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    AnchrCmd::new()
+        .args(&[
+            "asm",
+            "layout",
+            ovlp.to_str().unwrap(),
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "--filter-contained",
+            "-o",
+            layout.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    let data = fs::read_to_string(&layout).unwrap();
+    assert!(
+        !data.contains("a:unitig_2"),
+        "contained unitig must be filtered: {data}"
+    );
+    assert!(
+        data.contains("a:unitig_1") && data.contains("b:unitig_1"),
+        "dovetail partners must stay: {data}"
+    );
+}
+
 /// Deterministic xorshift PRNG for synthetic test genomes/reads.
 struct Rng(u64);
 

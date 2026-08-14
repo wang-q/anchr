@@ -339,3 +339,196 @@ reads 回贴验证（`anchr asm map`，完美匹配）：
   metaMDBG 语义；
   需 reads 侧验证口径（参考菌株不匹配时不能只用贴回率）。
 * 真实宏基因组数据验证 + 调参。
+
+## 14. 设计评审与改造（2026-08-15，G37 multik 合并实验驱动）
+
+### 14.1 输入约定的来源与"一代 vs 短读"辨析
+
+**来源**：`asm olc` 驱动器"输入 reads"不是抄一代测序范式——2026-08-12
+用户裁定明确"**不做 reads 级 OLC**：reads 先用 DBG（`asm unitig`）压缩成
+unitigs"（§1），参考文档也写明"不是对 reads 做 OLC，把不同 k 的 unitigs
+当伪 reads，在 unitig 层做 OLC"（`references/canu.md` §8.1）。
+"输入 reads"只是 S0 的入口（内部生成 unitigs），**ovlp/layout/cns 操作
+对象始终是 unitigs**。
+
+**一代 vs 短读**：
+
+* 直接对 reads 做全对 overlap 的 OLC 只有一代（Sanger：长 ~1kb、几万条）
+  可行；短读（Illumina：百万级、150 bp、有错误）全对 overlap 不可行——
+  这正是裁定"不做 reads 级 OLC"的原因（§2 数据量论证）；
+* 一代也不是"reads 直接 layout"：Celera 原版（Sanger/short-read 时代）
+  有 AS_BOG unitigger（Best Overlap Graph，先建 unitig 再布局，
+  `references/celera.md` §6.1），只是它的 unitig 基于 overlap 图
+  （mate 驱动）而非 DBG；
+* 结论：unitig 层 OLC 是**短读/宏基因组导向**的设计，不是一代遗留。
+
+### 14.2 G37 multik 合并暴露的三个问题
+
+用 `anchr asm olc` 合并 23 组 multik 输出（G37，`benchmarks/
+multik-allgroups.md`）后逐一定位：
+
+1. **`asm olc` 驱动器对"已是 unitigs"的输入多做 S0 二次组装**：长 unitig
+   在 k51 图里被多组序列"污染"（共享 51-mer 处分支）而切断（最长
+   178,776 → 56,787）——用错命令（应走独立管道或新 `--unitigs` 模式）；
+2. **撞名**：多组输出 cat 成单文件时 `unitig_<id>` 重名（`unitig_186`
+   有 7 份），ovlp/layout/cns 按名字取序列会串——必须多文件分别传入
+   （tag = 文件 stem，§5 设计如此，但 cat 是自然误区）；
+3. **独立管道缺 `filter_contained`**：`filter_contained`（unitig 级去
+   contain）只埋在驱动器（`olc.rs:164`），独立 `ovlp` 命令不调用 → 独立
+   管道输出 87% contain（`ov:A:C`）的 unitigs 全部单步输出 → dup 2.659；
+   `consensus::dedup_contained` 只丢"完全包含"，组间"部分重叠"（同区域
+   不同边界）不去。
+
+### 14.3 改造方案（适合现代流程：reads/multik 输出 → unitigs → OLC 合并）
+
+1. **`asm olc --unitigs` 输入模式**：跳过 S0，输入直接是 unitigs（多文件，
+   tag = stem 防撞名），内部走 filter_contained → ovlp → layout → cns——
+   一条命令覆盖"多组 multik 输出合并"，避免误用驱动器和独立管道缺
+   filter_contained 的问题；
+2. **`asm ovlp --filter-contained`**（或 layout 前自动）：把 §13 的
+   unitig 级冗余消减暴露给独立管道，使"用户自己跑 ovlp/layout/cns"也
+   享受与驱动器一致的语义；
+3. **cns 部分重叠去冗余（v1 列投票方向）**：`dedup_contained` 之外，
+   对 overlap 链上近似包含（边界/内容微差）的 contig 做对齐投票合并，
+   AS_CNS `BaseCallMajority` 语义（§S3 预留）——去冗余同时保留覆盖证据
+   （G37：输入 contained 去重 dup 1.201 但 GF -0.55pp，两全需此步）；
+4. 帮助文本/文档强化：`asm olc` 输入 reads、`--unitigs` 输入 unitigs、
+   独立管道供高级用法。
+
+**改造后的目标流程**：
+
+```text
+reads ──multik/unitig──> 多组 unitigs ──asm olc --unitigs──>
+  filter_contained → ovlp → layout → cns（含部分重叠去冗余）
+  ──> contigs（0 mis / 0 N / dup≈1 / 覆盖互补）
+```
+
+实施顺序：先 14.3-1（--unitigs 模式，复用现有 libs，改动最小、收益最大：
+G37 合并 dup 2.659 → 期待 ~1.2 且不损失 GF），再 14.3-2，最后 14.3-3。
+
+### 14.4 改造实施状态（2026-08-15）
+
+**14.3-1 已实现**：`anchr asm olc --unitigs`（跳过 S0，输入直接是
+unitigs/contigs，多文件 tag = stem 防撞名；内部 filter_contained → ovlp →
+layout → cns）。集成测试 `command_asm_olc_unitigs_merges_files`（dovetail
+合并 + contain 过滤 + 多文件 tag）。
+
+**14.3-2 已实现**：`anchr asm layout --filter-contained`（独立管道在布局前
+调用与驱动器相同的 `filter_contained`，unitig 级去精确包含）。集成测试
+`command_asm_layout_filter_contained`。G37 验证：独立管道
+ovlp → layout --filter-contained → cns 与 `--unitigs` 结果完全一致
+（N50 39,496 / dup 2.050 / GF 96.54%）。
+
+**14.3-3 已实现（`--dedup-ratio`）**：cns 输出后做 **contig 级近似包含
+去冗余**——`consensus_with_ratio` + `coverage`（seed 锚定 + 允许 ~1%
+错配的扩展，对齐 `anchr contained --idt 0.99` 语义）。`asm cns
+--dedup-ratio <f>`（默认 1.0 = 精确子串，向后兼容）；`asm olc --unitigs`
+默认 0.99（现代流程自动去重）。单元测试
+`dedups_approximate_contained_contigs`（边界差异的近似重复：ratio 1.0
+保留两条、0.95 合并为长条）。
+
+**G37 最终结果**（23 组 multik 输出，`--unitigs` 一条命令，dedup 0.99）：
+
+| 指标 | 改造前（独立管道） | `--unitigs` v1 | `--unitigs` 最终 |
+|---|---:|---:|---:|
+| # contigs | 65 | 48 | **21** |
+| N50 | 39,104 | 39,496 | **54,964** |
+| Largest | 179,610 | 179,610 | 179,610 |
+| Duplication ratio | 2.659 | 2.050 | **1.094** |
+| Genome fraction (%) | 96.44 | 96.54 | **96.54** |
+| # misassemblies | 0 | 1 | 1* |
+| # N's / 100 kbp | 0 | 0 | 0 |
+
+\* 唯一 mis 是 560 bp、cov 1.4 的低覆盖碎片（filter_contained 后 layout
+新拼接的 relocation，`--min-contig-len 1000` 可滤除）——不是合并引入的
+系统性问题。
+
+**改造完成度**：14.3-1/2/3 全部落地，`reads → multik（多组）→ asm olc
+--unitigs → contigs` 的现代流程成立：0 N、0 大 mis、GF 96.54%、N50 54.9K、
+dup 1.094（接近单组 MR 的 1.000）。剩余：560 bp 碎片 mis 的覆盖度门槛
+（可选）、真实宏基因组/长读验证（todo）。
+
+### 14.5 `anchr asm anchor`（2026-08-15，用户建议：reads mapping → anchors → OLC）
+
+用户建议："像老流程一样，用真实的 reads mapping 一遍得到 anchors，再对
+anchors 做 OLC"——老流程 anchors = bbwrap 回贴 + [lower, upper] 覆盖区间
+过滤（`references/anchr-legacy-pipeline.md` §2.4）。已实现为
+**`anchr asm anchor`**：`asm map`（完美匹配，bbmap perfectmode 等价）→
+逐碱基覆盖度（差分数组 sweep line）→ 老流程公式
+`lower = max(mincov, (median − mscale×MAD)/lscale)`、
+`upper = (median + mscale×MAD)×uscale` → 连续覆盖区 = anchors。
+
+* 库：`libs/olc/anchor.rs`（AnchorOptions / coverage_from_alignments /
+  anchor_thresholds / anchor_regions / extract_anchors），单元测试 2 个；
+* 命令：`anchr asm anchor <unitigs.fa> <reads...> -o anchors.fa`，参数
+  `--mincov 5 --mscale 3 --lscale 3 --uscale 2 --min-anchor-len 500
+  --kmer 31 --parallel`；集成测试 `tests/cli_asm_anchor.rs`；
+* **注意**：reads 必须用**产生该组 unitigs 的同一覆盖子集**（不是全量
+  reads——全量会得到 ~180× 覆盖，median 失真）。
+
+**G37 验证**（与 python 概念实验逐位一致）：
+
+| 方案 | N50 | dup | GF (%) | mis | mm/100k |
+|---|---:|---:|---:|---:|---:|
+| MRX40P001 单组 unitigs | 54,888 | 1.000 | 96.11 | 0 | 30.7 |
+| MRX40P001 单组 anchors | 54,841 | 1.000 | 95.66 | 0 | **27.21** |
+| 7 组 MR `--unitigs`（无 anchors） | 54,964 | 1.618 | 96.37 | 0 | 32.95 |
+| **7 组 MR anchors → `asm olc --unitigs`** | 54,858 | **1.002** | 96.04 | **0** | **28.12** |
+
+**现代流程最终形态**：
+
+```text
+reads（每覆盖度子集）
+  → asm multik → 每组 unitigs
+  → asm anchor（同子集 reads 回贴 + 覆盖过滤）→ 每组可靠 anchors
+  → 所有组 anchors（cat，名字唯一）→ asm olc --unitigs → contigs
+```
+
+覆盖过滤同时解决 `--unitigs` 的三大遗留：dup（upper 排除重复区多版本）、
+低覆盖碎片 mis（lower 排除）、mm（过滤掉高/低覆盖区错配）。代价：GF
+96.37 → 96.04（过滤掉的问题区本身是低质量区）。
+
+### 14.6 时间分析（2026-08-15，用户确认可接受）
+
+`anchr asm anchor` 实测（G37，MR 组，release，`-p 16`）：
+
+| 阶段 | 单组耗时 | 占比 |
+|---|---:|---:|
+| 总时间 | 0.24s | — |
+| reads 完美回贴（`asm map`） | ~0.14s | 58% |
+| SAM 写盘+读回+解析 | ~0.05s | 21% |
+| 覆盖度+阈值+区间 | ~0.03s | 12% |
+
+7 组 MR 串行 1.6s（每组 0.24–0.28s；80× 组 230K reads 只比 40× 组慢
+17%——mapping 的并行 verify 扩展性良好）。**现代流程的时间大头是
+`asm multik`**（单组 MR 40× 2.35s，占 ~65%），anchor 占 ~7%、OLC 合并
+~28%；23 组全跑（8 路并行）multik ~30s、anchor ~2s、OLC ~3s。用户
+2026-08-15 确认"时间还可以"（此前觉得偏长是错觉）。
+
+**保留的优化点**（非当前瓶颈，宏基因组数据时再评估）：SAM 中间文件
+内存化（map libs `map_read` 已算对齐、只写盘读盘，宏基因组 SAM GB 级时
+收益显著）；multik 性能（计数复用 / `remove_unsupported` 查表化 /
+轮数裁剪，见 `benchmarks/multik-complexity.md` 待办）。
+
+**G37 实测**（23 组 multik 输出，`--unitigs` 一条命令）：
+
+| 指标 | `--unitigs` | 独立管道（多文件） | 输入 contained + 管道 |
+|---|---:|---:|---:|
+| N50 | 39,496 | 39,104 | 39,189 |
+| Largest | 179,610 | 179,610 | 179,610 |
+| # misassemblies | **1** | 0 | 0 |
+| Genome fraction (%) | **96.54** | 96.44 | 95.89 |
+| Duplication ratio | 2.050 | 2.659 | **1.201** |
+| # mismatches / 100 kbp | 33.54 | 31.46 | 33.69 |
+
+**已知问题（1 mis）**：`contig_48`（560 bp、cov 1.4）是 filter_contained
+后 layout 新拼接的低覆盖碎片（relocation）——filter_contained 改变 greedy
+路径选择（§13 已注明是设计意图），低覆盖碎片被链错。独立管道无此问题
+（不含该序列）。影响小（560 bp），彻底解决需 layout 的覆盖度证据（14.3-3
+方向）。
+
+**dup 2.050 仍未到 1.2**：filter_contained 只去**精确包含**（ov:A:C），
+多组 unitigs 的冗余主要是**近似包含/部分重叠**（边界/内容微差）——
+`anchr contained --idt/--ratio`（近似判据）能到 1.201 但损失覆盖
+（GF -0.65pp）。**两全方案 = 14.3-3（cns 部分重叠去冗余/列投票）**，
+待实施。

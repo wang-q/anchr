@@ -59,9 +59,10 @@
 **结论**：简单 contained 合并把 N50 抬到 40× 水平（24.4K），但 duplication
 1.124（两个部分各自组装的 unitigs 大量部分重叠，contained 只去"完全包含"）
 且 Genome fraction 略降——**多覆盖度部分合并需要老流程的完整机制**
-（contained → orient → merge → anchors 化 → glue/fill OLC）去冗余，单纯
+（contained → orient → merge → anchors 化，即 OLC 式合并；fill/glue 是
+gap 填充辅助，见 `anchr-legacy-pipeline.md` §2.5/§2.7）去冗余，单纯
 cat + contained 不够。multik 若做多部分合并，需先解决"部分重叠 unitigs
-去冗余"（如覆盖率/长度证据合并或 OLC 拼装）。
+去冗余"（如覆盖率/长度证据合并或 overlap 图拼接）。
 
 ## 与老流程的对应
 

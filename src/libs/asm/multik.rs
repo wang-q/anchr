@@ -1246,8 +1246,8 @@ mod tests {
         let u = mk_unitig(&format!("{}{}", "A".repeat(40), s1), 30.0);
         let v = mk_unitig(&format!("{}{}", s1, "G".repeat(40)), 30.0);
         let w = mk_unitig(&format!("{}{}", s2, s1), 30.0);
-        let mut unitigs = vec![u, v, w];
-        let mut links = vec![
+        let unitigs = vec![u, v, w];
+        let links = vec![
             vec![Link {
                 to: 1,
                 from_rc: false,

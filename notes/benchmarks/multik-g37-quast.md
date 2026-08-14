@@ -50,7 +50,7 @@
 ## 更新（2026-08-14，层次 3 reads 桥接落地）
 
 实现 `bridge_filter`（unitig 间探针）+ `split_by_bridge`（unitig 内部
-60-mer 窗口切分，设计 `asm-multik-misassembly.md` §7）后：
+60-mer 窗口切分，设计 `asm-multik.md` §9）后：
 
 | 指标 | 修复前 | 层次 3 后 |
 |---|---:|---:|

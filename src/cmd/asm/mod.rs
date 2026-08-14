@@ -1,3 +1,4 @@
+pub mod anchor;
 pub mod cns;
 pub mod common;
 pub mod contig;
@@ -15,6 +16,7 @@ pub fn make_subcommand() -> Command {
         .about("Assembles reads into contigs/unitigs and maps reads back")
         .subcommand_required(true)
         .arg_required_else_help(true)
+        .subcommand(anchor::make_subcommand())
         .subcommand(contig::make_subcommand())
         .subcommand(unitig::make_subcommand())
         .subcommand(ovlp::make_subcommand())
@@ -27,6 +29,7 @@ pub fn make_subcommand() -> Command {
 /// Execute the asm command.
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     match args.subcommand() {
+        Some(("anchor", sub_matches)) => anchor::execute(sub_matches),
         Some(("contig", sub_matches)) => contig::execute(sub_matches),
         Some(("unitig", sub_matches)) => unitig::execute(sub_matches),
         Some(("ovlp", sub_matches)) => ovlp::execute(sub_matches),

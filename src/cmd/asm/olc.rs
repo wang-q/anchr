@@ -1,5 +1,5 @@
 use crate::libs::asm::assemble::{assemble_unitigs_buf, AssembleOptions};
-use crate::libs::olc::consensus::consensus;
+use crate::libs::olc::consensus::consensus_with_ratio;
 use crate::libs::olc::layout::build_layouts;
 use crate::libs::olc::overlap::{filter_contained, find_overlaps, OverlapOptions, Unitig};
 use anyhow::Context;
@@ -17,7 +17,11 @@ Runs the full OLC pipeline in memory: for every k in --kmer the reads are
 assembled into maximal unitigs (`anchr asm unitig` semantics), all unitigs are
 pooled as pseudo-reads, exact overlaps are found (`anchr asm ovlp`), layouts
 are built greedily (`anchr asm layout`), and each layout is stitched into a
-consensus contig (`anchr asm cns`). See notes/design/asm-olc.md.
+consensus contig (`anchr asm cns`). With `--unitigs` the inputs are taken
+as unitigs/contigs directly (no re-assembly), which is the intended path for
+merging pre-assembled sets (e.g. per-coverage `asm multik` outputs); the
+contained-unitig filter still runs, so overlapping sets are deduplicated.
+See notes/design/asm-olc.md.
 
 Unitigs are named `k<k>:unitig_<id>` so the per-k sets stay distinguishable
 and reproducible. Overlaps are exact (error-free unitigs), layouts stop at
@@ -27,6 +31,10 @@ applied.
 Notes:
 * Input is one or more FASTA/FASTQ files (plain or gzipped); pairing is
   irrelevant for assembly, and `--list-files` reads a one-path-per-line list
+* `--unitigs` treats the inputs as already-assembled sequences (one FASTA per
+  file; names get the file stem as a tag, so separate files stay
+  distinguishable — do not concatenate them into one file); `--kmer` and
+  `--min-count-seed` are ignored in this mode
 * --keep-dir writes the intermediate unitigs/overlap/layout files for
   debugging and inspection; the names there omit the `stem:` prefix that
   the standalone ovlp/layout/cns commands derive, so they are not directly
@@ -42,6 +50,8 @@ Examples:
        --kmer 21,51,81 --min-contig-len 1000 --keep-dir stage/
 3. Assemble from a list of files:
    anchr asm olc files.list -o contigs.fa --kmer 21,51,81 --list-files
+4. Merge pre-assembled per-coverage unitigs (no re-assembly):
+   anchr asm olc k40.fa k80.fa -o contigs.fa --unitigs
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
@@ -90,6 +100,12 @@ Examples:
                 .help("Minimum output contig length in bases"),
         )
         .arg(
+            Arg::new("unitigs")
+                .long("unitigs")
+                .action(ArgAction::SetTrue)
+                .help("Inputs are already-assembled unitigs/contigs (skip the S0 unitig assembly; one FASTA per file, tagged by file stem)"),
+        )
+        .arg(
             Arg::new("keep_dir")
                 .long("keep-dir")
                 .num_args(1)
@@ -134,20 +150,24 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // Reject `-o` that would overwrite an input read file.
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
 
-    // S0: unitigs per k.
+    // S0: unitigs per k, or take the inputs directly in --unitigs mode.
     let mut unitigs = Vec::new();
-    for &k in &ks {
-        let opts = AssembleOptions {
-            k,
-            min_count_seed,
-            ..AssembleOptions::default()
-        };
-        let bufs = assemble_unitigs_buf(&infiles, &opts)?;
-        for (id, bases) in bufs {
-            unitigs.push(Unitig {
-                name: format!("k{k}:unitig_{id}"),
-                seq: bases,
-            });
+    if args.get_flag("unitigs") {
+        unitigs = super::common::read_unitigs(&infiles)?;
+    } else {
+        for &k in &ks {
+            let opts = AssembleOptions {
+                k,
+                min_count_seed,
+                ..AssembleOptions::default()
+            };
+            let bufs = assemble_unitigs_buf(&infiles, &opts)?;
+            for (id, bases) in bufs {
+                unitigs.push(Unitig {
+                    name: format!("k{k}:unitig_{id}"),
+                    seq: bases,
+                });
+            }
         }
     }
     // S1: exact overlaps.
@@ -176,7 +196,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     }
 
     // S3: consensus stitch.
-    let contigs = consensus(&unitigs, &layouts, min_contig_len)?;
+    let dedup_ratio = if args.get_flag("unitigs") { 0.99 } else { 1.0 };
+    let contigs = consensus_with_ratio(&unitigs, &layouts, min_contig_len, dedup_ratio)?;
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;
     for (i, c) in contigs.iter().enumerate() {

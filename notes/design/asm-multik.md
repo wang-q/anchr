@@ -503,3 +503,267 @@ N50 24,445（v7 26,562，-8%：宁断勿嵌合的正确性代价）、Genome fra
 * `design/asm-olc.md`（现有并行多 k OLC；v1 素材与对照）
 * `design/asm-assemble.md` §8（`asm unitig` 语义与 L: 边）
 * `pgr: libs/kmer/supermer.rs`（FASTA 默认计数路径）
+
+<!-- 以下内容并入自 `asm-multik-misassembly.md`（2026-08-15 文档合并） -->
+
+## 9. 防 misassembly 方案（bridge_filter / split_by_bridge）
+
+> 2026-08-14。背景：G37 Quast 质检（`benchmarks/multik-g37-quast.md`）
+> 显示 multik 有 8 个 misassembly（全 relocation），unitig_1 把参考相隔
+> ~48 万 bp 的两段（4286-60431 与 540652-571614）连在一起。参考这两段
+> **无共享 k-mer**（非简单重复区）。老流程 anchors 的目的就是防
+> misassembly，但其实现（bbwrap→basecov→spanr→hnsm→contained→orient→
+> merge）极冗余。本文规划精简方案：**只取 anchors 的核心思想（reads 回贴
+> + 覆盖度区间过滤），复用 multik/pgr 已有机制**。
+
+### 1. anchors 防 misassembly 的核心机制（读 `templates/anchors.tera.sh` 确认）
+
+1. reads 映射回 unitigs（bbwrap perfectmode）→ 每碱基覆盖度；
+2. 覆盖度区间 `[lower, upper]`：
+   `lower = max(mincov, (median − mscale×MAD)/lscale)`、
+   `upper = (median + mscale×MAD)×uscale`；
+3. **只保留覆盖度在区间内的区域**（低覆盖 = 错误区、高覆盖 = 重复区，
+   都不可靠 → 排除）→ "properly covered regions" 才是 anchors。
+
+**防 misassembly 的原理**：错误连接通常发生在覆盖度异常的区域（重复区
+reads 过多、错误区 reads 过少）；把这些区域排除（宁可断开、不错连），
+misassembly 自然减少。
+
+### 2. multik 的现状与差距
+
+* multik 已有：unitig `cov=`（组成 k-mer 平均覆盖度）、渐进丰度过滤
+  （只删低覆盖分支）、跨接验证（k-mer 计数 ≥2 选边）；
+* **缺**：`upper`（高覆盖/重复区排除）——渐进丰度过滤只处理低覆盖，
+  没有"高覆盖=重复区→断开"的机制。这是 8 个 relocation 的根源（错连
+  发生在覆盖异常区）。
+
+### 3. 方案（三个层次，从简到繁）
+
+#### 层次 1：覆盖度一致性选边（迭代内，零额外工具）
+
+* 位置：跨接验证后、压实/合并前；
+* 机制：multik 的 unitigs 已有 `cov=`；对每条候选边 (u→v)，
+  **若 v.cov 显著高于 u.cov（或高于全局 upper）→ 断开该边**（v 可能是
+  重复区，连接不可靠）；
+* 阈值：`upper = (median + mscale×MAD)×uscale`（anchors 同款，unitig 级
+  cov 分布）；
+* 优点：零额外工具、零成本（cov 已有）；
+* 局限：unitig 级平均覆盖掩盖局部异常（重复区只是 unitig 的一部分时
+  平均 cov 可能正常）——G37 的 misassembly contigs cov 38-109 都 < upper
+  （196），**层次 1 可能不够**。
+
+#### 层次 2：reads 回贴 + 局部覆盖剖面（复用 pgr map 工具链）
+
+* 位置：multik 输出后（或迭代末），一个独立过滤步骤；
+* 机制：**复用 anchr 已有工具**（不用 bbwrap/spanr/hnsm）：
+  1. `pgr asm map`（perfect mode，已实现）把 reads 映射回 unitigs；
+  2. `pgr sam to-rg` + `pgr rg coverage`（todo 已列）→ 每碱基覆盖度；
+  3. 覆盖度区间 `[lower, upper]`（anchors 同款参数 mscale=3/lscale=3/
+     uscale=2/mincov=5）；
+  4. 覆盖度在区间外的区域 → **断开 unitig**（按 rg 边界切分，不输出
+     跨异常区的连接）；
+* 优点：精确复刻 anchors 核心（每碱基剖面），但只有 3 个已有命令，
+  无 spanr/hnsm/contained/orient/merge 冗余链；
+* 局限：perfect mode 对含错误 reads 可能漏贴（低覆盖误判）——可用
+  k-mer 命中容错（multik 的 bridge_kmer 思路）替代；
+* 这是**推荐路径**（层次 1 不够时的自然升级）。
+
+#### 层次 3：reads 桥接选边（metaMDBG RepeatRemover 语义，最精确）
+
+* 对断开点/分支点，用 reads 同时覆盖两侧的证据（`nbBridgingReads != 0`）
+  选择正确连接（metaMDBG §4.2.1）；
+* 之前已分析（`asm-multik.md` §4.9 附近）：纯重复区（两拷贝都有证据）
+  需要 reads 桥接或覆盖度证据收尾；
+* 复杂度最高，作为层次 2 不足时的最终手段。
+
+### 4. 验证计划
+
+1. **层次 1**：G37 上实现 cov 一致性断边，Quast 复测 misassemblies
+   （预期部分减少，但 unitig 级平均覆盖可能漏）；
+2. **层次 2**：复用 map/to-rg/coverage 做局部剖面，Quast 复测
+   （预期 8 个 relocation → 显著减少，代价是 Genome fraction 略降——
+   断开的异常区不输出）；
+3. 同时验证：Lambda（46,467 零缺口）和合成长读（100% 单条）不回归
+   （过滤只在覆盖异常区生效，正常区域不切）。
+
+### 5. 与老流程的对比（为什么精简）
+
+| 老流程 anchors | 本方案层次 2 |
+|---|---|
+| bbwrap（外部工具） | `pgr asm map`（已有） |
+| basecov 解析 + perl 过滤 | `pgr sam to-rg` + `rg coverage`（已有） |
+| spanr cover/stat/some/span/compare（外部） | 无（直接按 rg 覆盖阈值切分） |
+| hnsm range 提取 | 无（在 unitig 上直接切分） |
+| contained→orient→merge（4 步） | 无（multik 已有压实） |
+
+本方案只保留 anchors 的核心判据（覆盖度区间），把"切分/去冗余/合并"
+交给 multik 已有机制，去掉全部外部工具链与后处理冗余。
+
+### 6. 待决
+
+* 层次 1 vs 层次 2 先做哪个（若 unitig 级 cov 已能抓住错连，层次 1 足够；
+  证据表明平均 cov 掩盖局部异常，倾向直接做层次 2）；
+* 断开策略：异常区切分后是丢弃（像 anchors 不选）还是保留为独立 unitig
+  （像 multik 的 dropped）；
+* 阈值参数是否沿用 anchors 默认（mscale=3/lscale=3/uscale=2/mincov=5）。
+
+### 7. 实现结果（2026-08-14，层次 3 落地）
+
+**实现**（`multik.rs`）：
+* `bridge_filter`：对每条 unitig 间边构造连接探针（u 尾 30bp + v 延续 30bp
+  = 60-mer），查 reads 表（`TadpoleTable::build_supermer`），count ≥ 2
+  保留、否则断开——metaMDBG `computeBridgingReads` 语义；每轮 recompact
+  前 + split 后各跑一次；
+* `split_by_bridge`：对每个 unitig 内部滑动 60-mer 窗口，无任何 reads
+  支撑（count 0）的窗口为嵌合连接点 → 切分 unitig（丢弃 < k0 碎片）；
+  **这是关键**——渐进丰度过滤的 recompact 会把错连边固化成单个 unitig
+  （G37 的 89,411 单 unitig 含 3 个 relocation），unitig 间桥接管不到，
+  必须切内部；
+* **探针长度 60-mer（probe_half=30）**：100-mer 对含错误 reads（Lambda
+  原始 FASTQ 0.1% 错误）误切 4.5% 窗口；60-mer 容错（0.999^60 ≈ 94% 全
+  匹配），Lambda 46,457 全窗口有支撑。
+
+**G37 Quast 复测**（对照参考 580,076）：
+
+| 指标 | 修复前 | 层次 3 后 |
+|---|---:|---:|
+| # misassemblies | **8** | **0** |
+| N50 | 24,527 | **26,562** |
+| Largest contig | 91,246 | 43,790 |
+| Genome fraction | 95.58% | 95.99% |
+| mismatches / 100 kbp | 31.4 | 33.7 |
+| indels / 100 kbp | 2.3 | 2.5 |
+| # N's / 100 kbp | 0 | 0 |
+
+**其他不回归**：Lambda 46,457 / N50 46,457（修复前 46,467）；20k 环状
+单条 100%。374 测试全绿、fmt/clippy 干净。
+
+**代价**：G37 最长 contig 91,246 → 43,790（错连 unitig 被切）；Genome
+fraction 基本持平（95.99%）。**无错连优先于最长 contig**（符合"无 N"目标：
+正确性 > 完整性）。真实数据上错连与最长 contig 的权衡可后续调
+（探针长度/阈值/是否切 vs 保留）。
+
+<!-- 以下内容并入自 `metaMDBG-vs-multik.md`（2026-08-15 文档合并） -->
+
+## 10. metaMDBG 与 multik 实现对比
+
+> 基于完整源码阅读：metaMDBG 1.4（`metaMDBG-metaMDBG-1.4/`，C++）与
+> anchr multik（`src/libs/asm/multik.rs`，Rust）。两者是同一条
+> "multi-k 迭代 + 图验证"路线的两种实现；本文对比实现层差异。
+
+### 1. 定位
+
+| 维度 | metaMDBG 1.4 | anchr `asm multik` |
+|---|---|---|
+| 目标 | 长读（HiFi/ONT）宏基因组组装 | 短读/长读通用，无 N 染色体 |
+| 语言/并行 | C++20 + OpenMP，多进程调度 | Rust + rayon，单进程内存组合 |
+| 建图空间 | minimizer 空间（density 0.005 采样） | 碱基 k-mer（FastK 字节键） |
+| 命令形态 | 单二进制多子命令 + checkpoint 断点续跑 | 单命令，进程内完成 |
+
+### 2. multi-k 迭代
+
+| 维度 | metaMDBG | multik |
+|---|---|---|
+| k 语义 | k′-min-mer 的 minimizer 数 | 碱基 k-mer 长度 |
+| 范围 | 4 → N50×1%（≈150 minimizers），每轮 +1 | auto 21/41/61/81/101/121（碱基），大步长 |
+| 单轮跨度 | k/density（每轮 +200 bp 碱基） | +20~30 bp（碱基窗口） |
+| 轮数 | 150+ | 4-6 |
+| 上限 | 读长驱动（N50×density×2） | `Kmer::MAX_K=128` 硬限制 |
+
+metaMDBG 的 k 是"minimizer 窗口长度"（间隔 200 bp），每轮 +1 覆盖 +200 bp
+碱基跨度；multik 的 k 是碱基窗口，大步长（20-30 bp/轮）。**metaMDBG 150
+轮 vs multik 4-6 轮**——metaMDBG 的 k′-min-mer 图节点天然长（minimizer
+流滑窗），multik 需要跨接验证补偿大步长。
+
+### 3. unitig 反馈与跨接验证
+
+| 维度 | metaMDBG | multik |
+|---|---|---|
+| 反馈形式 | 图结构（unitigGraph_prev 加载 + solveEdges 验证边）+ 序列参与计数 | compute_links 边 + 序列参与计数 |
+| 跨接验证 | doublet（pred 尾 k-1 minimizers + succ 延续 1）查 k-min-mer ≥2；短 unitig triplet | bridge_kmer（u 尾 k-1 碱基 + v 延续 1）查碱基 k-mer ≥2；短 unitig 跳过 |
+| 边更新 | solveEdges 逐边验证（createDoubletNode） | 跨接验证 + recompact 后 compute_links 重算 |
+| 方向解析 | minimizer 端匹配 | 实际碱基序列匹配（from_rc/to_rc 符号不用，实测匹配） |
+
+metaMDBG 的 solveEdges 是"逐边验证 + doublet 压实成新节点"（图结构保持）；
+multik 是"跨接 k-mer 查表 + recompact 合并链 + compute_links 重算边"
+（更粗粒度）。**碱基空间的跨接 k-mer 比 minimizer doublet 更细**（单碱基
+窗口 vs minimizer 窗口），验证更精确但边更多。
+
+### 4. 渐进丰度过滤
+
+| 维度 | metaMDBG | multik |
+|---|---|---|
+| 机制 | removeAbundanceNoQueue：t=1.1 起步、10% 步长到 maxAbundance，删 `abundance < t` + 每轮 recompact | progressive_filter：cutoff 上限 cov 中位 25%，只删分支/孤立，直链（主路径）永不删 |
+| 图简化 | simplify()：superbubble（BFS 找出口 + collapseSuperbubble2 删低丰度分支，repeatSolver 保护）+ tip | 无 superbubble（分支靠跨接验证/丰度过滤） |
+| 输出 | cutoff 快照（每个 cutoff 存图，generateContigs3 从高到低倒序输出） | 被删 unitigs 进 dropped（独立输出） |
+| 时机 | 每轮 contig 阶段做 | 只在最终做一次（迭代轮只 recompact，不删丰度） |
+
+**关键差异**：metaMDBG 删到 maxAbundance（依赖"主路径是单高丰度节点"的
+宏基因组假设）；multik 用中位 25% + 直链保护（单菌株覆盖波动不误删主路径
+——G37 重复区 600× 曾导致误删）。metaMDBG 的 superbubble 简化（平行路径
+选高丰度）multik 没有——multik 的分支由跨接验证 + 探针桥接处理。
+
+### 5. 嵌合清理与防 misassembly
+
+| 维度 | metaMDBG | multik |
+|---|---|---|
+| 嵌合清理 | removeUnsupportedUnitigs：内部 k-min-mer 缺失即删整条 | remove_unsupported：内部 k-mer 缺失 <2% 容错（覆盖波动不误删） |
+| 防错连 | RepeatRemover：fragment 按 unitig 边界切 → 覆盖均值 → 2×source 判重复 → 桥接 reads（nbBridgingReads≠0）才连 | bridge_filter（unitig 间 60-mer 探针 ≥2）+ split_by_bridge（unitig 内部 60-mer 窗口切分） |
+| reads 映射 | ReadVsContigMapper（minimizer 索引 + chaining，容错） | 完美 60-mer 探针（无容错 chaining） |
+
+metaMDBG 的 RepeatRemover 在最终 contig 上按 unitig 边界切 fragment 再
+验证桥接；multik 在 unitig 图合并前用探针验证（unitig 间）+ 切分
+（unitig 内部）。**multik 的 split_by_bridge 是 metaMDBG 没有的**——因为
+multik 的 recompact 会把错连固化成单 unitig（G37 89,411），必须切内部；
+metaMDBG 的 unitig 是图路径（内部无错连），只在 contig 层处理。
+
+### 6. 性能与规模
+
+| 维度 | metaMDBG | multik |
+|---|---|---|
+| 计数 | 外部分区（nbBases/20Gb 分区，clamp [cores, 5000]），disk scale-out | supermer 两段排序（内存） |
+| minimizer 提取 | 一次（convertReadsToMinimizerSpace），每轮只滑窗 | 每轮 count_at 全量 supermer（未复用） |
+| removeUnsupported | 节点级查表 | O(序列总长×k) 逐窗口编码+查表（瓶颈，见 multik-complexity.md） |
+| G37 实测 | —（长读数据，无直接对照） | ~4-5 s（155k reads，含探针验证） |
+| 1 Mb 合成 | — | ~10 s / 816 MB |
+
+metaMDBG 的"前期抹除计算复杂度"（minimizer 一次 + 节点级处理）在 multik
+未完全实现：count_at 每轮全量、remove_unsupported 序列级扫描（基准确认，
+见 `benchmarks/multik-complexity.md`）。
+
+### 7. 借鉴与差异总结
+
+**借鉴（metaMDBG → multik）**：
+1. multi-k 迭代 + unitig 反馈（核心）；
+2. 跨接验证（doublet → bridge_kmer，k-mer 计数选边）；
+3. 渐进丰度过滤（removeAbundanceNoQueue → progressive_filter，含
+   recompact）；
+4. 嵌合清理（removeUnsupportedUnitigs → remove_unsupported）；
+5. 桥接 reads 防错连（RepeatRemover → bridge_filter + split_by_bridge）。
+
+**multik 的简化/差异**：
+1. 碱基 k-mer 空间（无 minimizer 采样）——k 上限 128 硬限制 vs metaMDBG
+   读长驱动；
+2. 大步长 4-6 轮 vs metaMDBG 150 轮（短 unitig 大步长需跳过验证/探针
+   补偿）；
+3. 渐进过滤用中位 25% + 直链保护（单菌株不误删）vs metaMDBG 删到
+   maxAbundance（宏基因组假设）；
+4. remove_unsupported 容错 <2%（覆盖波动）；
+5. split_by_bridge 切 unitig 内部（metaMDBG 无——其 unitig 内部无错连）；
+6. 完美探针 vs minimap2 容错映射（multik 假设 reads 干净/unitig 精确）。
+
+**metaMDBG 有而 multik 未做**：
+1. superbubble 简化（平行路径选高丰度）——multik 靠跨接验证 + 探针；
+2. cutoff 快照分级输出——multik 直接输出 + dropped；
+3. 容错 reads 映射（minimap2/chaining）——multik 完美匹配；
+4. checkpoint 断点续跑、外部分区计数——multik 单进程内存。
+
+### 8. 结论
+
+两者是同一核心思想（multi-k 迭代 + 图验证）的两种实现：metaMDBG 面向
+长读宏基因组（minimizer 空间、150 轮、maxAbundance 假设、容错映射），
+multik 面向通用/无 N（碱基空间、大步长、单菌株保护、完美探针）。multik
+的两个独有设计（直链保护、split_by_bridge 内部切分）解决的是碱基空间/
+单菌株特有的问题（覆盖波动误删、recompact 固化错连），是 metaMDBG 不
+需要的。跨接验证与丰度过滤是共同骨架，实现细节因空间（minimizer vs
+碱基）而异。

@@ -5,6 +5,7 @@
 //! (stage S1), chains them into layouts (S2), and stitches each layout into
 //! a consensus contig (S3).
 
+pub mod anchor;
 pub mod consensus;
 pub mod layout;
 pub mod overlap;

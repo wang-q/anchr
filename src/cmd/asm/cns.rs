@@ -1,4 +1,4 @@
-use crate::libs::olc::consensus::consensus;
+use crate::libs::olc::consensus::consensus_with_ratio;
 use crate::libs::olc::layout::{Layout, LayoutStep};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
@@ -56,6 +56,14 @@ Examples:
                 .value_parser(value_parser!(usize))
                 .help("Minimum contig length in bases"),
         )
+        .arg(
+            Arg::new("dedup_ratio")
+                .long("dedup-ratio")
+                .num_args(1)
+                .default_value("1.0")
+                .value_parser(value_parser!(f64))
+                .help("Drop a contig when a longer kept contig covers this fraction of it (1.0 = exact substring; <1.0 merges boundary-differing near-duplicates)"),
+        )
 }
 
 /// Execute the cns command.
@@ -84,7 +92,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         id.insert(u.name.as_str(), i);
     }
     let layouts = parse_layouts(layout_path, &id)?;
-    let contigs = consensus(&unitigs, &layouts, min_contig_len)?;
+    let ratio = *args.get_one::<f64>("dedup_ratio").unwrap();
+    let contigs = consensus_with_ratio(&unitigs, &layouts, min_contig_len, ratio)?;
 
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;

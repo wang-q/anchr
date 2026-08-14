@@ -19,17 +19,17 @@ pub struct Contig {
     pub coverage: f64,
 }
 
-/// Stitches every layout into a consensus contig.
-///
-/// Layouts shorter than `min_contig_len` are dropped. A layout whose
-/// overlapping bases disagree with the already-stitched contig is an error
-/// (exact overlaps must agree); the contig index is reported for debugging.
-/// Multi-k redundancy is reduced by dropping contigs fully contained (as an
-/// exact substring, either strand) in a longer contig.
-pub fn consensus(
+/// `consensus` with an approximate-containment dedup: contigs whose sequence
+/// is covered by `ratio` (fraction of the shorter contig, either strand) of a
+/// longer kept contig are dropped. `ratio < 1.0` merges near-duplicate
+/// contigs whose boundaries differ by a few bases (multi-coverage-set
+/// assembly), keeping the longest representative without losing the covered
+/// sequence; `ratio = 1.0` is the exact-substring behaviour.
+pub fn consensus_with_ratio(
     unitigs: &[Unitig],
     layouts: &[Layout],
     min_contig_len: usize,
+    ratio: f64,
 ) -> Result<Vec<Contig>> {
     let mut contigs = Vec::new();
     for (ci, layout) in layouts.iter().enumerate() {
@@ -66,22 +66,28 @@ pub fn consensus(
             contigs.push(Contig { seq, coverage });
         }
     }
-    Ok(dedup_contained(contigs))
+    Ok(dedup_contained_ratio(contigs, ratio))
 }
 
-/// Drops contigs fully contained in a longer kept contig (either strand).
-///
-/// Different k values produce near-duplicate contigs for the same genomic
-/// region; exact containment means the shorter one adds no sequence. Kept
-/// contigs stay sorted longest-first (stable).
-fn dedup_contained(mut contigs: Vec<Contig>) -> Vec<Contig> {
+/// Drops contigs whose sequence is covered by >= `ratio` of a longer kept
+/// contig (either strand). Coverage is the longest exact common segment found
+/// by anchoring short seeds; multi-coverage-set unitigs are exact, so the
+/// near-duplicates differ only at their boundaries and the longest
+/// representative is kept.
+fn dedup_contained_ratio(mut contigs: Vec<Contig>, ratio: f64) -> Vec<Contig> {
     contigs.sort_by_key(|c| std::cmp::Reverse(c.seq.len()));
     let mut kept: Vec<Contig> = Vec::with_capacity(contigs.len());
     for c in contigs {
         let rc = rev_comp(&c.seq).collect::<Vec<u8>>();
-        let contained = kept
-            .iter()
-            .any(|k| contains(&k.seq, &c.seq) || contains(&k.seq, &rc));
+        let contained = if ratio >= 1.0 {
+            // Exact substring semantics (historical behaviour).
+            kept.iter()
+                .any(|k| contains(&k.seq, &c.seq) || contains(&k.seq, &rc))
+        } else {
+            // Approximate containment: boundary-differing near-duplicates.
+            kept.iter()
+                .any(|k| coverage(&k.seq, &c.seq) >= ratio || coverage(&k.seq, &rc) >= ratio)
+        };
         if !contained {
             kept.push(c);
         }
@@ -92,6 +98,62 @@ fn dedup_contained(mut contigs: Vec<Contig>) -> Vec<Contig> {
 /// Exact substring test.
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty() && haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+/// Fraction of `needle` covered by its longest near-identical segment inside
+/// `haystack` (either orientation is the caller's job). Anchors three seeds
+/// (head, middle, tail) and extends each hit while the accumulated mismatch
+/// rate stays within 1% — multi-coverage-set contigs for one region differ by
+/// a few bases at their boundaries and junctions, so an exact-only extension
+/// would stop too early (matching `anchr contained --idt 0.99` semantics).
+fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
+    if needle.len() < 100 {
+        return if contains(haystack, needle) { 1.0 } else { 0.0 };
+    }
+    let seed_len = 100usize;
+    let mut best = 0usize;
+    let seeds = [
+        0usize,
+        needle.len() / 2 - seed_len / 2,
+        needle.len() - seed_len,
+    ];
+    for seed_start in seeds {
+        let seed = &needle[seed_start..seed_start + seed_len];
+        for (p, _) in haystack
+            .windows(seed_len)
+            .enumerate()
+            .filter(|(_, w)| *w == seed)
+        {
+            let mut left = 0usize;
+            let mut left_mm = 0usize;
+            while p as i64 - left as i64 > 0 && seed_start as i64 - left as i64 > 0 {
+                if haystack[p - left - 1] == needle[seed_start - left - 1] {
+                    left += 1;
+                } else if left_mm * 100 <= left + left_mm {
+                    left += 1;
+                    left_mm += 1; // tolerate ~1% mismatches
+                } else {
+                    break;
+                }
+            }
+            let mut right = 0usize;
+            let mut right_mm = 0usize;
+            while p + seed_len + right < haystack.len()
+                && seed_start + seed_len + right < needle.len()
+            {
+                if haystack[p + seed_len + right] == needle[seed_start + seed_len + right] {
+                    right += 1;
+                } else if right_mm * 100 <= right + right_mm {
+                    right += 1;
+                    right_mm += 1; // tolerate ~1% mismatches
+                } else {
+                    break;
+                }
+            }
+            best = best.max(seed_len + left + right);
+        }
+    }
+    best as f64 / needle.len() as f64
 }
 
 #[cfg(test)]
@@ -145,7 +207,7 @@ mod tests {
                 overlap_len: 8,
             },
         ])];
-        let contigs = consensus(&us, &layouts, 1).unwrap();
+        let contigs = consensus_with_ratio(&us, &layouts, 1, 1.0).unwrap();
         assert_eq!(contigs.len(), 1);
         assert_eq!(contigs[0].seq, b"AAAAAAAAACGTACGTCCCCCCCCGGGGGGGG");
         // 48 unitig bases over a 32 bp contig.
@@ -174,7 +236,7 @@ mod tests {
                 overlap_len: 6,
             },
         ])];
-        let contigs = consensus(&us, &layouts, 1).unwrap();
+        let contigs = consensus_with_ratio(&us, &layouts, 1, 1.0).unwrap();
         assert_eq!(contigs[0].seq, b"TTTTACGTACCCCC");
     }
 
@@ -189,8 +251,14 @@ mod tests {
             q_end: 8,
             overlap_len: 0,
         }])];
-        assert_eq!(consensus(&us, &layouts, 9).unwrap().len(), 0);
-        assert_eq!(consensus(&us, &layouts, 8).unwrap().len(), 1);
+        assert_eq!(
+            consensus_with_ratio(&us, &layouts, 9, 1.0).unwrap().len(),
+            0
+        );
+        assert_eq!(
+            consensus_with_ratio(&us, &layouts, 8, 1.0).unwrap().len(),
+            1
+        );
     }
 
     /// A disagreeing overlap is a friendly error, not a panic.
@@ -215,7 +283,7 @@ mod tests {
         ])];
         // The claimed 6 bp overlap does not match (u0 suffix "AACCCC" vs
         // u1 prefix "CCCCGG"): the stitch must fail cleanly.
-        let err = consensus(&us, &layouts, 1).unwrap_err();
+        let err = consensus_with_ratio(&us, &layouts, 1, 1.0).unwrap_err();
         assert!(err.to_string().contains("disagree"), "{err}");
     }
 
@@ -239,7 +307,7 @@ mod tests {
                 overlap_len: 0,
             }]),
         ];
-        let contigs = consensus(&us, &layouts, 1).unwrap();
+        let contigs = consensus_with_ratio(&us, &layouts, 1, 1.0).unwrap();
         assert_eq!(contigs.len(), 1);
         assert_eq!(contigs[0].seq, b"AAAACCCCGGGGTTTT");
     }
@@ -267,9 +335,58 @@ mod tests {
                 overlap_len: 0,
             }]),
         ];
-        let contigs = consensus(&us, &layouts, 1).unwrap();
+        let contigs = consensus_with_ratio(&us, &layouts, 1, 1.0).unwrap();
         assert_eq!(contigs.len(), 1);
         assert_eq!(contigs[0].seq, b"AAAATACGTACGTTTT");
+    }
+
+    /// `--dedup-ratio < 1.0` merges near-duplicate contigs whose boundaries
+    /// differ by a few bases: exact containment (ratio 1.0) keeps both, the
+    /// approximate rule keeps the longer one.
+    #[test]
+    fn dedups_approximate_contained_contigs() {
+        // long = A*95 + ACGT*25 + T*10; short = same but last two bases GG.
+        let long: Vec<u8> = b"A"
+            .repeat(95)
+            .into_iter()
+            .chain(b"ACGT".repeat(25))
+            .chain(b"T".repeat(10))
+            .collect();
+        let short: Vec<u8> = b"A"
+            .repeat(95)
+            .into_iter()
+            .chain(b"ACGT".repeat(25))
+            .chain(b"T".repeat(8))
+            .chain([b'G', b'G'])
+            .collect();
+        let us = unitigs(
+            &["u0", "u1"],
+            &[
+                std::str::from_utf8(&long).unwrap(),
+                std::str::from_utf8(&short).unwrap(),
+            ],
+        );
+        let layouts = vec![
+            layout(vec![LayoutStep {
+                unitig: 0,
+                strand: '+',
+                q_start: 0,
+                q_end: long.len(),
+                overlap_len: 0,
+            }]),
+            layout(vec![LayoutStep {
+                unitig: 1,
+                strand: '+',
+                q_start: 0,
+                q_end: short.len(),
+                overlap_len: 0,
+            }]),
+        ];
+        let exact = consensus_with_ratio(&us, &layouts, 1, 1.0).unwrap();
+        assert_eq!(exact.len(), 2, "not an exact substring: both kept");
+        let approx = consensus_with_ratio(&us, &layouts, 1, 0.95).unwrap();
+        assert_eq!(approx.len(), 1, "boundary-differing duplicate merged");
+        assert_eq!(approx[0].seq.len(), long.len());
     }
 
     /// Distinct contigs are all kept, longest first.
@@ -292,7 +409,7 @@ mod tests {
                 overlap_len: 0,
             }]),
         ];
-        let contigs = consensus(&us, &layouts, 1).unwrap();
+        let contigs = consensus_with_ratio(&us, &layouts, 1, 1.0).unwrap();
         assert_eq!(contigs.len(), 2);
         assert_eq!(contigs[0].seq, b"AAAACCCCGGGG");
         assert_eq!(contigs[1].seq, b"TTTTCCCCAAAA");

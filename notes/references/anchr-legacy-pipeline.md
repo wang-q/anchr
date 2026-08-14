@@ -30,9 +30,10 @@
 reads（全量）
   → 拆分成多个覆盖度部分（4_down_sampling X40/X80 × P 副本；6_down_sampling MR 版）
   → 每个部分分别组装（unitigs：4 工具 × 6 k → contained）
-  → 每个部分出 anchors（bbwrap 回贴 + 覆盖度区间过滤）
-  → 所有部分的 anchors 合并（7_merge_anchors：contained + 重新 anchors 化）
-  → 经典 OLC 拼装（7_extend/7_glue/7_fill：overlap2 → group → layout）
+  → 每个部分取可靠的 anchors（bbwrap 回贴 + 覆盖度区间过滤，排除错误区/重复区）
+  → 所有部分的可靠 anchors 合并（7_merge_anchors：contained + orient/merge 或
+    重新 anchors 化）——**合并本身是经典 OLC**（overlap → layout，见 §2.5）
+  → fill/glue 辅助：用 8_* 的长 contigs（2GS）填充/粘合 gap（非主 OLC，见 §2.7）
   → 对照路线 8_spades/8_megahit（全量 reads 直接组装）
   → 9_stat_final / 9_quast 比较全部产物
 ```
@@ -137,7 +138,20 @@ reads（全量）
 滤低覆盖错误区和重复区）的连续片段，从 unitigs 提取后 contained/
 orient/merge。**不是 reads 延伸**。
 
-### 2.5 merge anchors（`templates/7_merge_anchors.tera.sh`）
+### 2.5 merge anchors（`templates/7_merge_anchors.tera.sh`）——**经典 OLC 的合并**
+
+**用户纠正（2026-08-15）**："先取其中可靠的 anchors，然后再合并，这个合并
+其实非常像经典的 OLC"——**合并（7_merge_anchors）才是老流程的 OLC 主步骤**，
+fill/glue 不是（见 §2.7）。OLC 语义落在 `anchr contained/orient/merge` 三个
+命令上（都基于 `anchr overlap`）：
+
+* `anchr merge`（"Merge overlapped unitigs"）实现 = **overlap → 有向图 →
+  拓扑排序去环 → 按序拼接**（`src/cmd/merge.rs:125-260`：`anchr overlap`
+  产出所有重叠 → 重叠关系建 DiGraphMap（边权 = append length）→ 环删除、
+  分支保留 → 拓扑序按序把后序序列的非重叠部分接上）——这就是 OLC 的
+  **overlap + layout**（consensus 简化：高 idt 0.9999 下直接按 overlap 拼接）；
+* `anchr orient` = 重叠序列方向一致化（layout 前置）；
+* `anchr contained` = 丢弃被包含的片段（overlap 关系去冗余）。
 
 * **`--redo` 分支**（G37 model.md 带 `--redo`，走此路径）：
   1. `anchr contained $(find ... -name anchor.fasta | sort -r)` 合并所有
@@ -149,8 +163,10 @@ orient/merge。**不是 reads 延伸**。
      "anchors with Q0L0 reads" 但实际路径是 `trim/pe.cor.fa.gz`）→
      `anchor.merge.fasta`；
   3. others（pe.others.fa）也 contained 合并（--len 500）。
-* **`--redo 0` 分支**：直接 `orient --idt 0.999` + `merge --idt 0.9999` +
-  `contained --idt 0.98 --ratio 0.99`（不重新 anchors 化）。
+* **`--redo 0` 分支**：`contained → orient --idt 0.999 → merge --idt 0.9999
+  → contained --idt 0.98 --ratio 0.99`（**不重新 anchors 化**）——这一串就是
+  完整的 OLC 式合并：overlap（contained/merge 内部）→ layout（orient +
+  拓扑拼接）→ 去冗余。
 
 ### 2.6 最终组装（`templates/8_spades.tera.sh` 等）
 
@@ -164,11 +180,15 @@ orient/merge。**不是 reads 延伸**。
 * 再 **anchors 化**：`anchr anchors spades.non-contained.fasta
   pe.cor.fa.gz --ratio 0.98` → `8_spades/anchor/anchor.fasta`。
 
-### 2.7 经典 OLC 拼装（`7_extend` / `7_glue` / `7_fill`，2026-08-15 补）
+### 2.7 gap 填充/粘合辅助（`7_extend` / `7_glue` / `7_fill`，非主 OLC）
 
-这是用户纠正的核心："每一个部分拼接完之后，**再用经典的 OLC 把它们拼装
-起来**"。调用链在 `templates/0_bsub.tera.sh`（`--extend 1` 分支），本地
-G37 手动执行（产物在 `7_glue_anchors/`、`7_fill_anchors/`，
+**用户纠正（2026-08-15）**：fill/glue **不是**老流程的"经典 OLC"——主 OLC
+在 §2.5 的合并（contained/orient/merge）。fill/glue 是合并之后用
+**8_* 的长 contigs（2GS）**对 anchors 做 gap 填充/粘合的辅助步骤：它的
+`dazz overlap2` 是 **anchor × long**（不是片段间两两 overlap），`dazz
+group/layout` 把 long 序列挂到 anchor 分组上补 gap，而不是从零做
+overlap-layout。调用链在 `templates/0_bsub.tera.sh`（`--extend 1` 分支），
+本地 G37 手动执行（产物在 `7_glue_anchors/`、`7_fill_anchors/`，
 9_stat_final/9_quast 都引用）：
 
 ```bash
@@ -189,8 +209,8 @@ bash 0_script/7_fill_anchors.sh 7_glue_anchors/contig.fasta \
     7_extend_anchors/contigs.2GS.fasta 3
 ```
 
-**fill/glue 脚本内部 = 标准 OLC 三段**（`templates/7_glue_anchors.tera.sh`
-与 `7_fill_anchors.tera.sh` 相同骨架）：
+**fill/glue 脚本内部**（`templates/7_glue_anchors.tera.sh` 与
+`7_fill_anchors.tera.sh` 相同骨架）：
 
 1. **Overlap**：`dazz overlap2 ${FILE_ANCHOR} ${FILE_LONG} -b 50 --len 1000
    --idt 0.999 --all`（anchor × long 两两比对）→ `anchorLong.ovlp.tsv`；
@@ -200,16 +220,18 @@ bash 0_script/7_fill_anchors.sh 7_glue_anchors/contig.fasta \
    [--oa anchor.ovlp.tsv] --range 1-N --len 1000 --idt 0.999
    [--max 100 | --max -30] -c GAP_COV`——按 anchor 分组建图（-c = gap
    覆盖度阈值）；
-3. **Layout（每组内）**：`anchr orient`（方向一致化）→ `anchr overlap`
+3. **Layout（每组内，拼 long 补 gap）**：`anchr orient`（方向一致化）→ `anchr overlap`
    （组内精确 overlap，`--len 1000 --idt 0.9999`）→ `anchr restrict`
-   （按 restrict.tsv 约束）→ **`dazz layout`** → `group/*.contig.fasta`；
+   （按 restrict.tsv 约束，只允许 anchor-anchor / anchor-long 的合法连接）
+   → **`dazz layout`** → `group/*.contig.fasta`；
    汇总 `non_grouped.fasta + *.contig.fasta` → `contig.fasta`
    （`faops filter -a 1000`）。
 
 **fill vs glue 的差异**：glue 用 anchor 内部 overlap 辅助分组（`--oa`）、
-`--max -30`（允许每个 anchor 进多个组）；fill 用 `--keep --max 100`，
+`--max -30`（允许每个 anchor 进多个组）；fill 用 `--keep --max 100`、
 `-c 2`（bsub 版统一传 3）。fill 的输入 anchor = glue 的 contig——即
-**先 glue 把 anchors 和长 contigs 拼起来，再 fill 用长 contigs 填 gap**。
+**先 glue 把 anchors 和长 contigs 粘合，再 fill 用长 contigs 填 gap**；
+两者都是合并（§2.5）之后的精修，不改变"合并 = 主 OLC"的定位。
 
 **G37 本地产物与 bsub 版参数不同**：本地 `7_fill_anchors/anchor.fasta`
 （16 条，md5 ≠ `7_merge_anchors/anchor.merge.fasta` 的 17 条）说明手动
@@ -217,11 +239,28 @@ bash 0_script/7_fill_anchors.sh 7_glue_anchors/contig.fasta \
 
 ## 3. 关键结论（修正我此前的理解）
 
-0. **老流程是"多覆盖度拆分 → 各部分组装 → OLC 拼装"**（用户纠正，
-   2026-08-15）：reads 按覆盖度拆成多个部分（G37：3 trim 档 × X40/X80 ×
-   P 副本 + MR 版；用户经验 30×/60× 合适，不是越高越好），各部分独立
-   unitigs → anchors，合并后再用经典 OLC（overlap2 → group → layout）
-   拼装（§2.2/§2.7）——**不是"一部分 reads 从前往后组装得到一个东西"**；
+0. **老流程是"多覆盖度拆分 → 各部分组装 → 取可靠 anchors → OLC 式合并"**
+   （用户纠正，2026-08-15）：
+   老流程**先取可靠的 anchors**（覆盖度区间过滤，排除错误区/重复区），再
+   **合并**（7_merge_anchors：contained/orient/merge 或重新 anchors 化）——
+   **合并本身是经典 OLC**（`anchr merge` = overlap → 有向图 → 拓扑排序 →
+   拼接，见 §2.5）；**fill/glue 不是主 OLC**（是用 2GS 长 contigs 做 gap
+   填充/粘合的辅助步骤，见 §2.7）；reads 按覆盖度拆成多个部分（G37：
+   3 trim 档 × X40/X80 × P 副本 + MR 版；用户经验 30×/60× 合适，不是
+   越高越好），各部分独立 unitigs → anchors——**不是"一部分 reads 从前往后
+   组装得到一个东西"**；
+   - **0a. "取可靠 anchors" = 覆盖度区间筛选**（用户强调）：anchors 步骤
+     （bbwrap 回贴 + [lower, upper] 过滤）先选出可靠片段再合并——低覆盖
+     （错误区）和高覆盖（重复区）都排除，合并的输入是"可靠 anchors"而非
+     全部 unitigs；
+   - **0b. 合并 = 经典 OLC**：`anchr merge`（`src/cmd/merge.rs`）= overlap
+     → 有向图（边权 = 追加长度）→ 拓扑排序去环 → 按序拼接；`--redo 0`
+     分支 `contained → orient → merge → contained` 是完整 OLC（overlap +
+     layout + 去冗余）；`--redo`（G37）用 contained 合并 + 重新 anchors 化，
+     同一骨架；
+   - **0c. fill/glue = gap 填充/粘合辅助**（非主 OLC）：输入 = 合并的
+     anchors × 2GS 长 contigs，`dazz overlap2` 是 anchor×long 比对、
+     group/layout 把 long 挂到 anchor 分组补 gap——不是从零的片段 OLC。
 1. **anchors ≠ reads 延伸**（用户纠正）：anchors = unitigs 的覆盖质量筛选
    片段（bbwrap 回贴 + [lower, upper] 覆盖过滤 + 补洞 + pgr fa range 提取）；
 2. **pe.cor.fa 序列未纠错**（用户纠正）：quorum 修正过的 reads 带
@@ -252,11 +291,43 @@ bash 0_script/7_fill_anchors.sh 7_glue_anchors/contig.fasta \
   重复区排除）没有对应——老流程的"多覆盖度部分"（30×/60×）本质也是这个
   思想的另一形态：低覆盖部分天然避开重复区冲突；multik 若按覆盖度拆多个
   部分跑再合并，或引入覆盖度区间过滤，等价于老流程的 anchors 语义；
-* 老流程把"每个部分"的 unitigs → anchors → **OLC 拼装（overlap2 → group
-  → layout）**；multik 的 unitig 图跨接验证 + 链压实是"OLC 拼装"的
-  图论替代（边有 k-mer 计数证据，而非仅 overlap 长度）——两套语义的
-  对应关系值得展开（§2.7 的 dazz layout vs multik merge_chains）；
+* 老流程把"每个部分"的 unitigs → **可靠 anchors（覆盖筛选）→ OLC 式合并**
+  （`anchr merge` = overlap → 拓扑拼接，§2.5）；multik 的 unitig 图跨接
+  验证 + 链压实是"合并"的图论替代（边有 k-mer 计数证据，而非仅 overlap
+  长度）——两套语义的对应关系值得展开（`merge.rs` 的拓扑拼接 vs multik
+  `merge_chains`）；fill/glue（§2.7）的 dazz layout 是 gap 填充辅助，不是
+  主 OLC，对比时优先级低；
 * merged reads（MR）路径对 multik 的意义（multik 直接吃 merged reads 的
   可行性）；
 * 7_extend 的 2GS contigs（8_* 合并）作为 glue/fill 的 long 输入：multik
   输出作为 FILE_LONG 与老流程 anchors 做 OLC 拼装的混搭可行性。
+
+## 5. 现代替代对照（2026-08-15 盘点：老流程每个组件是否都有自实现替代）
+
+| 老流程组件 | 旧工具/命令 | 现代替代（anchr/pgr） | 状态 |
+|---|---|---|---|
+| trim（dedupe/质量/长度/adapter） | bbtools bbduk + clumpify | `fq clean`（bbduk 等价：adapter k-mer/质量/组成过滤）+ `fq clump`（clumpify-compatible） | **自实现 ✓** |
+| PE 合并 + **纠错（ecphase）** | bbtools bbmerge（`anchr mergeread --ecphase "1 2 3"`：ecco/ecct/eccc） | `fq merge`（bbmerge-compatible，含 ecco 等 phase；`--ihist` 写 insert 直方图）/ `fq ec-overlap`（= merge phase 1，ecco） | **自实现 ✓** |
+| quorum 步骤（**2026-08-15 核对修正**） | 外部 quorum（k-mer 计数纠错器）；老流程用法 = **丢弃带 `:sub:`/`trunc` 标记的被修正 reads**，pe.cor 保留**未被修正的原始序列**——实际效果是 **reads 筛选**，不是纠错输出 | **`fq s-filter`**（自实现 ✓）：帮助/实现明确"用输入 reads 自身当参考，检查 **quorum 的信号**（无高质量 anchor / truncation / 会 substitution 的碱基 + Poisson 碰撞测试），**不产出修正序列——保留原样或丢弃**"——正是老流程 quorum 的语义（`pgr::libs::kmer::qcheck`） | **自实现 ✓**（用户 2026-08-15 确认；multik 的 solid 阈值是另一层冗余过滤） |
+| QC | FastQC | `fq qc`（FastQC-compatible） | **自实现 ✓** |
+| insert size 统计 | bbtools/picard statInsertSize | `fq merge --ihist`（bbmerge ihist 格式） | **自实现 ✓** |
+| fastk（k-mer 谱/基因组特征，**2026-08-15 核对修正**） | 外部 fastk（-NTable/-Histex）+ GeneScope R | **`pgr kmer table/hist`**（k-mer 表/频率直方图，替代 fastk 计数与 Histex）+ **`pgr kmer gsize --model --plot`**（GenomeScope 模型拟合：kmercov/het/genome size + 谱图，替代 GeneScope） | **自实现 ✓**（`libs/kmer/genomescope.rs`、`cmd_pgr/kmer/gsize.rs`；另有 `profile`/`qhist`） |
+| 降采样 | `pgr fa split about` | `pgr fa split`（pgr 库） | **自实现 ✓** |
+| unitigs | bcalm / bifrost / superreads / tadpole | `asm unitig`（bcalm graph3 移植 + supermer/DFA 优化） | **自实现+优化 ✓** |
+| 迭代组装（现代新增） | — | `asm multik`（metaMDBG 跨接验证 + SKESA 严格链 + megahit 清洗） | **自实现 ✓** |
+| anchors（覆盖筛选） | bbwrap perfectmode + basecov + R 阈值 | `asm map`（完美匹配，替代 bbwrap）+ `asm anchor`（覆盖区间过滤） | **自实现+优化 ✓**（补洞逻辑待办） |
+| merge anchors | `anchr contained/orient/merge`（自实现） | 同上 + `asm olc --unitigs`（现代合并） | **自实现+优化 ✓** |
+| glue/fill | dazz overlap2 / group / layout | `asm ovlp / layout / cns`（精确 overlap 替代） | **自实现 ✓** |
+| spades / megahit（**可选参考**） | 外部组装器 | 现代主路线 = multik + OLC；**spades/megahit 保留为可选参考**（用户 2026-08-15：用于对照，如 `multik-g37-quast.md` 的 mr_spades/mr_megahit 对比列） | 可选参考 ✓（不实现、不替代） |
+| quast（最终质检） | 外部 quast | 仍用外部 quast（用户明确要求） | 有意保留 ✗ |
+| repetitive（重复区提取） | `pgr fa` | `pgr fa range/filter` | **自实现 ✓** |
+
+**结论**：老流程的每个**功能性组件**（trim/merge/纠错/unitigs/anchors/合并/
+OLC）现在都有自实现的现代替代（fq 家族 + asm 家族 + pgr fa），且带优化
+（supermer/DFA、精确 overlap、图论合并）。**quorum 步骤的替代是
+`fq s-filter`**（用户 2026-08-15 确认：s-filter 检查的正是 quorum 的信号、
+且"保留原样或丢弃"语义一致），老流程的纠错在 merge 的 ecphase
+（`fq merge`/`fq ec-overlap` 已替代），fastk/GeneScope 的替代是
+**`pgr kmer gsize --model`**（GenomeScope 拟合，用户 2026-08-15 核对确认）。
+**保留外部的组件：quast（最终质量确认）+ spades/megahit（可选参考，
+用于对照，用户 2026-08-15 确认）**。
