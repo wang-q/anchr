@@ -7,7 +7,7 @@
 //! the count table and parallelizes by partitioning the sorted vertex list
 //! (no CAS / locks needed), unlike cuttlefish's edge-scan update path.
 
-use super::tadpole::{Kmer, KmerFnvHasher, TadpoleTable};
+use super::refine::{Kmer, KmerFnvHasher, RefineTable};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
@@ -27,7 +27,7 @@ pub(crate) struct VertexState {
     pub out_base: u8,
 }
 
-/// Classified states for every vertex in `TadpoleTable::sorted_entries`,
+/// Classified states for every vertex in `RefineTable::sorted_entries`,
 /// with a canonical-key index for the walk.
 pub(crate) struct VertexStates {
     /// Sorted solid (canonical k-mer, count) entries; kept so the walk
@@ -43,7 +43,7 @@ pub(crate) struct VertexStates {
 impl VertexStates {
     /// Classifies all solid k-mers (count >= `threshold`). `threads > 1`
     /// parallelizes the per-vertex pass; the result is order-independent.
-    pub(crate) fn classify(table: &TadpoleTable, threshold: u32, threads: usize) -> Self {
+    pub(crate) fn classify(table: &RefineTable, threshold: u32, threads: usize) -> Self {
         let threads = if threads == 0 {
             rayon::current_num_threads()
         } else {
@@ -169,7 +169,7 @@ impl VertexStates {
 }
 
 /// Distinct predecessor bases (`b + kmer[..k-1]` solid) and the unique one.
-fn count_in(table: &TadpoleTable, km: &Kmer, threshold: u32) -> (u8, u8) {
+fn count_in(table: &RefineTable, km: &Kmer, threshold: u32) -> (u8, u8) {
     let mut n = 0u8;
     let mut base = 0u8;
     for b in 0..4u8 {
@@ -184,7 +184,7 @@ fn count_in(table: &TadpoleTable, km: &Kmer, threshold: u32) -> (u8, u8) {
 }
 
 /// Distinct successor bases (`kmer[1..] + b` solid) and the unique one.
-fn count_out(table: &TadpoleTable, km: &Kmer, threshold: u32) -> (u8, u8) {
+fn count_out(table: &RefineTable, km: &Kmer, threshold: u32) -> (u8, u8) {
     let mut n = 0u8;
     let mut base = 0u8;
     for b in 0..4u8 {

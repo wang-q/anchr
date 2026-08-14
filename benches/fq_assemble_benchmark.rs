@@ -3,7 +3,7 @@
 //! count-table build and the full assembly (bubbles on and off).
 
 use anchr::libs::asm::assemble::{assemble, assemble_unitigs, AssembleOptions};
-use anchr::libs::asm::tadpole::TadpoleTable;
+use anchr::libs::asm::refine::RefineTable;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use std::sync::OnceLock;
@@ -38,7 +38,7 @@ fn bench_build_and_assemble(c: &mut Criterion) {
     group.sample_size(10);
     group.bench_function("tadpole_table_build_k31_20k", |b| {
         b.iter(|| {
-            let table = TadpoleTable::build(reads, 31, 0.5);
+            let table = RefineTable::build(reads, 31, 0.5);
             black_box(table)
         })
     });

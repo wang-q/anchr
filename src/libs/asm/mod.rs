@@ -1,6 +1,6 @@
-//! De novo assembly algorithms (BBTools tadpole-compatible).
+//! De novo assembly and read-refinement algorithms.
 
 pub mod assemble;
 pub mod dfa;
 pub mod multik;
-pub mod tadpole;
+pub mod refine;

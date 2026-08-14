@@ -65,7 +65,7 @@ anchr（fq/asm 业务 + 命令壳）
 pgr（格式/基础 + 比对/分析/索引/遮蔽等其余命令组）
 ```
 
-`fq` 与 `asm` 在 anchr 内互相依赖（`fq/merge` 用 `asm::tadpole`、
+`fq` 与 `asm` 在 anchr 内互相依赖（`fq/merge` 用 `asm::refine`、
 `asm` 用 `fq::qual`），同一 crate 内无碍。pgr 侧 `kmer qhist` 的
 `detect_quality_base` 依赖由基础层满足，不随迁。
 
@@ -202,7 +202,7 @@ docs），依赖 pgr crate 的基础模块：
 | :--- | :--- | :--- |
 | `fq/bbnet.rs` | `fq/bbnet.rs` | 业务 |
 | `fq/clump.rs` | `fq/clump.rs` | 业务 |
-| `fq/merge.rs` | `fq/merge.rs` | 业务（依赖 `asm::tadpole`） |
+| `fq/merge.rs` | `fq/merge.rs` | 业务（依赖 `asm::refine`） |
 | `fq/norm.rs` | `fq/norm.rs` | 业务（依赖 `kmer`，pgr 基础） |
 | `fq/overlap.rs` | `fq/overlap.rs` | 业务 |
 | `fq/sample.rs` | `fq/sample.rs` | 业务 |

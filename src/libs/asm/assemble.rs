@@ -1,9 +1,9 @@
 //! Tadpole-compatible contig assembly (contigMode).
 
 use crate::libs::asm::dfa::VertexStates;
-use crate::libs::asm::tadpole::{
+use crate::libs::asm::refine::{
     argmax2, base_code, base_defined, number_to_base, second_highest_position, Kmer, KmerFnvHasher,
-    TadpoleTable,
+    RefineTable,
 };
 use anyhow::Result;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
@@ -202,7 +202,7 @@ pub fn assemble<W: Write>(
     let reads = read_records(infiles)?;
 
     // Pass 2: count k-mers from the canonicalized (phred) qualities.
-    let table = TadpoleTable::build_threaded(&reads, opts.k, opts.min_prob, opts.parallel);
+    let table = RefineTable::build_threaded(&reads, opts.k, opts.min_prob, opts.parallel);
 
     // Pass 3: multi-pass seeding and contig building (BuildThread.run).
     let mut claimed: HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>> =
@@ -432,13 +432,13 @@ pub(crate) fn assemble_unitigs_core(
         }
         let n = reads.len() as u64;
         (
-            TadpoleTable::build_supermer(reads, opts.k, opts.supermer_m)?,
+            RefineTable::build_supermer(reads, opts.k, opts.supermer_m)?,
             n,
         )
     } else if opts.parallel > 0 {
         let t0 = std::time::Instant::now();
         let (table, n) =
-            TadpoleTable::build_streamed(infiles, opts.k, opts.min_prob, opts.parallel)?;
+            RefineTable::build_streamed(infiles, opts.k, opts.min_prob, opts.parallel)?;
         if std::env::var_os("ANCHR_SM_TIMING").is_some() {
             eprintln!(
                 "streamed count: {:.3}s ({} reads)",
@@ -453,7 +453,7 @@ pub(crate) fn assemble_unitigs_core(
         let reads = read_records(infiles)?;
         let n = reads.len() as u64;
         (
-            TadpoleTable::build_threaded(&reads, opts.k, opts.min_prob, 0),
+            RefineTable::build_threaded(&reads, opts.k, opts.min_prob, 0),
             n,
         )
     };
@@ -584,7 +584,7 @@ fn end_kmer1(bases: &[u8], k: usize, right: bool) -> Kmer {
 }
 
 /// Compresses every solid k-mer into its maximal unitig (order-independent).
-fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
+fn build_unitigs(table: &RefineTable, opts: &AssembleOptions) -> Vec<Unitig> {
     let k = opts.k;
     let threshold = opts.min_count_seed as u32;
     let want_abundances = opts.all_abundance_counts || opts.emit_gfa;
@@ -686,7 +686,7 @@ fn build_unitigs(table: &TadpoleTable, opts: &AssembleOptions) -> Vec<Unitig> {
 /// buckets per step. The walk order/decisions are identical to
 /// `build_unitigs` (same seed scan, same visited/circular handling).
 fn build_unitigs_dfa(
-    _table: &TadpoleTable,
+    _table: &RefineTable,
     opts: &AssembleOptions,
     states: &VertexStates,
 ) -> Vec<Unitig> {
@@ -787,7 +787,7 @@ fn rightmost_kmer(bb: &[u8], k: usize) -> Kmer {
 }
 
 /// The single solid successor of `kmer`, or None at a branch or dead end.
-fn unique_solid_out(kmer: &Kmer, table: &TadpoleTable, threshold: u32) -> Option<u8> {
+fn unique_solid_out(kmer: &Kmer, table: &RefineTable, threshold: u32) -> Option<u8> {
     let counts = table.fill_right_counts(kmer);
     let mut out = None;
     for b in 0..4u8 {
@@ -802,7 +802,7 @@ fn unique_solid_out(kmer: &Kmer, table: &TadpoleTable, threshold: u32) -> Option
 }
 
 /// Number of solid predecessors of `kmer`.
-fn unique_solid_in(kmer: &Kmer, table: &TadpoleTable, threshold: u32) -> usize {
+fn unique_solid_in(kmer: &Kmer, table: &RefineTable, threshold: u32) -> usize {
     let counts = table.fill_left_counts(kmer);
     (0..4).filter(|&b| counts[b] >= threshold).count()
 }
@@ -883,7 +883,7 @@ fn pass_threshold(opts: &AssembleOptions, i: usize) -> usize {
 /// One seeding scan over all table k-mers (BuildThread.processNextTable).
 #[allow(clippy::too_many_arguments)]
 fn scan_table(
-    table: &TadpoleTable,
+    table: &RefineTable,
     threshold: usize,
     opts: &AssembleOptions,
     claimed: &mut HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>>,
@@ -915,7 +915,7 @@ fn scan_table(
 /// Builds one contig from a claimed seed (Tadpole2.makeContig).
 fn make_contig(
     seed: &Kmer,
-    table: &TadpoleTable,
+    table: &RefineTable,
     opts: &AssembleOptions,
     claimed: &mut HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>>,
 ) -> Option<Contig> {
@@ -1005,7 +1005,7 @@ fn make_contig(
 }
 
 /// Counts of the four right/left extensions of a k-mer at `bb`'s 3'/5' end.
-fn right_counts_of(bb: &[u8], table: &TadpoleTable, opts: &AssembleOptions) -> [u32; 4] {
+fn right_counts_of(bb: &[u8], table: &RefineTable, opts: &AssembleOptions) -> [u32; 4] {
     let k = opts.k;
     let mut kmer = Kmer::new(k);
     for &b in &bb[bb.len() - k..] {
@@ -1014,7 +1014,7 @@ fn right_counts_of(bb: &[u8], table: &TadpoleTable, opts: &AssembleOptions) -> [
     table.fill_right_counts(&kmer)
 }
 
-fn left_counts_of(bb: &[u8], table: &TadpoleTable, opts: &AssembleOptions) -> [u32; 4] {
+fn left_counts_of(bb: &[u8], table: &RefineTable, opts: &AssembleOptions) -> [u32; 4] {
     let k = opts.k;
     let mut kmer = Kmer::new(k);
     for &b in &bb[bb.len() - k..] {
@@ -1028,7 +1028,7 @@ fn left_counts_of(bb: &[u8], table: &TadpoleTable, opts: &AssembleOptions) -> [u
 /// Returns the exit status and, for branch exits, the branch ratio.
 fn extend_to_right(
     bb: &mut Vec<u8>,
-    table: &TadpoleTable,
+    table: &RefineTable,
     opts: &AssembleOptions,
     claimed: &mut HashSet<Kmer, std::hash::BuildHasherDefault<KmerFnvHasher>>,
 ) -> (i32, f32) {
@@ -1141,7 +1141,7 @@ fn extend_to_right(
 }
 
 /// `KmerTableSet.calcCoverage`: mean/min/max canonical k-mer counts.
-fn calc_coverage(bases: &[u8], table: &TadpoleTable, k: usize) -> (f32, usize, usize) {
+fn calc_coverage(bases: &[u8], table: &RefineTable, k: usize) -> (f32, usize, usize) {
     if bases.len() < k {
         return (0.0, 0, 0);
     }
@@ -1524,7 +1524,7 @@ fn set_associate(id: usize, inbound: Option<&[EdgeRef]>, contigs: &mut [Contig])
 
 /// Builds the contig end-kmer ownership map and edges
 /// (Tadpole.initializeContigs + ProcessContigThread).
-fn process_contigs(contigs: &mut [Contig], table: &TadpoleTable, opts: &AssembleOptions) {
+fn process_contigs(contigs: &mut [Contig], table: &RefineTable, opts: &AssembleOptions) {
     let k = opts.k;
     let mut end_claims: HashMap<Kmer, usize> = HashMap::new();
     for (i, c) in contigs.iter().enumerate() {
@@ -1540,7 +1540,7 @@ fn process_contigs(contigs: &mut [Contig], table: &TadpoleTable, opts: &Assemble
 fn process_contig_left(
     c_id: usize,
     contigs: &mut [Contig],
-    table: &TadpoleTable,
+    table: &RefineTable,
     opts: &AssembleOptions,
     end_claims: &HashMap<Kmer, usize>,
 ) {
@@ -1587,7 +1587,7 @@ fn process_contig_left(
 fn process_contig_right(
     c_id: usize,
     contigs: &mut [Contig],
-    table: &TadpoleTable,
+    table: &RefineTable,
     opts: &AssembleOptions,
     end_claims: &HashMap<Kmer, usize>,
 ) {
@@ -1631,7 +1631,7 @@ fn process_contig_right(
 /// orientation bit).
 fn explore_right(
     kmer0: &Kmer,
-    table: &TadpoleTable,
+    table: &RefineTable,
     opts: &AssembleOptions,
     end_claims: &HashMap<Kmer, usize>,
     contigs: &[Contig],

@@ -227,7 +227,7 @@ overlap,bbnet}`、`libs/asm/{tadpole,assemble}`、`libs/kmer/{quality,qcheck}`�
 `cargo fmt --check` clean。
 
 第二轮：merge 家族（`merge`/`ec-kmer`/`ec-overlap`/`extend`/`s-filter` 5 个子命令
-及 `libs/fq/{merge,overlap,bbnet}`、`libs/asm/tadpole`、`libs/kmer/{quality,qcheck}`
+及 `libs/fq/{merge,overlap,bbnet}`、`libs/asm/refine`、`libs/kmer/{quality,qcheck}`
 ）修复缺陷 4（Zero-Panic 1 [s-filter `-k≥65` 移位越界]、数据安全 1 [s-filter
 `--discard-file` 覆盖输入]、行为一致性 1 [ec-overlap `--efilter 0`]、测试修复 1
 [bbnet 23 维校验与单元测试对齐]），文档一致性 3，均含回归测试或已修正文档。
@@ -251,7 +251,7 @@ assemble，与 asm 共享）。本节对迁移后的现行代码做全命令族�
 ## 复核范围与方法
 
 - 逐行重读全部 16 个命令文件、`cmd/args.rs` 共享参数助手，以及
-  `libs/fq/`、`libs/asm/tadpole.rs`、`libs/asm/assemble.rs` 的关键路径。
+  `libs/fq/`、`libs/asm/refine.rs`、`libs/asm/assemble.rs` 的关键路径。
 - 逐命令核对 Zero-Panic（索引/溢出/除零/unwrap）、clap 参数校验、数据安全
   （`-o` 同输入保护 + 多输出互斥）、算法边界（k 上界、滑动窗口、桶除零、
   质量修剪、merge/join 切片）、文档一致性（`docs/fq.md` ↔ 帮助 ↔ 行为）。

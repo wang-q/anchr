@@ -115,10 +115,11 @@ match app.get_matches().subcommand() {
 
 ## 4. 核心库层详解
 
-### 4.1 `libs/asm/` — tadpole 兼容组装
+### 4.1 `libs/asm/` — k-mer 图组装与 read 精修
 
-- `tadpole.rs`：多字 `Kmer`（`Vec<u64>`，镜像 BBTools long array，k 无上限）、
-  质量门控计数表、双向贪心扩展、泡泡消除（对照 `Tadpole.java`）；
+- `refine.rs`：read 级 k-mer 图精修——质量门控计数表、局部重装纠错、
+  保守延伸、junk/low-depth 过滤（最初移植自 BBTools `tadpole.sh`，后续
+  已发展出 long-k 路径/打包表/流式计数，仅保留 CLI 兼容对照）；
 - `assemble.rs`：`assemble`（contig）/`assemble_unitigs`（unitig）入口，
   种子深度阈值、分支处理。
 - `multik.rs`：multi-k 迭代组装（unitig 图跨轮验证：桥接 k-mer 选边 +
@@ -195,7 +196,8 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 
 - ~~迁移收尾~~（2026-08-15 销账：`fq-asm-migrate.md` 已标注"阶段 1-4 均已
   落地"（阶段 4 走"只写文档"路线，pgr 代码保留）、todo/索引已同步）；
-- 既有 warning 清理（`Overlap` dead_code、`tadpole` 未读字段等 8 处）；
+- 既有 warning 清理（`Overlap` dead_code（bin/lib 双份 libs 结构问题）、
+  `refine` 未读字段（2026-08-15 已删 2 处））；
 - ~~部分流程命令（`dep`/`ena`/`template` 链）的外部工具版本核对~~
   （2026-08-15 完成：现代依赖清单见 §7.1，`check_dep.sh` 已更新，必需项
   全在位、已替代工具标注 legacy）。

@@ -12,7 +12,7 @@
 use super::assemble::{
     assemble_unitigs_core, compute_links, read_records, AssembleOptions, Link, Unitig,
 };
-use super::tadpole::{base_code, Kmer as TdKmer, TadpoleTable};
+use super::refine::{base_code, Kmer as TdKmer, RefineTable};
 use anyhow::Result;
 use pgr::libs::kmer::key::Kmer;
 use pgr::libs::nt::rev_comp;
@@ -217,17 +217,17 @@ fn count_at(
     infiles: &[String],
     k: usize,
     _parallel: usize,
-) -> Result<TadpoleTable> {
+) -> Result<RefineTable> {
     let mut reads = read_records(infiles)?;
     for u in unitigs {
         reads.push((u.bases.clone(), Vec::new()));
     }
-    let table = TadpoleTable::build_supermer(reads, k, None)?;
+    let table = RefineTable::build_supermer(reads, k, None)?;
     Ok(table)
 }
 
 /// Encodes a base slice into the assembly k-mer key (canonical lookup is
-/// applied by `TadpoleTable::get_count`).
+/// applied by `RefineTable::get_count`).
 fn kmer_from_bases(bases: &[u8], k: usize) -> Option<TdKmer> {
     if bases.len() != k {
         return None;
@@ -365,7 +365,7 @@ fn bridge_filter(
     }
     let probe_len = probe_half * 2;
     let reads = read_records(infiles)?;
-    let table = TadpoleTable::build_supermer(reads, probe_len, None)?;
+    let table = RefineTable::build_supermer(reads, probe_len, None)?;
     for (i, ls) in links.iter_mut().enumerate() {
         ls.retain(|l| {
             probe_kmer(&unitigs[i], &unitigs[l.to], l, k0, probe_half)
@@ -395,7 +395,7 @@ fn split_by_bridge(
     }
     let probe_len = probe_half * 2;
     let reads = read_records(infiles)?;
-    let table = TadpoleTable::build_supermer(reads, probe_len, None)?;
+    let table = RefineTable::build_supermer(reads, probe_len, None)?;
     let mut out: Vec<Unitig> = Vec::new();
     for u in unitigs.iter() {
         let n = u.bases.len();
@@ -541,7 +541,7 @@ fn weak_link_remover(unitigs: &mut [Unitig], links: &mut [Vec<Link>], local_rati
 fn remove_unsupported(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
-    table: &TadpoleTable,
+    table: &RefineTable,
     k: usize,
     threshold: u32,
 ) -> Result<()> {

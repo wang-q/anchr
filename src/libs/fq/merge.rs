@@ -1,7 +1,7 @@
 //! Paired-read overlap merging and overlap-based error correction
 //! (BBMerge-compatible).
 
-use crate::libs::asm::tadpole::{extend_read_right, TadpoleOptions, TadpoleTable};
+use crate::libs::asm::refine::{extend_read_right, RefineOptions, RefineTable};
 use crate::libs::fq::bbnet::CellNet;
 use crate::libs::fq::overlap;
 use anyhow::Result;
@@ -732,11 +732,11 @@ pub fn merge<W: Write>(
             }
             out
         };
-        let t = TadpoleOptions {
+        let t = RefineOptions {
             k: 81,
-            ..TadpoleOptions::default()
+            ..RefineOptions::default()
         };
-        Some(TadpoleTable::build(&reads, t.k, t.min_prob))
+        Some(RefineTable::build(&reads, t.k, t.min_prob))
     } else {
         None
     };
@@ -780,9 +780,9 @@ pub fn merge<W: Write>(
         {
             stats.clone_from(&stats_before);
             let original_insert = outcome.insert();
-            let t = TadpoleOptions {
+            let t = RefineOptions {
                 k: 81,
-                ..TadpoleOptions::default()
+                ..RefineOptions::default()
             };
             let table = table.as_ref().unwrap();
             // BBMerge computes `lengthSum` from the *unextended* reads before

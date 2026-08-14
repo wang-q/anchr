@@ -1,9 +1,11 @@
-//! Tadpole-compatible k-mer error correction, read extension, and tossing.
+//! Read-level refinement along the k-mer graph.
 //!
-//! Ports the BBTools `tadpole.sh` correct/extend/discard modes: a canonical
-//! k-mer count table (quality-filtered by `minprob`), per-read error
-//! correction by local reassembly through the k-mer graph, conservative read
-//! extension that stops at branches, and junk/low-depth read discarding.
+//! A quality-filtered canonical k-mer count table, per-read error correction
+//! by local reassembly through the k-mer graph, conservative read extension
+//! that stops at branches, and junk/low-depth read discarding. Initially
+//! ported from BBTools `tadpole.sh` (correct/extend/discard modes); the
+//! implementation has since diverged (long-k path, packed table, streaming
+//! counting) and only the command-line compatibility notes remain.
 
 use anyhow::Result;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
@@ -19,7 +21,7 @@ pub const DEFAULT_K: usize = 31;
 
 /// Options mirroring the tadpole.sh defaults used by the anchr merge flow.
 #[derive(Debug, Clone)]
-pub struct TadpoleOptions {
+pub struct RefineOptions {
     /// K-mer length.
     pub k: usize,
     /// Ignore k-mers whose probability of being error-free is below this.
@@ -83,7 +85,7 @@ pub struct TadpoleOptions {
     pub require_both_bad: bool,
 }
 
-impl Default for TadpoleOptions {
+impl Default for RefineOptions {
     fn default() -> Self {
         Self {
             k: DEFAULT_K,
@@ -131,7 +133,7 @@ impl Default for TadpoleOptions {
 /// the packed sort path keeps intermediate buffers to a single global key
 /// list, so both memory and counting time drop an order of magnitude.
 #[derive(Debug, Clone, Default)]
-pub struct TadpoleTable {
+pub struct RefineTable {
     table: pgr::libs::kmer::KmerTable,
     /// 2-byte-prefix bucket offsets into `table.keys` (65537 entries, or
     /// 257 for k < 8): `get_count` binary-searches within the bucket, so a
@@ -142,7 +144,7 @@ pub struct TadpoleTable {
     sorted: OnceLock<Vec<(Kmer, u32)>>,
 }
 
-impl TadpoleTable {
+impl RefineTable {
     /// Builds the table from reads (bases, phred qualities) with `minprob`
     /// quality filtering, mirroring `KmerTableSetU.addKmersToTable`.
     pub fn build(reads: &[(Vec<u8>, Vec<u8>)], k: usize, min_prob: f32) -> Self {
@@ -820,7 +822,7 @@ fn fill_kmers(bases: &[u8], k: usize) -> Vec<Option<Kmer>> {
 }
 
 /// Fill the per-window canonical k-mer counts of a read.
-fn fill_counts(kmers: &[Option<Kmer>], table: &TadpoleTable) -> Vec<i64> {
+fn fill_counts(kmers: &[Option<Kmer>], table: &RefineTable) -> Vec<i64> {
     kmers
         .iter()
         .map(|k| {
@@ -834,7 +836,7 @@ fn fill_counts(kmers: &[Option<Kmer>], table: &TadpoleTable) -> Vec<i64> {
 }
 
 /// Raw table count, mirroring Java `getCount`: -1 when the k-mer is absent.
-fn raw_count(kmer: &Kmer, table: &TadpoleTable) -> i64 {
+fn raw_count(kmer: &Kmer, table: &RefineTable) -> i64 {
     let c = table.get_count(kmer);
     if c == 0 {
         -1
@@ -846,7 +848,7 @@ fn raw_count(kmer: &Kmer, table: &TadpoleTable) -> i64 {
 /// `KmerTableSet.regenerateCounts`: recompute window counts starting at `ca`
 /// after a base change, resetting at undefined bases (count 0 for invalid
 /// windows, raw -1 for absent k-mers).
-fn regenerate_counts(bases: &[u8], counts: &mut [i64], table: &TadpoleTable, k: usize, ca: usize) {
+fn regenerate_counts(bases: &[u8], counts: &mut [i64], table: &RefineTable, k: usize, ca: usize) {
     let b = ca + k - 1;
     let lim = bases.len().min(b + k + 1);
     let mut kmer = Kmer::new(k);
@@ -888,7 +890,7 @@ impl ErrorTracker {
 }
 
 /// `isSimilar`: two k-mer depths are similar within absolute/fractional tolerances.
-fn is_similar(a: i64, b: i64, opts: &TadpoleOptions) -> bool {
+fn is_similar(a: i64, b: i64, opts: &RefineOptions) -> bool {
     let min = a.min(b);
     let max = a.max(b);
     let dif = max - min;
@@ -897,7 +899,7 @@ fn is_similar(a: i64, b: i64, opts: &TadpoleOptions) -> bool {
 }
 
 /// `isError(high, low)` (errorPath=1).
-fn is_error2(high: i64, low: i64, opts: &TadpoleOptions) -> bool {
+fn is_error2(high: i64, low: i64, opts: &RefineOptions) -> bool {
     let em1 = opts.error_mult1;
     (low as f32) * em1 < high as f32
         || (low <= opts.error_lower_const as i64
@@ -905,7 +907,7 @@ fn is_error2(high: i64, low: i64, opts: &TadpoleOptions) -> bool {
 }
 
 /// `isError(high, low, q)` (errorPath=1, quality-weighted).
-fn is_error3(high: i64, low: i64, q: u8, opts: &TadpoleOptions) -> bool {
+fn is_error3(high: i64, low: i64, q: u8, opts: &RefineOptions) -> bool {
     let em1 = opts.error_mult1 * (1.0 + q as f32 * opts.error_mult_q_factor);
     (low as f32) * em1 < high as f32
         || (low <= opts.error_lower_const as i64
@@ -913,7 +915,7 @@ fn is_error3(high: i64, low: i64, q: u8, opts: &TadpoleOptions) -> bool {
 }
 
 /// `isErrorBidirectional`.
-fn is_error_bidirectional(a: i64, b: i64, qa: u8, qb: u8, opts: &TadpoleOptions) -> bool {
+fn is_error_bidirectional(a: i64, b: i64, qa: u8, qb: u8, opts: &RefineOptions) -> bool {
     if a >= b {
         is_error3(a, b, qb, opts)
     } else {
@@ -928,7 +930,7 @@ fn is_substitution(
     qb: u8,
     counts: &[i64],
     k: usize,
-    opts: &TadpoleOptions,
+    opts: &RefineOptions,
 ) -> bool {
     let cb = ca + 1;
     let a_count = counts[ca];
@@ -957,7 +959,7 @@ fn is_substitution(
     }
 }
 
-fn similar_range(a: i64, loc1: isize, loc2: isize, counts: &[i64], opts: &TadpoleOptions) -> bool {
+fn similar_range(a: i64, loc1: isize, loc2: isize, counts: &[i64], opts: &RefineOptions) -> bool {
     if loc2 < 0 {
         // Java clamps loc2 to -1 and the loop body never runs (empty range).
         return true;
@@ -970,7 +972,7 @@ fn similar_range(a: i64, loc1: isize, loc2: isize, counts: &[i64], opts: &Tadpol
     counts[lo..=hi].iter().all(|&c| is_similar(a, c, opts))
 }
 
-fn error_range(a: i64, loc1: usize, loc2: usize, counts: &[i64], opts: &TadpoleOptions) -> bool {
+fn error_range(a: i64, loc1: usize, loc2: usize, counts: &[i64], opts: &RefineOptions) -> bool {
     let hi = loc2.min(counts.len() - 1);
     if loc1 > hi {
         return true;
@@ -979,7 +981,7 @@ fn error_range(a: i64, loc1: usize, loc2: usize, counts: &[i64], opts: &TadpoleO
 }
 
 /// `countErrors`: count error positions, skipping `k` after each hit.
-fn count_errors(counts: &[i64], quals: Option<&[u8]>, k: usize, opts: &TadpoleOptions) -> usize {
+fn count_errors(counts: &[i64], quals: Option<&[u8]>, k: usize, opts: &RefineOptions) -> usize {
     let mut possible = 0usize;
     let mut i = 1usize;
     while i < counts.len() {
@@ -999,7 +1001,7 @@ fn count_errors(counts: &[i64], quals: Option<&[u8]>, k: usize, opts: &TadpoleOp
 }
 
 /// `hasErrorsFast`: sampled k-mer depth screen for likely errors.
-fn has_errors_fast(kmers: &[Option<Kmer>], table: &TadpoleTable, opts: &TadpoleOptions) -> bool {
+fn has_errors_fast(kmers: &[Option<Kmer>], table: &RefineTable, opts: &RefineOptions) -> bool {
     if kmers.is_empty() {
         return false;
     }
@@ -1033,7 +1035,7 @@ fn has_errors_fast(kmers: &[Option<Kmer>], table: &TadpoleTable, opts: &TadpoleO
 }
 
 /// `isJunction(max, second)` with branch-resolution thresholds.
-pub(crate) fn is_junction(max: u32, second: u32, opts: &TadpoleOptions) -> bool {
+pub(crate) fn is_junction(max: u32, second: u32, opts: &RefineOptions) -> bool {
     if second < 1
         || (second as f32) * opts.branch_mult1 < max as f32
         || (second <= opts.branch_lower_const as u32
@@ -1050,8 +1052,8 @@ pub(crate) fn is_junction(max: u32, second: u32, opts: &TadpoleOptions) -> bool 
 #[allow(clippy::too_many_arguments)]
 fn extend_to_right2(
     bases: &mut Vec<u8>,
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     distance: usize,
     include_junction_base: bool,
     use_left: bool,
@@ -1212,7 +1214,7 @@ pub(crate) fn second_highest_position(a: &[u32; 4]) -> usize {
 }
 
 /// `isJunk`: read cannot be used for assembly.
-pub fn is_junk(bases: &[u8], table: &TadpoleTable, opts: &TadpoleOptions, paired: bool) -> bool {
+pub fn is_junk(bases: &[u8], table: &RefineTable, opts: &RefineOptions, paired: bool) -> bool {
     let k = opts.k;
     let blen = bases.len();
     if blen < k {
@@ -1271,8 +1273,8 @@ pub fn is_junk(bases: &[u8], table: &TadpoleTable, opts: &TadpoleOptions, paired
 /// `hasKmersAtOrBelow`: does the read have enough low-depth k-mers to toss?
 pub fn has_kmers_at_or_below(
     bases: &[u8],
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     too_low: u32,
     fraction: f32,
 ) -> bool {
@@ -1320,8 +1322,8 @@ pub fn expected_errors(quals: &[u8]) -> f32 {
 pub fn error_correct(
     bases: &mut Vec<u8>,
     quals: &mut Vec<u8>,
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     tracker: &mut ErrorTracker,
 ) -> usize {
     tracker.suspected = 0;
@@ -1400,8 +1402,8 @@ pub fn error_correct(
 fn reassemble(
     bases: &mut [u8],
     quals: &mut [u8],
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     counts: &mut Vec<i64>,
     tracker: &mut ErrorTracker,
     error_extension: usize,
@@ -1437,8 +1439,8 @@ fn reassemble(
 fn reassemble_pass(
     bases: &mut [u8],
     quals: &mut [u8],
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     counts: &mut Vec<i64>,
     tracker: &mut ErrorTracker,
     error_extension: usize,
@@ -1568,8 +1570,8 @@ fn reassemble_pass(
 fn reassemble_inner(
     bases: &mut [u8],
     quals: &[u8],
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     counts: &mut [i64],
     error_extension: usize,
 ) -> usize {
@@ -1633,7 +1635,7 @@ fn reassemble_inner(
 }
 
 /// `clearWindow2`: sliding-window quality filter over correction candidates.
-fn clear_window2(bb: &mut [u8], quals: &[u8], opts: &TadpoleOptions) -> usize {
+fn clear_window2(bb: &mut [u8], quals: &[u8], opts: &RefineOptions) -> usize {
     let len = bb.len();
     let window = opts.window_len as isize;
     let mut cleared = 0usize;
@@ -1671,8 +1673,8 @@ fn clear_window2(bb: &mut [u8], quals: &[u8], opts: &TadpoleOptions) -> usize {
 pub fn extend_read(
     bases: &mut Vec<u8>,
     quals: &mut Vec<u8>,
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     numeric_id: u64,
 ) -> usize {
     let mut extension_right = 0usize;
@@ -1728,8 +1730,8 @@ pub fn extend_read(
 pub fn extend_read_right(
     bases: &mut Vec<u8>,
     quals: &mut Vec<u8>,
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     distance: usize,
 ) -> usize {
     // BBMerge `extendRead` calls `extendToRight2(..., false)` (no junction
@@ -1749,8 +1751,8 @@ pub fn extend_read_right(
 fn extend_read_one_side(
     bases: &mut Vec<u8>,
     quals: &mut Vec<u8>,
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
     distance: usize,
 ) -> usize {
     let initial = bases.len();
@@ -1769,7 +1771,7 @@ fn extend_read_one_side(
 
 /// Per-read processing outcome counters (subset of tadpole.sh stats).
 #[derive(Debug, Default, Clone)]
-pub struct TadpoleStats {
+pub struct RefineStats {
     pub reads_in: u64,
     pub bases_in: u64,
     pub bases_extended: u64,
@@ -1789,9 +1791,9 @@ pub struct TadpoleStats {
 pub fn process_read(
     bases: &mut Vec<u8>,
     quals: &mut Vec<u8>,
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
-    stats: &mut TadpoleStats,
+    table: &RefineTable,
+    opts: &RefineOptions,
+    stats: &mut RefineStats,
     numeric_id: u64,
     mate: Option<usize>,
     discard_mate: &mut bool,
@@ -1857,8 +1859,8 @@ pub fn process_read(
 fn count_errors_from(
     bases: &[u8],
     quals: &[u8],
-    table: &TadpoleTable,
-    opts: &TadpoleOptions,
+    table: &RefineTable,
+    opts: &RefineOptions,
 ) -> usize {
     let kmers = fill_kmers(bases, opts.k);
     let counts = fill_counts(&kmers, table);
@@ -1879,11 +1881,7 @@ fn canonicalize_quality(rec: &mut SeqRecord) {
 
 /// Runs the tadpole correct/extend/discard pipeline over FASTQ input
 /// (1 interleaved file or 2 paired files), mirroring `tadpole.sh`.
-pub fn run<W: Write>(
-    infiles: &[String],
-    out: &mut W,
-    opts: &TadpoleOptions,
-) -> Result<TadpoleStats> {
+pub fn run<W: Write>(infiles: &[String], out: &mut W, opts: &RefineOptions) -> Result<RefineStats> {
     anyhow::ensure!(
         opts.k >= 1,
         "k-mer length must be at least 1, got {}",
@@ -1934,10 +1932,10 @@ pub fn run<W: Write>(
             )
         })
         .collect();
-    let table = TadpoleTable::build(&reads, opts.k, opts.min_prob);
+    let table = RefineTable::build(&reads, opts.k, opts.min_prob);
 
     // Pass 3: process pairs and write surviving reads.
-    let mut stats = TadpoleStats {
+    let mut stats = RefineStats {
         reads_in: records.len() as u64,
         ..Default::default()
     };
@@ -2119,7 +2117,7 @@ fn kmer_to_u128(k: &Kmer, kmer_len: usize) -> u128 {
 #[test]
 fn counting_matches_simple_expected() {
     let reads = vec![(b"ACGTACGT".to_vec(), vec![40; 8])];
-    let table = TadpoleTable::build(&reads, 4, 0.5);
+    let table = RefineTable::build(&reads, 4, 0.5);
     // 5 windows -> canonical keys ACGT(x2), CGTA(x2), GTAC(x1).
     assert_eq!(table.table.counts.iter().sum::<u32>(), 5);
     assert_eq!(table.table.keys.len(), 3); // 3 distinct packed keys (k=4 -> 1 B each)
@@ -2132,8 +2130,8 @@ fn counting_matches_simple_expected() {
 
 #[test]
 fn junk_detects_short_read() {
-    let opts = TadpoleOptions::default();
-    let table = TadpoleTable::build(&[], opts.k, opts.min_prob);
+    let opts = RefineOptions::default();
+    let table = RefineTable::build(&[], opts.k, opts.min_prob);
     assert!(is_junk(b"ACGT".as_ref(), &table, &opts, false));
 }
 
@@ -2151,12 +2149,12 @@ fn read36_left_extension_matches_golden() {
         reads.push((seq, quals));
     }
     let k = 62usize;
-    let table = TadpoleTable::build(&reads, k, 0.5);
-    let opts = TadpoleOptions {
+    let table = RefineTable::build(&reads, k, 0.5);
+    let opts = RefineOptions {
         k,
         extend_left: 20,
         extend_right: 20,
-        ..TadpoleOptions::default()
+        ..RefineOptions::default()
     };
     let r36 = &reads[35].0;
     let mut bases = r36.clone();
@@ -2188,7 +2186,7 @@ fn k81_table_counts_match_bruteforce() {
         reads.push((seq, quals));
     }
     let k = 81usize;
-    let table = TadpoleTable::build(&reads, k, 0.5);
+    let table = RefineTable::build(&reads, k, 0.5);
     // Probe: the last 81 bases of the first read.
     let seq = &reads[0].0;
     let mut probe = Kmer::new(k);
@@ -2236,7 +2234,7 @@ fn seed_kmer_count_symmetric() {
     let seq = b"AGAGATTCTTGGCGGAGAAACCATAATTGCATCTACTCGTCGCGAACCGCTTTCATCCGGCACAGTATCAAGGTATTTTATGCGCGCACGAAAAGCATC".to_vec();
     let quals = vec![40; seq.len()];
     let k = 62usize;
-    let table = TadpoleTable::build(&[(seq.clone(), quals.clone())], k, 0.5);
+    let table = RefineTable::build(&[(seq.clone(), quals.clone())], k, 0.5);
     let rc: Vec<u8> = rev_comp(&seq).collect();
     for (label, s) in [("forward", &seq), ("rc", &rc)] {
         let mut kmer = Kmer::new(k);

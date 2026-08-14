@@ -4,7 +4,7 @@
 > 审计记录（而非 pgr 侧）。
 
 对 `anchr asm` 全部 7 个子命令（contig/unitig/ovlp/layout/cns/olc/map）及相关库
-文件（`libs/asm/assemble.rs`、`libs/asm/tadpole.rs`、`libs/olc/overlap.rs`、
+文件（`libs/asm/assemble.rs`、`libs/asm/refine.rs`、`libs/olc/overlap.rs`、
 `libs/olc/layout.rs`、`libs/olc/consensus.rs`、`libs/map.rs`，以及
 `cmd/asm/common.rs`）和全部测试/文档进行审核。以下仅保留有借鉴意义的结论；
 逐轮验证过程已精简（第一轮发现并修复 5 类问题，第二、三轮复核未再发现新问题，
@@ -15,8 +15,8 @@
 
 | 子命令 | 命令文件 | 主要库 |
 | ------ | -------- | ------ |
-| contig | `src/cmd/asm/contig.rs` | `libs/asm/assemble.rs`, `libs/asm/tadpole.rs` |
-| unitig | `src/cmd/asm/unitig.rs` | `libs/asm/assemble.rs`, `libs/asm/tadpole.rs` |
+| contig | `src/cmd/asm/contig.rs` | `libs/asm/assemble.rs`, `libs/asm/refine.rs` |
+| unitig | `src/cmd/asm/unitig.rs` | `libs/asm/assemble.rs`, `libs/asm/refine.rs` |
 | ovlp   | `src/cmd/asm/ovlp.rs`   | `libs/olc/overlap.rs` |
 | layout | `src/cmd/asm/layout.rs` | `libs/olc/layout.rs` |
 | cns    | `src/cmd/asm/cns.rs`    | `libs/olc/consensus.rs` |

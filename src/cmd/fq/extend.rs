@@ -1,4 +1,4 @@
-use crate::libs::asm::tadpole::{run, TadpoleOptions};
+use crate::libs::asm::refine::{run, RefineOptions};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
 use std::io::Write;
@@ -91,7 +91,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         .cloned()
         .collect();
     let outfile = crate::cmd::args::get_outfile(args);
-    let mut opts = TadpoleOptions {
+    let mut opts = RefineOptions {
         k: *args.get_one::<usize>("kmer").unwrap(),
         extend_left: args.get_one::<usize>("el").copied().unwrap_or(100),
         extend_right: args.get_one::<usize>("er").copied().unwrap_or(100),
