@@ -26,7 +26,9 @@ log_info "merge anchors with anchr asm olc --unitigs"
 mkdir -p ${DIR_MERGE}
 
 # reversely sorted files, so that Q30L60X80 will be first
-find . -path "*${DIR_PREFIX}*" -name "anchor.fasta" | sort -r \
+find . -path "*${DIR_PREFIX}*" \
+    \( -name "anchor.fasta" -o -name "anchor.merge.fasta" \) |
+    sort -r \
     > ${DIR_MERGE}/anchors.list
 
 anchr asm olc --unitigs --list-files ${DIR_MERGE}/anchors.list \

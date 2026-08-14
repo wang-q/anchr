@@ -21,12 +21,8 @@ for PREFIX in R S T; do
         ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
         -o ${PREFIX}.tadpole.contig.fasta
 
-    cat ${PREFIX}.tadpole.contig.fasta |
-        anchr dazzname --no-replace --prefix T stdin \
-        > ${PREFIX}.tadpole.contig.fa
-
     anchr asm map \
-        ${PREFIX}.tadpole.contig.fa \
+        ${PREFIX}.tadpole.contig.fasta \
         ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
         --paired \
         --max-reads {{ opt.reads }} \

@@ -390,7 +390,7 @@ fn command_asm_unitig_links_no_dangling() {
     let ids: std::collections::HashSet<String> = recs
         .iter()
         .map(|(h, _)| {
-            h.split(',')
+            h.split_whitespace()
                 .next()
                 .unwrap()
                 .trim_start_matches("unitig_")

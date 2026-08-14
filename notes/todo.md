@@ -12,6 +12,17 @@
 - ~~`dep`/`ena`/`template` 的外部工具版本核对~~（2026-08-15 完成：
   `check_dep.sh` 已更新现代依赖清单；`ena` 已 Rust 化（`ena meta`/
   `ena manifest`，ureq 客户端）；`template` 无外部工具依赖）。
+- ~~`anchr contained` 命令删除~~（2026-08-15 完成：`src/cmd/contained.rs`
+  与 `src/libs/overlap.rs` 一并删除；8_* 模板直接用 `contigs.fasta`/
+  `final.contigs.fa` 产出 anchors，`9_quast`/`9_busco`/`9_stat_final`
+  同步去掉 non-contained 引用；G37 全流程验证通过）。
+- ~~G37 全流程端到端验证 + `results/model_org.md`~~（2026-08-15 完成：
+  现代模板链（multik → anchor → olc --unitigs）在 G37 全量数据跑通，
+  文档已生成；过程中修掉：2_quorum 对 Q0L0 未压缩 `.fq` 的兼容、
+  4/6_anchors 的 reads 路径、8_spades repair 模式（fint→rp）、
+  8_megahit 奇数交错 reads（`--12` 需偶数）、7_merge_anchors 第三次
+  合并的 find 遗漏 `anchor.merge.fasta`、`asm anchor` 新增 `--stats`
+  输出（Mapped/median/MAD/lower/upper/SumOthers，替代旧 env.json 统计）。
 
 ## 挂账 / 待决
 
@@ -37,8 +48,8 @@
   覆盖证据）；
 - `asm olc` 参数验证：overlap 少量错配、不同 k unitig 冗余去重、repeat
   breaking 覆盖度阈值（`references/canu.md` §8）；
-- 大规模真实数据全链：`fq → asm → map → template` 统计核对（覆盖量/
-  unitig 数/PSL 行数）；
+- ~~大规模真实数据全链~~（2026-08-15 G37 全量：`fq → asm → template`
+  跑通，结果见 `results/model_org.md`；统计核对完成）；
 - gz/大输入回归：默认 supermer 路径全链回归 + 峰值内存；
 - 560 bp 碎片 mis 覆盖度门槛（`asm-olc.md` §14.3，`--min-contig-len 1000`
   可滤，可选）。
@@ -48,10 +59,9 @@
 - ~~`scripts/verify-migrate.sh` 的 `asm_olc` 用例加速~~（2026-08-15 评估：
   输入已是 `R1.2k`（2k reads 缩小版），约 6 s 是双 k OLC 合理开销；脚本
   已历史化（仅旧 pgr 二进制可用），加速价值低，不做）。
-- warning 清理（2026-08-15 部分完成）：`tadpole` 的
-  `error_extension_pincer/tail` 未读字段已删；`Overlap` 的 dead_code 是
-  bin/lib 双份 `libs`（cmd 混用 `crate::libs` 与 `anchr::`）的结构问题，
-  非字段级清理，保留 `#[allow(dead_code)]`，待统一引用重构时一并解决。
+- warning 清理（2026-08-15 完成）：`tadpole` 的
+  `error_extension_pincer/tail` 未读字段已删；`Overlap` 的 dead_code 已
+  随 `contained` 命令删除（`src/libs/overlap.rs` 移除）一并解决。
 
 ## 技术债
 

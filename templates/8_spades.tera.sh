@@ -15,7 +15,7 @@ DIR_READS=${1:-"2_illumina/trim"}
 # Convert to abs path
 DIR_READS="$(cd "$(dirname "$DIR_READS")"; pwd)/$(basename "$DIR_READS")"
 
-if [ -e 8_spades/anchor.fasta ]; then
+if [ -s 8_spades/anchor.fasta ]; then
     log_info "8_spades/anchor.fasta presents"
     exit;
 fi
@@ -28,10 +28,14 @@ if [ -e 8_spades/contigs.fasta ]; then
 else
     log_info "Run spades"
 
+    rm -fr 8_spades
     mkdir -p 8_spades
     cd 8_spades
 
     mkdir -p re-pair
+    # pe.cor.fa.gz is fully shuffled by 2_quorum (tsv-sample), so use the
+    # name-indexed "repair" (rp) mode; "fint" only fixes partially-broken
+    # interleaving and cannot pair fully shuffled reads.
     pgr fa filter --min-len 60 ${DIR_READS}/pe.cor.fa.gz |
         repair.sh \
             in=stdin.fa \
@@ -39,7 +43,7 @@ else
             out2=re-pair/R2.fa \
             outs=re-pair/Rs.fa \
             threads={{ opt.parallel }} \
-            fint overwrite
+            repair overwrite
 
     # spades seems ignore non-properly paired reads
     spades.py \
@@ -48,6 +52,7 @@ else
         -k 21,33,55,77 \
         -1 re-pair/R1.fa \
         -2 re-pair/R2.fa \
+        -s re-pair/Rs.fa \
         -o .
 
     log_info "Clear intermediate files"

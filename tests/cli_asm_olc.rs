@@ -438,7 +438,7 @@ fn command_asm_cns_stitches_layout() {
         .assert()
         .success();
     let data = fs::read_to_string(&out).unwrap();
-    assert!(data.starts_with(">contig_1,len=32,cov=1.5\n"));
+    assert!(data.starts_with(">contig_1 len=32,cov=1.5\n"));
     assert!(data.contains("AAAAAAAAACGTACGTCCCCCCCCGGGGGGGG"));
 }
 

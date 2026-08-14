@@ -19,8 +19,8 @@ assembly steps of the anchr `2_insert_size` and `unitigs` flows.
 Notes:
 * Input is one or more FASTA/FASTQ files (plain or gzipped); pairing is
   irrelevant for assembly, and `--list-files` reads a one-path-per-line list
-* Contigs are written longest-first with a `contig_<id>` FASTA header carrying
-  length, coverage, GC, and dimer composition fields (BBTools SHORT_NAMES)
+* Contigs are written longest-first with a `contig_<id>` FASTA header and the
+  length/coverage/GC/dimer fields as the header comment
 * Processing is ordered and deterministic (equivalent to `threads=1`)
 * Bubble-popping resolutions may differ slightly from BBTools on some
   overlapping structures (its expand order depends on a memory-dependent

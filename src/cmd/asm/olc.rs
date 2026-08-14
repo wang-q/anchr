@@ -39,7 +39,7 @@ Notes:
   debugging and inspection; the names there omit the `stem:` prefix that
   the standalone ovlp/layout/cns commands derive, so they are not directly
   re-runnable through those commands as-is
-* Output contigs are written longest-first with `>contig_<id>,len=...,cov=...`
+* Output contigs are written longest-first with `>contig_<id> len=...,cov=...`
   headers, 70-column wrapped
 
 Examples:
@@ -203,7 +203,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     for (i, c) in contigs.iter().enumerate() {
         writeln!(
             out,
-            ">contig_{},len={},cov={}",
+            ">contig_{} len={},cov={}",
             i + 1,
             c.seq.len(),
             super::common::format_cov(c.coverage)

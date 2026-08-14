@@ -133,7 +133,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     for (i, u) in unitigs.iter().enumerate() {
         writeln!(
             out,
-            ">unitig_{},len={},cov={}",
+            ">unitig_{} len={},cov={}",
             i + 1,
             u.bases.len(),
             super::common::format_cov(u.coverage as f64)

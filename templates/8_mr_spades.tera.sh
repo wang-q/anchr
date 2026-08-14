@@ -10,7 +10,7 @@ log_warn 8_mr_spades.sh
 #----------------------------#
 USAGE="Usage: $0"
 
-if [ -e 8_mr_spades/anchor.fasta ]; then
+if [ -s 8_mr_spades/anchor.fasta ]; then
     log_info "8_mr_spades/anchor.fasta presents"
     exit;
 fi

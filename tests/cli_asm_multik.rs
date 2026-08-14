@@ -5,19 +5,20 @@ mod common;
 use common::AnchrCmd;
 use std::fs;
 
-/// Parses `unitig_<id>,len=...,cov=...` headers into (id, len, cov).
+/// Parses `unitig_<id> len=...,cov=...` headers into (id, len, cov).
 fn parse_unitigs(data: &str) -> Vec<(usize, usize, f32)> {
     data.lines()
         .filter(|l| l.starts_with('>'))
         .map(|l| {
             let head = l.trim_start_matches('>');
-            let mut fields = head.split(',');
-            let id: usize = fields
+            let mut parts = head.split_whitespace();
+            let id: usize = parts
                 .next()
                 .unwrap()
                 .trim_start_matches("unitig_")
                 .parse()
                 .unwrap();
+            let mut fields = parts.next().unwrap().split(',');
             let len: usize = fields
                 .next()
                 .unwrap()

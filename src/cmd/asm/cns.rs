@@ -22,7 +22,7 @@ The unitig FASTA files must be the same files passed to `anchr asm ovlp` and
 `anchr asm layout` (the `stem:name` prefixes are re-derived here and must
 match). The layout TSV is the first positional argument.
 
-Output is FASTA (`>contig_<id>,len=...,cov=...`, 70-column wrap, longest
+Output is FASTA (`>contig_<id> len=...,cov=...`, 70-column wrap, longest
 first). `cov` is the approximate unitig depth (sum of unitig lengths over
 the contig length).
 
@@ -100,7 +100,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     for (i, c) in contigs.iter().enumerate() {
         writeln!(
             out,
-            ">contig_{},len={},cov={}",
+            ">contig_{} len={},cov={}",
             i + 1,
             c.seq.len(),
             super::common::format_cov(c.coverage)

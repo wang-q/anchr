@@ -84,7 +84,7 @@ match app.get_matches().subcommand() {
 | :--- | :--- | :--- |
 | Dependence | `dep check/install` | 依赖检查 |
 | Download | `ena meta/manifest` | ENA 元数据抓取（JSON）/ 下载清单（tsv/ftp/md5/ascp） |
-| Overlaps | `contained`/`dazzname` | 包含去冗余 / 重命名（8_*/2_insert_size 用） |
+| Overlaps | — | 已全部废弃：`contained`/`dazzname` 于 2026-08-15 删除（现代 OLC 用 `asm ovlp/layout/cns`） |
 | Assembling | `trim`/`quorum`/`mergeread`/`template` | 流程原语与模板编排 |
 
 ### 3.2 `fq` 命令组（15 个，随迁自 pgr）
@@ -170,9 +170,9 @@ match app.get_matches().subcommand() {
 
 ### 5.4 流程命令约定
 
-`contained`/`dazzname` 为自实现 overlap 工具（无外部依赖）；dazzler
-流水线（overlap/orient/merge 及外部 LAshow/daligner）已废弃
-（2026-08-15，现代 OLC 用 `asm ovlp/layout/cns`）。
+自实现 overlap 工具（`contained`/`dazzname`）已全部删除（2026-08-15）；
+dazzler 流水线（overlap/orient/merge 及外部 LAshow/daligner）也已废弃，
+现代 OLC 用 `asm ovlp/layout/cns`。
 
 ## 6. 项目现状评估
 
@@ -263,8 +263,9 @@ match app.get_matches().subcommand() {
 - **BBTools 替换链**：`fq clump/split/sample/clean/filter/merge/ec-*/norm`
   对照 39.38 golden；文档：`notes/design/fq-trim-replace.md`、
   `notes/design/fq-merge-replace.md`、`notes/references/bbtools.md`；
-- **Overlap 工具**：`contained`/`dazzname`（8_*/2_insert_size）；`covered`
-  命令已废弃（pgr runlist 替代）；基准 `benches/covered_benchmark.rs`。
+- **Overlap 工具**：`contained`/`dazzname` 已删除（2026-08-15，见
+  `notes/design/asm-olc-modern-flow.md`）；`covered` 命令已废弃（pgr
+  runlist 替代）；基准 `benches/covered_benchmark.rs`。
 
 ## 10. 设计笔记索引（notes/design/）
 

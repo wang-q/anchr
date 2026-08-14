@@ -830,7 +830,7 @@ fn write_unitig<W: Write>(w: &mut W, u: &Unitig, links: Option<&[Link]>) -> Resu
     let (gc, hh, caga) = calc_scalars(&u.bases);
     write!(
         w,
-        ">unitig_{},len={},cov={},gc={},min={},max={},hh={},caga={}",
+        ">unitig_{} len={},cov={},gc={},min={},max={},hh={},caga={}",
         u.id,
         u.bases.len(),
         fmt_fixed(u.coverage as f64, 1),
@@ -1300,12 +1300,12 @@ fn contig_cmp(a: &Contig, b: &Contig) -> std::cmp::Ordering {
     a.id.cmp(&b.id).reverse()
 }
 
-/// Writes one contig in FASTA (SHORT_NAMES header, 70-column wrap).
+/// Writes one contig in FASTA (attributes as header comment, 70-column wrap).
 fn write_contig<W: Write>(w: &mut W, c: &Contig) -> Result<()> {
     let (gc, hh, caga) = calc_scalars(&c.bases);
     writeln!(
         w,
-        ">contig_{},len={},cov={},gc={},min={},max={},hh={},caga={}",
+        ">contig_{} len={},cov={},gc={},min={},max={},hh={},caga={}",
         c.id,
         c.bases.len(),
         fmt_fixed(c.coverage as f64, 1),
