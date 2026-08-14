@@ -17,34 +17,27 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    tadpole.sh \
-        in=../${PREFIX}1.fq.gz \
-        in2=../${PREFIX}2.fq.gz \
-        out=${PREFIX}.tadpole.contig.fasta \
-        threads={{ opt.parallel }} \
-        overwrite {% if opt.prefilter != "0" %}prefilter={{ opt.prefilter }}{% endif %}
+    anchr asm contig \
+        ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
+        -o ${PREFIX}.tadpole.contig.fasta
 
     cat ${PREFIX}.tadpole.contig.fasta |
         anchr dazzname --no-replace --prefix T stdin \
         > ${PREFIX}.tadpole.contig.fa
 
-    bbmap.sh \
-        in=../${PREFIX}1.fq.gz \
-        in2=../${PREFIX}2.fq.gz \
-        out=${PREFIX}.tadpole.sam.gz \
-        ref=${PREFIX}.tadpole.contig.fa \
-        threads={{ opt.parallel }} \
-        pairedonly \
-        reads={{ opt.reads }} \
-        nodisk overwrite
+    anchr asm map \
+        ${PREFIX}.tadpole.contig.fa \
+        ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
+        --paired \
+        --max-reads {{ opt.reads }} \
+        --outm ${PREFIX}.tadpole.sam
 
-    reformat.sh \
-        in=${PREFIX}.tadpole.sam.gz \
-        ihist=${PREFIX}.ihist.tadpole.txt \
-        overwrite
+    anchr sam ihist \
+        ${PREFIX}.tadpole.sam \
+        -o ${PREFIX}.ihist.tadpole.txt
 
     picard SortSam \
-        -I ${PREFIX}.tadpole.sam.gz \
+        -I ${PREFIX}.tadpole.sam \
         -O ${PREFIX}.tadpole.sort.bam \
         --SORT_ORDER coordinate \
         --VALIDATION_STRINGENCY LENIENT
@@ -55,23 +48,19 @@ for PREFIX in R S T; do
         --Histogram_FILE ${PREFIX}.insert_size.tadpole.pdf
 
     if [ -e ../../1_genome/genome.fa ]; then
-        bbmap.sh \
-            in=../${PREFIX}1.fq.gz \
-            in2=../${PREFIX}2.fq.gz \
-            out=${PREFIX}.genome.sam.gz \
-            ref=../../1_genome/genome.fa \
-            threads={{ opt.parallel }} \
-            maxindel=0 strictmaxindel \
-            reads={{ opt.reads }} \
-            nodisk overwrite
+        anchr asm map \
+            ../../1_genome/genome.fa \
+            ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
+            --paired \
+            --max-reads {{ opt.reads }} \
+            --outm ${PREFIX}.genome.sam
 
-        reformat.sh \
-            in=${PREFIX}.genome.sam.gz \
-            ihist=${PREFIX}.ihist.genome.txt \
-            overwrite
+        anchr sam ihist \
+            ${PREFIX}.genome.sam \
+            -o ${PREFIX}.ihist.genome.txt
 
         picard SortSam \
-            -I ${PREFIX}.genome.sam.gz \
+            -I ${PREFIX}.genome.sam \
             -O ${PREFIX}.genome.sort.bam \
             --SORT_ORDER coordinate
 
@@ -81,7 +70,7 @@ for PREFIX in R S T; do
             --Histogram_FILE ${PREFIX}.insert_size.genome.pdf
     fi
 
-    find . -name "${PREFIX}.*.sam.gz" -or -name "${PREFIX}.*.sort.bam" |
+    find . -name "${PREFIX}.*.sam" -or -name "${PREFIX}.*.sort.bam" |
         parallel --no-run-if-empty -j 1 rm
 done
 

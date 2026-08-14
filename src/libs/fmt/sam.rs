@@ -157,7 +157,7 @@ pub fn ihist<R: BufRead, W: Write>(reader: R, writer: &mut W) -> Result<()> {
     writeln!(
         writer,
         "#PercentOfPairs\t{:.3}",
-        n as f64 / total_pairs.max(1) as f64
+        n as f64 * 100.0 / total_pairs.max(1) as f64
     )?;
     writeln!(writer, "#InsertSize\tCount")?;
     let mut i = 0usize;

@@ -102,7 +102,7 @@ fn command_sam_ihist_basic() {
         .run();
     assert_eq!(
         stdout,
-        "#Mean\t70.000\n#Median\t70\n#Mode\t70\n#STDev\t0.000\n#PercentOfPairs\t1.000\n#InsertSize\tCount\n70\t2\n"
+        "#Mean\t70.000\n#Median\t70\n#Mode\t70\n#STDev\t0.000\n#PercentOfPairs\t100.000\n#InsertSize\tCount\n70\t2\n"
     );
 }
 
@@ -124,7 +124,7 @@ fn command_sam_ihist_name_normalization() {
         .args(&["sam", "ihist", sam.to_str().unwrap()])
         .run();
     assert!(
-        stdout.contains("#PercentOfPairs\t1.000"),
+        stdout.contains("#PercentOfPairs\t100.000"),
         "stdout: {stdout}"
     );
     assert!(stdout.contains("70\t1"), "stdout: {stdout}");

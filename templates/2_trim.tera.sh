@@ -13,8 +13,8 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    if [ -e ${PREFIX}1.fq.gz ]; then
-        log_debug "2_illumina/trim/${PREFIX}1.fq.gz presents"
+    if [ -e ${PREFIX}1.fq ]; then
+        log_debug "2_illumina/trim/${PREFIX}1.fq presents"
         continue;
     fi
 
@@ -45,18 +45,18 @@ for PREFIX in R S T; do
     fi
 
     for NAME in clumpify filteredbytile highpass sample trim filter ${PREFIX}1 ${PREFIX}2 ${PREFIX}s; do
-        if [ ! -e ${NAME}.fq.gz ]; then
+        if [ ! -e ${NAME}.fq ]; then
             continue;
         fi
 
         printf "%s\t%s\t%s\t%s\n" \
-            $(echo ${NAME}; stat_format_fq ${NAME}.fq.gz;) >> statTrimReads.tsv
+            $(echo ${NAME}; stat_format_fq ${NAME}.fq;) >> statTrimReads.tsv
     done
 
-    log_info "clear unneeded .fq.gz files"
+    log_info "clear unneeded .fq files"
     for NAME in temp clumpify filteredbytile highpass sample trim filter; do
-        if [ -e ${NAME}.fq.gz ]; then
-            rm ${NAME}.fq.gz
+        if [ -e ${NAME}.fq ]; then
+            rm ${NAME}.fq
         fi
     done
 done

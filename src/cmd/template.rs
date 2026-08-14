@@ -34,7 +34,6 @@ pub fn make_subcommand() -> Command {
     * --filter "adapter"
 
 * Post-trimming
-    * --quorum
     * --merge
     * --prefilter
     * --ecphase "1 2 3"
@@ -165,13 +164,6 @@ pub fn make_subcommand() -> Command {
                 .help("Adapter, artifact, or both")
                 .num_args(1)
                 .default_value("adapter"),
-        )
-        // Post-trimming
-        .arg(
-            Arg::new("quorum")
-                .long("quorum")
-                .action(ArgAction::SetTrue)
-                .help("Run quorum"),
         )
         .arg(
             Arg::new("merge")
@@ -446,11 +438,9 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         gen_gatk(&context)?;
     }
 
-    if args.get_flag("quorum") {
-        gen_quorum(&context)?;
-    } else {
-        gen_no_quorum(&context)?;
-    }
+    // s-filter replaced the external quorum (no_quorum fallback removed);
+    // the filter step always runs.
+    gen_quorum(&context)?;
     gen_down_sampling(&context)?;
 
     let unitiggers = args
@@ -618,23 +608,6 @@ fn gen_quorum(context: &Context) -> anyhow::Result<()> {
     tera.add_raw_templates(vec![
         ("header", include_str!("../../templates/header.tera.sh")),
         ("t", include_str!("../../templates/2_quorum.tera.sh")),
-    ])
-    .unwrap();
-
-    let rendered = tera.render("t", context).unwrap();
-    anchr::utils::write_lines(outname, &[rendered.as_str()])?;
-
-    Ok(())
-}
-
-fn gen_no_quorum(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_script/2_quorum.sh";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    tera.add_raw_templates(vec![
-        ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/2_no_quorum.tera.sh")),
     ])
     .unwrap();
 

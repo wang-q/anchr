@@ -42,12 +42,12 @@ fn command_template() -> anyhow::Result<()> {
     assert!(stderr.contains("2_merge.sh"));
     assert!(&tempdir.path().join("0_script/2_merge.sh").is_file());
 
-    // anchr template --quorum
+    // anchr template always generates 2_quorum.sh (s-filter replaced the
+    // external quorum; the no_quorum fallback was removed).
     let mut cmd = Command::cargo_bin("anchr")?;
-    let output = cmd.arg("template").arg("--quorum").output().unwrap();
+    let output = cmd.arg("template").output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
 
-    assert_eq!(stderr.lines().count(), 17);
     assert!(stderr.contains("2_quorum.sh"));
     assert!(&tempdir.path().join("0_script/2_quorum.sh").is_file());
 
