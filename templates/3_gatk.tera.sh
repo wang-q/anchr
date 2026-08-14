@@ -26,7 +26,7 @@ cd 3_gatk
 #----------------------------#
 #https://github.com/gatk-workflows/gatk4-mitochondria-pipeline/blob/master/tasks/align-and-call.wdl
 if [ ! -e R.raw.vcf ]; then
-    gatk --java-options "-Xmx{{ opt.xmx }}" \
+    gatk \
         Mutect2 \
         --native-pair-hmm-threads {{ parallel2 }} \
         -R ../3_bwa/genome.fa \
@@ -42,7 +42,7 @@ fi
 # Filter
 #----------------------------#
 if [ ! -e R.filtered.vcf ]; then
-    gatk --java-options "-Xmx{{ opt.xmx }}" \
+    gatk \
         FilterMutectCalls \
         -R ../3_bwa/genome.fa \
         -V R.raw.vcf \

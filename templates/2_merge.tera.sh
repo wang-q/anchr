@@ -39,11 +39,7 @@ for PREFIX in R S T; do
 
     anchr mergeread \
         ../trim/${PREFIX}1.fq.gz ../trim/${PREFIX}2.fq.gz ../trim/${PREFIX}s.fq.gz \
-{% if opt.prefilter != "0" -%}
-        --prefilter {{ opt.prefilter }} \
-{% endif -%}
-        --ecphase "{{ opt.ecphase }}" \
-        --parallel {{ opt.parallel }}{% if opt.xmx != "0" %} --xmx {{ opt.xmx }}{% endif %} \
+        --parallel {{ opt.parallel }} \
         --prefixm ${PREFIXM} \
         --prefixu ${PREFIXU} \
         -o mergeread.sh

@@ -76,7 +76,6 @@ rm 0_script/*
 anchr template \
     --genome 580076 \
     --parallel 8 \
-    --xmx 12g \
     \
     --repetitive \
     \
@@ -90,11 +89,9 @@ anchr template \
     --filter "adapter artifact" \
     \
     --merge \
-    --ecphase "1 2 3" \
     \
     --cov "40 80" \
     --statp 2 \
-    --readl 125 \
     --uscale 2 \
     --lscale 3
 

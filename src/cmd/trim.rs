@@ -113,12 +113,6 @@ Fastq files can be gzipped
                 .num_args(1),
         )
         .arg(
-            Arg::new("xmx")
-                .long("xmx")
-                .help("Set Java memory usage")
-                .num_args(1),
-        )
-        .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
@@ -176,15 +170,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         "sample",
         if args.contains_id("sample") {
             args.get_one::<String>("sample").unwrap()
-        } else {
-            &binding_0
-        },
-    );
-
-    opt.insert(
-        "xmx",
-        if args.contains_id("xmx") {
-            args.get_one::<String>("xmx").unwrap()
         } else {
             &binding_0
         },

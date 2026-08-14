@@ -12,7 +12,6 @@ pub fn make_subcommand() -> Command {
 * Info
     * --genome
     * --se
-    * --xmx
     * --parallel 8
     * --queue mpi
 
@@ -34,8 +33,6 @@ pub fn make_subcommand() -> Command {
 
 * Post-trimming
     * --merge
-    * --prefilter
-    * --ecphase "1 2 3"
 
 * Mapping
     * --bwa
@@ -45,7 +42,6 @@ pub fn make_subcommand() -> Command {
     * --cov "40 80"
     * --splitp 20
     * --statp 2
-    * --readl 100
     * --uscale 2
     * --lscale 3
 
@@ -68,12 +64,6 @@ pub fn make_subcommand() -> Command {
                 .long("se")
                 .action(ArgAction::SetTrue)
                 .help("Single end mode"),
-        )
-        .arg(
-            Arg::new("xmx")
-                .long("xmx")
-                .help("Set Java memory usage")
-                .num_args(1),
         )
         .arg(
             Arg::new("parallel")
@@ -164,19 +154,6 @@ pub fn make_subcommand() -> Command {
                 .action(ArgAction::SetTrue)
                 .help("Run merge reads"),
         )
-        .arg(
-            Arg::new("prefilter")
-                .long("prefilter")
-                .help("Prefilter=N (1 or 2) for tadpole and bbmerge, 1 use less memories")
-                .num_args(1),
-        )
-        .arg(
-            Arg::new("ecphase")
-                .long("ecphase")
-                .help("Error-correct phases. Phase 2 can be skipped")
-                .num_args(1)
-                .default_value("1 2 3"),
-        )
         // Mapping
         .arg(
             Arg::new("bwa")
@@ -211,13 +188,6 @@ pub fn make_subcommand() -> Command {
                 .help("Parts of stats")
                 .num_args(1)
                 .default_value("2"),
-        )
-        .arg(
-            Arg::new("readl")
-                .long("readl")
-                .help("Length of reads")
-                .num_args(1)
-                .default_value("100"),
         )
         .arg(
             Arg::new("uscale")
@@ -268,14 +238,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             &binding_0
         },
     );
-    opt.insert(
-        "xmx",
-        if args.contains_id("xmx") {
-            args.get_one::<String>("xmx").unwrap()
-        } else {
-            &binding_0
-        },
-    );
     opt.insert("parallel", args.get_one::<String>("parallel").unwrap());
     opt.insert(
         "queue",
@@ -309,15 +271,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             &binding_0
         },
     );
-    opt.insert(
-        "prefilter",
-        if args.contains_id("prefilter") {
-            args.get_one::<String>("prefilter").unwrap()
-        } else {
-            "0"
-        },
-    );
-    opt.insert("ecphase", args.get_one::<String>("ecphase").unwrap());
 
     opt.insert(
         "bwa",
@@ -339,7 +292,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     opt.insert("cov", args.get_one::<String>("cov").unwrap());
     opt.insert("splitp", args.get_one::<String>("splitp").unwrap());
     opt.insert("statp", args.get_one::<String>("statp").unwrap());
-    opt.insert("readl", args.get_one::<String>("readl").unwrap());
     opt.insert("uscale", args.get_one::<String>("uscale").unwrap());
     opt.insert("lscale", args.get_one::<String>("lscale").unwrap());
     let mut context = Context::new();

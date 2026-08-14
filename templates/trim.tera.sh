@@ -40,6 +40,7 @@ if [ ! -e highpass.fq ]; then
         --parallel {{ opt.parallel }}
 fi
 rm temp.fq; ln -s highpass.fq temp.fq
+rm -f clumpify.fq
 {% endif -%}
 {# Keep a blank line #}
 {% if opt.sample != "0" -%}
@@ -52,6 +53,7 @@ if [ ! -e sample.fq ]; then
         --bases {{ opt.sample }}
 fi
 rm temp.fq; ln -s sample.fq temp.fq
+rm -f clumpify.fq highpass.fq
 {% endif -%}
 {# Keep a blank line #}
 # Trim 5' adapters and discard reads with Ns
@@ -79,6 +81,7 @@ if [ ! -e trim.fq ]; then
         -o trim.fq
 fi
 rm temp.fq; ln -s trim.fq temp.fq
+rm -f clumpify.fq highpass.fq sample.fq
 
 # Remove synthetic artifacts, spike-ins and 3' adapters by kmer-matching.
 log_info "filter with anchr fq filter"
@@ -92,6 +95,7 @@ if [ ! -e filter.fq ]; then
         -o filter.fq
 fi
 rm temp.fq; ln -s filter.fq temp.fq
+rm -f trim.fq
 
 log_info "kmer histogram and peaks with pgr kmer hist"
 if [ ! -e peaks.final.txt ]; then
@@ -116,6 +120,7 @@ if [ ! -e {{ opt.prefix }}1.trim.fq.gz ]; then
     cp -L temp.fq {{ opt.prefix }}1.fq
 {% endif -%}
 fi
+rm -f filter.fq
 
 #----------------------------#
 # Sickle

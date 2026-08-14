@@ -30,7 +30,7 @@ for PREFIX in R S T; do
         --sample $(( {{ opt.genome }} * {{ opt.sample }} )) \
     {% endif -%}
     {% endif -%}
-        --parallel {{ opt.parallel }}{% if opt.xmx != "0" %} --xmx {{ opt.xmx }}{% endif %} \
+        --parallel {{ opt.parallel }} \
         ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
         --prefix ${PREFIX} \
         -o trim.sh
@@ -44,7 +44,7 @@ for PREFIX in R S T; do
             > statTrimReads.tsv
     fi
 
-    for NAME in clumpify filteredbytile highpass sample trim filter ${PREFIX}1 ${PREFIX}2 ${PREFIX}s; do
+    for NAME in clumpify highpass sample trim filter ${PREFIX}1 ${PREFIX}2 ${PREFIX}s; do
         FQ=${NAME}.fq
         [ -e ${FQ} ] || FQ=${NAME}.fq.gz
         if [ ! -e ${FQ} ]; then
@@ -56,7 +56,7 @@ for PREFIX in R S T; do
     done
 
     log_info "clear unneeded .fq files"
-    for NAME in temp clumpify filteredbytile highpass sample trim filter; do
+    for NAME in temp clumpify highpass sample trim filter; do
         if [ -e ${NAME}.fq ]; then
             rm ${NAME}.fq
         fi

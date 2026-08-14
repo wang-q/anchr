@@ -131,10 +131,11 @@ anchr `merge` 命令生成 `merge.sh`，输入 R1/R2（可选 SE），流程如�
 | 6 | bbduk qtrim | `bbduk.sh qtrim=r trimq=... minlen=...` | 未合并 reads 质量修剪 | `fq clean`（无 ref）✅ |
 | 7 | repair | `repair.sh repair` | 拆分 R1/R2/singles | `fq split --repair` ✅ |
 
-> 步骤 2a/2b/2c 由 `opt.ecphase` 控制（anchr 默认 `"1 2 3"` 全开）；
-> `opt.prefilter` 默认 0（不开，内存够时避免 countmin 两次耗时）。
-> **anchr `template.rs` 的 `--ecphase` 帮助明确 "Phase 2 can be skipped"**，
-> 且用户反馈 phase 2 以前经常卡住（见 §3.3）。
+> 步骤 2a/2b/2c 固定执行 2a（ec-overlap）+ 2c（ec-kmer），phase 2 已删
+> （2026-08-15 移除 `--ecphase` 选项，merge 模板固定两步）；
+> `--prefilter` 选项 2026-08-15 已删（未实现，纯透传占位）；countmin
+> 预过滤在阶段 C 实现时再加回（防大数据内存爆炸）。
+> 用户反馈 phase 2 以前经常卡住（见 §3.3）。
 
 ## 2. 工具对照
 

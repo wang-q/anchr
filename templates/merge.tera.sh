@@ -32,45 +32,32 @@ rm clumpeds.fq
 {% endif -%}
 rm -f temp.fq; ln -s clumped.fq temp.fq
 
-{% set ecphases = opt.ecphase | split(pat=" ") -%}
-{% for ecphase in ecphases -%}
-log_info Error-correct phase {{ ecphase }}
-
-{% if ecphase == "1" -%}
-# Error-correct phase 1
-# error-correct via overlap
+# Error-correct: overlap (bbmerge ecco replacement)
+log_info "Error-correct: overlap"
 anchr fq ec-overlap \
     temp.fq \
     --no-make-vector --vstrict \
     --ihist {{ opt.prefixm }}.ihist.merge1.txt \
     -o ecco.fq
 rm temp.fq; ln -s ecco.fq temp.fq
-{% endif -%}
+rm -f clumped.fq
 
-{% if ecphase == "2" -%}
-# Error-correct phase 2
-# 跳过：clumpify ecc（phase 2）与 phase 3（tadpole ecc）冗余且常卡住，
-# anchr 侧不实现（见 design/fq-merge-replace.md §3.3）；temp 链不变。
-{% endif -%}
-
-{% if ecphase == "3" -%}
-# Error-correct phase 3
-# Low-depth reads can be discarded here with the "tossjunk", "tossdepth", or "tossuncorrectable" flags.
+# Error-correct: kmer graph (tadpole ecc replacement)
+log_info "Error-correct: kmer"
 anchr fq ec-kmer \
     temp.fq \
     --toss-junk --toss-depth 2 --toss-uncorrectable \
     -o ecct.fq
 rm temp.fq; ln -s ecct.fq temp.fq
-{% endif -%}
-
-{% endfor -%}
+rm -f clumped.fq ecco.fq
 {# Keep a blank line #}
 log_info "Read extension"
 anchr fq extend \
     temp.fq \
     -k 62 --el 20 --er 20 \
-    -o extended.fq
+-o extended.fq
 rm temp.fq; ln -s extended.fq temp.fq
+rm -f clumped.fq ecco.fq ecct.fq
 
 log_info "Read merging"
 anchr fq merge \
@@ -79,6 +66,7 @@ anchr fq merge \
     --ihist {{ opt.prefixm }}.ihist.merge.txt \
     -o merged.raw.fq \
     --outu unmerged.raw.fq
+rm -f extended.fq
 
 log_info "Dedupe merged reads"
 anchr fq clump \
@@ -86,6 +74,7 @@ anchr fq clump \
     -o {{ opt.prefixm }}1.fq \
     --dedupe \
     --parallel {{ opt.parallel }}
+rm -f merged.raw.fq
 
 log_info "Quality-trim the unmerged reads"
 anchr fq clean \
@@ -93,6 +82,7 @@ anchr fq clean \
     --trim-quality {{ opt.qual }} \
     --minlen {{ opt.len }} \
     -o unmerged.trim.fq
+rm -f unmerged.raw.fq
 
 # Separates unmerged reads
 anchr fq split \
@@ -100,6 +90,7 @@ anchr fq split \
     -o {{ opt.prefixu }}1.fq \
     --outfile-2 {{ opt.prefixu }}2.fq \
     --outfile-single {{ opt.prefixu }}s.fq
+rm -f unmerged.trim.fq
 
 #----------------------------#
 # Done.

@@ -11,7 +11,7 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
         rm 2_illumina/{}.fq.gz;
         touch 2_illumina/{}.fq.gz;
     fi
-    " ::: clumpify filteredbytile sample trim filter
+    " ::: clumpify sample trim filter
 
 # insertSize
 rm -f 2_illumina/insert_size/*tadpole.contig.fa*

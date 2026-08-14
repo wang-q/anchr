@@ -41,19 +41,6 @@ Rs is single
                 .default_value("15"),
         )
         .arg(
-            Arg::new("prefilter")
-                .long("prefilter")
-                .help("Prefilter=N (1 or 2) for tadpole and bbmerge")
-                .num_args(1),
-        )
-        .arg(
-            Arg::new("ecphase")
-                .long("ecphase")
-                .help("Error-correct phases. Phase 2 can be skipped")
-                .num_args(1)
-                .default_value("1 2 3"),
-        )
-        .arg(
             Arg::new("prefixm")
                 .long("prefixm")
                 .help("Prefix of merged reads")
@@ -66,12 +53,6 @@ Rs is single
                 .help("Prefix of unmerged reads")
                 .num_args(1)
                 .default_value("U"),
-        )
-        .arg(
-            Arg::new("xmx")
-                .long("xmx")
-                .help("Set Java memory usage")
-                .num_args(1),
         )
         .arg(
             Arg::new("parallel")
@@ -99,29 +80,9 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let mut opt = HashMap::new();
     opt.insert("len", args.get_one::<String>("len").unwrap());
     opt.insert("qual", args.get_one::<String>("qual").unwrap());
-    opt.insert("ecphase", args.get_one::<String>("ecphase").unwrap());
     opt.insert("prefixm", args.get_one::<String>("prefixm").unwrap());
     opt.insert("prefixu", args.get_one::<String>("prefixu").unwrap());
     opt.insert("parallel", args.get_one::<String>("parallel").unwrap());
-
-    let binding_0 = "0".to_string();
-    opt.insert(
-        "prefilter",
-        if args.contains_id("prefilter") {
-            args.get_one::<String>("prefilter").unwrap()
-        } else {
-            &binding_0
-        },
-    );
-
-    opt.insert(
-        "xmx",
-        if args.contains_id("xmx") {
-            args.get_one::<String>("xmx").unwrap()
-        } else {
-            &binding_0
-        },
-    );
 
     let infiles = args.get_many::<String>("infiles").unwrap().collect_vec();
 
