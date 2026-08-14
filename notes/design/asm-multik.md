@@ -24,6 +24,12 @@
 >   核心算法单元测试：`bridge_kmer` 三个方向（正链/rc 目标/左端出）、
 >   `progressive_filter` 主路径保护 + 孤立删除、`recompact_graph` 链合并
 >   + 假边消失——374 全量测试绿。
+> * v5（真实数据 + 工程修复，2026-08-14）：**G37 真实数据端到端验证**
+>   （首个真实基因组）：覆盖参考 96.9% k-mer、总长 571,370（98.5% 参考）、
+>   最长 91,246 bp 单条（旧路线 bcalm Sum 561.2K）。工程修复 4 处：
+>   pass 0 启用 supermer+DFA（真实数据 0.66s→秒级）、环状图 head-walk
+>   死循环、渐进过滤时机（每轮→最终一次）与 cutoff 上限（max→中位 25%）、
+>   remove_unsupported 容错（允许 <2% 内部 k-mer 缺失）。见 §4.10。
 
 ## 1. 为什么现有路线不能保证无 N
 
@@ -316,6 +322,42 @@ unitig_2 头序列**（断点未桥接）。原因：断点处 reads 覆盖剖�
 10-30 bp 13×——**gap 中间 reads 覆盖不足，局部组装无原料**。结论：
 Lambda 短读的 95.8% 是数据覆盖极限（非算法缺陷）；multik 正确输出零缺口
 主 contig，gap 处保持断开（无 N 优先于完整）。
+
+### 4.10 v5：真实数据验证 + 工程修复（2026-08-14）
+
+**G37（Mycoplasma genitalium）真实数据端到端**（`results/model.md` 的
+手动模拟例子，纠错后 reads `Q25L60X40P000/pe.cor.fa`，150 bp × 155k 条，
+40×；参考 580,076 bp）：
+
+* multik auto：395 contigs / 最长 **91,246 bp** / N50 24,527 / 总长
+  **571,370**（参考 **98.5%**）；k-mer 覆盖参考 **96.9%**；
+* 对比旧路线（`results/model.md` 手动流程）：bcalm 6 k + contained →
+  Sum 561.2K / N50 ~15-25K；merge anchors → N50 55K / 17 条。multik
+  总长更接近参考（571K vs 561K），有 91 kb 单条长 contig；碎片（395 条）
+  多于旧路线（17-50 条）——旧路线用 `anchr contained` 激进去冗余，multik
+  保留全部内容（含低丰度 dropped）。
+
+**真实数据暴露的工程问题（全部修复）**：
+
+1. **pass 0 性能**：multik 未启用 `use_supermer`/`use_dfa`（asm unitig
+   默认有），真实数据（155k reads）单轮卡 30s+ → 启用后 0.66s；
+2. **环状图死循环**：`merge_chains`/`recompact_graph` 的 head-walk 无环
+   检测（细菌染色体首尾相接 → left_of 环 → 无限循环）→ 加 `seen` 检测；
+3. **渐进过滤时机与 cutoff**：
+   * 每轮迭代都跑渐进过滤（累积删除、单菌株覆盖波动误删）→ **只在最终
+     merge_chains 前做一次**；迭代轮只做跨接验证 + remove_unsupported +
+     recompact（主路径每轮增长）；
+   * cutoff 上限从 `max_abundance`（重复区可到 600×）改为 **cov 中位数的
+     25%**——单菌株正常覆盖（40×）不被删，只删显著低丰度；
+4. **remove_unsupported 容错**：单菌株覆盖波动（个别内部 k-mer <2×）会
+   误删整条主 unitig（Lambda 46,467 曾因此消失）→ **允许 <2% 内部 k-mer
+   缺失**（`max_missing = max(1, n_kmers/50)`），只删真正嵌合的 unitig。
+
+**短 unitig 跨接验证跳过**（§4.5 大步长限制的落地）：u/v 短于当前 `k−1`
+窗口时跳过跨接验证（保留边，merge_chains 用实际端点匹配决定）——避免
+大步长（21→61）下短 unitig 的边被误删（G37 曾因此把主路径边全删）。
+
+**性能**（G37 40× / 155k reads，release）：auto k（6 轮）~3 s / ~10 s CPU。
 
 ## 5. 数据结构与复用
 

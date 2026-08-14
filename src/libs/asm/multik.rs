@@ -74,13 +74,20 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
         k: ks[0],
         min_count_seed: opts.min_count_seed,
         parallel: opts.parallel,
+        // FASTA input: FastK-style super-mer two-stage counting (the `asm
+        // unitig` default); FASTQ falls back to the direct path inside
+        // `assemble_unitigs_core`.
+        use_supermer: true,
+        // Same fast paths as the `asm unitig` command: adaptive minimizer
+        // length and the DFA-state walk engine.
+        supermer_m: Some((12).min((5).max(ks[0] / 4))),
+        use_dfa: true,
         ..AssembleOptions::default()
     };
     let (mut unitigs, _) = assemble_unitigs_core(infiles, &assemble_opts)?;
     let mut links = compute_links(&unitigs, ks[0]);
 
     // Iterative rounds: validate the graph with each larger k.
-    let mut low_abundance: Vec<MultikUnitig> = Vec::new();
     for &k in &ks[1..] {
         let table = count_at(&unitigs, infiles, k, opts.parallel)?;
         let threshold = opts.min_count_extend as u32;
@@ -88,19 +95,33 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
         // covering the junction must be solid at the current k.
         for (i, ls) in links.iter_mut().enumerate() {
             ls.retain(|l| {
-                bridge_kmer(&unitigs[i], &unitigs[l.to], l, k, k0)
-                    .is_some_and(|km| table.get_count(&km) >= threshold)
+                let u = &unitigs[i];
+                let v = &unitigs[l.to];
+                // Short unitigs (shorter than the current k-1 window) cannot
+                // provide a full bridge k-mer; skip their validation and let
+                // the final compaction decide via actual extremity matching
+                // (the link is guaranteed to share a (k0-1)-mer).
+                if u.bases.len() < k - 1 || v.bases.len() < k - 1 {
+                    return true;
+                }
+                bridge_kmer(u, v, l, k, k0).is_some_and(|km| table.get_count(&km) >= threshold)
             });
         }
         // 2. Chimeric-unitig cleanup (removeUnsupportedUnitigs): every
         // internal current-k k-mer of a long-enough unitig must be solid.
         remove_unsupported(&mut unitigs, &mut links, &table, k, threshold)?;
-        // 3. Progressive abundance filter (removeAbundanceNoQueue): drop
-        // the lowest-abundance unitigs so the high-abundance path can
-        // recompact; dropped unitigs stay independent output (mirroring
-        // metaMDBG's cutoff snapshots).
-        low_abundance.extend(progressive_filter(&mut unitigs, &mut links, k0));
+        // 3. Recompact unique chains so the main path grows between rounds
+        // (metaMDBG recompacts after every abundance-removal round). No
+        // abundance pruning here — that is deferred to the final filter, so
+        // single-genome coverage fluctuation never drops real content.
+        recompact_graph(&mut unitigs, &mut links, k0);
     }
+
+    // Final abundance filter (once, not per round): drop low-abundance
+    // branching/isolated unitigs so the main path recompacts; dropped
+    // unitigs stay independent output (mirroring metaMDBG's cutoff
+    // snapshots).
+    let low_abundance = progressive_filter(&mut unitigs, &mut links, k0);
 
     // Final compaction: merge validated chains into long unitigs.
     let mut chains = merge_chains(&unitigs, &links, k0)?;
@@ -157,7 +178,8 @@ fn count_at(
     for u in unitigs {
         reads.push((u.bases.clone(), Vec::new()));
     }
-    TadpoleTable::build_supermer(reads, k, None)
+    let table = TadpoleTable::build_supermer(reads, k, None)?;
+    Ok(table)
 }
 
 /// Encodes a base slice into the assembly k-mer key (canonical lookup is
@@ -244,10 +266,24 @@ fn remove_unsupported(
             if u.bases.len() < k {
                 return true;
             }
-            (0..=u.bases.len() - k).all(|j| {
-                kmer_from_bases(&u.bases[j..j + k], k)
-                    .is_some_and(|km| table.get_count(&km) >= threshold)
-            })
+            let n_kmers = u.bases.len() - k + 1;
+            // Tolerate a small fraction of missing internal k-mers: a single
+            // genome's coverage fluctuates (a few windows below the solid
+            // threshold) without making the unitig chimeric. Only unitigs
+            // whose internal k-mers are largely unsupported are dropped.
+            let max_missing = (n_kmers / 50).max(1);
+            let mut missing = 0usize;
+            for j in 0..n_kmers {
+                let ok = kmer_from_bases(&u.bases[j..j + k], k)
+                    .is_some_and(|km| table.get_count(&km) >= threshold);
+                if !ok {
+                    missing += 1;
+                    if missing > max_missing {
+                        break;
+                    }
+                }
+            }
+            missing <= max_missing
         })
         .collect();
     retain_graph(unitigs, links, &keep);
@@ -300,14 +336,22 @@ fn progressive_filter(
     links: &mut Vec<Vec<Link>>,
     k_build: usize,
 ) -> Vec<MultikUnitig> {
-    let max_abundance: f32 = unitigs
-        .iter()
-        .map(|u| u.coverage)
-        .fold(0.0f32, f32::max)
-        .min(10000.0);
+    if unitigs.is_empty() {
+        return Vec::new();
+    }
+    // The cutoff climbs from 1.1 but stops at 25% of the median coverage:
+    // metaMDBG's "up to the graph maximum" assumes the main path is one
+    // high-abundance unitig, which holds for strain divergence but not for a
+    // single genome whose k=21 unitig graph is fragmented (a repeated region
+    // can push the max to 600x while the genome is 40x — climbing to the max
+    // would prune every real branch into the dropped list).
+    let mut covs: Vec<f32> = unitigs.iter().map(|u| u.coverage).collect();
+    covs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let median = covs[covs.len() / 2];
+    let cutoff_cap = (median * 0.25).max(1.1);
     let mut dropped: Vec<MultikUnitig> = Vec::new();
     let mut t = 1.1f32;
-    while t < max_abundance && !unitigs.is_empty() {
+    while t < cutoff_cap && !unitigs.is_empty() {
         // Main-path protection: unitigs on a unique chain (both ends have
         // <= 1 link) are kept regardless of coverage — coverage fluctuates
         // within one genome and a raw `cov < cutoff` rule would delete the
@@ -439,10 +483,12 @@ fn recompact_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, k_buil
         }
         let mut head = seed;
         let mut head_rev = false;
+        let mut seen = vec![false; n];
         while let Some((p, prev)) = left_of[node_of(head, head_rev)] {
-            if visited[p] {
+            if visited[p] || seen[p] {
                 break;
             }
+            seen[p] = true;
             head = p;
             head_rev = prev;
         }
@@ -575,10 +621,12 @@ fn merge_chains(
         // Walk back to the chain head (unique left neighbor of the begin).
         let mut head = seed;
         let mut head_rev = false;
+        let mut seen = vec![false; n];
         while let Some((p, prev)) = left_of[node_of(head, head_rev)] {
-            if visited[p] {
+            if visited[p] || seen[p] {
                 break;
             }
+            seen[p] = true;
             head = p;
             head_rev = prev;
         }
