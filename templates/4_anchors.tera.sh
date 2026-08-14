@@ -36,11 +36,12 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
     anchr asm anchor \
         unitigs.fasta \
-        pe.cor.fa \
+        ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa \
         --mincov 5 --mscale 3 \
         --lscale {{ opt.lscale }} \
         --uscale {{ opt.uscale }} \
         -p {{ parallel2 }} \
+        --stats anchor.stats.tsv \
         -o anchor.fasta
 
     echo >&2

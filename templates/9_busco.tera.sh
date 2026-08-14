@@ -29,18 +29,18 @@ if [ -e 7_merge_anchors/anchor.merge.fasta ]; then
     ARRAY+=('merge_anchors::7_merge_anchors/anchor.merge.fasta')
 fi
 
-if [ -e 8_spades/spades.non-contained.fasta ]; then
-    ARRAY+=('spades::8_spades/spades.non-contained.fasta')
+if [ -e 8_spades/contigs.fasta ]; then
+    ARRAY+=('spades::8_spades/contigs.fasta')
 fi
-if [ -e 8_mr_spades/spades.non-contained.fasta ]; then
-    ARRAY+=('mr_spades::8_mr_spades/spades.non-contained.fasta')
+if [ -e 8_mr_spades/contigs.fasta ]; then
+    ARRAY+=('mr_spades::8_mr_spades/contigs.fasta')
 fi
 
-if [ -e 8_megahit/megahit.non-contained.fasta ]; then
-    ARRAY+=('megahit::8_megahit/megahit.non-contained.fasta')
+if [ -e 8_megahit/final.contigs.fa ]; then
+    ARRAY+=('megahit::8_megahit/final.contigs.fa')
 fi
-if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
-    ARRAY+=('mr_megahit::8_mr_megahit/megahit.non-contained.fasta')
+if [ -e 8_mr_megahit/final.contigs.fa ]; then
+    ARRAY+=('mr_megahit::8_mr_megahit/final.contigs.fa')
 fi
 
 mkdir -p 9_busco

@@ -26,24 +26,25 @@ printf "%s\t" \
 
 for X in {{ opt.cov }}; do
 	for P in $(printf "%03d " {0..{{ opt.statp }}}); do
-		if [ ! -e ${DIR_PREFIX}/MRX${X}P${P}/anchor/anchor.fasta ]; then
+		if [ ! -e ${DIR_PREFIX}/MRX${X}P${P}/anchor.fasta ] || \
+		   [ ! -e ${DIR_PREFIX}/MRX${X}P${P}/anchor.stats.tsv ]; then
 			continue;
 		fi
 
 		pushd ${DIR_PREFIX}/MRX${X}P${P}/ > /dev/null
 
-		SUM_COR=$( cat env.json | jq '.SUM_COR | tonumber' )
+		SUM_COR=$( pgr fa n50 -H -N 0 -S ../../6_down_sampling/MRX${X}P${P}/pe.cor.fa )
 
         printf "%s\t" \
 			"MRX${X}P${P}" \
 			$( perl -e "printf qq(%.1f), ${SUM_COR} / {{ opt.genome }};" ) \
-            $( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber | (. * 1000 | round) / 1000' ) \
-			$( stat_format anchor/anchor.fasta ) \
-            $( stat_format anchor/pe.others.fa | cut -f 2 ) \
-            $( cat anchor/env.json | jq '.median | tonumber | (. * 10 | round) / 10' ) \
-            $( cat anchor/env.json | jq '.MAD    | tonumber | (. * 10 | round) / 10' ) \
-            $( cat anchor/env.json | jq '.lower  | tonumber | (. * 10 | round) / 10' ) \
-            $( cat anchor/env.json | jq '.upper  | tonumber | (. * 10 | round) / 10' ) |
+            $( cut -f1 anchor.stats.tsv ) \
+			$( stat_format anchor.fasta ) \
+            $( cut -f6 anchor.stats.tsv ) \
+            $( cut -f2 anchor.stats.tsv ) \
+            $( cut -f3 anchor.stats.tsv ) \
+            $( cut -f4 anchor.stats.tsv ) \
+            $( cut -f5 anchor.stats.tsv ) |
             sed 's/\t$/\n/'
 
 		popd > /dev/null

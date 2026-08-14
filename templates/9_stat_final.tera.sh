@@ -37,11 +37,6 @@ for D in 7_merge_anchors; do
             sed 's/\t$/\n/' \
             >> ${tempfile}
     fi
-    if [ -e ${D}/others.non-contained.fasta ]; then
-        printf "%s\t" "${D}.others" $( stat_format ${D}/others.non-contained.fasta ) |
-            sed 's/\t$/\n/' \
-            >> ${tempfile}
-    fi
 done
 
 # spades
@@ -55,12 +50,6 @@ if [ -e 8_spades/scaffolds.fasta ]; then
         sed 's/\t$/\n/' \
         >> ${tempfile}
 fi
-if [ -e 8_spades/spades.non-contained.fasta ]; then
-    printf "%s\t" "spades.non-contained" $( stat_format 8_spades/spades.non-contained.fasta ) |
-        sed 's/\t$/\n/' \
-        >> ${tempfile}
-fi
-
 # mr_spades
 if [ -e 8_mr_spades/contigs.fasta ]; then
     printf "%s\t" "mr_spades.contig" $( stat_format 8_mr_spades/contigs.fasta ) |
@@ -72,36 +61,18 @@ if [ -e 8_mr_spades/scaffolds.fasta ]; then
         sed 's/\t$/\n/' \
         >> ${tempfile}
 fi
-if [ -e 8_mr_spades/spades.non-contained.fasta ]; then
-    printf "%s\t" "mr_spades.non-contained" $( stat_format 8_mr_spades/spades.non-contained.fasta ) |
-        sed 's/\t$/\n/' \
-        >> ${tempfile}
-fi
-
 # megahit
 if [ -e 8_megahit/final.contigs.fa ]; then
     printf "%s\t" "megahit.contig" $( stat_format 8_megahit/final.contigs.fa ) |
         sed 's/\t$/\n/' \
         >> ${tempfile}
 fi
-if [ -e 8_megahit/megahit.non-contained.fasta ]; then
-    printf "%s\t" "megahit.non-contained" $( stat_format 8_megahit/megahit.non-contained.fasta ) |
-        sed 's/\t$/\n/' \
-        >> ${tempfile}
-fi
-
 # mr_megahit
 if [ -e 8_mr_megahit/final.contigs.fa ]; then
     printf "%s\t" "mr_megahit.contig" $( stat_format 8_mr_megahit/final.contigs.fa ) |
         sed 's/\t$/\n/' \
         >> ${tempfile}
 fi
-if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
-    printf "%s\t" "mr_megahit.non-contained" $( stat_format 8_mr_megahit/megahit.non-contained.fasta ) |
-        sed 's/\t$/\n/' \
-        >> ${tempfile}
-fi
-
 tva to md ${tempfile} --right 2-4 -o statFinal.md
 echo -e "\nTable: statFinal\n" >> statFinal.md
 

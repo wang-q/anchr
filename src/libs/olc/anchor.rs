@@ -64,16 +64,34 @@ pub fn coverage_from_alignments(lens: &[usize], aligns: &[Alignment]) -> Vec<Vec
         .collect()
 }
 
-/// Coverage thresholds from the per-position depths of all references
-/// (zero-coverage positions included): `(lower, upper)` per the legacy
-/// formula with the caller's `AnchorOptions`.
-pub fn anchor_thresholds(covs: &[Vec<u32>], opts: &AnchorOptions) -> (f64, f64) {
+/// Coverage statistics for the anchor window (zero-coverage positions
+/// included): the legacy formula with the caller's `AnchorOptions`.
+#[derive(Debug, Clone, Copy)]
+pub struct AnchorStats {
+    /// Per-base depth median.
+    pub median: u32,
+    /// Median absolute deviation of the per-base depths.
+    pub mad: u32,
+    /// Lower coverage bound.
+    pub lower: f64,
+    /// Upper coverage bound.
+    pub upper: f64,
+}
+
+/// Computes the coverage window statistics from the per-position depths of
+/// all references.
+pub fn anchor_stats(covs: &[Vec<u32>], opts: &AnchorOptions) -> AnchorStats {
     let mut all: Vec<u32> = Vec::new();
     for cov in covs {
         all.extend_from_slice(&cov[1..]);
     }
     if all.is_empty() {
-        return (0.0, 0.0);
+        return AnchorStats {
+            median: 0,
+            mad: 0,
+            lower: 0.0,
+            upper: 0.0,
+        };
     }
     all.sort_unstable();
     let median = all[all.len() / 2];
@@ -84,7 +102,12 @@ pub fn anchor_thresholds(covs: &[Vec<u32>], opts: &AnchorOptions) -> (f64, f64) 
     };
     let lower = ((median as f64 - opts.mscale * mad as f64) / opts.lscale).max(opts.mincov as f64);
     let upper = (median as f64 + opts.mscale * mad as f64) * opts.uscale;
-    (lower, upper)
+    AnchorStats {
+        median,
+        mad,
+        lower,
+        upper,
+    }
 }
 
 /// Contiguous positions with `lower <= depth <= upper`, returned as

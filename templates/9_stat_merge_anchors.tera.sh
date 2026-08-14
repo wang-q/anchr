@@ -31,16 +31,29 @@ for D in $( find . -type d -name "${DIR_PREFIX}*" | sort ); do
 
 	pushd ${D}/ > /dev/null
 
+    # merged anchors 的覆盖统计（老流程 anchors 化等价物）
+    anchr asm anchor \
+        anchor.merge.fasta \
+        ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz \
+        --mincov 5 --mscale 3 \
+        --lscale {{ opt.lscale }} \
+        --uscale {{ opt.uscale }} \
+        -p {{ opt.parallel }} \
+        --stats merge.stats.tsv \
+        -o /dev/null
+
     printf "%s\t" \
         $(basename "${D}") \
-        $( cat anchor/env.json | jq '.MAPPED_RATIO | tonumber | (. * 1000 | round) / 1000' ) \
+        $( cut -f1 merge.stats.tsv ) \
         $( stat_format anchor.merge.fasta ) \
-        $( stat_format others.non-contained.fasta | cut -f 2 ) \
-        $( cat anchor/env.json | jq '.median | tonumber | (. * 10 | round) / 10' ) \
-        $( cat anchor/env.json | jq '.MAD    | tonumber | (. * 10 | round) / 10' ) \
-        $( cat anchor/env.json | jq '.lower  | tonumber | (. * 10 | round) / 10' ) \
-        $( cat anchor/env.json | jq '.upper  | tonumber | (. * 10 | round) / 10' ) |
+        $( cut -f6 merge.stats.tsv ) \
+        $( cut -f2 merge.stats.tsv ) \
+        $( cut -f3 merge.stats.tsv ) \
+        $( cut -f4 merge.stats.tsv ) \
+        $( cut -f5 merge.stats.tsv ) |
         sed 's/\t$/\n/'
+
+    rm -f merge.stats.tsv
 
 	popd > /dev/null
 done \

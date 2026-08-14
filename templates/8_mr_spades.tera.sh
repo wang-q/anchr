@@ -10,16 +10,16 @@ log_warn 8_mr_spades.sh
 #----------------------------#
 USAGE="Usage: $0"
 
-if [ -e 8_mr_spades/anchor/anchor.fasta ]; then
-    log_info "8_mr_spades/anchor/anchor.fasta presents"
+if [ -e 8_mr_spades/anchor.fasta ]; then
+    log_info "8_mr_spades/anchor.fasta presents"
     exit;
 fi
 
 #----------------------------#
 # spades
 #----------------------------#
-if [ -e 8_mr_spades/spades.non-contained.fasta ]; then
-    log_info "8_mr_spades/spades.non-contained.fasta presents"
+if [ -e 8_mr_spades/contigs.fasta ]; then
+    log_info "8_mr_spades/contigs.fasta presents"
 else
     log_info "Run spades"
 
@@ -49,12 +49,6 @@ else
         -s re-pair/Rs.fa \
         -o .
 
-    anchr contained \
-        contigs.fasta \
-        --len 1000 --idt 0.98 --ratio 0.99999 --parallel {{ opt.parallel }} \
-        -o stdout |
-        pgr fa filter --min-len 1000 stdin -o spades.non-contained.fasta
-
     log_info "Clear intermediate files"
     find . -type d -not -name "anchor" | parallel --no-run-if-empty -j 1 rm -fr
 fi
@@ -69,12 +63,13 @@ mkdir -p 8_mr_spades
 cd 8_mr_spades
 
 anchr asm anchor \
-    spades.non-contained.fasta \
+    contigs.fasta \
     ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz \
     --mincov 5 --mscale 3 \
     --lscale {{ opt.lscale }} \
     --uscale {{ opt.uscale }} \
     -p {{ opt.parallel }} \
+    --stats anchor.stats.tsv \
     -o anchor.fasta
 
 exit 0;

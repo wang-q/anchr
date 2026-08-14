@@ -17,7 +17,6 @@ fn main() -> anyhow::Result<()> {
         .propagate_version(true)
         .arg_required_else_help(true)
         .subcommand(cmd::asm::make_subcommand())
-        .subcommand(cmd::contained::make_subcommand())
         .subcommand(cmd::dazzname::make_subcommand())
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
@@ -54,7 +53,6 @@ Subcommand groups:
         Some(("ena", sub_matches)) => cmd::ena::execute(sub_matches),
         Some(("dazzname", sub_matches)) => cmd::dazzname::execute(sub_matches),
         Some(("sam", sub_matches)) => cmd::sam::execute(sub_matches),
-        Some(("contained", sub_matches)) => cmd::contained::execute(sub_matches),
         // Assembling
         Some(("trim", sub_matches)) => cmd::trim::execute(sub_matches),
         Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),

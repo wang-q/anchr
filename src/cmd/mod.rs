@@ -2,7 +2,6 @@
 
 pub mod args;
 pub mod asm;
-pub mod contained;
 pub mod dazzname;
 pub mod dep;
 pub mod ena;

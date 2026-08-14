@@ -15,16 +15,16 @@ DIR_READS=${1:-"2_illumina/trim"}
 # Convert to abs path
 DIR_READS="$(cd "$(dirname "$DIR_READS")"; pwd)/$(basename "$DIR_READS")"
 
-if [ -e 8_spades/anchor/anchor.fasta ]; then
-    log_info "8_spades/anchor/anchor.fasta presents"
+if [ -e 8_spades/anchor.fasta ]; then
+    log_info "8_spades/anchor.fasta presents"
     exit;
 fi
 
 #----------------------------#
 # spades
 #----------------------------#
-if [ -e 8_spades/spades.non-contained.fasta ]; then
-    log_info "8_spades/spades.non-contained.fasta presents"
+if [ -e 8_spades/contigs.fasta ]; then
+    log_info "8_spades/contigs.fasta presents"
 else
     log_info "Run spades"
 
@@ -50,12 +50,6 @@ else
         -2 re-pair/R2.fa \
         -o .
 
-    anchr contained \
-        contigs.fasta \
-        --len 1000 --idt 0.98 --ratio 0.99999 --parallel {{ opt.parallel }} \
-        -o stdout |
-        pgr fa filter --min-len 1000 stdin -o spades.non-contained.fasta
-
     log_info "Clear intermediate files"
     find . -type d -not -name "anchor" | parallel --no-run-if-empty -j 1 rm -fr
 fi
@@ -70,12 +64,13 @@ mkdir -p 8_spades
 cd 8_spades
 
 anchr asm anchor \
-    spades.non-contained.fasta \
+    contigs.fasta \
     ${DIR_READS}/pe.cor.fa.gz \
     --mincov 5 --mscale 3 \
     --lscale {{ opt.lscale }} \
     --uscale {{ opt.uscale }} \
     -p {{ opt.parallel }} \
+    --stats anchor.stats.tsv \
     -o anchor.fasta
 
 exit 0;

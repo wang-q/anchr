@@ -23,7 +23,8 @@ for Q in 0 {{ opt.qual }}; do
         cd 2_illumina/Q${Q}L${L}
 
         for PREFIX in R S T; do
-            if [ ! -e ${PREFIX}1.fq.gz ]; then
+            # trim 根目录（Q0L0）输出未压缩 .fq，分档目录输出 .fq.gz
+            if [ ! -e ${PREFIX}1.fq ] && [ ! -e ${PREFIX}1.fq.gz ]; then
                 continue;
             fi
 
@@ -34,16 +35,27 @@ for Q in 0 {{ opt.qual }}; do
 
             log_info "Qual-Len: Q${Q}L${L}.${PREFIX}"
 
+            FQ1=${PREFIX}1.fq
+            [ -e ${FQ1} ] || FQ1=${PREFIX}1.fq.gz
+            FQ2=${PREFIX}2.fq
+            [ -e ${FQ2} ] || FQ2=${PREFIX}2.fq.gz
+            FQS=
+            if [ -s ${PREFIX}s.fq ]; then
+                FQS=${PREFIX}s.fq
+            elif [ -s ${PREFIX}s.fq.gz ]; then
+                FQS=${PREFIX}s.fq.gz
+            fi
+
+            FILES=( ${FQ1} )
+            if [ -e ${FQ2} ]; then
+                FILES+=( ${FQ2} )
+            fi
+            if [ -n "${FQS}" ]; then
+                FILES+=( ${FQS} )
+            fi
+
             anchr quorum \
-                ${PREFIX}1.fq.gz \
-{% if opt.se == "0" -%}
-                ${PREFIX}2.fq.gz \
-                $(
-                    if [ -s ${PREFIX}s.fq.gz ]; then
-                        echo ${PREFIX}s.fq.gz;
-                    fi
-                ) \
-{% endif -%}
+                "${FILES[@]}" \
                 -p {{ opt.parallel }} \
                 --prefix ${PREFIX} \
                 -o quorum.sh
@@ -71,7 +83,7 @@ for Q in 0 {{ opt.qual }}; do
         done
 
         log_info "Combine Q${Q}L${L} .cor.fa.gz files"
-        if [ -e S1.fq.gz ]; then
+        if [ -e S1.fq ] || [ -e S1.fq.gz ]; then
             gzip -d -c [RST].cor.fa.gz |
                 awk '{
                     OFS="\t"; \

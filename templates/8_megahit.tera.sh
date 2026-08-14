@@ -15,16 +15,16 @@ DIR_READS=${1:-"2_illumina/trim"}
 # Convert to abs path
 DIR_READS="$(cd "$(dirname "$DIR_READS")"; pwd)/$(basename "$DIR_READS")"
 
-if [ -e 8_megahit/anchor/anchor.fasta ]; then
-    log_info "8_megahit/anchor/anchor.fasta presents"
+if [ -e 8_megahit/anchor.fasta ]; then
+    log_info "8_megahit/anchor.fasta presents"
     exit;
 fi
 
 #----------------------------#
 # spades
 #----------------------------#
-if [ -e 8_megahit/megahit.non-contained.fasta ]; then
-    log_info "8_megahit/megahit.non-contained.fasta presents"
+if [ -e 8_megahit/final.contigs.fa ]; then
+    log_info "8_megahit/final.contigs.fa presents"
 else
     log_info "Run megahit"
 
@@ -34,12 +34,6 @@ else
         --12 ${DIR_READS}/pe.cor.fa.gz \
         --min-count 3 \
         -o 8_megahit
-
-    anchr contained \
-        8_megahit/final.contigs.fa \
-        --len 1000 --idt 0.98 --ratio 0.99999 --parallel 16 \
-        -o stdout |
-        pgr fa filter --min-len 1000 stdin -o 8_megahit/megahit.non-contained.fasta
 
     log_info "Clear intermediate files"
     find . -type d -path "*8_megahit/*" -not -name "anchor" | parallel --no-run-if-empty -j 1 rm -fr
@@ -54,12 +48,13 @@ mkdir -p 8_megahit
 cd 8_megahit
 
 anchr asm anchor \
-    megahit.non-contained.fasta \
+    final.contigs.fa \
     ${DIR_READS}/pe.cor.fa.gz \
     --mincov 5 --mscale 3 \
     --lscale {{ opt.lscale }} \
     --uscale {{ opt.uscale }} \
     -p {{ opt.parallel }} \
+    --stats anchor.stats.tsv \
     -o anchor.fasta
 
 exit 0;

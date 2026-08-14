@@ -27,21 +27,21 @@ if [ -e 7_merge_anchors/anchor.merge.fasta ]; then
     QUAST_LABEL+="merge_anchors,"
 fi
 
-if [ -e 8_spades/spades.non-contained.fasta ]; then
-    QUAST_TARGET+=" 8_spades/spades.non-contained.fasta "
+if [ -e 8_spades/contigs.fasta ]; then
+    QUAST_TARGET+=" 8_spades/contigs.fasta "
     QUAST_LABEL+="spades,"
 fi
-if [ -e 8_mr_spades/spades.non-contained.fasta ]; then
-    QUAST_TARGET+=" 8_mr_spades/spades.non-contained.fasta "
+if [ -e 8_mr_spades/contigs.fasta ]; then
+    QUAST_TARGET+=" 8_mr_spades/contigs.fasta "
     QUAST_LABEL+="mr_spades,"
 fi
 
-if [ -e 8_megahit/megahit.non-contained.fasta ]; then
-    QUAST_TARGET+=" 8_megahit/megahit.non-contained.fasta "
+if [ -e 8_megahit/final.contigs.fa ]; then
+    QUAST_TARGET+=" 8_megahit/final.contigs.fa "
     QUAST_LABEL+="megahit,"
 fi
-if [ -e 8_mr_megahit/megahit.non-contained.fasta ]; then
-    QUAST_TARGET+=" 8_mr_megahit/megahit.non-contained.fasta "
+if [ -e 8_mr_megahit/final.contigs.fa ]; then
+    QUAST_TARGET+=" 8_mr_megahit/final.contigs.fa "
     QUAST_LABEL+="mr_megahit,"
 fi
 

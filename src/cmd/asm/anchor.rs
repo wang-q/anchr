@@ -1,6 +1,6 @@
 use crate::libs::map::{map_files, read_fasta, MapOptions};
 use crate::libs::olc::anchor::{
-    anchor_regions, anchor_thresholds, coverage_from_alignments, extract_anchors, Alignment,
+    anchor_regions, anchor_stats, coverage_from_alignments, extract_anchors, Alignment,
     AnchorOptions,
 };
 use anyhow::Context;
@@ -105,6 +105,12 @@ Examples:
                 .help("Worker threads for the read mapping"),
         )
         .arg(
+            Arg::new("stats")
+                .long("stats")
+                .num_args(1)
+                .help("Output TSV with Mapped/median/MAD/lower/upper/SumOthers"),
+        )
+        .arg(
             Arg::new("list_files")
                 .long("list-files")
                 .action(clap::ArgAction::SetTrue)
@@ -146,7 +152,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         .context("failed to create tempdir")?;
     let sam_path = tempdir.path().join("mapped.sam");
     let sam_str = sam_path.to_str().unwrap();
-    map_files(
+    let mapped = map_files(
         &refs,
         &read_files,
         &MapOptions {
@@ -158,6 +164,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             parallel,
         },
     )?;
+    let mapped_ratio = if mapped.reads_in > 0 {
+        mapped.mapped as f64 / mapped.reads_in as f64
+    } else {
+        0.0
+    };
 
     // Parse the mapped SAM into per-unitig alignments (perfect M CIGAR).
     let name_to_idx: std::collections::HashMap<String, usize> = refs
@@ -196,10 +207,27 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     // Coverage window and anchor regions.
     let covs = coverage_from_alignments(&lens, &aligns);
-    let (lower, upper) = anchor_thresholds(&covs, &opts);
-    let regions = anchor_regions(&covs, &opts, lower, upper);
+    let stats = anchor_stats(&covs, &opts);
+    let regions = anchor_regions(&covs, &opts, stats.lower, stats.upper);
     let seqs: Vec<Vec<u8>> = refs.iter().map(|r| r.seq.clone()).collect();
     let anchors = extract_anchors(&seqs, &regions);
+
+    if let Some(stats_file) = args.get_one::<String>("stats") {
+        let total_bases: usize = lens.iter().sum();
+        let anchor_bases: usize = regions.iter().map(|&(_, a, b)| b - a + 1).sum();
+        let mut out = pgr::libs::io::writer(stats_file)
+            .with_context(|| format!("failed to open stats file {stats_file}"))?;
+        writeln!(
+            out,
+            "{:.3}\t{}\t{}\t{:.1}\t{:.1}\t{}",
+            mapped_ratio,
+            stats.median,
+            stats.mad,
+            stats.lower,
+            stats.upper,
+            total_bases - anchor_bases
+        )?;
+    }
 
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;
