@@ -29,18 +29,6 @@ if [ ! -e clumpify.fq ]; then
 fi
 rm -f temp.fq; ln -s clumpify.fq temp.fq
 
-{% if opt.tile == "1" -%}
-# Remove low-quality reads by positions in flowcell
-log_info "filteredbytile"
-if [ ! -e filteredbytile.fq ]; then
-    filterbytile.sh \
-        in=temp.fq \
-        out=filteredbytile.fq \
-        threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
-fi
-rm temp.fq; ln -s filteredbytile.fq temp.fq
-{% endif -%}
-{# Keep a blank line #}
 {% if opt.cutoff != "0" -%}
 # Remove reads without high depth kmer
 log_info "kmer cutoff with anchr fq norm"

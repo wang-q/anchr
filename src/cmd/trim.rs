@@ -101,12 +101,6 @@ Fastq files can be gzipped
                 .help("Do the dedupe step"),
         )
         .arg(
-            Arg::new("tile")
-                .long("tile")
-                .action(ArgAction::SetTrue)
-                .help("With normal Illumina names, do tile-based filtering"),
-        )
-        .arg(
             Arg::new("cutoff")
                 .long("cutoff")
                 .help("Min kmer depth cutoff")
@@ -163,14 +157,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     opt.insert(
         "dedupe",
         if args.get_flag("dedupe") {
-            &binding_1
-        } else {
-            &binding_0
-        },
-    );
-    opt.insert(
-        "tile",
-        if args.get_flag("tile") {
             &binding_1
         } else {
             &binding_0
