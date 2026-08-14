@@ -178,6 +178,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         .collect();
     let lens: Vec<usize> = refs.iter().map(|r| r.seq.len()).collect();
     let mut aligns: Vec<Alignment> = Vec::new();
+    let mut read_lens: Vec<usize> = Vec::new();
     let mut reader =
         pgr::libs::io::reader(sam_str).with_context(|| format!("failed to open SAM {sam_str}"))?;
     let mut line = String::new();
@@ -201,6 +202,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             .strip_suffix('M')
             .and_then(|s| s.parse::<usize>().ok())
             .with_context(|| format!("SAM line {line_no}: unexpected CIGAR {cigar}"))?;
+        read_lens.push(mlen);
         aligns.push((ri, pos, pos + mlen - 1));
         line.clear();
     }
@@ -208,7 +210,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     // Coverage window and anchor regions.
     let covs = coverage_from_alignments(&lens, &aligns);
     let stats = anchor_stats(&covs, &opts);
-    let regions = anchor_regions(&covs, &opts, stats.lower, stats.upper);
+    // Read length for the edge ramp: median of the full-length perfect
+    // matches (reads cannot fully cover the contig ends).
+    read_lens.sort_unstable();
+    let read_len = read_lens.get(read_lens.len() / 2).copied().unwrap_or(0);
+    let regions = anchor_regions(&covs, &opts, stats.lower, stats.upper, read_len);
     let seqs: Vec<Vec<u8>> = refs.iter().map(|r| r.seq.clone()).collect();
     let anchors = extract_anchors(&seqs, &regions);
 

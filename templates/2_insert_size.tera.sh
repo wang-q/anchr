@@ -74,7 +74,7 @@ printf "%s\t%s\t%s\t%s\t%s\n" \
     "Group" "Mean" "Median" "STDev" "Pairs%/Orientation" \
     > statInsertSize.tsv
 
-# bbtools reformat.sh
+# anchr sam ihist
 #Mean	339.868
 #Median	312
 #Mode	251
@@ -95,7 +95,7 @@ for PREFIX in R S T; do
 
                 END {
                     printf qq(%s\t%.1f\t%s\t%.1f\t%.2f%%\n),
-                        qq($ENV{GROUP}.bbtools),
+                        qq($ENV{GROUP}.ihist),
                         $stat->{Mean},
                         $stat->{Median},
                         $stat->{STDev},

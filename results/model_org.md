@@ -113,12 +113,12 @@ bash 0_script/0_master.sh
 
 ```
 
-| Group             |   Mean | Median |   STDev | Pairs%/Orientation |
-| ----------------- | -----: | -----: | ------: | -----------------: |
-| R.genome.bbtools  | 2035.3 |    452 | 21883.0 |             97.74% |
-| R.tadpole.bbtools |  462.4 |    447 |   130.2 |             92.63% |
-| R.genome.picard   |  466.5 |    452 |   127.8 |                 FR |
-| R.tadpole.picard  |  462.1 |    447 |   126.1 |                 FR |
+| Group            |  Mean | Median | STDev | Pairs%/Orientation |
+| ---------------- | ----: | -----: | ----: | -----------------: |
+| R.genome.ihist   | 466.5 |    451 | 127.8 |             97.74% |
+| R.tadpole.ihist  | 462.1 |    447 | 126.1 |             92.63% |
+| R.genome.picard  | 466.5 |    452 | 127.8 |                 FR |
+| R.tadpole.picard | 462.1 |    447 | 126.1 |                 FR |
 
 Table: statInsertSize
 

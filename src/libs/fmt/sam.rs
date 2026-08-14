@@ -75,8 +75,9 @@ pub fn to_ranges<R: BufRead, W: Write>(reader: R, writer: &mut W, strict: bool) 
 /// Pairs are grouped by read name (first whitespace token, trailing
 /// `/1`/`/2` stripped); only proper FR pairs — both ends mapped, same
 /// reference, opposite strands, pointing inward — contribute an insert
-/// size. `#PercentOfPairs` is the fraction of pairs contributing to the
-/// histogram.
+/// size. Insert sizes beyond `median ± 10*MAD` are dropped from the stats
+/// and the histogram (picard `DEVIATIONS=10` semantics, e.g. circular-origin
+/// chimeric pairs); `#PercentOfPairs` still counts every proper pair.
 pub fn ihist<R: BufRead, W: Write>(reader: R, writer: &mut W) -> Result<()> {
     use std::collections::HashMap;
 
@@ -117,29 +118,51 @@ pub fn ihist<R: BufRead, W: Write>(reader: R, writer: &mut W) -> Result<()> {
     }
 
     insert_sizes.sort_unstable();
-    let n = insert_sizes.len() as u64;
-    let (mean, median, mode, stdev) = if insert_sizes.is_empty() {
+    let proper_n = insert_sizes.len() as u64;
+
+    // Outlier removal: keep `median ± 10*MAD`.
+    let kept: Vec<u32> = if insert_sizes.len() < 3 {
+        insert_sizes.clone()
+    } else {
+        let med = insert_sizes[(insert_sizes.len() - 1) / 2];
+        let mut devs: Vec<u32> = insert_sizes.iter().map(|&x| x.abs_diff(med)).collect();
+        devs.sort_unstable();
+        let mad = devs[(devs.len() - 1) / 2];
+        if mad > 0 {
+            let cutoff = 10u32.saturating_mul(mad);
+            insert_sizes
+                .iter()
+                .copied()
+                .filter(|&x| x.abs_diff(med) <= cutoff)
+                .collect()
+        } else {
+            insert_sizes.clone()
+        }
+    };
+
+    let n = kept.len() as u64;
+    let (mean, median, mode, stdev) = if kept.is_empty() {
         (0.0, 0u64, 0u64, 0.0)
     } else {
-        let sum: u64 = insert_sizes.iter().map(|&x| x as u64).sum();
+        let sum: u64 = kept.iter().map(|&x| x as u64).sum();
         let mean = sum as f64 / n as f64;
-        let median = insert_sizes[((n - 1) / 2) as usize] as u64;
+        let median = kept[((n - 1) / 2) as usize] as u64;
         // Mode: most frequent insert size; ties -> the smallest.
-        let mut mode = insert_sizes[0];
+        let mut mode = kept[0];
         let mut best_count = 0usize;
         let mut i = 0usize;
-        while i < insert_sizes.len() {
+        while i < kept.len() {
             let mut j = i;
-            while j < insert_sizes.len() && insert_sizes[j] == insert_sizes[i] {
+            while j < kept.len() && kept[j] == kept[i] {
                 j += 1;
             }
             if j - i > best_count {
                 best_count = j - i;
-                mode = insert_sizes[i];
+                mode = kept[i];
             }
             i = j;
         }
-        let variance = insert_sizes
+        let variance = kept
             .iter()
             .map(|&x| {
                 let d = x as f64 - mean;
@@ -157,16 +180,16 @@ pub fn ihist<R: BufRead, W: Write>(reader: R, writer: &mut W) -> Result<()> {
     writeln!(
         writer,
         "#PercentOfPairs\t{:.3}",
-        n as f64 * 100.0 / total_pairs.max(1) as f64
+        proper_n as f64 * 100.0 / total_pairs.max(1) as f64
     )?;
     writeln!(writer, "#InsertSize\tCount")?;
     let mut i = 0usize;
-    while i < insert_sizes.len() {
+    while i < kept.len() {
         let mut j = i;
-        while j < insert_sizes.len() && insert_sizes[j] == insert_sizes[i] {
+        while j < kept.len() && kept[j] == kept[i] {
             j += 1;
         }
-        writeln!(writer, "{}\t{}", insert_sizes[i], j - i)?;
+        writeln!(writer, "{}\t{}", kept[i], j - i)?;
         i = j;
     }
     Ok(())

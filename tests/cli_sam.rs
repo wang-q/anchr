@@ -130,6 +130,46 @@ fn command_sam_ihist_name_normalization() {
     assert!(stdout.contains("70\t1"), "stdout: {stdout}");
 }
 
+/// Insert sizes beyond `median ± 10*MAD` are dropped from the stats and the
+/// histogram (circular-origin chimeric pairs), while PercentOfPairs still
+/// counts every proper pair.
+#[test]
+fn command_sam_ihist_filters_outliers() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let sam = out_dir.path().join("in.sam");
+    let mut lines = String::from("@HD\tVN:1.6\tSO:unknown\n@SQ\tSN:ut\tLN:10000\n");
+    for i in 0..10u32 {
+        let size = 90 + i;
+        lines.push_str(&format!(
+            "{}\n",
+            sam_record(&format!("p{i}"), 67, 11, 11 + size, size as i32,)
+        ));
+        lines.push_str(&format!(
+            "{}\n",
+            sam_record(&format!("p{i}"), 147, 11 + size, 11, -(size as i32),)
+        ));
+    }
+    // One circular-origin chimeric pair (huge insert size).
+    lines.push_str(&format!("{}\n", sam_record("px", 67, 1, 9000, 9000)));
+    lines.push_str(&format!("{}\n", sam_record("px", 147, 9000, 1, -9000)));
+    std::fs::write(&sam, lines).unwrap();
+    let (stdout, stderr) = AnchrCmd::new()
+        .args(&["sam", "ihist", sam.to_str().unwrap()])
+        .run();
+    // insert sizes 140-149 (span + read length), median 145, MAD 3,
+    // cutoff 30: the 9000 pair is filtered.
+    assert!(
+        !stdout.contains("9000\t"),
+        "outlier must be filtered: {stdout}\nstderr: {stderr}"
+    );
+    assert!(stdout.contains("#Mean\t144.500"), "stdout: {stdout}");
+    assert!(stdout.contains("#Median\t144"), "stdout: {stdout}");
+    assert!(
+        stdout.contains("#PercentOfPairs\t100.000"),
+        "stdout: {stdout}"
+    );
+}
+
 /// A SAM without proper pairs yields zeroed stats and an empty histogram.
 #[test]
 fn command_sam_ihist_empty() {

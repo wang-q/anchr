@@ -112,19 +112,34 @@ pub fn anchor_stats(covs: &[Vec<u32>], opts: &AnchorOptions) -> AnchorStats {
 
 /// Contiguous positions with `lower <= depth <= upper`, returned as
 /// `(ref_index, start, end)` 1-based inclusive regions of length >= `min_len`.
+/// Positions within `read_len / 2` of a contig end scale the window down
+/// linearly (`lower/upper * 2*dist/read_len`, floored at `mincov`): reads
+/// cannot fully cover the ends, so the expected coverage ramps up from the
+/// edge (legacy `--keepedge` behavior).
 pub fn anchor_regions(
     covs: &[Vec<u32>],
     opts: &AnchorOptions,
     lower: f64,
     upper: f64,
+    read_len: usize,
 ) -> Vec<(usize, usize, usize)> {
+    let half = read_len / 2;
     let mut regions = Vec::new();
     for (ri, cov) in covs.iter().enumerate() {
+        let len = cov.len() - 1;
         let mut in_run = false;
         let mut start = 0usize;
         for (p, &depth) in cov.iter().enumerate().skip(1) {
             let d = depth as f64;
-            let ok = d >= lower && d <= upper;
+            let ok = if half > 0 && p <= half {
+                let f = (p - 1) as f64 * 2.0 / read_len as f64;
+                d >= (lower * f).max(opts.mincov as f64) && d <= upper * f
+            } else if half > 0 && p > len.saturating_sub(half) {
+                let f = (len - p) as f64 * 2.0 / read_len as f64;
+                d >= (lower * f).max(opts.mincov as f64) && d <= upper * f
+            } else {
+                d >= lower && d <= upper
+            };
             if ok && !in_run {
                 in_run = true;
                 start = p;
@@ -180,8 +195,34 @@ mod tests {
             min_len: 2,
             ..Default::default()
         };
-        let regions = anchor_regions(&covs, &opts, 5.0, 20.0);
-        // Two runs: 1-3 and 6-10.
-        assert_eq!(regions, vec![(0, 1, 3), (0, 6, 10)]);
+        // read_len = 2 -> half = 1: only the very first/last base is an edge.
+        let regions = anchor_regions(&covs, &opts, 5.0, 20.0, 2);
+        // Runs: 2-3 and 6-9 (base 1 and 10 are zero-width edges).
+        assert_eq!(regions, vec![(0, 2, 3), (0, 6, 9)]);
+    }
+
+    /// The coverage ramp at contig ends is accepted by the scaled window
+    /// (legacy `--keepedge`), instead of being clipped by the global lower.
+    #[test]
+    fn anchor_regions_keeps_edge_ramp() {
+        // len 20; depth ramps 2..10 over the first 5 bases and 10..2 over
+        // the last 5, 10 in the middle (read_len 10 -> half 5).
+        let mut covs = vec![vec![0u32; 21]; 1];
+        let ramp = [2u32, 4, 6, 8, 10];
+        for (i, v) in ramp.iter().enumerate() {
+            covs[0][i + 1] = *v;
+            covs[0][20 - i] = *v;
+        }
+        for p in 6..=15 {
+            covs[0][p] = 10;
+        }
+        let opts = AnchorOptions {
+            min_len: 2,
+            ..Default::default()
+        };
+        // lower = 5, upper = 20: mid-edge bases (depth 6-10) pass the scaled
+        // window, the first/last (depth 2) are below mincov and stay cut.
+        let regions = anchor_regions(&covs, &opts, 5.0, 20.0, 10);
+        assert_eq!(regions, vec![(0, 3, 18)]);
     }
 }
