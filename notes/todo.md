@@ -31,6 +31,18 @@
   新默认 half(8) 基线 k31 1.36 s/597 MB、k99 2.19 s/1131 MB
   （[asm-assemble.md](design/asm-assemble.md) §12.3、
   [unitig-bench.md](benchmarks/unitig-bench.md)）；
+- **`asm multik` v4（2026-08-14）**：multi-k 迭代组装落地——unitig 图
+  跨轮验证（桥接 k-mer ≥2 + 内部 k-mer 嵌合清理）+ **渐进丰度过滤 +
+  recompact**（主路径保护：只删分支/孤立节点，直链永远保留）+ **k 序列
+  自适应**（`--kmer auto`，读长 N50 驱动）。
+  **Lambda 20k：38 contigs / 最长 46467 / N50 46467 / 总长 49359**——最长
+  ≈ 参考 48502 的 95.8%，reads 100% 覆盖、零缺口（短读数据下第一条近整条
+  染色体级无 N contig；OLC 对照最长 19035）。合成长读：**完整覆盖（环状）
+  → 单条 100,000 bp = 基因组 100%（k-mer 多重集一致）**；0.1% 错误 +
+  2 kb 重复 ×2 → k-mer 覆盖 97.4%（重复区完整）。
+  设计 [asm-multik.md](design/asm-multik.md) §4.6-§4.8、参考
+  [metaMDBG.md](references/metaMDBG.md) §4.1.1/§6.3；v5 候选（重复区
+  reads 桥接、0.25× 保护阈值、小 unitig 大步长插值）见设计 §4.5/§7；
 - 双轨核对 22/22（历史）：`scripts/verify-migrate.sh` 只对"删除
   fq/asm/sam 之前"的 pgr 有效，新版 pgr 下全 FAIL 属预期（脚本头已
   注明），勿当 bug。
@@ -67,6 +79,12 @@
 
 ## 4. 待验证 / 等数据或场景到位
 
+- **`asm multik` 端到端**：Lambda 短读（最长 46467 ≈ 参考 95.8%，零缺口）
+  与合成长读（单条 98.5% 零缺口；0.1% 错误 + 2 kb 重复 ×2 → k-mer 覆盖
+  97.4%、重复区 980/980 完整；完整环状覆盖 → **单条 100% 基因组**；1 Mb
+  基准 9.4 s / 816 MB）已过；需**真实**宏基因组/长读数据验证无 N 判据
+  （覆盖完整 + 无 gap + 无嵌合）；`--parallel` 扩展性复测与
+  `--min-count-extend` 阈值调参（设计 §7）；
 - **大规模真实数据**：Lambda 20k/40k reads 之外，用真实染色体数据跑
   `fq → asm → map → template` 全链，核对统计（覆盖量/unitig 数/PSL 行数）；
 - **多线程与内存**：`fq norm` 外部 hash-bucket 路径（`--mem`）、
@@ -85,8 +103,8 @@
 
 - `scripts/verify-migrate.sh` 的 `asm_olc` 用例用 Lambda 数据（约 6 s），
   可考虑缩小输入加速日常核对；
-- `notes/benchmarks/` 目录索引：迁移 `bbtools-vs-anchr.md` 后补一篇
-  README 或索引（当前只有一篇）。
+- ~~`notes/benchmarks/` 目录索引~~：已补 `README.md`（2026-08-14，含
+  `multik.md`）。
 
 ## 6. 技术债（有空再议）
 

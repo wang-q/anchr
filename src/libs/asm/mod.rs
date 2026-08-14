@@ -2,4 +2,5 @@
 
 pub mod assemble;
 pub mod dfa;
+pub mod multik;
 pub mod tadpole;

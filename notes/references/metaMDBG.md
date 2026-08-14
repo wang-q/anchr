@@ -8,6 +8,13 @@
 > 工程化版本，与 pgr 的 `asm unitig`（bcalm 移植）同属 k-mer/unitig 路线，但其
 > 核心创新——**local progressive abundance filter（用丰度替代气泡解析处理菌株
 > 多样性）**——正好回应 pgr 讨论中"气泡不如不处理"的直觉。
+> **首要借鉴点（2026-08-14 重读补充）**：对 anchr 当前最有价值的是 **multi-k′
+> 迭代 + 跨接验证**——每轮 k 递增后，用当前 k 的 solid k′-min-mer（丰度 ≥ 2）
+> 验证上一轮 unitig 图里每条相邻 unitig 连接（doublet/triplet），不支持的边剪
+> 掉、支持的压实成新 unitig。这就是**连接 unitig 时对 bubble（分叉）的选择**：
+> 更大 k 的计数天然区分低丰度菌株分支与主路径。该机制是 DBG/unitig 组装通用的
+> "多轮 k 精化"模式，**与 OLC 无关**；OLC RepeatRemover（§4.2.1/§9）只是
+> metaMDBG 的另一个借鉴点，不是重点。
 > **与 OLC 的连接（2026-08-12）**：pgr `asm olc` 已落地，metaMDBG 的
 > 渐进丰度过滤与 RepeatRemover 直接映射其 v1 的"覆盖度证据 repeat
 > breaking"（见 §9）。
@@ -103,7 +110,9 @@ _lastK = Commons::computeLastK(_minimizerDensityAssembly, readStats._n50ReadLeng
    rescue 模式）；**后续轮**加载上一轮 refined abundance
    （`loadRefinedAbundances`），并从 `read_data_corrected.txt` **和**
    `unitig_data.txt`（上一轮的 unitig 序列）一起计数——这是
-   "unitig 反馈进下一轮"的实现。
+   "unitig 反馈进下一轮"的**序列部分**；此外后续轮在计数完成后还会调用
+   `computeNextUnitigGraph`（`CreateMdbg.cpp:3712`）加载上一轮 unitig 图做
+   **跨接验证**（图结构部分，见 §4.1.1）——这才是 multi-k 迭代的核心机制。
 2. `generateContigs(k, pass)`：`contig` 子命令。加载 unitig 图 →
    `ProgressiveAbundanceFilter::execute`（图简化，见 §6）→ `generateContigs3`
    从各 cutoff 快照生成 `contigs.nodepath`。
@@ -135,6 +144,54 @@ kminmerOverlapMean  = kminmerLengthMean - minimizerSpacingMean; // 相邻 k-min-
 之后每 +10）导出一次 GFA（`doesGenerateAssemblyGraph`，
 `AssemblyPipeline.hpp:831`；首轮过大不导出）——用"隔轮导出"控制磁盘/内存，
 pgr 的 `pl` 管道若多轮组装可参考。
+
+### 4.1.1 跨接验证：连接 unitig 时对 bubble 的选择 ★
+
+`CreateMdbg::computeNextUnitigGraph`（`CreateMdbg.cpp:3712`，仅
+`k > firstK+1` 时执行）是 multi-k 迭代的核心：**上一轮的 unitig 图结构本身
+被加载进当前轮**（`unitigGraph_prev.*`），然后按当前（更大的）k 重新验证每条
+相邻 unitig 连接。三个子步骤：
+
+```cpp
+solveEdges(unitigGraph);            // 1. 逐条验证 unitig 间连接
+removeUnsupportedUnitigs(unitigGraph); // 2. 删内部 k′-min-mer 无支撑的 unitig
+solveSmallUnitigs(unitigGraph);     // 3. 处理长度恰为单个 k′-min-mer 的小 unitig
+```
+
+1. **`solveEdges`**（`CreateMdbg.cpp:3874`）：对每条相邻 unitig 边
+   `pred → succ`，用 `getDoublet2` 构造**跨接 k′-min-mer（doublet）**：
+   前驱末尾 1 个 minimizer + 后继开头 k−1 个 minimizer（长度恰为**当前** k）。
+   查当前轮计数表 `_mdbgNodesLight`（丰度 ≤ 1 的不进表，见下）：
+   - `isEdgeSupported`（`CreateMdbg.hpp:3229`）：doublet 存在 → `createDoubletNode`
+     （`CreateMdbg.cpp:4063`）把 doublet 压实成新 unitig 节点，替换原直接边
+     （`pred → edgeNode → succ`）；
+   - doublet 不存在 → `removeSuccessor` 删除该边。
+   无论支持与否原边都会被移除（`CreateMdbg.cpp:4000-4001`），区别只在于
+   支持时经由新 edge node 重建连接、不支持时直接断开。
+2. **`removeUnsupportedUnitigs`**（`CreateMdbg.cpp:4138`）：unitig 内部所有
+   当前 k 的 k′-min-mer 必须在 `_mdbgNodesLight` 中存在，否则整条 unitig 删除
+   ——上一轮拼错/嵌合的 unitig 在更大 k 下内部 k′-min-mer 不 solid，被剔除。
+3. **`solveSmallUnitigsSub2`**（`CreateMdbg.cpp:4489`）：对上一轮长度恰为一个
+   k′-min-mer 的小 unitig（`_nbMinimizers == _kminmerSizePrev`），构造前向
+   triplet（前驱末尾 1 + 小 unitig 全部）与后向 triplet（小 unitig 全部 +
+   后继开头 1），各自也是当前 k 长度；分别查计数表得 `supportedPredecessors` /
+   `supportedSuccessors`，支持的前驱 × 后继**两两建边**，最后删掉小节点本身。
+
+**`_mdbgNodesLight` 的丰度传播**（`IndexKminmerFunctor`，
+`CreateMdbg.hpp:951`）：后续轮从 reads 和 `unitig_data.txt` 解析当前 k 的
+k′-min-mer 时，丰度取"其组成的前一轮 k−1 k′-min-mer 丰度"相邻两者的**最小值**
+（`getAbundance`，`CreateMdbg.hpp:1006`，`nbSubKminmers=2`），≤ 1 的直接
+`continue` 不进表（`CreateMdbg.hpp:1445`）——即表里只存 **solid（丰度 ≥ 2）**
+的当前 k 的 k′-min-mer。
+
+**这就是"连接 unitig 时对 bubble 的选择"**：上一轮 k 的 unitig 图在分歧点有
+多个候选后继（bubble）；进入更大 k 后，跨接每个候选的 k′-min-mer 互不相同，
+只有被 reads（+ unitig 序列）以丰度 ≥ 2 支撑的才保留连接，低丰度分支的边被
+剪掉、高丰度主路径保留并被压实成更长 unitig。**与 §6.3 渐进丰度过滤互补**：
+后者是同一轮内按 unitig 丰度删低覆盖节点（丰度阈值过滤），前者是**跨轮按
+更大 k 的 solid k′-min-mer 选边**（结构验证）——两者共同实现"渐进长单元化
++ 丰度驱动消歧"。这也是"unitig 反馈进下一轮"的图结构部分：上一轮 unitig
+不仅作为序列参与计数，其图结构还决定下一轮哪些连接候选被验证。
 
 ### 4.2 最终后处理（isFinalPass）
 
@@ -430,60 +487,71 @@ coverage ≤ `--min-contig-coverage`；或 length < `--min-contig-length`；或
 
 ## 8. 与 pgr 的对应/借鉴点
 
-1. **丰度过滤替代气泡解析**（最值得借鉴）：`ProgressiveAbundanceFilter` 的
+1. **multi-k 跨接验证 = 连接 unitig 时 bubble 的选择**（**首要借鉴**，
+   2026-08-14 重读补充，见 §4.1.1）：每轮 k 递增后用当前 k 的 solid
+   k′-min-mer（丰度 ≥ 2）验证上一轮 unitig 图每条相邻连接（doublet/triplet），
+   支持的压实成新 unitig、不支持的剪边；同时 `removeUnsupportedUnitigs` 剔除
+   内部 k′-min-mer 无支撑的嵌合 unitig。这给 pgr 的多 k 迭代（`asm unitig`
+   多趟、SKESA clean_reads 式反馈）提供了一个**结构验证骨架**：每轮之间
+   回放上一轮 unitig 边界处的 k-mer 计数即可选边，不需要额外启发式。与 OLC
+   无关，是"多重多次 Kmer"的核心价值。
+2. **丰度过滤替代气泡解析**（同轮机制，次优先）：`ProgressiveAbundanceFilter` 的
    "1.1x 起步、~10% 步长、边删边压实"策略可以直接映射到 pgr `asm contig`/
    `unitig` 的 `--min-coverage` 语义：不是单阈值一刀切，而是**多轮渐进 + 每轮
    重压实**，低覆盖菌株分支逐步被吞并。pgr 目前只有全局 `--min-coverage`，
    可考虑加"渐进模式"。
-2. **cutoff 快照倒序输出**：metaMDBG 存多个 cutoff 的图快照、生成 contig 时
+3. **cutoff 快照倒序输出**：metaMDBG 存多个 cutoff 的图快照、生成 contig 时
    从高丰度往低丰度补——天然适合"先出高置信 contig、再补低丰度"的宏基因组
    输出策略，pgr 的 `asm contig --min-coverage` 是单值，可借鉴快照思路。
-3. **unitig 丰度 = 中位数向量**：与 pgr `asm unitig`（bcalm 移植）的
+4. **unitig 丰度 = 中位数向量**：与 pgr `asm unitig`（bcalm 移植）的
    `km:f:` 平均丰度不同，metaMDBG 保留每个 unitig 的丰度向量并取中位数，
    merge 时合并向量。若 pgr unitig 要输出稳健丰度（宏基因组场景），可参考
    中位数语义。
-4. **k′-min-mer = minimizer 序列**：pgr 的 kmer 表是碱基 k-mer（u128 ≤ 64），
+5. **k′-min-mer = minimizer 序列**：pgr 的 kmer 表是碱基 k-mer（u128 ≤ 64），
    metaMDBG 的节点是"minimizer 序列"（k′ 个 minimizer 的向量，hash128）。
    两者维度不同：minimizer 空间天然支持长读（HiFi/ONT），pgr 目前是短读工具，
    这一块暂不对齐，但知道差距在哪。
-5. **内嵌 minimap2+spoa 抛光**：pgr 的 `asm map` 是完美匹配、无 gap；metaMDBG
+6. **内嵌 minimap2+spoa 抛光**：pgr 的 `asm map` 是完美匹配、无 gap；metaMDBG
    的 toBasespace 用 minimap2 容忍错误 + POA 抛光。若 pgr 未来要支持长读纠错
    或容错比对，metaMDBG 是"内嵌依赖"的参考，但 pgr 目前不引新依赖（用户约束）。
-6. **断点续跑**：checkpoint 文件机制简单实用，pgr 的 `pl` 管道若做多步任务
+7. **断点续跑**：checkpoint 文件机制简单实用，pgr 的 `pl` 管道若做多步任务
    可参考（不过 pgr 目前坚持原语路线，优先级低）。
-7. **multi-k 反馈 = 迭代式参数精化**（新增，2026-08-12）：把"组装"重构成
+8. **multi-k 反馈 = 迭代式参数精化**（新增，2026-08-12）：把"组装"重构成
    **"参数化子命令 + 磁盘中间文件 + 循环调度"**——同一 `graph`/`contig`/
    `toMinspace` 子命令被 `AssemblyPipeline` 以不同 `k` 反复调用，跨进程只通过
    `parameters.gz`（gzip 二进制参数 blob，`Parameters::load/save`）和
    `unitig_data.txt`/`refined_abundances` 传递状态。pgr 的单进程 `libs/` 路线
    不必照搬子进程，但**"迭代长度参数 + 反馈 unitig"** 的骨架可直接映射到
-   `asm` 的多趟 OLC/unitig 循环；`parameters.gz` 可类比 pgr 用 struct 传参。
-8. **外部分区计数（scale-out）**：k′-min-mer 计数不把全量 k-mer 塞内存，而是
+   `asm` 的多趟 OLC/unitig 循环（跨接验证语义见本列表第 1 条）；`parameters.gz`
+   可类比 pgr 用 struct 传参。
+9. **外部分区计数（scale-out）**：k′-min-mer 计数不把全量 k-mer 塞内存，而是
    `hash128 % nbPartitions`（`nbBases/20Gb`，clamp `[nbCores, 5000]`）写分区文件
    → 分区内去重计数 → 合并（`KminmerCounter::partitionKminmers`，
    `CreateMdbg.hpp:3652`）。这是典型的"外排序式"大数据手法，pgr 若做超大
    数据集（如 `kmer count` 溢出内存）可参考分区+归并，而非一味加大内存。
-9. **内存驱动的批量分片**：toBasespace 用 `--max-memory`（默认 8 GB，
+10. **内存驱动的批量分片**：toBasespace 用 `--max-memory`（默认 8 GB，
    `_maxMemoryGB/8`，clamp `[1,100]`）决定 minimap2 一次读入多少 reads
    （`ToBasespace2.hpp:337`）——峰值内存预算显式控制批大小。pgr 若加长读抛光，
    可把内存预算作为一等参数。
-10. **fragment = unitig 边界切分**（新增，2026-08-14）：把 contig 按"组成
-    k-min-mer 所属 unitig"切回片段再逐片算覆盖——"先按图结构分片、再回放 reads"
-    的模式与 pgr `asm map` 输出天然对齐（`to-rg` 后按 rg 边界即片段），是
-    RepeatRemover 桥接证据的地基（见 §4.2.1）。
-11. **read 桥接证据 = 图类型无关的 repeat breaking**（新增，2026-08-14）：
-    "read 同时覆盖 ≥2 片段 → 连接证据；无证据且覆盖异常 → 断开" 可复用到任何
-    "用 reads 验证连接"的场景，不限于 OLC（见 §4.2.1、§9.2）。
-12. **minimizer chaining 比对的取舍**（新增，2026-08-14）：低密度 minimizer 锚点 +
-    按 contig 分组 + chaining 过滤（`ReadVsContigMapper`），内存友好、容忍错误；
-    与 pgr `asm map` 的全 k-mer 完美匹配是不同取舍——pgr 精度优先，metaMDBG
-    内存/速度优先（见 §4.2.2）。
+11. **fragment = unitig 边界切分**（新增，2026-08-14）：把 contig 按"组成
+   k-min-mer 所属 unitig"切回片段再逐片算覆盖——"先按图结构分片、再回放 reads"
+   的模式与 pgr `asm map` 输出天然对齐（`to-rg` 后按 rg 边界即片段），是
+   RepeatRemover 桥接证据的地基（见 §4.2.1）。
+12. **read 桥接证据 = 图类型无关的 repeat breaking**（新增，2026-08-14）：
+   "read 同时覆盖 ≥2 片段 → 连接证据；无证据且覆盖异常 → 断开" 可复用到任何
+   "用 reads 验证连接"的场景，不限于 OLC（见 §4.2.1、§9.2）。
+13. **minimizer chaining 比对的取舍**（新增，2026-08-14）：低密度 minimizer 锚点 +
+   按 contig 分组 + chaining 过滤（`ReadVsContigMapper`），内存友好、容忍错误；
+   与 pgr `asm map` 的全 k-mer 完美匹配是不同取舍——pgr 精度优先，metaMDBG
+   内存/速度优先（见 §4.2.2）。
 
 > 结论：metaMDBG 对 pgr 的价值分三层（2026-08-14 更新）：
-> - **直接可移植**：§6.3 渐进丰度过滤（含交替收敛节奏、`2×cutoff` 保护、删后压实）、
->   unitig 丰度中位数、多 cutoff 快照倒序输出、RepeatRemover 桥接 reads 阈值
->   （`2×source` 与 `nbBridgingReads != 0`）。
-> - **架构参考**：multi-k 反馈、外部分区计数、内存驱动批分片、checkpoint 断点续跑。
+> - **直接可移植（首要）**：§4.1.1 multi-k 跨接验证（doublet/triplet 用当前 k
+>   的 solid k′-min-mer 选边 + `removeUnsupportedUnitigs` 嵌合清理）——连接
+>   unitig 时 bubble 的选择骨架；§6.3 渐进丰度过滤（同轮内丰度过滤，含交替
+>   收敛节奏、`2×cutoff` 保护、删后压实）、unitig 丰度中位数、多 cutoff 快照
+>   倒序输出、RepeatRemover 桥接 reads 阈值（`2×source` 与 `nbBridgingReads != 0`）。
+> - **架构参考**：multi-k 迭代调度、外部分区计数、内存驱动批分片、checkpoint 断点续跑。
 > - **语义对照**：minimizer-space 节点、minimap2+POA 抛光，与 pgr 短读+完美匹配
 >   路线距离较远，暂不借鉴但已知差距。
 

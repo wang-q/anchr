@@ -263,7 +263,7 @@ pub fn assemble<W: Write>(
 /// a second structure — the two full copies together were ~0.6 GB on G37
 /// full. Pairing is irrelevant for assembly (BCALM semantics): every record
 /// from every file contributes its k-mers in order.
-fn read_records(infiles: &[String]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+pub(crate) fn read_records(infiles: &[String]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     anyhow::ensure!(!infiles.is_empty(), "at least one input file is required");
     let mut reads: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut rec = SeqRecord::new();
@@ -282,16 +282,16 @@ fn read_records(infiles: &[String]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
 
 /// One maximal unitig (non-branching path; BCALM `graph3` semantics).
 #[derive(Clone)]
-struct Unitig {
-    bases: Vec<u8>,
-    id: usize,
-    coverage: f32,
-    min_cov: usize,
-    max_cov: usize,
+pub(crate) struct Unitig {
+    pub(crate) bases: Vec<u8>,
+    pub(crate) id: usize,
+    pub(crate) coverage: f32,
+    pub(crate) min_cov: usize,
+    pub(crate) max_cov: usize,
     /// The k-mer path closes back on itself (a circular contig).
-    circular: bool,
+    pub(crate) circular: bool,
     /// Per-k-mer canonical counts (`ab:Z:` vector); empty when not requested.
-    abundances: Vec<u32>,
+    pub(crate) abundances: Vec<u32>,
 }
 
 /// Assembles reads into maximal unitigs instead of seeded contigs.
@@ -385,7 +385,7 @@ pub fn assemble_unitigs_buf(
 }
 
 /// Shared core of the unitig assemblers: builds and sorts unitigs.
-fn assemble_unitigs_core(
+pub(crate) fn assemble_unitigs_core(
     infiles: &[String],
     opts: &AssembleOptions,
 ) -> Result<(Vec<Unitig>, AssembleStats)> {
@@ -485,10 +485,10 @@ fn assemble_unitigs_core(
 /// `true` = in-neighbor (`L:-:` from its left end). `to_rc` is the target
 /// strand.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Link {
-    to: usize,
-    from_rc: bool,
-    to_rc: bool,
+pub(crate) struct Link {
+    pub(crate) to: usize,
+    pub(crate) from_rc: bool,
+    pub(crate) to_rc: bool,
 }
 
 /// Computes links between unitigs sharing an endpoint (k-1)-mer, matching
@@ -501,7 +501,7 @@ struct Link {
 /// bcalm's 8-pass disk partitioning (`is_in_pass`) is only a memory-bounding
 /// device: both ends of a shared canonical (k-1)-mer hash to the same pass,
 /// so a single in-memory pass has identical semantics.
-fn compute_links(unitigs: &[Unitig], k: usize) -> Vec<Vec<Link>> {
+pub(crate) fn compute_links(unitigs: &[Unitig], k: usize) -> Vec<Vec<Link>> {
     if k < 2 || unitigs.is_empty() {
         return vec![Vec::new(); unitigs.len()];
     }

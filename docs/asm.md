@@ -12,6 +12,8 @@ reads and mapping reads back to an assembly.
 *   `ovlp`: Find exact overlaps between unitigs (OLC stage 1).
 *   `layout`: Chain unitigs into layouts from an overlap PAF (OLC stage 2).
 *   `cns`: Stitch layouts into consensus contigs (OLC stage 3).
+*   `multik`: Assemble reads into long unitigs by iterating over increasing
+    k (cross-round junction validation).
 *   `olc`: Assemble reads into contigs via multi-k unitig OLC (full
     pipeline).
 
@@ -355,6 +357,71 @@ anchr asm cns <layout.tsv> <infiles>... -o contigs.fa
 2.  **Drop short contigs**:
     ```bash
     anchr asm cns layout.tsv unitigs.fa -o contigs.fa --min-contig-len 500
+    ```
+
+---
+
+## multik
+
+Iterates the unitig graph over increasing k-mer lengths (metaMDBG-style
+cross-round validation): pass 0 assembles maximal unitigs at the first k,
+then every later k validates the previous graph. Each unitig link's bridge
+k-mer — the current-k window covering the shared `(k_prev-1)`-mer junction —
+must be solid (count >= `--min-count-extend`) in the reads plus the previous
+unitigs, and every internal k-mer of a long-enough unitig must stay solid
+(chimeric-unitig cleanup). A progressive abundance filter then drops the
+lowest-abundance unitigs (cutoff grows ~10% per round from 1.1 up to the
+graph maximum) and recompacts the surviving chains, so high-coverage strain
+divergence dissolves and the main path compacts into longer unitigs; dropped
+unitigs stay independent output, so low-abundance species are not lost.
+Validated links are compacted into longer unitigs, so confirmed connections
+grow monotonically instead of being re-split by a larger k. See
+`notes/design/asm-multik.md`.
+
+This is the iterative counterpart of `anchr asm olc` (parallel multi-k
+pooling + heuristic layout): junctions are accepted only when the larger k's
+k-mer count supports them, which selects bubble branches without heuristics
+and avoids the multi-k redundancy of pooled OLC.
+
+Input is one or more FASTA/FASTQ files, plain or gzipped; pairing is
+irrelevant for assembly (BCALM semantics), and `--list-files` accepts a
+one-path-per-line list.
+
+```bash
+anchr asm multik [OPTIONS] <infiles>...
+```
+
+### Options
+
+*   `-k, --kmer <int,int,...|auto>`: Comma-separated increasing k-mer
+    lengths, or `auto` (default) to derive them from the read-length N50
+    (21/41/61/81 for short reads, 31/61/91/121 for long reads; each k in
+    1..=128; sorted and deduplicated internally).
+*   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
+*   `--min-count-seed <int>`: Solid k-mer count threshold for pass 0
+    (default 3).
+*   `--min-count-extend <int>`: Solid k-mer count threshold for
+    cross-round validation (default 2).
+*   `-p, --parallel <int>`: Worker threads for counting (default 0 = all
+    cores).
+*   `--list-files`: Treat `<infiles>` as list files, one sequence file path
+    per line (blank lines and `#` comments are ignored).
+
+### Examples
+
+1.  **Iterate over three k values**:
+    ```bash
+    anchr asm multik reads.fq.gz -o unitigs.fa
+    ```
+
+2.  **Use explicit k values**:
+    ```bash
+    anchr asm multik reads.fq.gz -o unitigs.fa --kmer 21,51,81
+    ```
+
+3.  **Raise the validation threshold**:
+    ```bash
+    anchr asm multik reads.fa -o unitigs.fa --min-count-extend 3
     ```
 
 ---

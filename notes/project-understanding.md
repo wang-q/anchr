@@ -108,6 +108,7 @@ match app.get_matches().subcommand() {
 | 命令 | 对照 | 说明 |
 | :--- | :--- | :--- |
 | `contig` / `unitig` | tadpole / BCALM2 | k-mer 图组装 |
+| `multik` | metaMDBG | multi-k 迭代组装（unitig 图跨轮验证，无 N 核心方向，见 `design/asm-multik.md`） |
 | `ovlp` / `layout` / `cns` | OLC 三段 | 精确 overlap → 布局 → 一致序列 |
 | `olc` | — | 多 k unitig + OLC 组合流水线 |
 | `map` | bbmap perfectmode | reads 回帖（完美匹配） |
@@ -120,6 +121,9 @@ match app.get_matches().subcommand() {
   质量门控计数表、双向贪心扩展、泡泡消除（对照 `Tadpole.java`）；
 - `assemble.rs`：`assemble`（contig）/`assemble_unitigs`（unitig）入口，
   种子深度阈值、分支处理。
+- `multik.rs`：multi-k 迭代组装（unitig 图跨轮验证：桥接 k-mer 选边 +
+  嵌合清理 + 渐进丰度过滤/主路径保护 + recompact；设计
+  `design/asm-multik.md`）。
 
 ### 4.2 `libs/olc/` — OLC 三阶段
 
@@ -247,6 +251,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `asm-map.md` | perfect-mode map 移植 |
 | `fq-range.md` | FASTQ `.loc` 索引（range 命令） |
 | `asm-olc.md` | OLC 三段设计 |
+| `asm-multik.md` | multi-k 迭代组装（unitig 图跨轮验证，借鉴 metaMDBG；无 N 染色体核心方向） |
 | `qc.md` | 自有 QC 方案设计（FastQC/Falco 双参考，M1-M4 里程碑） |
 
 ## 11. 外部工具参考索引（notes/references/）
@@ -256,7 +261,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `bbtools.md` | fq/asm 主参考（tadpole/bbduk/bbmap/clumpify 等） |
 | `bcalm.md` | `asm unitig` 移植来源 |
 | `canu.md` / `celera.md` | `asm olc` 参考 |
-| `metaMDBG.md` / `skesa.md` / `megahit.md` | OLC v1 素材 / 多 k 迭代与图清洗参考 |
+| `metaMDBG.md` / `skesa.md` / `megahit.md` | multi-k 迭代（metaMDBG 首要借鉴，见 `asm-multik.md`）/ OLC v1 素材 / 图清洗参考 |
 | `cutadapt.md` / `sickle.md` | `fq trim-qual` 算法来源 |
 | `fairy.md` | `fq norm` 大数据方案调研 |
 | `quorum.md` | read 纠错参考（`fq ec-kmer`） |
@@ -272,5 +277,8 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 - `notes/benchmarks/qc-bench.md`：`fq qc` 端到端基准（anchr vs FastQC vs
   Falco，hyperfine；fastqc 1.1s 启动主导、falco 最快、anchr 慢 3× 且
   绝对值小，多线程小数据负优化）；
+- `notes/benchmarks/multik.md`：`asm multik` 吞吐 sanity check（1 Mb 合成
+  基因组 → 单条 100%，9.4 s / 816 MB）；
+- `notes/benchmarks/README.md`：benchmarks 目录索引；
 - `notes/todo.md`：近期待办清单（已完成/待实现/挂账/待验证/审计/技术债）；
 - 本文档为项目理解与索引入口；`AGENTS.md` 为行为准则。

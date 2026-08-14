@@ -3,6 +3,7 @@ pub mod common;
 pub mod contig;
 pub mod layout;
 pub mod map;
+pub mod multik;
 pub mod olc;
 pub mod ovlp;
 pub mod unitig;
@@ -19,6 +20,7 @@ pub fn make_subcommand() -> Command {
         .subcommand(ovlp::make_subcommand())
         .subcommand(layout::make_subcommand())
         .subcommand(cns::make_subcommand())
+        .subcommand(multik::make_subcommand())
         .subcommand(olc::make_subcommand())
         .subcommand(map::make_subcommand())
 }
@@ -30,6 +32,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         Some(("ovlp", sub_matches)) => ovlp::execute(sub_matches),
         Some(("layout", sub_matches)) => layout::execute(sub_matches),
         Some(("cns", sub_matches)) => cns::execute(sub_matches),
+        Some(("multik", sub_matches)) => multik::execute(sub_matches),
         Some(("olc", sub_matches)) => olc::execute(sub_matches),
         Some(("map", sub_matches)) => map::execute(sub_matches),
         _ => Ok(()),
