@@ -53,6 +53,14 @@
 - gz/大输入回归：默认 supermer 路径全链回归 + 峰值内存；
 - 560 bp 碎片 mis 覆盖度门槛（`asm-olc.md` §14.3，`--min-contig-len 1000`
   可滤，可选）。
+- `tsv-sample` 无种子（2_quorum/2_merge 的 shuffle）：down-sampling 随机
+  分桶会让 anchor/merge 有运行间波动。已修掉由此暴露的 dup 问题：
+  `consensus::coverage()` 从"最长单段覆盖率"改为"多块区间累计覆盖率"
+  （合并输出中整条被另一 contig 分两段覆盖的冗余 contig 现在会被
+  `dedup_contained_ratio` 0.99 丢弃），G37 merge_anchors dup 稳定回到
+  **1.000**（此前随机差的一轮为 1.205），0 mis、0 N、GF ~95.9% 不变；
+  新增测试 `dedups_multi_block_contained_contigs`。完全可复现仍可给
+  `tsv-sample` 加固定 `--seed`（待决）。
 
 ## 低风险审计（可顺手修）
 

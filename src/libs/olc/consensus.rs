@@ -70,10 +70,11 @@ pub fn consensus_with_ratio(
 }
 
 /// Drops contigs whose sequence is covered by >= `ratio` of a longer kept
-/// contig (either strand). Coverage is the longest exact common segment found
-/// by anchoring short seeds; multi-coverage-set unitigs are exact, so the
-/// near-duplicates differ only at their boundaries and the longest
-/// representative is kept.
+/// contig (either strand). Coverage accumulates every near-identical block
+/// found by anchoring short seeds, so a contig split into several blocks by
+/// small junction differences is still detected; multi-coverage-set unitigs
+/// are exact, so the near-duplicates differ only at their boundaries and the
+/// longest representative is kept.
 fn dedup_contained_ratio(mut contigs: Vec<Contig>, ratio: f64) -> Vec<Contig> {
     contigs.sort_by_key(|c| std::cmp::Reverse(c.seq.len()));
     let mut kept: Vec<Contig> = Vec::with_capacity(contigs.len());
@@ -100,23 +101,24 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty() && haystack.windows(needle.len()).any(|w| w == needle)
 }
 
-/// Fraction of `needle` covered by its longest near-identical segment inside
-/// `haystack` (either orientation is the caller's job). Anchors three seeds
-/// (head, middle, tail) and extends each hit while the accumulated mismatch
-/// rate stays within 1% — multi-coverage-set contigs for one region differ by
-/// a few bases at their boundaries and junctions, so an exact-only extension
-/// would stop too early (matching `anchr contained --idt 0.99` semantics).
+/// Fraction of `needle` covered by near-identical segments inside `haystack`
+/// (either orientation is the caller's job). Anchors three seeds (head,
+/// middle, tail), extends each hit while the accumulated mismatch rate stays
+/// within 1%, and merges the covered intervals — a contig fully present as
+/// several blocks (small junction differences) is still detected (matching
+/// `anchr contained --idt 0.99` semantics).
 fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
     if needle.len() < 100 {
         return if contains(haystack, needle) { 1.0 } else { 0.0 };
     }
     let seed_len = 100usize;
-    let mut best = 0usize;
     let seeds = [
         0usize,
         needle.len() / 2 - seed_len / 2,
         needle.len() - seed_len,
     ];
+    // Covered intervals on the needle, `[start, end)`.
+    let mut intervals: Vec<(usize, usize)> = Vec::new();
     for seed_start in seeds {
         let seed = &needle[seed_start..seed_start + seed_len];
         for (p, _) in haystack
@@ -150,10 +152,24 @@ fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
                     break;
                 }
             }
-            best = best.max(seed_len + left + right);
+            intervals.push((seed_start - left, seed_start + seed_len + right));
         }
     }
-    best as f64 / needle.len() as f64
+    // Merge overlapping intervals and sum the covered length.
+    intervals.sort_unstable();
+    let mut covered = 0usize;
+    let (mut cur_start, mut cur_end) = (0usize, 0usize);
+    for (s, e) in intervals {
+        if s > cur_end {
+            covered += cur_end - cur_start;
+            cur_start = s;
+            cur_end = e;
+        } else {
+            cur_end = cur_end.max(e);
+        }
+    }
+    covered += cur_end - cur_start;
+    covered.min(needle.len()) as f64 / needle.len() as f64
 }
 
 #[cfg(test)]
@@ -386,6 +402,62 @@ mod tests {
         assert_eq!(exact.len(), 2, "not an exact substring: both kept");
         let approx = consensus_with_ratio(&us, &layouts, 1, 0.95).unwrap();
         assert_eq!(approx.len(), 1, "boundary-differing duplicate merged");
+        assert_eq!(approx[0].seq.len(), long.len());
+    }
+
+    /// A contig fully covered by a longer one through two separate blocks
+    /// (a small junction difference between them) is deduplicated with
+    /// `--dedup-ratio < 1.0`: the blocks are summed, not just the longest.
+    #[test]
+    fn dedups_multi_block_contained_contigs() {
+        fn pseudo(len: usize, seed: u64) -> Vec<u8> {
+            let mut rng = seed;
+            let mut s = Vec::with_capacity(len);
+            for _ in 0..len {
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                s.push(b"ACGT"[(rng >> 33) as usize % 4]);
+            }
+            s
+        }
+        // short = B1 + M' + B2 vs long = B1 + M + B2: the 5-bp middle breaks
+        // the single-segment extension, but the B1/B2 blocks cover ~99.8%.
+        let b1 = pseudo(200, 42);
+        let b2 = pseudo(200, 43);
+        let mut long = b1.clone();
+        long.extend(b"CCCCC");
+        long.extend(&b2);
+        let mut short = b1.clone();
+        short.extend(b"GGGGG");
+        short.extend(&b2);
+        let us = unitigs(
+            &["u0", "u1"],
+            &[
+                std::str::from_utf8(&long).unwrap(),
+                std::str::from_utf8(&short).unwrap(),
+            ],
+        );
+        let layouts = vec![
+            layout(vec![LayoutStep {
+                unitig: 0,
+                strand: '+',
+                q_start: 0,
+                q_end: long.len(),
+                overlap_len: 0,
+            }]),
+            layout(vec![LayoutStep {
+                unitig: 1,
+                strand: '+',
+                q_start: 0,
+                q_end: short.len(),
+                overlap_len: 0,
+            }]),
+        ];
+        let exact = consensus_with_ratio(&us, &layouts, 1, 1.0).unwrap();
+        assert_eq!(exact.len(), 2, "not a single exact substring: both kept");
+        let approx = consensus_with_ratio(&us, &layouts, 1, 0.99).unwrap();
+        assert_eq!(approx.len(), 1, "multi-block duplicate merged");
         assert_eq!(approx[0].seq.len(), long.len());
     }
 
