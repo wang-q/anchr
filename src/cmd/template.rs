@@ -2,7 +2,6 @@ use clap::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Read;
 use tera::{Context, Tera};
 
 // Create clap subcommand arguments
@@ -434,7 +433,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     }
     if args.get_flag("fastk") {
         gen_fastk(&context)?;
-        gen_genescopefk(&context)?;
     }
 
     gen_trim(&context)?;
@@ -510,13 +508,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn decode_gz(bytes: &[u8]) -> anyhow::Result<String> {
-    let mut gz = flate2::read::MultiGzDecoder::new(bytes);
-    let mut s = String::new();
-    gz.read_to_string(&mut s)?;
-    Ok(s)
-}
-
 fn gen_repetitive(context: &Context) -> anyhow::Result<()> {
     let outname = "0_script/1_repetitive.sh";
     eprintln!("Create {}", outname);
@@ -578,22 +569,6 @@ fn gen_fastk(context: &Context) -> anyhow::Result<()> {
         ("t", include_str!("../../templates/2_fastk.tera.sh")),
     ])
     .unwrap();
-
-    let rendered = tera.render("t", context).unwrap();
-    anchr::utils::write_lines(outname, &[rendered.as_str()])?;
-
-    Ok(())
-}
-
-fn gen_genescopefk(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_script/genescopefk.R";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    static FILE_GS: &[u8] = include_bytes!("../../templates/genescopefk.R.gz");
-    let file_gs = decode_gz(FILE_GS).unwrap();
-
-    tera.add_raw_templates(vec![("t", file_gs)]).unwrap();
 
     let rendered = tera.render("t", context).unwrap();
     anchr::utils::write_lines(outname, &[rendered.as_str()])?;

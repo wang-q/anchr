@@ -26,9 +26,9 @@ Reads FASTQ file(s) and writes FastQC-compatible quality-control statistics:
 * `fastqc_data.txt` — per-module data (Basic Statistics, per-base/per-sequence
   quality, base content, GC content, N content, length distribution).
 * `summary.txt` — per-module pass/warn/fail.
+* `fastqc_report.html` — FastQC-compatible report (with `--format html/both`).
 
 Output goes to `<outdir>/<input>_fastqc/` for each input file (fastqc layout).
-The HTML report is planned for a later milestone.
 
 Examples:
 1. Basic QC of one file:

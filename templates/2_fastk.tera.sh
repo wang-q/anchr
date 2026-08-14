@@ -20,18 +20,22 @@ for PREFIX in R S T; do
     for KMER in 21 51 81; do
         log_info "PREFIX: ${PREFIX}; KMER: ${KMER}"
 
-        log_info "FastK"
-        FastK -v -T{{ opt.parallel }} -t1 -k${KMER} \
+        log_info "pgr kmer table"
+        pgr kmer table -k ${KMER} \
+            -o Table-${KMER}.pkt \
             ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
-            -NTable-${KMER}
 
-        log_info "GeneScope"
-        Histex -G Table-${KMER} |
-            Rscript ../../0_script/genescopefk.R -k ${KMER} -p 1 -o ${PREFIX}-GeneScope-${KMER}
+        log_info "pgr kmer gsize"
+        pgr kmer gsize --table Table-${KMER}.pkt \
+            --model -p 1 \
+            -o ${PREFIX}-GeneScope-${KMER}
 
-        KatGC -T{{ opt.parallel }} -x1.9 -s Table-${KMER} ${PREFIX}-Merqury-KatGC-${KMER}
+        log_info "pgr kmer gc"
+        pgr kmer gc --table Table-${KMER}.pkt \
+            -x1.9 \
+            -o ${PREFIX}-Merqury-KatGC-${KMER}.kgc
 
-        Fastrm Table-${KMER}
+        rm Table-${KMER}.pkt
     done
 done
 

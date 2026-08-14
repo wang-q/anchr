@@ -11,34 +11,18 @@ cd 1_genome/repetitive
 if [ ! -s repetitive.fa ]; then
     pgr fa size ../genome.fa > chr.sizes
 
-    FastK -v -p -k21 ../genome
+    pgr rept s-kmer ../genome.fa -k 21 --fill-kmer 2 --min-len 100 \
+        --fill-fragment 10 \
+        -o repetitive.json
 
-    cat chr.sizes |
-        number-lines |
-        parallel --col-sep "\t" --no-run-if-empty --linebuffer -k -j 4 '
-            Profex ../genome {1} |
-                sed "1,2 d" |
-                perl -nl -e '\''/(\d+).+(\d+)/ and printf qq(%s\t%s\n), $1 + 1, $2'\'' |
-                tsv-filter --ge 2:2 |
-                cut -f 1 |
-                sed "s/^/{2}:/" |
-                spanr cover stdin |
-                spanr span --op fill -n 2 stdin |
-                spanr span --op excise -n 100 stdin |
-                spanr span --op fill -n 10 stdin
-        ' |
-        spanr combine stdin \
-        > repetitive.json
+    pgr runlist convert repetitive.json \
+        > region.txt
 
-    Fastrm ../genome
-
-    spanr convert repetitive.json > region.txt
     pgr fa range ../genome.fa -r region.txt |
         pgr fa filter -N -d --min-len 100 stdin \
         > repetitive.fa
 
-    spanr stat chr.sizes repetitive.json |
-        tr ',' '\t' \
+    pgr runlist stat chr.sizes repetitive.json \
         > statRepetitive.tsv
 fi
 
