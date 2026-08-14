@@ -1,7 +1,7 @@
 # 现代组装流程总结（2026-08-15 会话收官）
 
 > 本文是长会话（SKESA/multik/OLC 改造/anchors/替代盘点）的完整总结，
-> 供后续会话快速恢复上下文。快速交接看 `todo.md` 开头的"会话交接"节；
+> 供后续会话快速恢复上下文。快速交接看 §1 现代流程与 §2.2 用户裁定；
 > 机制细节见 `asm-olc.md` §14、`references/anchr-legacy-pipeline.md` §5、
 > `benchmarks/multik-allgroups.md`。
 

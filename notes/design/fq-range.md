@@ -160,6 +160,12 @@ FASTQ 双端数据的 name 有三种常见模式：
 双端感知 S2：两个输入文件 + `-o/--outfile-2` 分离输出；交错输入单文件
 输出保持交错。索引层已就绪（每文件独立 `.loc`、name 归一化），增量在命令层。
 
+未决：**BGZF 的 `.gzi` 需外部预生成**——`CachedBgzfReader::open` 只读
+`.gzi` 不自动构建，`open_fq_indexed` 也只自动建 `.loc`；当前 BGZF 输入需
+先用 `pgr fa gz --index`（或 bgzip）生成 `.gzi`。若要在 anchr 侧免预生成，
+需封装 `pgr::libs::bgzf::build_gzi_index` 或请 pgr 补 CLI。另待真实 BGZF
+大文件（含 `.gzi`）端到端验证（现有测试为 plain + BGZF 小数据）。
+
 ## 8. 一期实现记录（2026-08）
 
 - 代码：`pgr::libs/loc.rs`（`normalize_pair_name`/`create_fq_loc`/

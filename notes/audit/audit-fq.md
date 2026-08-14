@@ -1,5 +1,8 @@
 # pgr fq 命令族代码审核记录（2026-08-11）
 
+> 维护约定：本文是迁移时的审计快照；fq 命令族已迁至 anchr，后续 anchr 侧
+> 对 fq 的修改应更新本审计记录（而非 pgr 侧）。
+
 对 `pgr fq`（10 个子命令）命令族及相关库文件（`libs/fq/{clump,norm,pairs,
 sample,split,trim,trim_adapter}`、`libs/fmt/fq`、`libs/fmt/seq`、`libs/loc`、
 `libs/par`）和全部测试/文档进行审核。本报告由 `audit-fa-fq-2bit.md` 中的 fq

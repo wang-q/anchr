@@ -203,6 +203,10 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 - 不重复基础层：格式 I/O、Phred、k-mer 表、PAF 解析一律走 pgr；
 - 不引入新的外部算法库替代已迁移实现（BBTools/BCALM 语义已本地化）；
 - 不内置 pgr 的比对/索引/遮蔽命令（那些留在 pgr）。
+- 不搬 pgr 专属基准：`benches/` 33 个 .rs 与 `notes/benchmarks/` 12 篇
+  均服务 pgr 剩余命令/基础层，留在 pgr；
+- 不做并行 walk（`--parallel-walk` 已撤：多阶段线程池叠加会卡死系统，
+  教训见 `design/asm-assemble.md` §12.2）。
 
 ## 7. 与周边项目的关系
 
@@ -253,6 +257,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `asm-olc.md` | OLC 三段设计 |
 | `asm-multik.md` | multi-k 迭代组装（unitig 图跨轮验证，借鉴 metaMDBG；无 N 染色体核心方向；§9 防 misassembly（bridge_filter/split_by_bridge）、§10 metaMDBG 对比，2026-08-15 并入） |
 | `asm-olc-modern-flow.md` | 现代组装流程总结（2026-08-15 会话收官：fq→multik→anchor→olc--unitigs→quast；完整总结与用户裁定） |
+| `fq-validation.md` | fq 前处理验证计划（2026-08-15：与老流程 reads 准备阶段逐一对账 + P0-P5 行动计划） |
 | `qc.md` | 自有 QC 方案设计（FastQC/Falco 双参考，M1-M4 里程碑） |
 
 ## 11. 外部工具参考索引（notes/references/）
@@ -282,5 +287,6 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 - `notes/benchmarks/multik.md`：`asm multik` 吞吐 sanity check（1 Mb 合成
   基因组 → 单条 100%，9.4 s / 816 MB）；
 - `notes/benchmarks/README.md`：benchmarks 目录索引；
-- `notes/todo.md`：近期待办清单（已完成/待实现/挂账/待验证/审计/技术债）；
+- `notes/todo.md`：待办清单（仅 actionable 项，历史结论与细节见各
+  design/benchmark 文档，会话交接见 `design/asm-olc-modern-flow.md`）；
 - 本文档为项目理解与索引入口；`AGENTS.md` 为行为准则。

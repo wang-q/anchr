@@ -1,5 +1,8 @@
 # asm 命令族代码审核记录（2026-08-13）
 
+> 维护约定：本文是迁移时的审计快照；后续 anchr 侧对 asm 的修改应更新本
+> 审计记录（而非 pgr 侧）。
+
 对 `anchr asm` 全部 7 个子命令（contig/unitig/ovlp/layout/cns/olc/map）及相关库
 文件（`libs/asm/assemble.rs`、`libs/asm/tadpole.rs`、`libs/olc/overlap.rs`、
 `libs/olc/layout.rs`、`libs/olc/consensus.rs`、`libs/map.rs`，以及
