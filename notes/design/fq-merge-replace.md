@@ -316,6 +316,37 @@ pairs，`tests/cli_fq_merge.rs`）：
 
 ## 7. 实现状态（tadpole ecc/extend 迁移完成，2026-08-11）
 
+### 7.3 merge 与 BBTools 的真实数据对照（2026-08-15）
+
+G37 Q25L60 50k 对（100k reads）实测（输入相同，两边分别跑）：
+
+* **无 extend2（`--strict`）**：fq merge 与 `bbmerge.sh strict` 的 merged
+  集合**逐条完全一致**（1,648 条，0 差异）；
+* **带 extend2=80 rem（老流程/模板参数）**：fq merge 与 `bbmerge-auto.sh
+  strict k=81 extend2=80 rem` 差 **2 条 / 50k 对（0.004%）**——fq 多合并
+  （ERR486835.274849、ERR486835.282548，merged 275-276 bp）；
+* **net vs classic 路径**：`--net bbmerge.bbnet` 与 `--no-make-vector`
+  在此数据上输出完全一致（模板的 classic 路径无额外差异）；
+* **根因定位**：差异只在 extend2 路径。BBTools rem 接受规则
+  （`BBMerge.java:2788`：`bestInsertE > approxMaxOverlappingInsert &&
+  extension >= minExt`）与 fq 实现（`insert > pre_len_sum-26 && e1+e2 >= 12`）
+  **逻辑等价**；2 条 reads 的 merged 长度恰在 approx_max（274）边界，
+  差异来自 **extend 后 overlap 检测的 insert/延伸长度边界微差**（fq
+  判定略宽松）。
+
+**2026-08-15 深挖记录（未修复，0.004% 可接受）**：逐一排除并验证——
+① rem 规则等价（对照 `BBMerge.java:2784-2792`）；② 延伸参数一致
+（minCountSeed=3/extend=2/branchMult1=20/minProb=0.5，`BBMerge.java:3161-
+3165`）；③ `isJunction` 逐行一致（`Tadpole.java:2573`）；④ 左分支检查
+双方默认关闭（`extendThroughLeftJunctions=true` → leftCounts=null）；
+⑤ R2 方向语义一致（fq `process_pair` 内部 rev_comp 等价 BBMerge 的
+"同向状态"）；⑥ 建表输入一致（maxReads=-1 全量）；⑦ 尝试把 retry 条件
+改为 BBTools 的 `e1>0||e2>0` 才 retry —— **被 golden 测试否决**
+（`command_fq_merge_extend2_rem_matches_bbtools_golden` 失败，说明 fq
+原无条件 retry 才是正确语义），已还原。剩余 2 条差异的精确机制需要
+BBTools per-read 延伸调试（Tadpole verbose 不输出 extendToRight2 细节），
+成本 > 收益（0.004%），记录为已知边界差异。
+
 **`anchr fq ec-kmer` / `anchr fq extend` 已实现并通过 BBTools 40.01 黑盒逐字节对照**
 （Lambda 40k pairs 全量 + 2k pairs 子集 golden，`tests/cli_fq_ecc.rs` /
 `tests/cli_fq_extend.rs`，fmt/clippy clean，全量测试绿）：

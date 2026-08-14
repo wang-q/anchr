@@ -164,11 +164,11 @@ FASTQ 双端数据的 name 有三种常见模式：
 rejects_outfile_2_without_pair。交错输入单文件输出保持交错的路径由
 `#n` 消歧 + 顺序保持保证（§5.4）。
 
-未决：**BGZF 的 `.gzi` 需外部预生成**——`CachedBgzfReader::open` 只读
-`.gzi` 不自动构建，`open_fq_indexed` 也只自动建 `.loc`；当前 BGZF 输入需
-先用 `pgr fa gz --index`（或 bgzip）生成 `.gzi`。若要在 anchr 侧免预生成，
-需封装 `pgr::libs::bgzf::build_gzi_index` 或请 pgr 补 CLI。真实 BGZF
-大文件（含 `.gzi`）端到端已在小数据验证（2026-08-15，bgzip 生成）。
+**已完成（2026-08-15）**：BGZF 输入 `.gzi` **自动生成**——`fq range`
+检测 BGZF（`pgr::is_bgzf`）且 `.gzi` 缺失或旧于输入时，调用
+`pgr::libs::bgzf::build_gzi_index` 自动构建，无需外部 `pgr fa gz
+--index` / bgzip 步骤。测试 `command_fq_range_bgzf_autobuilds_gzi`；
+真实 bgzip 文件端到端验证通过（无 `.gzi` → 自动生成 + 提取正确）。
 
 ## 8. 一期实现记录（2026-08）
 

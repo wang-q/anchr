@@ -104,6 +104,20 @@ fn extract_file(
     mut out: impl Write,
 ) -> anyhow::Result<()> {
     let mut cache: lru::LruCache<String, Vec<u8>> = lru::LruCache::new(cache_capacity);
+    // BGZF inputs need a sibling `.gzi` block index; build it automatically
+    // when missing or older than the input, so `fq range` works without a
+    // separate `pgr fa gz --index` / bgzip step.
+    if pgr::is_bgzf(infile) {
+        let gzi = format!("{infile}.gzi");
+        let stale = match (std::fs::metadata(&gzi), std::fs::metadata(infile)) {
+            (Ok(g), Ok(src)) => g.modified().ok() < src.modified().ok(),
+            (Err(_), Ok(_)) => true,
+            _ => false,
+        };
+        if stale {
+            pgr::libs::bgzf::build_gzi_index(infile)?;
+        }
+    }
     let (mut reader, loc_of) = pgr::libs::loc::open_fq_indexed(infile, force_update)?;
     for el in ranges.iter() {
         let rg = Range::from_str(el);

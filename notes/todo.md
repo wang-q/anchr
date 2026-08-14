@@ -7,9 +7,8 @@
 
 ## 待实现
 
-- `fq range` 剩余：BGZF `.gzi` 免预生成（封装
-  `pgr::libs::bgzf::build_gzi_index` 或 pgr 补 CLI）；
-  双端感知 S2 已完成（2026-08-15 核对，`design/fq-range.md` §7）；
+- ~~`fq range` 剩余~~（2026-08-15 全部完成：双端感知 S2 已核对 +
+  BGZF `.gzi` 自动生成已实现，见 `design/fq-range.md` §7）；
 - `dep`/`ena`/`template` 的外部工具版本核对（dazzler/hnsm 预装清单）。
 
 ## 挂账 / 待决
