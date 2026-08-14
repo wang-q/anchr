@@ -65,18 +65,16 @@ fi
 log_info "Create anchors"
 
 cd ${BASH_DIR}/..
-mkdir -p 8_mr_spades/anchor
-cd 8_mr_spades/anchor
+mkdir -p 8_mr_spades
+cd 8_mr_spades
 
-anchr anchors \
-    ../spades.non-contained.fasta \
+anchr asm anchor \
+    spades.non-contained.fasta \
     ${BASH_DIR}/../2_illumina/merge/pe.cor.fa.gz \
-    --readl {{ opt.readl }} \
-    --uscale {{ opt.uscale }} \
+    --mincov 5 --mscale 3 \
     --lscale {{ opt.lscale }} \
+    --uscale {{ opt.uscale }} \
     -p {{ opt.parallel }} \
-    --ratio 0.98 \
-    -o anchors.sh
-bash anchors.sh
+    -o anchor.fasta
 
 exit 0;

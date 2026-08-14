@@ -114,14 +114,11 @@ if [ ! -f R.mosdepth.summary.txt ]; then
                     print qq($F[0]:$start-$end);
                 }
             ' |
-            spanr cover stdin -o covered.json
+            pgr rg cover stdin -o covered.json
 
-        spanr stat chr.sizes covered.json -o stdout |
+        pgr runlist stat chr.sizes covered.json |
             grep -v "^all" |
-            sed 's/^chr/chrom/' |
-            sed 's/,size/,covLength/' |
-            sed 's/,coverage/,covRate/' |
-            sed 's/,/\t/g' \
+            sed 's/^chr/chrom/' \
             > coverage.tsv
 
         # join

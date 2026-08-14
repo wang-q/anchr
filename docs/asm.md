@@ -66,7 +66,7 @@ work fine (BCALM semantics).
 
 ### Examples
 
-1.  **Assemble contigs from corrected reads (anchr unitigs step)**:
+1.  **Assemble contigs from corrected reads**:
     ```bash
     anchr asm contig pe.cor.fa -o unitigs_K31.fasta --kmer 31
     ```

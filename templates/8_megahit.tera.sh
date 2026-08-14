@@ -50,18 +50,16 @@ fi
 #----------------------------#
 log_info "Create anchors"
 
-mkdir -p 8_megahit/anchor
-cd 8_megahit/anchor
+mkdir -p 8_megahit
+cd 8_megahit
 
-anchr anchors \
-    ../megahit.non-contained.fasta \
+anchr asm anchor \
+    megahit.non-contained.fasta \
     ${DIR_READS}/pe.cor.fa.gz \
-    --readl {{ opt.readl }} \
-    --uscale {{ opt.uscale }} \
+    --mincov 5 --mscale 3 \
     --lscale {{ opt.lscale }} \
+    --uscale {{ opt.uscale }} \
     -p {{ opt.parallel }} \
-    --ratio 0.98 \
-    -o anchors.sh
-bash anchors.sh
+    -o anchor.fasta
 
 exit 0;

@@ -24,7 +24,7 @@ ESTIMATED_GENOME_SIZE={{ opt.genome }}
 save ESTIMATED_GENOME_SIZE
 
 for PREFIX in R S T; do
-    if [ ! -e ../trim/${PREFIX}1.fq.gz ]; then
+    if [ ! -e ../trim/${PREFIX}1.fq ]; then
         continue;
     fi
 
@@ -32,13 +32,13 @@ for PREFIX in R S T; do
     PREFIXM=$(echo ${PREFIX} | tr 'A-Z' 'V-ZA-U')   # M N O
     PREFIXU=$(echo ${PREFIX} | tr 'A-Z' 'D-ZA-C')   # U V W
 
-    if [ -e ${PREFIX}1.fq.gz ]; then
-        log_debug "2_illumina/merge/${PREFIXM}1.fq.gz presents"
+    if [ -e ${PREFIX}1.fq ]; then
+        log_debug "2_illumina/merge/${PREFIXM}1.fq presents"
         continue;
     fi
 
     anchr mergeread \
-        ../trim/${PREFIX}1.fq.gz ../trim/${PREFIX}2.fq.gz ../trim/${PREFIX}s.fq.gz \
+        ../trim/${PREFIX}1.fq ../trim/${PREFIX}2.fq ../trim/${PREFIX}s.fq \
 {% if opt.prefilter != "0" -%}
         --prefilter {{ opt.prefilter }} \
 {% endif -%}
@@ -52,18 +52,18 @@ for PREFIX in R S T; do
     # Create .cor.fa.gz
     anchr fq interleave \
         --name-prefix unmerged \
-        ${PREFIXU}1.fq.gz \
-        ${PREFIXU}2.fq.gz \
+        ${PREFIXU}1.fq \
+        ${PREFIXU}2.fq \
         > ${PREFIXM}.interleave.fa
 
     anchr fq interleave \
         --name-prefix single \
-        ${PREFIXU}s.fq.gz \
+        ${PREFIXU}s.fq \
         >> ${PREFIXM}.interleave.fa
 
     anchr fq interleave \
         --name-prefix merged \
-        ${PREFIXM}1.fq.gz \
+        ${PREFIXM}1.fq \
         >> ${PREFIXM}.interleave.fa
 
     # Shuffle interleaved read pairs.
@@ -83,7 +83,7 @@ for PREFIX in R S T; do
     rm ${PREFIXM}.interleave.fa
     pigz -p {{ opt.parallel }} ${PREFIXM}.cor.fa
 
-    log_info "stats of all .fq.gz files"
+    log_info "stats of all .fq files"
     if [ ! -e statMergeReads.tsv ]; then
         printf "%s\t%s\t%s\t%s\n" \
             "Name" "N50" "Sum" "#" \
@@ -91,11 +91,11 @@ for PREFIX in R S T; do
     fi
 
     for NAME in clumped ecco eccc ecct extended merged.raw unmerged.raw unmerged.trim ${PREFIXM}1 ${PREFIXU}1 ${PREFIXU}2 ${PREFIXU}s; do
-        if [ ! -e ${NAME}.fq.gz ]; then
+        if [ ! -e ${NAME}.fq ]; then
             continue
         fi
         printf "%s\t%s\t%s\t%s\n" \
-            $(echo ${NAME}; stat_format_fq ${NAME}.fq.gz;) >> statMergeReads.tsv
+            $(echo ${NAME}; stat_format_fq ${NAME}.fq;) >> statMergeReads.tsv
     done
 
     printf "%s\t%s\t%s\t%s\n" \
@@ -134,10 +134,10 @@ for PREFIX in R S T; do
             >> statMergeInsert.tsv
     done
 
-    log_info "clear unneeded .fq.gz files"
+    log_info "clear unneeded .fq files"
     for NAME in temp clumped ecco eccc ecct extended merged.raw unmerged.raw unmerged.trim; do
-        if [ -e ${NAME}.fq.gz ]; then
-            rm ${NAME}.fq.gz
+        if [ -e ${NAME}.fq ]; then
+            rm ${NAME}.fq
         fi
     done
 

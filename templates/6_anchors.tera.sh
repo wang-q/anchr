@@ -10,7 +10,7 @@ log_warn 6_anchors.sh
 #----------------------------#
 USAGE="Usage: $0 [DIR_PREFIX]"
 
-DIR_PREFIX=${1:-"6_unitigs_superreads"}
+DIR_PREFIX=${1:-"6_unitigs_multik"}
 
 {% set parallel2 = opt.parallel | int / 2 -%}
 {% set parallel2 = parallel2 | round(method="floor") -%}
@@ -21,7 +21,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
     fi
 
     echo >&2 '==> ${DIR_PREFIX}/MRX{1}P{2}'
-    if [ -e ${DIR_PREFIX}/MRX{1}P{2}/anchor/anchor.fasta ]; then
+    if [ -e ${DIR_PREFIX}/MRX{1}P{2}/anchor.fasta ]; then
         echo >&2 '    anchor.fasta already presents'
         exit;
     fi
@@ -31,22 +31,17 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         exit;
     fi
 
-    if [ -d ${DIR_PREFIX}/MRX{1}P{2}/anchor ]; then
-        rm -fr ${DIR_PREFIX}/MRX{1}P{2}/anchor
-    fi
-    mkdir -p ${DIR_PREFIX}/MRX{1}P{2}/anchor
-    cd ${DIR_PREFIX}/MRX{1}P{2}/anchor
+    mkdir -p ${DIR_PREFIX}/MRX{1}P{2}
+    cd ${DIR_PREFIX}/MRX{1}P{2}
 
-    anchr anchors \
-        ../unitigs.fasta \
-        ../pe.cor.fa \
-        --readl {{ opt.readl }} \
-        --uscale {{ opt.uscale }} \
+    anchr asm anchor \
+        unitigs.fasta \
+        pe.cor.fa \
+        --mincov 5 --mscale 3 \
         --lscale {{ opt.lscale }} \
+        --uscale {{ opt.uscale }} \
         -p {{ parallel2 }} \
-        --keepedge \
-        -o anchors.sh
-    bash anchors.sh
+        -o anchor.fasta
 
     echo >&2
     " ::: {{ opt.cov }} ::: $(printf "%03d " {0..{{ opt.splitp }}})

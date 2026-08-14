@@ -4,7 +4,6 @@
 # Run
 #----------------------------#
 log_warn 0_cleanup.sh
-{% set unitiggers = opt.unitigger | split(pat=" ") -%}
 {# Keep a blank line #}
 # Illumina
 parallel --no-run-if-empty --linebuffer -k -j 1 "
@@ -36,15 +35,8 @@ if [ -d 2_illumina ]; then
 fi
 
 # down sampling
-{% for u in unitiggers -%}
-find . -type f -path "*4_unitigs_{{ u }}/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_unitigs_{{ u }}/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*4_unitigs_{{ u }}/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
-
-find . -type f -path "*6_unitigs_{{ u }}/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_unitigs_{{ u }}/*/anchor*" -name "basecov.txt" | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_unitigs_{{ u }}/*/anchor*" -name "*.sam"       | parallel --no-run-if-empty -j 1 rm
-{% endfor -%}
+find . -type f -path "*4_unitigs_multik/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_unitigs_multik/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
 {# Keep a blank line #}
 # tempdir
 find . -type d -name "\?" | xargs rm -fr
@@ -89,18 +81,16 @@ if [ -e statAnchors.md ]; then
     cat statAnchors.md;
     echo;
 fi
-{% for u in unitiggers -%}
-if [ -e 9_markdown/statUnitigs{{ u | title }}.md ]; then
+if [ -e 9_markdown/statUnitigsMultik.md ]; then
     echo;
-    cat 9_markdown/statUnitigs{{ u | title }}.md
-    echo;
-fi
-if [ -e 9_markdown/statMRUnitigs{{ u | title }}.md ]; then
-    echo;
-    cat 9_markdown/statMRUnitigs{{ u | title }}.md;
+    cat 9_markdown/statUnitigsMultik.md
     echo;
 fi
-{% endfor -%}
+if [ -e 9_markdown/statMRUnitigsMultik.md ]; then
+    echo;
+    cat 9_markdown/statMRUnitigsMultik.md;
+    echo;
+fi
 if [ -e 9_markdown/statMergeAnchors.md ]; then
     echo;
     cat 9_markdown/statMergeAnchors.md;

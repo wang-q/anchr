@@ -16,7 +16,6 @@ fn main() -> anyhow::Result<()> {
         .about("Anchr - the Assembler of N-free CHRomosomes")
         .propagate_version(true)
         .arg_required_else_help(true)
-        .subcommand(cmd::anchors::make_subcommand())
         .subcommand(cmd::asm::make_subcommand())
         .subcommand(cmd::contained::make_subcommand())
         .subcommand(cmd::covered::make_subcommand())
@@ -36,7 +35,6 @@ fn main() -> anyhow::Result<()> {
         .subcommand(cmd::show2ovlp::make_subcommand())
         .subcommand(cmd::template::make_subcommand())
         .subcommand(cmd::trim::make_subcommand())
-        .subcommand(cmd::unitigs::make_subcommand())
         .after_help(
             r###"
 Subcommand groups:
@@ -54,7 +52,7 @@ Subcommand groups:
         * group
         * layout
 * Assembling
-    * trim / quorum / mergeread / unitigs / anchors
+    * trim / quorum / mergeread
     * template
 
 "###,
@@ -87,8 +85,6 @@ Subcommand groups:
         Some(("trim", sub_matches)) => cmd::trim::execute(sub_matches),
         Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),
         Some(("mergeread", sub_matches)) => cmd::mergeread::execute(sub_matches),
-        Some(("unitigs", sub_matches)) => cmd::unitigs::execute(sub_matches),
-        Some(("anchors", sub_matches)) => cmd::anchors::execute(sub_matches),
         Some(("template", sub_matches)) => cmd::template::execute(sub_matches),
         _ => unreachable!(),
     }?;

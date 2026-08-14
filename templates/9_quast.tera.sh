@@ -4,7 +4,6 @@
 # Run
 #----------------------------#
 log_warn 9_quast.sh
-{% set unitiggers = opt.unitigger | split(pat=" ") -%}
 
 QUAST_TARGET=
 QUAST_LABEL=
@@ -13,19 +12,15 @@ if [ -e 1_genome/genome.fa ]; then
     QUAST_TARGET+=" -R 1_genome/genome.fa "
 fi
 
-{% for u in unitiggers -%}
-if [ -e 7_merge_unitigs_{{ u }}/anchor.merge.fasta ]; then
-    QUAST_TARGET+=" 7_merge_unitigs_{{ u }}/anchor.merge.fasta "
-    QUAST_LABEL+="merge_{{ u }},"
+if [ -e 7_merge_unitigs_multik/anchor.merge.fasta ]; then
+    QUAST_TARGET+=" 7_merge_unitigs_multik/anchor.merge.fasta "
+    QUAST_LABEL+="merge_multik,"
 fi
-{% endfor -%}
 {# Keep a blank line #}
-{% for u in unitiggers -%}
-if [ -e 7_merge_mr_unitigs_{{ u }}/anchor.merge.fasta ]; then
-    QUAST_TARGET+=" 7_merge_mr_unitigs_{{ u }}/anchor.merge.fasta "
-    QUAST_LABEL+="merge_mr_{{ u }},"
+if [ -e 7_merge_mr_unitigs_multik/anchor.merge.fasta ]; then
+    QUAST_TARGET+=" 7_merge_mr_unitigs_multik/anchor.merge.fasta "
+    QUAST_LABEL+="merge_mr_multik,"
 fi
-{% endfor -%}
 {# Keep a blank line #}
 if [ -e 7_merge_anchors/anchor.merge.fasta ]; then
     QUAST_TARGET+=" 7_merge_anchors/anchor.merge.fasta "

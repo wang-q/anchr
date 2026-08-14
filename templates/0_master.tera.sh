@@ -4,7 +4,6 @@
 # Run
 #----------------------------#
 log_warn 0_master.sh
-{% set unitiggers = opt.unitigger | split(pat=" ") -%}
 {# Keep a blank line #}
 #----------------------------#
 # Illumina QC
@@ -63,17 +62,15 @@ if [ -e 0_script/4_down_sampling.sh ]; then
     bash 0_script/4_down_sampling.sh
 fi
 
-{% for u in unitiggers -%}
-if [ -e 0_script/4_unitigs_{{ u }}.sh ]; then
-    bash 0_script/4_unitigs_{{ u }}.sh
+if [ -e 0_script/4_unitigs_multik.sh ]; then
+    bash 0_script/4_unitigs_multik.sh
 fi
 if [ -e 0_script/4_anchors.sh ]; then
-    bash 0_script/4_anchors.sh 4_unitigs_{{ u }}
+    bash 0_script/4_anchors.sh 4_unitigs_multik
 fi
 if [ -e 0_script/9_stat_anchors.sh ]; then
-    bash 0_script/9_stat_anchors.sh 4_unitigs_{{ u }} statUnitigs{{ u | title }}.md
+    bash 0_script/9_stat_anchors.sh 4_unitigs_multik statUnitigsMultik.md
 fi
-{% endfor -%}
 {# Keep a blank line #}
 {% if opt.merge == "1" and opt.se == "0" -%}
 #----------------------------#
@@ -83,34 +80,28 @@ if [ -e 0_script/6_down_sampling.sh ]; then
     bash 0_script/6_down_sampling.sh
 fi
 
-{% for u in unitiggers -%}
-if [ -e 0_script/6_unitigs_{{ u }}.sh ]; then
-    bash 0_script/6_unitigs_{{ u }}.sh
+if [ -e 0_script/6_unitigs_multik.sh ]; then
+    bash 0_script/6_unitigs_multik.sh
 fi
 if [ -e 0_script/6_anchors.sh ]; then
-    bash 0_script/6_anchors.sh 6_unitigs_{{ u }}
+    bash 0_script/6_anchors.sh 6_unitigs_multik
 fi
 if [ -e 0_script/9_stat_anchors.sh ]; then
-    bash 0_script/9_stat_mr_anchors.sh 6_unitigs_{{ u }} statMRUnitigs{{ u | title }}.md
+    bash 0_script/9_stat_mr_anchors.sh 6_unitigs_multik statMRUnitigsMultik.md
 fi
-{% endfor -%}
 {% endif -%}
 {# Keep a blank line #}
 #----------------------------#
 # merge anchors
 #----------------------------#
-{% for u in unitiggers -%}
 if [ -e 0_script/7_merge_anchors.sh ]; then
-    bash 0_script/7_merge_anchors.sh 4_unitigs_{{ u }} 7_merge_unitigs_{{ u }}
+    bash 0_script/7_merge_anchors.sh 4_unitigs_multik 7_merge_unitigs_multik
 fi
-{% endfor -%}
 {# Keep a blank line #}
 {% if opt.merge == "1" and opt.se == "0" -%}
-{% for u in unitiggers -%}
 if [ -e 0_script/7_merge_anchors.sh ]; then
-    bash 0_script/7_merge_anchors.sh 6_unitigs_{{ u }} 7_merge_mr_unitigs_{{ u }}
+    bash 0_script/7_merge_anchors.sh 6_unitigs_multik 7_merge_mr_unitigs_multik
 fi
-{% endfor -%}
 {% endif -%}
 {# Keep a blank line #}
 if [ -e 0_script/7_merge_anchors.sh ]; then

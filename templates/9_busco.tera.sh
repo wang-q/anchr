@@ -4,7 +4,6 @@
 # Run
 #----------------------------#
 log_warn 9_busco.sh
-{% set unitiggers = opt.unitigger | split(pat=" ") -%}
 
 ARRAY=()
 
@@ -18,17 +17,13 @@ if [ -e 1_genome/repetitive.fa ]; then
     ARRAY+=('repetitive::1_genome/repetitive.fa')
 fi
 
-{% for u in unitiggers -%}
-if [ -e 7_merge_unitigs_{{ u }}/anchor.merge.fasta ]; then
-    ARRAY+=('merge_{{ u }}::7_merge_unitigs_{{ u }}/anchor.merge.fasta')
+if [ -e 7_merge_unitigs_multik/anchor.merge.fasta ]; then
+    ARRAY+=('merge_multik::7_merge_unitigs_multik/anchor.merge.fasta')
 fi
-{% endfor -%}
 {# Keep a blank line #}
-{% for u in unitiggers -%}
-if [ -e 7_merge_mr_unitigs_{{ u }}/anchor.merge.fasta ]; then
-    ARRAY+=('merge_mr_{{ u }}::7_merge_mr_unitigs_{{ u }}/anchor.merge.fasta')
+if [ -e 7_merge_mr_unitigs_multik/anchor.merge.fasta ]; then
+    ARRAY+=('merge_mr_multik::7_merge_mr_unitigs_multik/anchor.merge.fasta')
 fi
-{% endfor -%}
 {# Keep a blank line #}
 if [ -e 7_merge_anchors/anchor.merge.fasta ]; then
     ARRAY+=('merge_anchors::7_merge_anchors/anchor.merge.fasta')

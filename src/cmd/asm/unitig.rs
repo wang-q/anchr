@@ -33,7 +33,7 @@ Notes:
 * Supports both plain text and gzipped (.gz) files
 
 Examples:
-1. Assemble unitigs from corrected reads (anchr unitigs step):
+1. Assemble unitigs from corrected reads:
    anchr asm unitig pe.cor.fa -o unitigs_K31.fasta --kmer 31
 
 2. Assemble from paired-end reads:
