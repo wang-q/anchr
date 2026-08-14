@@ -24,7 +24,7 @@ ESTIMATED_GENOME_SIZE={{ opt.genome }}
 save ESTIMATED_GENOME_SIZE
 
 for PREFIX in R S T; do
-    if [ ! -e ../trim/${PREFIX}1.fq ]; then
+    if [ ! -e ../trim/${PREFIX}1.fq.gz ]; then
         continue;
     fi
 
@@ -32,13 +32,13 @@ for PREFIX in R S T; do
     PREFIXM=$(echo ${PREFIX} | tr 'A-Z' 'V-ZA-U')   # M N O
     PREFIXU=$(echo ${PREFIX} | tr 'A-Z' 'D-ZA-C')   # U V W
 
-    if [ -e ${PREFIX}1.fq ]; then
-        log_debug "2_illumina/merge/${PREFIXM}1.fq presents"
+    if [ -e ${PREFIXM}1.fq ] || [ -e ${PREFIXM}1.fq.gz ]; then
+        log_debug "2_illumina/merge/${PREFIXM}1.fq(.gz) presents"
         continue;
     fi
 
     anchr mergeread \
-        ../trim/${PREFIX}1.fq ../trim/${PREFIX}2.fq ../trim/${PREFIX}s.fq \
+        ../trim/${PREFIX}1.fq.gz ../trim/${PREFIX}2.fq.gz ../trim/${PREFIX}s.fq.gz \
 {% if opt.prefilter != "0" -%}
         --prefilter {{ opt.prefilter }} \
 {% endif -%}
@@ -138,6 +138,13 @@ for PREFIX in R S T; do
     for NAME in temp clumped ecco eccc ecct extended merged.raw unmerged.raw unmerged.trim; do
         if [ -e ${NAME}.fq ]; then
             rm ${NAME}.fq
+        fi
+    done
+
+    log_info "compress kept merge outputs"
+    for NAME in M1 U1 U2 Us; do
+        if [ -e ${NAME}.fq ]; then
+            pigz -p {{ opt.parallel }} ${NAME}.fq
         fi
     done
 

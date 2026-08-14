@@ -50,7 +50,7 @@ awk 'NR%4==1' {{ opt.prefix }}.discard.fastq |
     sed 's/^@//' \
     > {{ opt.prefix }}.discard.lst
 
-# FASTA 输出（下游依赖 pe.cor.fa）
+# FASTA 输出（下游依赖 pe.cor.fa.gz）
 anchr fq to-fa {{ opt.prefix }}.cor.fastq \
     -o {{ opt.prefix }}.cor.fa
 

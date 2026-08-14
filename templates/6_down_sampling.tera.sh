@@ -22,7 +22,8 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
     if [[ {} == 'all' ]]; then
         mkdir -p 6_down_sampling/MRXallP000
         cd 6_down_sampling/MRXallP000
-        gzip -dcf ../../2_illumina/merge/pe.cor.fa.gz > pe.cor.fa
+        gzip -dcf ../../2_illumina/merge/pe.cor.fa.gz |
+            pigz -p {{ opt.parallel }} > pe.cor.fa.gz
         cp ../../2_illumina/merge/env.json .
         exit;
     fi
@@ -47,6 +48,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
         mv  \"6_down_sampling/MRX{}/\${P}.fa\" \
             \"6_down_sampling/MRX{}P\${P}/pe.cor.fa\"
+        pigz -p {{ opt.parallel }} \"6_down_sampling/MRX{}P\${P}/pe.cor.fa\"
         cp 2_illumina/merge/env.json \"6_down_sampling/MRX{}P\${P}\"
     done
 

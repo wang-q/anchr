@@ -35,7 +35,7 @@ printf "%s\t" \
 
 	        pushd ${DIR_PREFIX}/Q${Q}L${L}X${X}P${P}/ > /dev/null
 
-	        SUM_COR=$( pgr fa n50 -H -N 0 -S ../../4_down_sampling/Q${Q}L${L}X${X}P${P}/pe.cor.fa )
+	        SUM_COR=$( pgr fa n50 -H -N 0 -S ../../4_down_sampling/Q${Q}L${L}X${X}P${P}/pe.cor.fa.gz )
 
             printf "%s\t" \
 		        "Q${Q}L${L}X${X}P${P}" \

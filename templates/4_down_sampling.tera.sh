@@ -20,7 +20,8 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
     if [[ {3} == 'all' ]]; then
         mkdir -p 4_down_sampling/Q{1}L{2}XallP000
         cd 4_down_sampling/Q{1}L{2}XallP000
-        gzip -dcf ../../2_illumina/Q{1}L{2}/pe.cor.fa.gz > pe.cor.fa
+        gzip -dcf ../../2_illumina/Q{1}L{2}/pe.cor.fa.gz |
+            pigz -p {{ opt.parallel }} > pe.cor.fa.gz
         cp ../../2_illumina/Q{1}L{2}/env.json .
         exit;
     fi
@@ -45,6 +46,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
         mv  \"4_down_sampling/Q{1}L{2}X{3}/\${P}.fa\" \
             \"4_down_sampling/Q{1}L{2}X{3}P\${P}/pe.cor.fa\"
+        pigz -p {{ opt.parallel }} \"4_down_sampling/Q{1}L{2}X{3}P\${P}/pe.cor.fa\"
         cp 2_illumina/Q{1}L{2}/env.json \"4_down_sampling/Q{1}L{2}X{3}P\${P}\"
     done
 

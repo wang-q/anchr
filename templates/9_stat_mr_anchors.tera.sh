@@ -33,7 +33,7 @@ for X in {{ opt.cov }}; do
 
 		pushd ${DIR_PREFIX}/MRX${X}P${P}/ > /dev/null
 
-		SUM_COR=$( pgr fa n50 -H -N 0 -S ../../6_down_sampling/MRX${X}P${P}/pe.cor.fa )
+		SUM_COR=$( pgr fa n50 -H -N 0 -S ../../6_down_sampling/MRX${X}P${P}/pe.cor.fa.gz )
 
         printf "%s\t" \
 			"MRX${X}P${P}" \

@@ -16,7 +16,7 @@ DIR_PREFIX=${1:-"4_unitigs_multik"}
 {% set parallel2 = parallel2 | round(method="floor") -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
 parallel --no-run-if-empty --linebuffer -k -j 2 "
-    if [ ! -e 4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa ]; then
+    if [ ! -e 4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz ]; then
         exit;
     fi
 
@@ -36,7 +36,7 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
     anchr asm anchor \
         unitigs.fasta \
-        ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa \
+        ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
         --mincov 5 --mscale 3 \
         --lscale {{ opt.lscale }} \
         --uscale {{ opt.uscale }} \

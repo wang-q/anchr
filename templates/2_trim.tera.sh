@@ -13,8 +13,8 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    if [ -e ${PREFIX}1.fq ]; then
-        log_debug "2_illumina/trim/${PREFIX}1.fq presents"
+    if [ -e ${PREFIX}1.fq ] || [ -e ${PREFIX}1.fq.gz ]; then
+        log_debug "2_illumina/trim/${PREFIX}1.fq(.gz) presents"
         continue;
     fi
 
@@ -45,18 +45,27 @@ for PREFIX in R S T; do
     fi
 
     for NAME in clumpify filteredbytile highpass sample trim filter ${PREFIX}1 ${PREFIX}2 ${PREFIX}s; do
-        if [ ! -e ${NAME}.fq ]; then
+        FQ=${NAME}.fq
+        [ -e ${FQ} ] || FQ=${NAME}.fq.gz
+        if [ ! -e ${FQ} ]; then
             continue;
         fi
 
         printf "%s\t%s\t%s\t%s\n" \
-            $(echo ${NAME}; stat_format_fq ${NAME}.fq;) >> statTrimReads.tsv
+            $(echo ${NAME}; stat_format_fq ${FQ};) >> statTrimReads.tsv
     done
 
     log_info "clear unneeded .fq files"
     for NAME in temp clumpify filteredbytile highpass sample trim filter; do
         if [ -e ${NAME}.fq ]; then
             rm ${NAME}.fq
+        fi
+    done
+
+    log_info "compress trim outputs"
+    for NAME in ${PREFIX}1 ${PREFIX}2 ${PREFIX}s; do
+        if [ -e ${NAME}.fq ]; then
+            pigz -p {{ opt.parallel }} ${NAME}.fq
         fi
     done
 done

@@ -6,7 +6,7 @@
 log_warn {{ outname }}
 
 parallel --no-run-if-empty --linebuffer -k -j 1 "
-    if [ ! -e 6_down_sampling/MRX{1}P{2}/pe.cor.fa ]; then
+    if [ ! -e 6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz ]; then
         exit;
     fi
 
@@ -20,7 +20,7 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     cd 6_unitigs_multik/MRX{1}P{2}
 
     anchr asm multik \
-        ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa \
+        ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
         -k 31,41,51,61,71,81 \
         -p {{ opt.parallel }} \
         -o unitigs.fasta
