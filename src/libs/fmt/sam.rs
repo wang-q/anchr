@@ -121,8 +121,8 @@ pub fn ihist<R: BufRead, W: Write>(reader: R, writer: &mut W) -> Result<()> {
     let proper_n = insert_sizes.len() as u64;
 
     // Outlier removal: keep `median ± 10*MAD`.
-    let kept: Vec<u32> = if insert_sizes.len() < 3 {
-        insert_sizes.clone()
+    let (mad, kept): (u32, Vec<u32>) = if insert_sizes.len() < 3 {
+        (0, insert_sizes.clone())
     } else {
         let med = insert_sizes[(insert_sizes.len() - 1) / 2];
         let mut devs: Vec<u32> = insert_sizes.iter().map(|&x| x.abs_diff(med)).collect();
@@ -130,13 +130,16 @@ pub fn ihist<R: BufRead, W: Write>(reader: R, writer: &mut W) -> Result<()> {
         let mad = devs[(devs.len() - 1) / 2];
         if mad > 0 {
             let cutoff = 10u32.saturating_mul(mad);
-            insert_sizes
-                .iter()
-                .copied()
-                .filter(|&x| x.abs_diff(med) <= cutoff)
-                .collect()
+            (
+                mad,
+                insert_sizes
+                    .iter()
+                    .copied()
+                    .filter(|&x| x.abs_diff(med) <= cutoff)
+                    .collect(),
+            )
         } else {
-            insert_sizes.clone()
+            (mad, insert_sizes.clone())
         }
     };
 
@@ -177,11 +180,16 @@ pub fn ihist<R: BufRead, W: Write>(reader: R, writer: &mut W) -> Result<()> {
     writeln!(writer, "#Median\t{median}")?;
     writeln!(writer, "#Mode\t{mode}")?;
     writeln!(writer, "#STDev\t{stdev:.3}")?;
+    writeln!(writer, "#MAD\t{mad}")?;
+    writeln!(writer, "#Min\t{}", kept.first().copied().unwrap_or(0))?;
+    writeln!(writer, "#Max\t{}", kept.last().copied().unwrap_or(0))?;
     writeln!(
         writer,
         "#PercentOfPairs\t{:.3}",
         proper_n as f64 * 100.0 / total_pairs.max(1) as f64
     )?;
+    writeln!(writer, "#ReadPairs\t{proper_n}")?;
+    writeln!(writer, "#Orientation\tFR")?;
     writeln!(writer, "#InsertSize\tCount")?;
     let mut i = 0usize;
     while i < kept.len() {

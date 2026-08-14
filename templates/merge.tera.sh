@@ -32,7 +32,7 @@ rm clumpeds.fq
 {% endif -%}
 rm -f temp.fq; ln -s clumped.fq temp.fq
 
-# Error-correct: overlap (bbmerge ecco replacement)
+# Error-correct: overlap
 log_info "Error-correct: overlap"
 anchr fq ec-overlap \
     temp.fq \
@@ -42,7 +42,7 @@ anchr fq ec-overlap \
 rm temp.fq; ln -s ecco.fq temp.fq
 rm -f clumped.fq
 
-# Error-correct: kmer graph (tadpole ecc replacement)
+# Error-correct: kmer graph
 log_info "Error-correct: kmer"
 anchr fq ec-kmer \
     temp.fq \

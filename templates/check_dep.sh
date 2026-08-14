@@ -43,14 +43,14 @@ perl -MNumber::Format -e "1" 2>/dev/null || {
 }
 
 #----------------------------#
-# QC / insert-size / merge (optional references and retained picard)
+# QC / merge (optional references; picard kept for 3_bwa BAM processing)
 #----------------------------#
 hash fastqc 2>/dev/null || {
     echo >&2 "fastqc is optional (reference for fq qc) but it's not installed."
 }
 
 hash picard 2>/dev/null || {
-    echo >&2 "picard is required (2_insert_size / 3_bwa) but it's not installed."
+    echo >&2 "picard is required (3_bwa) but it's not installed."
 }
 
 #----------------------------#

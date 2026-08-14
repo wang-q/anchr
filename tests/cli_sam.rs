@@ -102,7 +102,7 @@ fn command_sam_ihist_basic() {
         .run();
     assert_eq!(
         stdout,
-        "#Mean\t70.000\n#Median\t70\n#Mode\t70\n#STDev\t0.000\n#PercentOfPairs\t100.000\n#InsertSize\tCount\n70\t2\n"
+        "#Mean\t70.000\n#Median\t70\n#Mode\t70\n#STDev\t0.000\n#MAD\t0\n#Min\t70\n#Max\t70\n#PercentOfPairs\t100.000\n#ReadPairs\t2\n#Orientation\tFR\n#InsertSize\tCount\n70\t2\n"
     );
 }
 
@@ -164,6 +164,7 @@ fn command_sam_ihist_filters_outliers() {
     );
     assert!(stdout.contains("#Mean\t144.500"), "stdout: {stdout}");
     assert!(stdout.contains("#Median\t144"), "stdout: {stdout}");
+    assert!(stdout.contains("#Max\t149"), "stdout: {stdout}");
     assert!(
         stdout.contains("#PercentOfPairs\t100.000"),
         "stdout: {stdout}"
@@ -185,6 +186,6 @@ fn command_sam_ihist_empty() {
         .run();
     assert_eq!(
         stdout,
-        "#Mean\t0.000\n#Median\t0\n#Mode\t0\n#STDev\t0.000\n#PercentOfPairs\t0.000\n#InsertSize\tCount\n"
+        "#Mean\t0.000\n#Median\t0\n#Mode\t0\n#STDev\t0.000\n#MAD\t0\n#Min\t0\n#Max\t0\n#PercentOfPairs\t0.000\n#ReadPairs\t0\n#Orientation\tFR\n#InsertSize\tCount\n"
     );
 }

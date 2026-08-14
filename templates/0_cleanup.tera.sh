@@ -14,7 +14,7 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     " ::: clumpify sample trim filter
 
 # insertSize
-rm -f 2_illumina/insert_size/*tadpole.contig.fa*
+rm -f 2_illumina/insert_size/*contig.fasta
 
 # bwa
 if [ -d 3_bwa ]; then

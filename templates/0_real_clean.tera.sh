@@ -21,11 +21,9 @@ rm -fr 2_illumina/*.tsv
 # down sampling
 rm -fr 4_down_sampling
 rm -fr 4_unitigs*
-rm -fr 4_tadpole*
 
 rm -fr 6_down_sampling
 rm -fr 6_unitigs*
-rm -fr 6_tadpole*
 
 # mergeAnchors, anchorLong and anchorFill
 rm -fr 7_merge*

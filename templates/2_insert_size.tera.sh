@@ -13,35 +13,24 @@ for PREFIX in R S T; do
         continue;
     fi
 
-    if [ -e ${PREFIX}.ihist.tadpole.txt ]; then
+    if [ -e ${PREFIX}.ihist.contig.txt ]; then
         continue;
     fi
 
     anchr asm contig \
         ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
-        -o ${PREFIX}.tadpole.contig.fasta
+        -o ${PREFIX}.contig.fasta
 
     anchr asm map \
-        ${PREFIX}.tadpole.contig.fasta \
+        ${PREFIX}.contig.fasta \
         ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
         --paired \
         --max-reads {{ opt.reads }} \
-        --outm ${PREFIX}.tadpole.sam
+        --outm ${PREFIX}.contig.sam
 
     anchr sam ihist \
-        ${PREFIX}.tadpole.sam \
-        -o ${PREFIX}.ihist.tadpole.txt
-
-    picard SortSam \
-        -I ${PREFIX}.tadpole.sam \
-        -O ${PREFIX}.tadpole.sort.bam \
-        --SORT_ORDER coordinate \
-        --VALIDATION_STRINGENCY LENIENT
-
-    picard CollectInsertSizeMetrics \
-        -I ${PREFIX}.tadpole.sort.bam \
-        -O ${PREFIX}.insert_size.tadpole.txt \
-        --Histogram_FILE ${PREFIX}.insert_size.tadpole.pdf
+        ${PREFIX}.contig.sam \
+        -o ${PREFIX}.ihist.contig.txt
 
     if [ -e ../../1_genome/genome.fa ]; then
         anchr asm map \
@@ -54,24 +43,14 @@ for PREFIX in R S T; do
         anchr sam ihist \
             ${PREFIX}.genome.sam \
             -o ${PREFIX}.ihist.genome.txt
-
-        picard SortSam \
-            -I ${PREFIX}.genome.sam \
-            -O ${PREFIX}.genome.sort.bam \
-            --SORT_ORDER coordinate
-
-        picard CollectInsertSizeMetrics \
-            -I ${PREFIX}.genome.sort.bam \
-            -O ${PREFIX}.insert_size.genome.txt \
-            --Histogram_FILE ${PREFIX}.insert_size.genome.pdf
     fi
 
-    find . -name "${PREFIX}.*.sam" -or -name "${PREFIX}.*.sort.bam" |
+    find . -name "${PREFIX}.*.sam" |
         parallel --no-run-if-empty -j 1 rm
 done
 
-printf "%s\t%s\t%s\t%s\t%s\n" \
-    "Group" "Mean" "Median" "STDev" "Pairs%/Orientation" \
+printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
+    "Group" "Mean" "Median" "STDev" "Pairs%" "Orientation" \
     > statInsertSize.tsv
 
 # anchr sam ihist
@@ -81,7 +60,7 @@ printf "%s\t%s\t%s\t%s\t%s\n" \
 #STDev	134.676
 #PercentOfPairs	36.247
 for PREFIX in R S T; do
-    for G in genome tadpole; do
+    for G in genome contig; do
         if [ ! -e ${PREFIX}.ihist.${G}.txt ]; then
             continue;
         fi
@@ -90,41 +69,18 @@ for PREFIX in R S T; do
             GROUP="${PREFIX}.${G}" perl -nla -e '
                 BEGIN { our $stat = { }; };
 
-                m{\#(Mean|Median|STDev|PercentOfPairs)} or next;
+                m{\#(Mean|Median|STDev|PercentOfPairs|Orientation)} or next;
                 $stat->{$1} = $F[1];
 
                 END {
-                    printf qq(%s\t%.1f\t%s\t%.1f\t%.2f%%\n),
-                        qq($ENV{GROUP}.ihist),
+                    printf qq(%s\t%.1f\t%s\t%.1f\t%.2f%%\t%s\n),
+                        qq($ENV{GROUP}),
                         $stat->{Mean},
                         $stat->{Median},
                         $stat->{STDev},
-                        $stat->{PercentOfPairs};
+                        $stat->{PercentOfPairs},
+                        $stat->{Orientation};
                 }
-                '
-    done
-done \
-    >> statInsertSize.tsv
-
-# picard CollectInsertSizeMetrics
-#MEDIAN_INSERT_SIZE	MODE_INSERT_SIZE	MEDIAN_ABSOLUTE_DEVIATION	MIN_INSERT_SIZE	MAX_INSERT_SIZE	MEAN_INSERT_SIZE	STANDARD_DEVIATION	READ_PAIRS	PAIR_ORIENTATION	WIDTH_OF_10_PERCENT	WIDTH_OF_20_PERCENT	WIDTH_OF_30_PERCENT	WIDTH_OF_40_PERCENT	WIDTH_OF_50_PERCENT	WIDTH_OF_60_PERCENT	WIDTH_OF_70_PERCENT	WIDTH_OF_80_PERCENT	WIDTH_OF_90_PERCENT	WIDTH_OF_95_PERCENT	WIDTH_OF_99_PERCENT	SAMPLE	LIBRARY	READ_GROUP
-#296	287	14	92	501	294.892521	21.587526	1611331	FR	7	11	17	23	29	35	41	49	63	81	145
-for PREFIX in R S T; do
-    for G in genome tadpole; do
-        if [ ! -e ${PREFIX}.insert_size.${G}.txt ]; then
-            continue;
-        fi
-
-        cat ${PREFIX}.insert_size.${G}.txt |
-            GROUP="${PREFIX}.${G}" perl -nla -F"\t" -e '
-                next if @F < 9;
-                next unless /^\d/;
-                printf qq(%s\t%.1f\t%s\t%.1f\t%s\n),
-                    qq($ENV{GROUP}.picard),
-                    $F[5],
-                    $F[0],
-                    $F[6],
-                    $F[8];
                 '
     done
 done \
