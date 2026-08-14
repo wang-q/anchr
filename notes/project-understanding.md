@@ -253,6 +253,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `asm-olc.md` | OLC 三段设计 |
 | `asm-multik.md` | multi-k 迭代组装（unitig 图跨轮验证，借鉴 metaMDBG；无 N 染色体核心方向） |
 | `asm-multik-misassembly.md` | multik 防 misassembly 方案（anchors 覆盖度区间过滤核心，精简实现；三层次：cov 一致性/局部剖面/reads 桥接） |
+| `metaMDBG-vs-multik.md` | metaMDBG 与 `asm multik` 实现对比（架构/机制/性能/借鉴与差异） |
 | `qc.md` | 自有 QC 方案设计（FastQC/Falco 双参考，M1-M4 里程碑） |
 
 ## 11. 外部工具参考索引（notes/references/）

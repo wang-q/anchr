@@ -484,7 +484,38 @@ anchr 现状：`asm contig/unitig` 用 pgr 的 `KmerTable`（canonical 2-bit u12
    local contig 直接喂 `seq2sdbg`，另用 `iterate` 从 reads 补 (k+step+1)-mer 边；
    anchr `asm olc` 也是多 k，但目前各 k 独立出 unitig、无反馈（`notes/design/
    asm-olc.md`）——MEGAHIT 的"引导 + 迭代边"是 v2 反馈环的直接素材（与 SKESA 的
-   `clean_reads` 反馈、metaMDBG 的 unitig 反馈同族）。
+   `clean_reads` 反馈、metaMDBG 的 unitig 反馈同族）。**`asm multik`（2026-08-14）
+   已实现反馈环**（metaMDBG 式图级反馈），与 megahit 的引导机制对比见 §8.6。
+
+### 8.6 与 `asm multik` 的关联（2026-08-14 补充）
+
+`asm multik` 已实现（借鉴 metaMDBG，`notes/design/asm-multik.md`），megahit 的
+multi-k 迭代与之**同族但机制不同**：
+
+| | megahit | `asm multik` |
+|---|---|---|
+| 迭代步 | k 列表 21→141（+8/+10/+20），每轮**重建**更大 k 的图 | auto 21/41/61/81/101/121，unitig 图结构保留 |
+| 上一轮产物 | **序列级引导**：contigs/bubbles 喂 `seq2sdbg` 建新 k 图 | **图级反馈**：unitig 图 + compute_links 边保留，跨接验证选边 |
+| reads 桥接 | `iterate`：contig 端点索引 + reads 回帖，提取跨端点的 (k+step+1)-mer 迭代边（**建图素材**） | `bridge_filter`：60-mer 探针验证 unitig 间连接（**验证边**） |
+| unitig 生成 | 每轮 `assemble` 重新压缩（`NextSimplePathEdge`） | pass 0 一次，后续轮只验证/压实（不重新 unitig 化） |
+
+**关键差异**：megahit 每轮"重建 + 引导"（旧 contigs 是新图的种子），multik 每轮
+"验证 + 压实"（旧 unitig 图是验证对象）。两者都解决"更大 k 特异性的接入"：
+megahit 用 iterate 边把跨 contig 的 reads 证据带进新图；multik 用 bridge_kmer/
+探针验证跨 unitig 的连接。**megahit 的 iterate（contig 端点索引 + reads 回帖）
+与 multik 的 bridge_filter（探针桥接）是同族机制**——megahit 在建图侧、multik
+在验证侧。
+
+**可借鉴**（multik 视角）：megahit 的引导把"已确定的骨架"（contigs）直接带进
+下一轮，multik 的图级反馈保留了结构但**没利用 unitig 序列做更大 k 的计数引导**
+（multik 的 count_at 把 unitigs 序列作为输入计数，但迭代边提取——跨 unitig 的
+更大 k 连接——靠 bridge_kmer 验证而非"收集"）。若 multik 未来需要"把 contig
+序列喂进下一轮建图"（megahit seq2sdbg 式），可用 `TadpoleTable::build_supermer`
+对 unitigs 序列直接计数（已支持多序列输入）——这是 megahit 引导在 multik 的
+最小映射。**已实现（2026-08-14，v6）**：multik 的渐进过滤删的低丰度分支作为
+下一轮 unitigs 回灌（megahit bubble 回灌 + metaMDBG unitig 反馈结合），
+G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
+§4.11）。
 6. **本地组装（§4.5）**：MEGAHIT 用 reads 回帖 + IDBA-UD 内核做 contig 端点延伸，
    与 anchr `fq extend`（tadpole 沿图延伸）目标相近；其 `min_mapping_len=75`、
    `LocalRange = min(2*mean, mean+3*sd)` 封顶 650 等参数可对照。

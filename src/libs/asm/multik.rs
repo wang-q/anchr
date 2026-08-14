@@ -87,8 +87,14 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
     let (mut unitigs, _) = assemble_unitigs_core(infiles, &assemble_opts)?;
     let mut links = compute_links(&unitigs, ks[0]);
 
-    // Iterative rounds: validate the graph with each larger k.
+    // Iterative rounds: validate the graph with each larger k. Low-abundance
+    // branching unitigs are pruned every round but CARRIED into the next
+    // round's graph (megahit bubble re-feeding + metaMDBG unitig feedback):
+    // strain/polymorphic sequences keep participating in assembly instead of
+    // being emitted as dropped fragments only.
+    let mut carried: Vec<Unitig> = Vec::new();
     for &k in &ks[1..] {
+        unitigs.append(&mut carried);
         let t_round = std::time::Instant::now();
         let t0 = std::time::Instant::now();
         let table = count_at(&unitigs, infiles, k, opts.parallel)?;
@@ -124,6 +130,9 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
         // abundance pruning here — that is deferred to the final filter, so
         // single-genome coverage fluctuation never drops real content.
         recompact_graph(&mut unitigs, &mut links, k0);
+        // 4. Prune low-abundance branching/isolated unitigs and carry them
+        // into the next round (the final round's carry becomes output).
+        carried = progressive_filter(&mut unitigs, &mut links, k0);
         if std::env::var_os("ANCHR_MULTIK_TIMING").is_some() {
             let n = unitigs.len();
             let bp: usize = unitigs.iter().map(|u| u.bases.len()).sum();
@@ -136,12 +145,6 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
         }
     }
 
-    // Final abundance filter (once, not per round): drop low-abundance
-    // branching/isolated unitigs so the main path recompacts; dropped
-    // unitigs stay independent output (mirroring metaMDBG's cutoff
-    // snapshots).
-    let low_abundance = progressive_filter(&mut unitigs, &mut links, k0);
-
     // Split unitigs at internal positions that have no reads support (the
     // abundance filter's recompaction can fuse chimeric links into a single
     // unitig — the source of G37 relocations). Every 100-mer window of a
@@ -152,9 +155,20 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
     // join distant regions, so every surviving link needs bridging reads.
     bridge_filter(&unitigs, &mut links, infiles, k0, 30, 2)?;
 
+    // Megahit-style cleaning on the final (compacted) unitigs: drop short
+    // low-depth tips and disconnect weak links (depth-proportional, see
+    // megahit tip_remover / weak_link_remover). Doing this per round was
+    // too aggressive on the k0=21 fragments (G37 longest 52.8k -> 32.6k);
+    // after compaction the tips are real and few.
+    tip_remover(&mut unitigs, &mut links, k0 * 2, 20.0);
+    weak_link_remover(&mut unitigs, &mut links, 0.05);
+
     // Final compaction: merge validated chains into long unitigs.
     let mut chains = merge_chains(&unitigs, &links, k0)?;
-    chains.extend(low_abundance);
+    chains.extend(carried.into_iter().map(|u| MultikUnitig {
+        bases: u.bases,
+        coverage: u.coverage,
+    }));
     chains.sort_by_key(|u| std::cmp::Reverse(u.bases.len()));
     Ok(chains)
 }
@@ -436,6 +450,89 @@ fn split_by_bridge(
     Ok(())
 }
 
+/// Megahit-style tip removal: short unitigs (<= `max_tip_len`) that are
+/// tips (one end has no connection) with depth far below their neighbour
+/// (`neighbour > depth_ratio * self`) are error tips and dropped.
+fn tip_remover(
+    unitigs: &mut Vec<Unitig>,
+    links: &mut Vec<Vec<Link>>,
+    max_tip_len: usize,
+    depth_ratio: f32,
+) {
+    let keep: Vec<bool> = unitigs
+        .iter()
+        .enumerate()
+        .map(|(i, u)| {
+            if u.bases.len() > max_tip_len {
+                return true;
+            }
+            let out = links[i].len();
+            let in_deg = links
+                .iter()
+                .filter(|ls| ls.iter().any(|l| l.to == i))
+                .count();
+            if out + in_deg == 0 {
+                return true; // isolated: handled by the abundance filter
+            }
+            let is_tip = (out == 0 && in_deg >= 1) || (out >= 1 && in_deg == 0);
+            if !is_tip {
+                return true;
+            }
+            // Deepest neighbour depth.
+            let mut max_neighbour = 0.0f32;
+            for l in links[i].iter() {
+                max_neighbour = max_neighbour.max(unitigs[l.to].coverage);
+            }
+            for (j, ls) in links.iter().enumerate() {
+                if ls.iter().any(|l| l.to == i) {
+                    max_neighbour = max_neighbour.max(unitigs[j].coverage);
+                }
+            }
+            u.coverage * depth_ratio < max_neighbour
+        })
+        .collect();
+    retain_graph(unitigs, links, &keep);
+}
+
+/// Megahit-style weak-link disconnection: at a branching unitig end
+/// (out-degree >= 2), a neighbour whose depth is <= `local_ratio` of the
+/// total neighbour depth is disconnected (edge dropped, node kept) — the
+/// neighbour is likely a different strain sharing this region, not a real
+/// continuation.
+fn weak_link_remover(unitigs: &mut [Unitig], links: &mut [Vec<Link>], local_ratio: f32) {
+    for (i, u) in unitigs.iter().enumerate() {
+        if u.bases.is_empty() {
+            continue;
+        }
+        // For each end (from_rc false = right, true = left) with out-degree
+        // >= 2, disconnect neighbours below the proportional threshold.
+        for from_rc in [false, true] {
+            let mut total_depth = 0.0f32;
+            let mut depths: Vec<(usize, f32)> = Vec::new();
+            for (e, l) in links[i].iter().enumerate() {
+                if l.from_rc != from_rc {
+                    continue;
+                }
+                let d = unitigs[l.to].coverage;
+                total_depth += d;
+                depths.push((e, d));
+            }
+            if depths.len() <= 1 {
+                continue;
+            }
+            for &(e, d) in &depths {
+                if d <= local_ratio * total_depth {
+                    // Mark for removal after the loop (retain per link).
+                    links[i][e].to = usize::MAX;
+                }
+            }
+        }
+    }
+    for ls in links.iter_mut() {
+        ls.retain(|l| l.to != usize::MAX);
+    }
+}
+
 /// Drops unitigs whose internal current-k k-mer is missing from the solid
 /// table (chimeric cleanup). Unitigs shorter than `k` have no internal
 /// k-mer to check and survive until the final compaction (their links were
@@ -522,7 +619,7 @@ fn progressive_filter(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
     k_build: usize,
-) -> Vec<MultikUnitig> {
+) -> Vec<Unitig> {
     if unitigs.is_empty() {
         return Vec::new();
     }
@@ -536,7 +633,7 @@ fn progressive_filter(
     covs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let median = covs[covs.len() / 2];
     let cutoff_cap = (median * 0.25).max(1.1);
-    let mut dropped: Vec<MultikUnitig> = Vec::new();
+    let mut dropped: Vec<Unitig> = Vec::new();
     let mut t = 1.1f32;
     while t < cutoff_cap && !unitigs.is_empty() {
         // Main-path protection: unitigs on a unique chain (both ends have
@@ -577,10 +674,9 @@ fn progressive_filter(
             .collect();
         for (i, &k) in keep.iter().enumerate() {
             if !k {
-                dropped.push(MultikUnitig {
-                    bases: unitigs[i].bases.clone(),
-                    coverage: unitigs[i].coverage,
-                });
+                let mut d = unitigs[i].clone();
+                d.id = 0;
+                dropped.push(d);
             }
         }
         if keep.iter().all(|&k| k) {

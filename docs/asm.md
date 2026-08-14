@@ -369,14 +369,15 @@ then every later k validates the previous graph. Each unitig link's bridge
 k-mer — the current-k window covering the shared `(k_prev-1)`-mer junction —
 must be solid (count >= `--min-count-extend`) in the reads plus the previous
 unitigs, and every internal k-mer of a long-enough unitig must stay solid
-(chimeric-unitig cleanup). A progressive abundance filter then drops the
-lowest-abundance unitigs (cutoff grows ~10% per round from 1.1 up to the
-graph maximum) and recompacts the surviving chains, so high-coverage strain
-divergence dissolves and the main path compacts into longer unitigs; dropped
-unitigs stay independent output, so low-abundance species are not lost.
-Validated links are compacted into longer unitigs, so confirmed connections
-grow monotonically instead of being re-split by a larger k. See
-`notes/design/asm-multik.md`.
+(chimeric-unitig cleanup). Links must also have reads fully covering a
+junction-spanning probe (bridging-read validation, metaMDBG RepeatRemover
+semantics), and unitigs are split at internal windows no read supports —
+chimeric joins (relocations) are pruned before compaction. A progressive
+abundance filter prunes low-abundance branching/isolated unitigs (main-path
+chains are always kept) and carries the pruned branches into the next round
+(megahit bubble re-feeding), so strain/polymorphic sequences keep
+participating in assembly. Megahit-style tip and weak-link cleaning runs on
+the final compacted unitigs. See `notes/design/asm-multik.md`.
 
 This is the iterative counterpart of `anchr asm olc` (parallel multi-k
 pooling + heuristic layout): junctions are accepted only when the larger k's

@@ -30,6 +30,11 @@
 >   pass 0 启用 supermer+DFA（真实数据 0.66s→秒级）、环状图 head-walk
 >   死循环、渐进过滤时机（每轮→最终一次）与 cutoff 上限（max→中位 25%）、
 >   remove_unsupported 容错（允许 <2% 内部 k-mer 缺失）。见 §4.10。
+> * v6（被删分支回灌，2026-08-14）：渐进过滤每轮删的低丰度分支**作为
+>   下一轮 unitigs 继续参与**（megahit bubble 回灌 + metaMDBG unitig
+>   反馈）——菌株/多态序列参与组装而非只输出。G37：misassemblies 保持 0、
+>   最长 43,790 → 52,807（分支连接）、Genome fraction 95.99% → 95.33%
+>   （权衡）。见 §4.11。
 
 ## 1. 为什么现有路线不能保证无 N
 
@@ -358,6 +363,54 @@ Lambda 短读的 95.8% 是数据覆盖极限（非算法缺陷）；multik 正�
 大步长（21→61）下短 unitig 的边被误删（G37 曾因此把主路径边全删）。
 
 **性能**（G37 40× / 155k reads，release）：auto k（6 轮）~3 s / ~10 s CPU。
+
+### 4.11 v6：被删分支回灌（2026-08-14，借鉴 megahit bubble 回灌）
+
+**动机**（用户指出 megahit 宏基因组评价好，`references/megahit.md` §8.6）：
+megahit 把被合并的气泡序列（`bubble_seq.fa`）喂回下一轮 `seq2sdbg` 建图，
+metaMDBG 把上一轮 unitigs 反馈计数——**菌株/多态序列参与组装而非丢弃**。
+multik 原先把渐进过滤删的分支只输出（dropped），不参与后续轮。
+
+**实现**（`multik.rs`）：`progressive_filter` 移回迭代中（每轮 recompact 后
+调用，cutoff_cap 中位 25% + 直链保护不变），删的分支返回 `Vec<Unitig>`，
+下一轮循环开头 `unitigs.append(&mut carried)` 加回——分支参与后续轮的
+跨接验证/压实，可能被连接（回灌成功）或再删（最终 carried 输出）。
+
+**G37 Quast**（对照参考 580,076）：
+
+| 指标 | v5（无回灌） | v6（回灌） |
+|---|---:|---:|
+| # misassemblies | 0 | **0** |
+| Largest contig | 43,790 | **52,807**（+20%，分支连接） |
+| N50 | 26,562 | 23,585 |
+| Genome fraction | 95.99% | 95.33% |
+| # contigs | 487 | 295 |
+
+**不回归**：Lambda 46,457 / N50 46,457；20k 环状单条 100%；374 测试全绿。
+
+**权衡**：回灌让分支参与组装（最长 +20%、contigs 487→295），但 Genome
+fraction 略降（-0.66%，部分回灌分支在更大 k 下被重新评估/切分）。对宏基因
+组（菌株序列重要）方向正确；阈值/回灌范围可后续调（如只回灌相似度高的
+分支，或调整 cutoff）。
+
+### 4.12 v7：megahit 清洗（tip + weak link，2026-08-14）
+
+借鉴 megahit 清洗算法族（`references/megahit.md` §5）到 multik 最终阶段：
+
+* **`tip_remover`**（megahit `tip_remover.cpp`）：短 unitig（≤ 2×k0）+ 是
+  tip（一端无连接）+ 深度 `> 20×` 低于邻居 → 删（错误尖端）；
+* **`weak_link_remover`**（megahit `weak_link_remover.cpp`）：分支点（出度
+  ≥2），邻居深度 ≤ 0.05× 邻居总深度 → 断开（删边保留节点，菌株共享区
+  不错连）。
+
+**教训**：**每轮迭代做清洗会拆主路径**（G37 最长 52.8k → 32.6k——k0=21
+的碎片大量是"短 tip"，8×/0.1 阈值误删/误断）；**移到最终（unitigs 压实后）
+无副作用**（真实尖端少、弱连接明确）。
+
+**G37 实测**：最终清洗后 misassemblies 0、最长 52,807（保持 v6）、Lambda
+46,457、20k 100%、374 测试全绿。单菌株 G37 无弱连接/尖端问题（渐进过滤已
+覆盖），tip/weak_link 的**价值在宏基因组**（多菌株弱连接、低覆盖菌株共享
+区）——待真实宏基因组数据验证（todo §4）。
 
 ## 5. 数据结构与复用
 
