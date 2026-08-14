@@ -83,7 +83,7 @@ match app.get_matches().subcommand() {
 | 分组 | 命令 | 说明 |
 | :--- | :--- | :--- |
 | Dependence | `dep check/install` | 依赖检查 |
-| Download | `ena info/prep` | ENA 数据准备 |
+| Download | `ena meta/manifest` | ENA 元数据抓取（JSON）/ 下载清单（tsv/ftp/md5/ascp） |
 | Overlaps - Standalone | `dazzname`/`show2ovlp`/`paf2ovlp`/`covered`/`restrict` | 命名、转换、覆盖统计 |
 | Overlaps - Daligner | `overlap`/`orient`/`contained`/`merge`/`overlap2` | dazzler 比对流水线（tempdir 内运行） |
 | Assembling | `trim`/`quorum`/`mergeread`/`unitigs`/`anchors`/`template` | 流程原语与模板编排 |
@@ -227,6 +227,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | 类别 | 工具 | 用途 | 备注 |
 |---|---|---|---|
 | 必需 | `anchr` / `pgr` | 流程主命令 / 基础库命令（`kmer hist`、`fa split/range` 等） | 自建（cargo） |
+| 必需 | `ureq`（Rust crate） | `ena meta` 的 ENA portal API 客户端（替换 Perl LWP::Simple） | 2.12.1，`features=["json"]` |
 | 必需 | `parallel` `jq` `pigz` `faops` | 模板编排、JSON env、压缩、FASTA 工具 | cbp |
 | 必需 | `hnsm` | OLC 流水线（overlap 相关） | cbp |
 | 必需 | `daligner`（含 fasta2DB/DBsplit/LAshow） | dazzler 比对流水线（overlap/orient/contained/merge） | cbp |

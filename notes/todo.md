@@ -9,7 +9,9 @@
 
 - ~~`fq range` 剩余~~（2026-08-15 全部完成：双端感知 S2 已核对 +
   BGZF `.gzi` 自动生成已实现，见 `design/fq-range.md` §7）；
-- `dep`/`ena`/`template` 的外部工具版本核对（dazzler/hnsm 预装清单）。
+- ~~`dep`/`ena`/`template` 的外部工具版本核对~~（2026-08-15 完成：
+  `check_dep.sh` 已更新现代依赖清单；`ena` 已 Rust 化（`ena meta`/
+  `ena manifest`，ureq 客户端）；`template` 无外部工具依赖）。
 
 ## 挂账 / 待决
 

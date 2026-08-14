@@ -61,11 +61,11 @@ fn command_dep() -> anyhow::Result<()> {
 #[test]
 fn command_ena() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("anchr")?;
-    let output = cmd.arg("ena").arg("info").output().unwrap();
+    let output = cmd.arg("ena").arg("--help").output().unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
 
-    assert!(stdout.lines().count() > 100);
-    assert!(stdout.contains("accession"));
+    assert!(stdout.contains("meta"));
+    assert!(stdout.contains("manifest"));
 
     Ok(())
 }

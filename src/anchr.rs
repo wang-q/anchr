@@ -44,7 +44,7 @@ Subcommand groups:
 * Dependence
     * dep check / dep install
 * Download
-    * ena info / ena prep
+    * ena meta / ena manifest
 * Overlaps
     * Standalone
         * dazzname / show2ovlp / paf2ovlp / covered / restrict

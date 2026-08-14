@@ -107,6 +107,7 @@ Cargo.lock
 !*.tera.sh
 !scripts/*.sh
 !data/*.fa
+!tests/fasta/ufasta.fa
 
 # mdBook output directory
 /book/

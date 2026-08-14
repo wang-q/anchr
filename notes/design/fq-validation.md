@@ -145,8 +145,10 @@ s-filter 全量对照见 P1-1a（52,823 丢弃）。
   全过；**修复 3 个 panic**——`trim_adapter::make_read_buf`（clean/filter）
   与 `norm::change_quality` 的 seq/qual 长度不匹配越界（畸形输入截断保护）；
 * **fq norm 外部桶**：`--mem 1k` 强制外部路径，与内存路径输出逐条一致；
-* **BGZF range**：bgzip 生成真实 BGZF + `.gzi`，`fq range` 端到端提取成功
-  （fq-range.md §7 的待验证项完成）；
+* **BGZF range**：bgzip 生成真实 BGZF，`fq range` 端到端提取成功；
+  **2026-08-15 补充：`.gzi` 自动生成已实现**（缺失/过期时调用
+  `pgr::libs::bgzf::build_gzi_index`，无需外部预生成，测试
+  `command_fq_range_bgzf_autobuilds_gzi`，见 `fq-range.md` §7）；
 * **--parallel 扩展性**：G37 100k 对 `fq clean` -p1 3.21 s → -p8 0.46 s
   （7.0x），输出一致（与 50 万-pair 基准 6.6x 同量级）。
 
