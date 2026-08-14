@@ -43,6 +43,13 @@ for PREFIX in R S T; do
         --prefixm ${PREFIXM} \
         --prefixu ${PREFIXU} \
         -o mergeread.sh
+
+    if [ ! -e statMergeReads.tsv ]; then
+        printf "%s\t%s\t%s\t%s\n" \
+            "Name" "N50" "Sum" "#" \
+            > statMergeReads.tsv
+    fi
+
     bash mergeread.sh
 
     # Create .cor.fa.gz
@@ -80,13 +87,7 @@ for PREFIX in R S T; do
     pigz -p {{ opt.parallel }} ${PREFIXM}.cor.fa
 
     log_info "stats of all .fq files"
-    if [ ! -e statMergeReads.tsv ]; then
-        printf "%s\t%s\t%s\t%s\n" \
-            "Name" "N50" "Sum" "#" \
-            > statMergeReads.tsv
-    fi
-
-    for NAME in clumped ecco eccc ecct extended merged.raw unmerged.raw unmerged.trim ${PREFIXM}1 ${PREFIXU}1 ${PREFIXU}2 ${PREFIXU}s; do
+    for NAME in ${PREFIXM}1 ${PREFIXU}1 ${PREFIXU}2 ${PREFIXU}s; do
         if [ ! -e ${NAME}.fq ]; then
             continue
         fi
@@ -128,13 +129,6 @@ for PREFIX in R S T; do
                 }
                 ' \
             >> statMergeInsert.tsv
-    done
-
-    log_info "clear unneeded .fq files"
-    for NAME in temp clumped ecco eccc ecct extended merged.raw unmerged.raw unmerged.trim; do
-        if [ -e ${NAME}.fq ]; then
-            rm ${NAME}.fq
-        fi
     done
 
     log_info "compress kept merge outputs"

@@ -34,9 +34,6 @@ for PREFIX in R S T; do
         ../${PREFIX}1.fq.gz{% if opt.se == "0" %} ../${PREFIX}2.fq.gz{% endif %} \
         --prefix ${PREFIX} \
         -o trim.sh
-    bash trim.sh
-
-    log_info "stats of all .fq.gz files"
 
     if [ ! -e statTrimReads.tsv ]; then
         printf "%s\t%s\t%s\t%s\n" \
@@ -44,23 +41,7 @@ for PREFIX in R S T; do
             > statTrimReads.tsv
     fi
 
-    for NAME in clumpify highpass sample trim filter ${PREFIX}1 ${PREFIX}2 ${PREFIX}s; do
-        FQ=${NAME}.fq
-        [ -e ${FQ} ] || FQ=${NAME}.fq.gz
-        if [ ! -e ${FQ} ]; then
-            continue;
-        fi
-
-        printf "%s\t%s\t%s\t%s\n" \
-            $(echo ${NAME}; stat_format_fq ${FQ};) >> statTrimReads.tsv
-    done
-
-    log_info "clear unneeded .fq files"
-    for NAME in temp clumpify highpass sample trim filter; do
-        if [ -e ${NAME}.fq ]; then
-            rm ${NAME}.fq
-        fi
-    done
+    bash trim.sh
 
     log_info "compress trim outputs"
     for NAME in ${PREFIX}1 ${PREFIX}2 ${PREFIX}s; do

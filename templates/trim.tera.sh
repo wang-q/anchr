@@ -28,6 +28,8 @@ if [ ! -e clumpify.fq ]; then
         --parallel {{ opt.parallel }}
 fi
 rm -f temp.fq; ln -s clumpify.fq temp.fq
+printf "%s\t%s\t%s\t%s\n" \
+    $(echo clumpify; stat_format_fq clumpify.fq;) >> statTrimReads.tsv
 
 {% if opt.cutoff != "0" -%}
 # Remove reads without high depth kmer
@@ -40,6 +42,8 @@ if [ ! -e highpass.fq ]; then
         --parallel {{ opt.parallel }}
 fi
 rm temp.fq; ln -s highpass.fq temp.fq
+printf "%s\t%s\t%s\t%s\n" \
+    $(echo highpass; stat_format_fq highpass.fq;) >> statTrimReads.tsv
 rm -f clumpify.fq
 {% endif -%}
 {# Keep a blank line #}
@@ -53,6 +57,8 @@ if [ ! -e sample.fq ]; then
         --bases {{ opt.sample }}
 fi
 rm temp.fq; ln -s sample.fq temp.fq
+printf "%s\t%s\t%s\t%s\n" \
+    $(echo sample; stat_format_fq sample.fq;) >> statTrimReads.tsv
 rm -f clumpify.fq highpass.fq
 {% endif -%}
 {# Keep a blank line #}
@@ -81,6 +87,8 @@ if [ ! -e trim.fq ]; then
         -o trim.fq
 fi
 rm temp.fq; ln -s trim.fq temp.fq
+printf "%s\t%s\t%s\t%s\n" \
+    $(echo trim; stat_format_fq trim.fq;) >> statTrimReads.tsv
 rm -f clumpify.fq highpass.fq sample.fq
 
 # Remove synthetic artifacts, spike-ins and 3' adapters by kmer-matching.
@@ -95,6 +103,8 @@ if [ ! -e filter.fq ]; then
         -o filter.fq
 fi
 rm temp.fq; ln -s filter.fq temp.fq
+printf "%s\t%s\t%s\t%s\n" \
+    $(echo filter; stat_format_fq filter.fq;) >> statTrimReads.tsv
 rm -f trim.fq
 
 log_info "kmer histogram and peaks with pgr kmer hist"
@@ -120,6 +130,12 @@ if [ ! -e {{ opt.prefix }}1.trim.fq.gz ]; then
     cp -L temp.fq {{ opt.prefix }}1.fq
 {% endif -%}
 fi
+printf "%s\t%s\t%s\t%s\n" \
+    $(echo {{ opt.prefix }}1; stat_format_fq {{ opt.prefix }}1.fq;) >> statTrimReads.tsv
+printf "%s\t%s\t%s\t%s\n" \
+    $(echo {{ opt.prefix }}2; stat_format_fq {{ opt.prefix }}2.fq;) >> statTrimReads.tsv
+printf "%s\t%s\t%s\t%s\n" \
+    $(echo {{ opt.prefix }}s; stat_format_fq {{ opt.prefix }}s.fq;) >> statTrimReads.tsv
 rm -f filter.fq
 
 #----------------------------#
