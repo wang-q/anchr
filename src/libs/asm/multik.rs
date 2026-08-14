@@ -89,7 +89,10 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
 
     // Iterative rounds: validate the graph with each larger k.
     for &k in &ks[1..] {
+        let t_round = std::time::Instant::now();
+        let t0 = std::time::Instant::now();
         let table = count_at(&unitigs, infiles, k, opts.parallel)?;
+        let t_count = t0.elapsed().as_secs_f64();
         let threshold = opts.min_count_extend as u32;
         // 1. Cross-round link validation (solveEdges): the bridge k-mer
         // covering the junction must be solid at the current k.
@@ -110,11 +113,27 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
         // 2. Chimeric-unitig cleanup (removeUnsupportedUnitigs): every
         // internal current-k k-mer of a long-enough unitig must be solid.
         remove_unsupported(&mut unitigs, &mut links, &table, k, threshold)?;
+        // 2.5 Reads-bridge validation: every surviving link must have reads
+        // fully covering a probe spanning the junction. Chimeric links (two
+        // distant regions joined by a shared k-mer) have no bridging reads
+        // and are dropped BEFORE recompaction, so the per-round merge cannot
+        // fix them into the main path (prevents relocation misassemblies).
+        bridge_filter(&unitigs, &mut links, infiles, k0, 30, 2)?;
         // 3. Recompact unique chains so the main path grows between rounds
         // (metaMDBG recompacts after every abundance-removal round). No
         // abundance pruning here — that is deferred to the final filter, so
         // single-genome coverage fluctuation never drops real content.
         recompact_graph(&mut unitigs, &mut links, k0);
+        if std::env::var_os("ANCHR_MULTIK_TIMING").is_some() {
+            let n = unitigs.len();
+            let bp: usize = unitigs.iter().map(|u| u.bases.len()).sum();
+            let edges: usize = links.iter().map(|l| l.len()).sum();
+            eprintln!(
+                "round k={k}: {n} unitigs, {bp} bp, {edges} edges, count {t_count:.3}s graph {:.3}s total {:.3}s",
+                t_round.elapsed().as_secs_f64() - t_count,
+                t_round.elapsed().as_secs_f64()
+            );
+        }
     }
 
     // Final abundance filter (once, not per round): drop low-abundance
@@ -122,6 +141,16 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
     // unitigs stay independent output (mirroring metaMDBG's cutoff
     // snapshots).
     let low_abundance = progressive_filter(&mut unitigs, &mut links, k0);
+
+    // Split unitigs at internal positions that have no reads support (the
+    // abundance filter's recompaction can fuse chimeric links into a single
+    // unitig — the source of G37 relocations). Every 100-mer window of a
+    // unitig must occur in the reads; an unsupported window is a chimeric
+    // junction and the unitig is cut there.
+    split_by_bridge(&mut unitigs, &mut links, infiles, k0, 30, 1)?;
+    // Re-verify the links recomputed by the split: the new extremities may
+    // join distant regions, so every surviving link needs bridging reads.
+    bridge_filter(&unitigs, &mut links, infiles, k0, 30, 2)?;
 
     // Final compaction: merge validated chains into long unitigs.
     let mut chains = merge_chains(&unitigs, &links, k0)?;
@@ -247,6 +276,164 @@ fn bridge_kmer(u: &Unitig, v: &Unitig, link: &Link, k: usize, k_build: usize) ->
         seq.push(cont);
         kmer_from_bases(&seq, k)
     }
+}
+
+/// The probe spanning the `u → v` junction: `probe_half` bases on each side
+/// of the shared `(k_build-1)`-mer overlap (u tail + v continuation, or the
+/// reverse for a left-end link). Direction is resolved by actual extremity
+/// matching (same as [`bridge_kmer`]).
+fn probe_kmer(
+    u: &Unitig,
+    v: &Unitig,
+    link: &Link,
+    k_build: usize,
+    probe_half: usize,
+) -> Option<TdKmer> {
+    let probe_len = probe_half * 2;
+    let km1 = k_build - 1;
+    if link.from_rc {
+        // u's left end is the junction source: v upstream, u downstream.
+        let u_ext = &u.bases[..km1];
+        let vb = &v.bases[..km1];
+        let ve = &v.bases[v.bases.len() - km1..];
+        let v_dir: Vec<u8> = if u_ext == ve {
+            v.bases.clone()
+        } else if u_ext == rev_comp(vb).collect::<Vec<u8>>().as_slice() {
+            rev_comp(&v.bases).collect()
+        } else {
+            return None;
+        };
+        if v_dir.len() < probe_half || u.bases.len() < km1 + probe_half {
+            return None;
+        }
+        let mut seq: Vec<u8> = Vec::with_capacity(probe_len);
+        seq.extend_from_slice(&v_dir[v_dir.len() - probe_half..]);
+        seq.extend_from_slice(&u.bases[km1..km1 + probe_half]);
+        kmer_from_bases(&seq, probe_len)
+    } else {
+        // u's right end is the junction source: u upstream, v downstream.
+        let u_ext = &u.bases[u.bases.len() - km1..];
+        let vb = &v.bases[..km1];
+        let ve = &v.bases[v.bases.len() - km1..];
+        let v_dir: Vec<u8> = if u_ext == vb {
+            v.bases.clone()
+        } else if u_ext == rev_comp(ve).collect::<Vec<u8>>().as_slice() {
+            rev_comp(&v.bases).collect()
+        } else {
+            return None;
+        };
+        if u.bases.len() < probe_half || v_dir.len() < km1 + probe_half {
+            return None;
+        }
+        let mut seq: Vec<u8> = Vec::with_capacity(probe_len);
+        seq.extend_from_slice(&u.bases[u.bases.len() - probe_half..]);
+        seq.extend_from_slice(&v_dir[km1..km1 + probe_half]);
+        kmer_from_bases(&seq, probe_len)
+    }
+}
+
+/// Reads-bridge validation: drops links whose junction-spanning probe is
+/// not fully covered by at least `threshold` reads (metaMDBG
+/// `computeBridgingReads` — a chimeric link joining two distant regions has
+/// no reads covering the junction and is pruned). Links whose probe cannot
+/// be built (short unitigs) are kept conservatively.
+fn bridge_filter(
+    unitigs: &[Unitig],
+    links: &mut [Vec<Link>],
+    infiles: &[String],
+    k0: usize,
+    probe_half: usize,
+    threshold: u32,
+) -> Result<()> {
+    if unitigs.is_empty() {
+        return Ok(());
+    }
+    let probe_len = probe_half * 2;
+    let reads = read_records(infiles)?;
+    let table = TadpoleTable::build_supermer(reads, probe_len, None)?;
+    for (i, ls) in links.iter_mut().enumerate() {
+        ls.retain(|l| {
+            probe_kmer(&unitigs[i], &unitigs[l.to], l, k0, probe_half)
+                .map(|p| table.get_count(&p) >= threshold)
+                .unwrap_or(false)
+        });
+    }
+    Ok(())
+}
+
+/// Splits unitigs at internal windows that are not supported by any read:
+/// every `2*probe_half`-mer window of a unitig must occur in the reads (the
+/// unitig's own sequence comes from reads, so a window with count 0 is a
+/// chimeric junction — the abundance recompaction fused two distant regions).
+/// Splitting keeps those junctions out of the final compaction. Links are
+/// recomputed from the new extremities.
+fn split_by_bridge(
+    unitigs: &mut Vec<Unitig>,
+    links: &mut Vec<Vec<Link>>,
+    infiles: &[String],
+    k0: usize,
+    probe_half: usize,
+    threshold: u32,
+) -> Result<()> {
+    if unitigs.is_empty() {
+        return Ok(());
+    }
+    let probe_len = probe_half * 2;
+    let reads = read_records(infiles)?;
+    let table = TadpoleTable::build_supermer(reads, probe_len, None)?;
+    let mut out: Vec<Unitig> = Vec::new();
+    for u in unitigs.iter() {
+        let n = u.bases.len();
+        if n < probe_len {
+            out.push(u.clone());
+            continue;
+        }
+        // Mark windows without read support.
+        let mut cut: Vec<usize> = Vec::new();
+        let mut prev_cut = false;
+        for i in 0..=n - probe_len {
+            let ok = kmer_from_bases(&u.bases[i..i + probe_len], probe_len)
+                .map(|km| table.get_count(&km) >= threshold)
+                .unwrap_or(false);
+            // Start a cut at the beginning of an unsupported run.
+            if !ok && !prev_cut {
+                cut.push(i);
+            }
+            prev_cut = !ok;
+        }
+        if cut.is_empty() {
+            out.push(u.clone());
+            continue;
+        }
+        // Split at the cut positions.
+        let mut pieces: Vec<usize> = Vec::new();
+        let mut s = 0usize;
+        for &c in &cut {
+            if c <= s {
+                continue;
+            }
+            pieces.push(c - s);
+            s = c;
+        }
+        pieces.push(n - s);
+        let mut pos = 0usize;
+        for len in pieces {
+            if len < k0 {
+                // Too short to be a unitig (cannot host a (k0-1)-mer end):
+                // drop the fragment.
+                pos += len;
+                continue;
+            }
+            let mut nu = u.clone();
+            nu.bases = u.bases[pos..pos + len].to_vec();
+            nu.id = 0;
+            out.push(nu);
+            pos += len;
+        }
+    }
+    *unitigs = out;
+    *links = compute_links(unitigs, k0);
+    Ok(())
 }
 
 /// Drops unitigs whose internal current-k k-mer is missing from the solid
@@ -401,8 +588,9 @@ fn progressive_filter(
             continue; // nothing below the current cutoff, raise it
         }
         retain_graph(unitigs, links, &keep);
-        // Recompact after removal so merged main-path unitigs inherit the
-        // higher flank abundance (metaMDBG `recompact` in the same round).
+        // Recompact after removal so the main path grows (metaMDBG
+        // recompacts every round); chimeric junctions possibly fused here
+        // are cut back by `split_by_bridge` right after this filter.
         recompact_graph(unitigs, links, k_build);
         t += (t * 0.1).min(10.0);
     }

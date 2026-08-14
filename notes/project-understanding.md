@@ -252,6 +252,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `fq-range.md` | FASTQ `.loc` 索引（range 命令） |
 | `asm-olc.md` | OLC 三段设计 |
 | `asm-multik.md` | multi-k 迭代组装（unitig 图跨轮验证，借鉴 metaMDBG；无 N 染色体核心方向） |
+| `asm-multik-misassembly.md` | multik 防 misassembly 方案（anchors 覆盖度区间过滤核心，精简实现；三层次：cov 一致性/局部剖面/reads 桥接） |
 | `qc.md` | 自有 QC 方案设计（FastQC/Falco 双参考，M1-M4 里程碑） |
 
 ## 11. 外部工具参考索引（notes/references/）
@@ -267,6 +268,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `quorum.md` | read 纠错参考（`fq ec-kmer`） |
 | `fastqc.md` | reads 质控参考（`2_fastqc.tera.sh`，迁移候选） |
 | `falco.md` | FastQC 的 C++ 仿制实现（QC 方案第二参考，输出兼容） |
+| `anchr-legacy-pipeline.md` | 老手工流程理解（G37 例子，unitigs→anchors→merge→spades；待讨论纠正） |
 
 ## 12. 笔记根 / audit / benchmarks 索引
 

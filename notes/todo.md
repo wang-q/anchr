@@ -85,6 +85,15 @@
   98.5%）、最长 91,246 bp、k-mer 覆盖 96.9%（设计 §4.10）已过；需**真实
   宏基因组/长读**数据验证无 N 判据（覆盖完整 + 无 gap + 无嵌合）；
   `--parallel` 扩展性复测与 `--min-count-extend` 阈值调参（设计 §7）；
+- **`asm multik` 迭代性能**（2026-08-14 基准，`benchmarks/multik-complexity.md`）：
+  图结构递减 ✓（unitigs 1345→396、edges 346→12）但耗时递增
+  （remove_unsupported O(总长×k) 为瓶颈，迭代 3.25 s > 直接大 k 1.07 s）；
+  优化：计数复用（minimizer 流）、remove_unsupported 查表化、轮数裁剪；
+- **`asm multik` 防 misassembly（层次 3 落地，2026-08-14）**：
+  `bridge_filter`（unitig 间探针）+ `split_by_bridge`（unitig 内部 60-mer
+  窗口切分）——**G37 misassemblies 8 → 0**、N50 24.5K → 26.6K、Lambda/
+  20k 不回归（设计 `asm-multik-misassembly.md` §7）。待办：探针长度/阈值
+  调参、<500 bp dropped 碎片输出策略；
 - **大规模真实数据**：Lambda 20k/40k reads 之外，用真实染色体数据跑
   `fq → asm → map → template` 全链，核对统计（覆盖量/unitig 数/PSL 行数）；
 - **多线程与内存**：`fq norm` 外部 hash-bucket 路径（`--mem`）、
