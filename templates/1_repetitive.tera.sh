@@ -27,7 +27,7 @@ if [ ! -s repetitive.fa ]; then
 fi
 
 cat statRepetitive.tsv |
-    rgr md stdin --num \
+    tva to md stdin --num \
     > statRepetitive.md
 
 echo -e "\nTable: statRepetitive\n" >> statRepetitive.md

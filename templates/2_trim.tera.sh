@@ -62,7 +62,7 @@ for PREFIX in R S T; do
 done
 
 cat statTrimReads.tsv |
-    rgr md stdin --right 2-4 \
+    tva to md stdin --right 2-4 \
     > statTrimReads.md
 
 echo -e "\nTable: statTrimReads\n" >> statTrimReads.md

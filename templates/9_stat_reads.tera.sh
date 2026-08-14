@@ -68,7 +68,7 @@ done \
 
 fi # end of statReads
 
-rgr md statReads.tsv --right 2-4 -o statReads.md
+tva to md statReads.tsv --right 2-4 -o statReads.md
 echo -e "\nTable: statReads\n" >> statReads.md
 
 cat statReads.md

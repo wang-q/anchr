@@ -123,7 +123,7 @@ if [ -e Q0L0/statQuorum.R.tsv ]; then
                  "Kmer" "RealG" "EstG" "Est/Real" \
                  "RunTime" \
             && cat) |
-        rgr md stdin --right 2-9 \
+        tva to md stdin --right 2-9 \
         > statQuorum.md
 
     echo -e "\nTable: statQuorum\n" >> statQuorum.md

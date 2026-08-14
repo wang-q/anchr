@@ -46,7 +46,7 @@ for D in $( find . -type d -name "${DIR_PREFIX}*" | sort ); do
 done \
 >> ${tempfile}
 
-rgr md ${tempfile} --right 2-10 -o ${FILENAME_MD}
+tva to md ${tempfile} --right 2-10 -o ${FILENAME_MD}
 echo -e "\nTable: ${FILENAME_MD}\n" >> ${FILENAME_MD}
 
 cat ${FILENAME_MD}

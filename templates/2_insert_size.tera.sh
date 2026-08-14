@@ -135,7 +135,7 @@ done \
     >> statInsertSize.tsv
 
 cat statInsertSize.tsv |
-    rgr md stdin --right 2-5 \
+    tva to md stdin --right 2-5 \
     > statInsertSize.md
 
 echo -e "\nTable: statInsertSize\n" >> statInsertSize.md

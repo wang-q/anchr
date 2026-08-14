@@ -33,6 +33,10 @@ hash tsv-sample 2>/dev/null || {
     echo >&2 "tsv-sample is required but it's not installed."
 }
 
+hash tva 2>/dev/null || {
+    echo >&2 "tva is required but it's not installed."
+}
+
 perl -MNumber::Format -e "1" 2>/dev/null || {
     echo >&2 "Number::Format is required but it's not installed."
     echo >&2 "Install with cpanm: cpanm Number::Format"

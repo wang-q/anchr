@@ -31,7 +31,7 @@ for D in 8_spades 8_mr_spades 8_megahit 8_mr_megahit; do
         >> ${tempfile}
 done
 
-rgr md ${tempfile} --right 2-4 -o ${FILENAME_MD}
+tva to md ${tempfile} --right 2-4 -o ${FILENAME_MD}
 echo -e "\nTable: ${FILENAME_MD}\n" >> ${FILENAME_MD}
 
 cat ${FILENAME_MD}

@@ -15,7 +15,7 @@ for package in gatk; do
 done
 
 cbp install openjdk
-cbp install parallel jq pigz tsv-utils
+cbp install parallel jq pigz tsv-utils tva
 cbp install fastqc picard
 cbp install bwa samtools freebayes mosdepth
 cbp install quast spades megahit
