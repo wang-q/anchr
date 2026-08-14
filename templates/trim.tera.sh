@@ -3,7 +3,7 @@
 #----------------------------#
 # Run
 #----------------------------#
-rm -f temp.fq.gz;
+rm -f temp.fq;
 
 #----------------------------#
 # Pipeline
@@ -14,61 +14,60 @@ rm -f temp.fq.gz;
 # As we're going to precess reads from different sources, don't dedupe here.
 # 1. dedupe, Remove duplicate reads.
 # 2. optical, mark or remove optical duplicates only. Normal Illumina names needed.
-log_info "clumpify"
-if [ ! -e clumpify.fq.gz ]; then
-    clumpify.sh \
-        in={{ args.0 }} \
+log_info "clump with anchr fq clump"
+if [ ! -e clumpify.fq ]; then
+    anchr fq clump \
+        {{ args.0 }} \
 {% if args.1 -%}
-        in2={{ args.1 }} \
+        {{ args.1 }} \
 {% endif -%}
-        out=clumpify.fq.gz \
+        -o clumpify.fq \
 {% if opt.dedupe == "1" -%}
-        dedupe dupesubs=0 \
+        --dedupe \
 {% endif -%}
-        threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
+        --parallel {{ opt.parallel }}
 fi
-rm -f temp.fq.gz; ln -s clumpify.fq.gz temp.fq.gz
+rm -f temp.fq; ln -s clumpify.fq temp.fq
 
 {% if opt.tile == "1" -%}
 # Remove low-quality reads by positions in flowcell
 log_info "filteredbytile"
-if [ ! -e filteredbytile.fq.gz ]; then
+if [ ! -e filteredbytile.fq ]; then
     filterbytile.sh \
-        in=temp.fq.gz \
-        out=filteredbytile.fq.gz \
+        in=temp.fq \
+        out=filteredbytile.fq \
         threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
 fi
-rm temp.fq.gz; ln -s filteredbytile.fq.gz temp.fq.gz
+rm temp.fq; ln -s filteredbytile.fq temp.fq
 {% endif -%}
 {# Keep a blank line #}
 {% if opt.cutoff != "0" -%}
 # Remove reads without high depth kmer
-log_info "kmer cutoff with bbnorm.sh"
-if [ ! -e highpass.fq.gz ]; then
-    bbnorm.sh \
-        in=temp.fq.gz \
-        out=highpass.fq.gz \
-        passes=1 bits=16 min={{ opt.cutoff }} target=9999999 \
-        threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
+log_info "kmer cutoff with anchr fq norm"
+if [ ! -e highpass.fq ]; then
+    anchr fq norm \
+        temp.fq \
+        -o highpass.fq \
+        --min {{ opt.cutoff }} \
+        --parallel {{ opt.parallel }}
 fi
-rm temp.fq.gz; ln -s highpass.fq.gz temp.fq.gz
+rm temp.fq; ln -s highpass.fq temp.fq
 {% endif -%}
 {# Keep a blank line #}
 {% if opt.sample != "0" -%}
 # Down sampling reads. 300x is fine
-log_info "sample with reformat.sh"
-if [ ! -e sample.fq.gz ]; then
-    reformat.sh \
-        in=temp.fq.gz \
-        out=sample.fq.gz \
-        samplebasestarget={{ opt.sample }} \
-        threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
+log_info "sample with anchr fq sample"
+if [ ! -e sample.fq ]; then
+    anchr fq sample \
+        temp.fq \
+        -o sample.fq \
+        --bases {{ opt.sample }}
 fi
-rm temp.fq.gz; ln -s sample.fq.gz temp.fq.gz
+rm temp.fq; ln -s sample.fq temp.fq
 {% endif -%}
 {# Keep a blank line #}
 # Trim 5' adapters and discard reads with Ns
-# Use bbduk.sh to quality and length trim the Illumina reads and remove adapter sequences
+# Use anchr fq clean to quality and length trim the Illumina reads and remove adapter sequences
 # 1. ftm = 5, right trim read length to a multiple of 5
 # 2. k = 23, Kmer length used for finding contaminants
 # 3. ktrim=r, Trim reads to remove bases matching reference kmers to the right
@@ -79,55 +78,54 @@ rm temp.fq.gz; ln -s sample.fq.gz temp.fq.gz
 # 8. qtrim=r, trim read right ends to remove bases with low quality
 # 9. trimq=15, regions with average quality below 15 will be trimmed.
 # 10. minlen=60, reads shorter than 60 bps after trimming will be discarded.
-log_info "trim with bbduk.sh"
-if [ ! -e trim.fq.gz ]; then
-    bbduk.sh \
-        in=temp.fq.gz \
-        out=trim.fq.gz \
-        ref={{ opt.adapter }} \
-        maxns=0 ktrim=r k={{ opt.trimk }} mink=11 hdist=1 tbo tpe \
-        minlen={% set lens = opt.len | split(pat=" ") %}{{ lens.0}} qtrim=r trimq={{ opt.trimq }} ftm=5 \
-        stats={{ opt.prefix }}.trim.stats.txt overwrite \
-        tossbrokenreads=t \
-        threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
+log_info "trim with anchr fq clean"
+if [ ! -e trim.fq ]; then
+    anchr fq clean \
+        temp.fq \
+        --ref {{ opt.adapter }} \
+        --k {{ opt.trimk }} --min-k 11 --hamming-distance 1 \
+        --trim-quality {{ opt.trimq }} \
+        --minlen {% set lens = opt.len | split(pat=" ") %}{{ lens.0}} \
+        --max-ns 0 --force-trim-mod 5 \
+        --stats {{ opt.prefix }}.trim.stats.txt \
+        -o trim.fq
 fi
-rm temp.fq.gz; ln -s trim.fq.gz temp.fq.gz
+rm temp.fq; ln -s trim.fq temp.fq
 
 # Remove synthetic artifacts, spike-ins and 3' adapters by kmer-matching.
-log_info "filter with bbduk.sh"
-if [ ! -e filter.fq.gz ]; then
-    bbduk.sh \
-        in=temp.fq.gz \
-        out=filter.fq.gz \
-        ref={% set fs = opt.filter | split(pat=" ") %}{% for filter in fs %}{% if filter == "adapter" %}{{ opt.adapter }},{% endif %}{% if filter == "artifact" %}{{ opt.artifact }},{% endif %}{% endfor %} \
-        k={{ opt.matchk }} cardinality \
-        stats={{ opt.prefix }}.filter.stats.txt overwrite \
-        tossbrokenreads=t \
-        threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
+log_info "filter with anchr fq filter"
+if [ ! -e filter.fq ]; then
+    cat {% set fs = opt.filter | split(pat=" ") %}{% for filter in fs %}{% if filter == "adapter" %}{{ opt.adapter }} {% endif %}{% if filter == "artifact" %}{{ opt.artifact }} {% endif %}{% endfor %}> filter.ref.fa
+    anchr fq filter \
+        temp.fq \
+        --ref filter.ref.fa \
+        --k {{ opt.matchk }} \
+        --stats {{ opt.prefix }}.filter.stats.txt \
+        -o filter.fq
 fi
-rm temp.fq.gz; ln -s filter.fq.gz temp.fq.gz
+rm temp.fq; ln -s filter.fq temp.fq
 
-log_info "kmer histogram and peaks"
+log_info "kmer histogram and peaks with pgr kmer hist"
 if [ ! -e peaks.final.txt ]; then
-    kmercountexact.sh \
-        in=temp.fq.gz \
-        khist={{ opt.prefix }}.khist.txt peaks={{ opt.prefix }}.peaks.txt k={{ opt.cutk }} \
-        threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
+    pgr kmer hist \
+        temp.fq \
+        -k {{ opt.cutk }} \
+        --khist-text {{ opt.prefix }}.khist.txt \
+        --peaks {{ opt.prefix }}.peaks.txt \
+        -o {{ opt.prefix }}.hist
 fi
 
 # Revert to normal pair-end fastq files
-log_info "re-pair with repair.sh"
+log_info "re-pair with anchr fq split"
 if [ ! -e {{ opt.prefix }}1.trim.fq.gz ]; then
 {% if args.1 -%}
-    repair.sh \
-        in=temp.fq.gz \
-        out={{ opt.prefix }}1.fq.gz \
-        out2={{ opt.prefix }}2.fq.gz \
-        outs={{ opt.prefix }}s.fq.gz \
-        repair \
-        threads={{ opt.parallel }}{% if opt.xmx != "0" %} -Xmx{{ opt.xmx }}{% endif %}
+    anchr fq split \
+        temp.fq \
+        -o {{ opt.prefix }}1.fq \
+        --outfile-2 {{ opt.prefix }}2.fq \
+        --outfile-single {{ opt.prefix }}s.fq
 {% else -%}
-    cp -L temp.fq.gz {{ opt.prefix }}1.fq.gz
+    cp -L temp.fq {{ opt.prefix }}1.fq
 {% endif -%}
 fi
 
@@ -140,35 +138,32 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
     cd Q{1}L{2}
 
     printf '==> Qual-Len: %s\n'  Q{1}L{2}
-    if [ -e {{ opt.prefix }}1.fq.gz ]; then
-        echo '    {{ opt.prefix }}1.fq.gz already presents'
+    if [ -e {{ opt.prefix }}1.fq ]; then
+        echo '    {{ opt.prefix }}1.fq already presents'
         exit;
     fi
 
 {% if args.1 -%}
-    sickle pe \
-        -t sanger \
+    anchr fq trim-qual \
         -q {1} \
         -l {2} \
-        -f ../{{ opt.prefix }}1.fq.gz \
-        -r ../{{ opt.prefix }}2.fq.gz \
+        ../{{ opt.prefix }}1.fq \
+        ../{{ opt.prefix }}2.fq \
         -o {{ opt.prefix }}1.fq \
-        -p {{ opt.prefix }}2.fq \
-        -s {{ opt.prefix }}s.fq
-    sickle se \
-        -t sanger \
+        --outfile-2 {{ opt.prefix }}2.fq \
+        --outfile-single {{ opt.prefix }}s.fq
+    anchr fq trim-qual \
         -q {1} \
         -l {2} \
-        -f ../{{ opt.prefix }}s.fq.gz \
+        ../{{ opt.prefix }}s.fq \
         -o {{ opt.prefix }}s.temp.fq
     cat {{ opt.prefix }}s.temp.fq >> {{ opt.prefix }}s.fq
     rm {{ opt.prefix }}s.temp.fq
 {% else -%}
-    sickle se \
-        -t sanger \
+    anchr fq trim-qual \
         -q {1} \
         -l {2} \
-        -f ../{{ opt.prefix }}1.fq.gz \
+        ../{{ opt.prefix }}1.fq \
         -o {{ opt.prefix }}1.fq
 {% endif -%}
 

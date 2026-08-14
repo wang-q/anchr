@@ -62,6 +62,9 @@ const MINQ: u8 = 6;
 /// N bases get quality 0 and ACGT bases are raised to a minimum of 2.
 fn change_quality(seq: &[u8], qual: &mut [u8]) {
     for (i, &b) in seq.iter().enumerate() {
+        if i >= qual.len() {
+            break;
+        }
         let q = &mut qual[i];
         if b == b'N' || b == b'n' {
             *q = 0;

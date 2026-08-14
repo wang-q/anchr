@@ -155,16 +155,20 @@ FASTQ 双端数据的 name 有三种常见模式：
 - 吞吐 sanity：50 MB FASTQ 建索引耗时 + 按名提取小集合的耗时（记录到笔记，
   不建 criterion 基准）。
 
-## 7. 二期（未做）
+## 7. 二期（S2 双端感知）
 
-双端感知 S2：两个输入文件 + `-o/--outfile-2` 分离输出；交错输入单文件
-输出保持交错。索引层已就绪（每文件独立 `.loc`、name 归一化），增量在命令层。
+**已完成（2026-08-15 核对）**：`anchr fq range R1.fq --mate R2.fq read1
+-o r1.fq --outfile-2 r2.fq`——两个输入文件 + `-o/--outfile-2` 分离输出，
+索引层每文件独立 `.loc`、name 归一化（strip `/1` `/2`）。测试覆盖：
+`cli_fq_range.rs` 的 paired_end_by_name / paired_end_subsequence /
+rejects_outfile_2_without_pair。交错输入单文件输出保持交错的路径由
+`#n` 消歧 + 顺序保持保证（§5.4）。
 
 未决：**BGZF 的 `.gzi` 需外部预生成**——`CachedBgzfReader::open` 只读
 `.gzi` 不自动构建，`open_fq_indexed` 也只自动建 `.loc`；当前 BGZF 输入需
 先用 `pgr fa gz --index`（或 bgzip）生成 `.gzi`。若要在 anchr 侧免预生成，
-需封装 `pgr::libs::bgzf::build_gzi_index` 或请 pgr 补 CLI。另待真实 BGZF
-大文件（含 `.gzi`）端到端验证（现有测试为 plain + BGZF 小数据）。
+需封装 `pgr::libs::bgzf::build_gzi_index` 或请 pgr 补 CLI。真实 BGZF
+大文件（含 `.gzi`）端到端已在小数据验证（2026-08-15，bgzip 生成）。
 
 ## 8. 一期实现记录（2026-08）
 

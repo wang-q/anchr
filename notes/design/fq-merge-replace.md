@@ -285,6 +285,12 @@ BBTools-40.01 源码（`jgi/BBMerge*`、`assemble/Tadpole*`、`jgi/Clumpify*`）
 
 ## 6. 实现状态（bbmerge 迁移完成，2026-08-11）
 
+**2026-08-15 模板替换落地**：`templates/merge.tera.sh` 的 clumpify/bbmerge/
+tadpole/bbduk/repair 全部换成 `anchr fq clump/ec-overlap/ec-kmer/extend/
+merge/clean/split`（phase 2 clumpify ecc 按 §3.3 跳过），Lambda 端到端
+跑通（clump 19,992 对 → ecco → ecct 丢弃 1,702 → extend 37,873 → merge
+→ M1/U1/U2 输出）。命令级逐字节一致性见下。
+
 **`anchr fq merge` 已实现并通过 BBTools 40.01 黑盒逐字节对照**（Lambda 40k
 pairs，`tests/cli_fq_merge.rs`）：
 

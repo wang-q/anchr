@@ -193,10 +193,12 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 
 ### 6.3 待补全的（TODO / 设计阶段）
 
-- 迁移收尾：pgr 侧删除后的文档索引同步（todo/CHANGELOG）、
-  `notes/design/fq-asm-migrate.md` 的 anchr 副本标注阶段 4 完成；
+- ~~迁移收尾~~（2026-08-15 销账：`fq-asm-migrate.md` 已标注"阶段 1-4 均已
+  落地"（阶段 4 走"只写文档"路线，pgr 代码保留）、todo/索引已同步）；
 - 既有 warning 清理（`Overlap` dead_code、`tadpole` 未读字段等 8 处）；
-- 部分流程命令（`dep`/`ena`/`template` 链）的外部工具版本核对。
+- ~~部分流程命令（`dep`/`ena`/`template` 链）的外部工具版本核对~~
+  （2026-08-15 完成：现代依赖清单见 §7.1，`check_dep.sh` 已更新，必需项
+  全在位、已替代工具标注 legacy）。
 
 ### 6.4 不做 / 不适合做的
 
@@ -217,6 +219,29 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
   流程命令的外部依赖（系统 PATH）；
 - **bcalm/canu/celera/metaMDBG/megahit/skesa/quorum**：asm 与纠错的源码参考
   （笔记见 `notes/references/`）。
+
+### 7.1 外部依赖清单（2026-08-15 版本核对，现代流程）
+
+| 类别 | 工具 | 用途 | 备注 |
+|---|---|---|---|
+| 必需 | `anchr` / `pgr` | 流程主命令 / 基础库命令（`kmer hist`、`fa split/range` 等） | 自建（cargo） |
+| 必需 | `parallel` `jq` `pigz` `faops` | 模板编排、JSON env、压缩、FASTA 工具 | cbp |
+| 必需 | `hnsm` | OLC 流水线（overlap 相关） | cbp |
+| 必需 | `daligner`（含 fasta2DB/DBsplit/LAshow） | dazzler 比对流水线（overlap/orient/contained/merge） | cbp |
+| 必需 | `quast` | 最终组装质控（用户明确保留） | cbp |
+| 可选 | `fastqc` | QC 对照（`fq qc` 主参考） | 已替代但保留对照 |
+| 可选 | `spades` / `megahit` | 组装对照（用户保留参考） | 现代主路线 = multik+OLC |
+| 可选 | `bwa` `samtools` `gatk` `mosdepth` | 变异检测模板（`3_*`） | 非组装主流程 |
+| 已替代 | BBTools（bbduk/clumpify/bbnorm/reformat/repair） | trim 流水线 | → `fq clean/filter/clump/norm/sample/split`（P3 模板替换后不再调用） |
+| 已替代 | `sickle` | 质量修剪 | → `fq trim-qual` |
+| 已替代 | `kmercountexact`/`jellyfish` | k-mer 直方图 | → `pgr kmer hist` |
+| 已替代 | `quorum` | reads 筛选 | → `fq s-filter` |
+| 已替代 | `bcalm`/`bifrost` | unitigs | → `asm unitig`/`asm multik` |
+| 已替代 | `picard` | insert size | → `asm map` + SAM TLEN |
+| 已替代 | `masurca` | quorum 脚本 PATH 依赖 | quorum 不再用时不需要 |
+
+本机 cbp 环境 2026-08-15 核对：必需项全部在位（`dazzdb` 无独立命令，
+daligner 包内含 fasta2DB/DBsplit）；`bifrost` 未装（现代流程不需要）。
 
 ## 8. 关键风险与技术债
 

@@ -50,12 +50,6 @@ pub struct TadpoleOptions {
     pub path_similarity_fraction: f32,
     /// K-mers to verify after an error in reassembly (errorextensionreassemble).
     pub error_extension_reassemble: usize,
-    /// K-mers to verify in pincer mode (errorextensionpincer).
-    #[allow(dead_code)]
-    pub error_extension_pincer: usize,
-    /// K-mers to verify in tail mode (errorextensiontail).
-    #[allow(dead_code)]
-    pub error_extension_tail: usize,
     /// Do not correct bases within this distance of read ends (deadzone).
     pub dead_zone: usize,
     /// Sliding-window length for reassembly quality filtering (window).
@@ -107,8 +101,6 @@ impl Default for TadpoleOptions {
             path_similarity_constant: 3,
             path_similarity_fraction: 0.45,
             error_extension_reassemble: 5,
-            error_extension_pincer: 5,
-            error_extension_tail: 9,
             dead_zone: 0,
             window_len: 12,
             window_count: 6,

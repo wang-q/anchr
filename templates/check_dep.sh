@@ -5,6 +5,14 @@
 #----------------------------#
 # common
 #----------------------------#
+hash anchr 2>/dev/null || {
+    echo >&2 "anchr is required but it's not installed (cargo install --path .)."
+}
+
+hash pgr 2>/dev/null || {
+    echo >&2 "pgr is required but it's not installed (cargo install --path ../pgr)."
+}
+
 hash parallel 2>/dev/null || {
     echo >&2 "parallel is required but it's not installed."
 }
@@ -21,26 +29,34 @@ hash hnsm 2>/dev/null || {
     echo >&2 "hnsm is required but it's not installed."
 }
 
+hash faops 2>/dev/null || {
+    echo >&2 "faops is required but it's not installed."
+}
+
+hash quast.py 2>/dev/null || {
+    echo >&2 "quast is required but it's not installed."
+}
+
 #----------------------------#
 # QC
 #----------------------------#
 hash fastqc 2>/dev/null || {
-    echo >&2 "fastqc is required but it's not installed."
+    echo >&2 "fastqc is optional (reference for fq qc) but it's not installed."
 }
 
 hash picard 2>/dev/null || {
-    echo >&2 "picard is required but it's not installed."
+    echo >&2 "picard is legacy (replaced by asm map + SAM TLEN) but it's not installed."
 }
 
 #----------------------------#
 # trim, merge, and quorum
 #----------------------------#
 hash bbduk.sh 2>/dev/null || {
-    echo >&2 "bbtools is required but it's not installed."
+    echo >&2 "bbtools is legacy (replaced by anchr fq) but it's not installed."
 }
 
 hash sickle 2>/dev/null || {
-    echo >&2 "sickle is required but it's not installed."
+    echo >&2 "sickle is legacy (replaced by anchr fq trim-qual) but it's not installed."
 }
 
 hash tsv-sample 2>/dev/null || {
@@ -48,11 +64,11 @@ hash tsv-sample 2>/dev/null || {
 }
 
 hash jellyfish 2>/dev/null || {
-    echo >&2 "jellyfish is required but it's not installed."
+    echo >&2 "jellyfish is legacy (replaced by pgr kmer hist) but it's not installed."
 }
 
 hash quorum 2>/dev/null || {
-    echo >&2 "quorum is required but it's not installed."
+    echo >&2 "quorum is legacy (replaced by anchr fq s-filter) but it's not installed."
 }
 
 hash masurca 2>/dev/null || {
@@ -90,11 +106,11 @@ fi
 # unitigs
 #----------------------------#
 hash bcalm 2>/dev/null || {
-    echo >&2 "bcalm is required but it's not installed."
+    echo >&2 "bcalm is legacy (replaced by asm unitig) but it's not installed."
 }
 
 hash Bifrost 2>/dev/null || {
-    echo >&2 "bifrost is required but it's not installed."
+    echo >&2 "bifrost is legacy (replaced by asm unitig) but it's not installed."
 }
 
 hash fasta2DB 2>/dev/null || {

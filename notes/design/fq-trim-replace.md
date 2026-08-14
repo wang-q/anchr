@@ -65,7 +65,7 @@
 | M3-M5 `fq trim-adapter` | **完成，逐字节一致** | `cli_fq_trim_adapter.rs` 对照 trim/filter golden；`--stats` 输出 bbduk `stats=` 3 列格式，与 39.38 逐字节一致（#File 路径行除外，见 §6.5）；2026-08-10 晚复核：19 组 trim 变体（k/mink/hdist/minlen/trimq/ftm/maxns/tbo/tpe/qtrim/组合）+ 3 组 filter k 变体 + 质量边界，与 39.38 `bbduk.sh ordered=t` 逐字节一致；修复 changequality 与 qtrim 空 read 边界（见下） |
 | M7 kmercountexact | **完成，逐字节一致** | `pgr kmer hist --khist-text/--peaks`（logScale + CallPeaks 全移植）对照 R.khist.txt/R.peaks.txt |
 | M6 bbnorm cutoff | **完成（精确表语义）** | `anchr fq norm`（精确 canonical 表 + bbnorm per-read 判定逻辑：truedepth/depthAL 分位数 + toss 条件）；与 bbnorm bits=16 近似计数在 min=3 边界差 ~21 对（39846 vs 39888），属设计稿已声明的"先精确 KmerTable"路线 |
-| M8 集成 | **完成（原语路线）** | 只提供可组合原语（clump/split/sample/trim-adapter/fq norm/hist），**不内置 pl trim 流水线**——编排属于 anchr，pgr 不做"别人的活"（2026-08-10 修正，`pl trim` 已移除）；anchr 模板把 `bbduk.sh` 等调用换成 pgr 命令、用管道串联避免中间 gz |
+| M8 集成 | **完成（原语路线 + 模板替换）** | 只提供可组合原语（clump/split/sample/trim-adapter/fq norm/hist），**不内置 pl trim 流水线**——编排属于 anchr，pgr 不做"别人的活"（2026-08-10 修正，`pl trim` 已移除）；**2026-08-15 模板替换落地**：`templates/trim.tera.sh` 的 clumpify/bbnorm/bbduk/reformat/repair/sickle 全部换成 `anchr fq clump/norm/clean/filter/sample/split/trim-qual` + `pgr kmer hist`，Lambda 端到端跑通（Q25L60/Q30L60 输出合理），中间文件 plain FASTQ 避免反复 gz |
 
 基准见 [bbtools-vs-anchr.md](../benchmarks/bbtools-vs-anchr.md)
 （hyperfine，Lambda 40000 reads，pgr release 单线程 vs BBTools 39.38 8 线程）。
@@ -353,7 +353,7 @@ bbnorm 在 anchr 里的唯一用途（khist/peaks 由后续 `kmercountexact.sh` 
   （`makeKca` 全量建表 → `count` 全量过滤），确定性、与顺序无关——
   **不是对 reads 采样**（khmer 式单遍在线会顺序相关，已排除）。
 
-**精确 vs 近似 分析（结论未定，2026-08-10 保留）**：
+**精确 vs 近似 分析（2026-08-15 定稿：走精确表）**：
 
 1. 判定只需要阈值区分（≥min 与 ≥max(min, high/125)），不需要精确大计数。
 2. CMS（min-of-tables）只会高估不会低估 → 误差单向：只可能把 <min 的
@@ -371,8 +371,12 @@ bbnorm 在 anchr 里的唯一用途（khist/peaks 由后续 `kmercountexact.sh` 
 6. 工程上精确路径已实现/已并行/已测试；CMS 是新代码 + 任意参数
    （bits/表数/哈希数/饱和），结果随配置漂移。
 
-**倾向：精确**（外部桶路径即 1TB 答案）。转向近似的唯一场景：单机、
-极小内存、无大磁盘、接受判定噪声——非 pgr/anchr 语境。待用户定稿。
+**定稿（2026-08-15）**：anchr 走**精确表**（内存路径 + 外部桶路径，
+§4.6 同款 mem_cap 约束，1TB 级数据可用）。与 bbnorm `bits=16` 近似表的
+边界差异（Lambda min=3 为 21 对，随 min 增大而增多）**正式定义为
+"精确语义 vs bbnorm 近似语义"的定义差异，不是 bug**；近似碰撞随 `-Xmx`
+漂移，字节级对齐是移动靶，不追。转向近似的唯一场景（单机、极小内存、
+无大磁盘、接受判定噪声）非 pgr/anchr 语境。
 
 **2026-08-10 复核（多参数交叉验证）补充**：
 
@@ -393,10 +397,10 @@ bbnorm 在 anchr 里的唯一用途（khist/peaks 由后续 `kmercountexact.sh` 
   min20=37 对——近似表碰撞影响随 min 阈值增大而增多。外部桶路径与
   内存路径输出一致（--mem 1k 实测）。
 
-**可选的收尾项（待确认）**：① 把 21 对差异正式定义为"精确语义 vs bbnorm
-近似语义"；② `.pkt` count 字段按 bits 截断（对齐 bbnorm bits=16 → u16，
-更激进可 u8）缩小落盘体积，判定字节不变（阈值在低端，截断到 65535
-不影响任何判定）。
+**可选的收尾项**：① ~~把 21 对差异正式定义为"精确语义 vs bbnorm 近似
+语义"~~ **已完成（2026-08-15 定稿，见上）**；② `.pkt` count 字段按 bits
+截断（对齐 bbnorm bits=16 → u16，更激进可 u8）缩小落盘体积，判定字节
+不变（阈值在低端，截断到 65535 不影响任何判定）。
 
 khmer（Count-Min Sketch + 在线 diginorm）源码分析见
 `notes/references/khmer.md`。fairy（FracMinHash 稀疏采样 + 宏基因组

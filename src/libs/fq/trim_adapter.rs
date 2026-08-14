@@ -1809,12 +1809,17 @@ fn write_record<W: Write>(
 
 /// Builds a working read buffer with phred (offset-subtracted) quality.
 fn make_read_buf(rec: &SeqRecord, quality_base: u8) -> ReadBuf {
-    let seq = rec.sequence().to_vec();
+    let mut seq = rec.sequence().to_vec();
     let mut qual: Vec<u8> = rec
         .quality_scores()
         .iter()
         .map(|&q| q.saturating_sub(quality_base))
         .collect();
+    // Guard against malformed input (seq/qual length mismatch from binary or
+    // truncated records): truncate to the shorter side so we never panic.
+    let n = seq.len().min(qual.len());
+    seq.truncate(n);
+    qual.truncate(n);
     change_quality(&seq, &mut qual);
     ReadBuf {
         seq,
