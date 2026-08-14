@@ -100,6 +100,15 @@
   窗口切分）——**G37 misassemblies 8 → 0**、N50 24.5K → 26.6K、Lambda/
   20k 不回归（设计 `asm-multik-misassembly.md` §7）。待办：探针长度/阈值
   调参、<500 bp dropped 碎片输出策略；
+- **multik 多覆盖度拆分（2026-08-15 初验，`benchmarks/multik-cov.md`）**：
+  老流程"reads 拆成多个覆盖度部分（G37 文档记录 40×/80×；用户口头提过
+  30×/60× 合适）→ 各部分组装 → OLC 拼装"（`references/anchr-legacy-pipeline.md`
+  §2.2/§2.7）。初验：30×/60× 单跑 quality 达标（0 mis/~96%，60× mismatch
+  最优 25.9）；**30×+60× contained 合并 N50=40× 水平但 duplication 1.124**
+  ——多部分合并的去冗余机制（anchors upper / orient+merge / glue OLC）
+  待设计；**全分组复核已完成**（`benchmarks/multik-allgroups.md`：老流程
+  全部 23 组 40×/80× × Q/L × P + MR，23/23 组 0 mis、0 N、dup≤1.001，
+  MR 组 N50 34-55K 全面优于非 MR 17-24K）；
 - **megahit 借鉴待续**（`megahit.md` §8 差距清单）：low depth 局部窗口
   判定（宏基因组覆盖不均）、本地组装（contig 端点 reads 延伸）——
   有真实宏基因组数据后再定优先级；

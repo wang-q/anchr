@@ -269,7 +269,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | `quorum.md` | read 纠错参考（`fq ec-kmer`） |
 | `fastqc.md` | reads 质控参考（`2_fastqc.tera.sh`，迁移候选） |
 | `falco.md` | FastQC 的 C++ 仿制实现（QC 方案第二参考，输出兼容） |
-| `anchr-legacy-pipeline.md` | 老手工流程理解（G37 例子，unitigs→anchors→merge→spades；待讨论纠正） |
+| `anchr-legacy-pipeline.md` | 老手工流程理解（G37 例子：多覆盖度拆分 → 各部分 unitigs/anchors → merge → OLC 拼装（glue/fill）→ spades/megahit 对照；2026-08-15 修正） |
 
 ## 12. 笔记根 / audit / benchmarks 索引
 
