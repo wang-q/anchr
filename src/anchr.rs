@@ -18,21 +18,13 @@ fn main() -> anyhow::Result<()> {
         .arg_required_else_help(true)
         .subcommand(cmd::asm::make_subcommand())
         .subcommand(cmd::contained::make_subcommand())
-        .subcommand(cmd::covered::make_subcommand())
         .subcommand(cmd::dazzname::make_subcommand())
         .subcommand(cmd::dep::make_subcommand())
         .subcommand(cmd::ena::make_subcommand())
         .subcommand(cmd::fq::make_subcommand())
-        .subcommand(cmd::merge::make_subcommand())
         .subcommand(cmd::mergeread::make_subcommand())
-        .subcommand(cmd::orient::make_subcommand())
-        .subcommand(cmd::overlap::make_subcommand())
-        .subcommand(cmd::overlap2::make_subcommand())
-        .subcommand(cmd::paf2ovlp::make_subcommand())
         .subcommand(cmd::quorum::make_subcommand())
-        .subcommand(cmd::restrict::make_subcommand())
         .subcommand(cmd::sam::make_subcommand())
-        .subcommand(cmd::show2ovlp::make_subcommand())
         .subcommand(cmd::template::make_subcommand())
         .subcommand(cmd::trim::make_subcommand())
         .after_help(
@@ -43,14 +35,6 @@ Subcommand groups:
     * dep check / dep install
 * Download
     * ena meta / ena manifest
-* Overlaps
-    * Standalone
-        * dazzname / show2ovlp / paf2ovlp / covered / restrict
-    * Daligner pipelines
-        * overlap / orient / contained / merge
-        * overlap2
-        * group
-        * layout
 * Assembling
     * trim / quorum / mergeread
     * template
@@ -68,19 +52,9 @@ Subcommand groups:
         Some(("dep", sub_matches)) => cmd::dep::execute(sub_matches),
         // Download
         Some(("ena", sub_matches)) => cmd::ena::execute(sub_matches),
-        // Overlaps - Standalone
         Some(("dazzname", sub_matches)) => cmd::dazzname::execute(sub_matches),
-        Some(("show2ovlp", sub_matches)) => cmd::show2ovlp::execute(sub_matches),
-        Some(("paf2ovlp", sub_matches)) => cmd::paf2ovlp::execute(sub_matches),
-        Some(("covered", sub_matches)) => cmd::covered::execute(sub_matches),
-        Some(("restrict", sub_matches)) => cmd::restrict::execute(sub_matches),
         Some(("sam", sub_matches)) => cmd::sam::execute(sub_matches),
-        // Overlaps - Daligner pipelines
-        Some(("overlap", sub_matches)) => cmd::overlap::execute(sub_matches),
-        Some(("orient", sub_matches)) => cmd::orient::execute(sub_matches),
         Some(("contained", sub_matches)) => cmd::contained::execute(sub_matches),
-        Some(("merge", sub_matches)) => cmd::merge::execute(sub_matches),
-        Some(("overlap2", sub_matches)) => cmd::overlap2::execute(sub_matches),
         // Assembling
         Some(("trim", sub_matches)) => cmd::trim::execute(sub_matches),
         Some(("quorum", sub_matches)) => cmd::quorum::execute(sub_matches),

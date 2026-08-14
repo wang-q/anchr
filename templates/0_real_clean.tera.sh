@@ -30,9 +30,6 @@ rm -fr 6_tadpole*
 # mergeAnchors, anchorLong and anchorFill
 rm -fr 7_merge*
 rm -fr 7_anchor*
-rm -fr 7_extend_anchors
-rm -fr 7_glue_anchors
-rm -fr 7_fill_anchors
 
 # spades, megahit
 rm -fr 8_spades*

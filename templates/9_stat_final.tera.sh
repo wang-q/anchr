@@ -44,18 +44,6 @@ for D in 7_merge_anchors; do
     fi
 done
 
-# extended anchors
-if [ -e 7_glue_anchors/contig.fasta ]; then
-    printf "%s\t" "glue_anchors" $( stat_format 7_glue_anchors/contig.fasta ) |
-        sed 's/\t$/\n/' \
-        >> ${tempfile}
-fi
-if [ -e 7_fill_anchors/contig.fasta ]; then
-    printf "%s\t" "fill_anchors" $( stat_format 7_fill_anchors/contig.fasta ) |
-        sed 's/\t$/\n/' \
-        >> ${tempfile}
-fi
-
 # spades
 if [ -e 8_spades/contigs.fasta ]; then
     printf "%s\t" "spades.contig" $( stat_format 8_spades/contigs.fasta ) |

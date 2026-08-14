@@ -52,8 +52,9 @@ fn command_dep() -> anyhow::Result<()> {
     let output = cmd.arg("dep").arg("check").output().unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
 
-    assert!(stdout.lines().count() > 100);
-    assert!(stdout.contains("fastqc "));
+    assert!(stdout.lines().count() > 30);
+    assert!(stdout.contains("quast.py"));
+    assert!(stdout.contains("bwa "));
 
     Ok(())
 }

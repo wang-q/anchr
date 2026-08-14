@@ -10,7 +10,7 @@ log_warn 7_merge_anchors.sh
 #----------------------------#
 USAGE="Usage: $0 [DIR_PREFIX] [DIR_MERGE]"
 
-DIR_PREFIX=${1:-"4_unitigs"}
+DIR_PREFIX=${1:-"4_unitigs_multik"}
 DIR_MERGE=${2:-"7_merge_anchors"}
 
 if [ -e ${DIR_MERGE}/anchor.merge.fasta ]; then
@@ -19,96 +19,19 @@ if [ -e ${DIR_MERGE}/anchor.merge.fasta ]; then
 fi
 
 #----------------------------#
-# merge anchors
+# merge anchors（现代：asm olc --unitigs）
 #----------------------------#
-log_info "anchor.non-contained"
+log_info "merge anchors with anchr asm olc --unitigs"
 
 mkdir -p ${DIR_MERGE}
 
-# reversely sorted files, so that Q30L60X80 will be infile_0
-anchr contained \
-    $( find . -path "*${DIR_PREFIX}*" -name "anchor.fasta" -or -path "*${DIR_PREFIX}*" -name "anchor.merge.fasta" | sort -r ) \
-    --len 1000 --idt 0.9999 --ratio 0.99999 --parallel {{ opt.parallel }} \
-    -o stdout |
-    pgr fa filter --min-len 1000 stdin -o ${DIR_MERGE}/anchor.non-contained.fasta
+# reversely sorted files, so that Q30L60X80 will be first
+find . -path "*${DIR_PREFIX}*" -name "anchor.fasta" | sort -r \
+    > ${DIR_MERGE}/anchors.list
 
-{% if opt.redo == "0" -%}
-anchr orient \
-    ${DIR_MERGE}/anchor.non-contained.fasta \
-    --len 1000 --idt 0.999 --parallel {{ opt.parallel }} \
-    -o ${DIR_MERGE}/anchor.intermediate_0.fasta
-anchr merge \
-    ${DIR_MERGE}/anchor.intermediate_0.fasta \
-    --len 1000 --idt 0.9999 --parallel {{ opt.parallel }} \
-    -o ${DIR_MERGE}/anchor.intermediate_1.fasta
-anchr contained \
-    ${DIR_MERGE}/anchor.intermediate_1.fasta \
-    --len 1000 --idt 0.98 --ratio 0.99 --parallel {{ opt.parallel }} \
-    -o stdout |
-    pgr fa filter --min-len 1000 stdin -o ${DIR_MERGE}/anchor.merge.fasta
-{% else -%}
-#----------------------------#
-# anchors with Q0L0 reads
-#----------------------------#
-log_info "anchors with Q0L0 reads"
-
-mkdir -p ${DIR_MERGE}/anchor
-cd ${DIR_MERGE}/anchor
-
-anchr anchors \
-    ../anchor.non-contained.fasta \
-    ${BASH_DIR}/../2_illumina/trim/pe.cor.fa.gz \
-    --readl {{ opt.readl }} \
-    --uscale {{ opt.uscale }} \
-    --lscale {{ opt.lscale }} \
-    -p {{ opt.parallel }} \
-    --keepedge \
-    --ratio 0.98 \
-    -o anchors.sh
-bash anchors.sh
-
-mv anchor.fasta ../anchor.merge.fasta
-{% endif -%}
-{# Keep a blank line #}
-
-#----------------------------#
-# others
-#----------------------------#
-log_info "others"
-
-cd ${BASH_DIR}/..
-
-anchr contained \
-    $( find . -path "*${DIR_PREFIX}*" -name "pe.others.fa" -or -path "*${DIR_PREFIX}*" -name "others.non-contained.fasta" | sort -r ) \
-{% if opt.redo == "1" -%}
-    ${DIR_MERGE}/anchor/pe.others.fa \
-{% endif -%}
-    --len 500 --idt 0.9999 --ratio 0.99999 --parallel {{ opt.parallel }} \
-    -o stdout |
-    pgr fa filter --min-len 500 stdin -o ${DIR_MERGE}/others.intermediate_0.fasta
-
-anchr contained \
-    ${DIR_MERGE}/anchor.merge.fasta \
-    ${DIR_MERGE}/others.intermediate_0.fasta \
-    --len 500 --idt 0.98 --ratio 0.99999 --parallel {{ opt.parallel }} \
-    -o stdout |
-    pgr fa filter --min-len 500 stdin -o ${DIR_MERGE}/others.intermediate_1.fasta
-
-cat ${DIR_MERGE}/others.intermediate_1.fasta |
-    grep '>infile_1/' |
-    sed 's/>//' \
-    > ${DIR_MERGE}/others.txt
-
-faops some -l 0 \
-    ${DIR_MERGE}/others.intermediate_1.fasta \
-    ${DIR_MERGE}/others.txt \
-    ${DIR_MERGE}/others.non-contained.fasta
-
-{% if opt.redo == "1" -%}
-find ${DIR_MERGE}/anchor -name "*.fasta" -or -name "*.fa" | parallel --no-run-if-empty -j 1 rm
-{% endif -%}
-find ${DIR_MERGE} -name "anchor.intermediate*" | parallel --no-run-if-empty -j 1 rm
-find ${DIR_MERGE} -name "others.intermediate*" | parallel --no-run-if-empty -j 1 rm
+anchr asm olc --unitigs --list-files ${DIR_MERGE}/anchors.list \
+    --min-overlap 34 --min-contig-len 1000 \
+    -o ${DIR_MERGE}/anchor.merge.fasta
 
 log_info Done.
 

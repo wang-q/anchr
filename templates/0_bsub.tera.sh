@@ -139,43 +139,15 @@ bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) {% if opt
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_stat_other_anchors" \
     "bash 0_script/9_stat_other_anchors.sh"
 
-#----------------------------#
-# extend anchors
-#----------------------------#
-{% if opt.extend == "1" -%}
-bsub -w "ended(${BASE_NAME}-8_spades) && ended(${BASE_NAME}-8_megahit) {% if opt.merge == "1" and opt.se == "0" %}&& ended(${BASE_NAME}-8_mr_spades)&& ended(${BASE_NAME}-8_mr_megahit){% endif %}" \
-    -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-contigs_2GS" \
-    '
-    rm -fr 7_extend_anchors
-    mkdir -p 7_extend_anchors
-    cat \
-        8_spades/spades.non-contained.fasta \
-        8_megahit/megahit.non-contained.fasta \
-{% if opt.merge == "1" and opt.se == "0" -%}
-        8_mr_spades/spades.non-contained.fasta \
-        8_mr_megahit/megahit.non-contained.fasta \
-{% endif -%}
-        | anchr dazzname --no-replace stdin \
-        | pgr fa filter --min-len 1000 stdin -o 7_extend_anchors/contigs.2GS.fasta
-    '
-
-bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-contigs_2GS)" \
-    -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-7_glue_anchors" \
-    "bash 0_script/7_glue_anchors.sh 7_merge_anchors/anchor.merge.fasta 7_extend_anchors/contigs.2GS.fasta 3"
-
-bsub -w "ended(${BASE_NAME}-7_glue_anchors)" \
-    -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-7_fill_anchors" \
-    "bash 0_script/7_fill_anchors.sh 7_glue_anchors/contig.fasta 7_extend_anchors/contigs.2GS.fasta 3"
-{% endif -%}
 {# Keep a blank line #}
 #----------------------------#
 # final stats
 #----------------------------#
-bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-8_spades) {% if opt.extend == "1" %}&& ended(${BASE_NAME}-7_fill_anchors){% endif %}" \
+bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-8_spades)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_stat_final" \
     "bash 0_script/9_stat_final.sh"
 
-bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-8_spades) {% if opt.extend == "1" %}&& ended(${BASE_NAME}-7_fill_anchors){% endif %}" \
+bsub -w "ended(${BASE_NAME}-7_merge_anchors) && ended(${BASE_NAME}-8_spades)" \
     -q {{ opt.queue }} -n {{ opt.parallel }} -J "${BASE_NAME}-9_quast" \
     "bash 0_script/9_quast.sh"
 

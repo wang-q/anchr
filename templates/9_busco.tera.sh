@@ -29,13 +29,6 @@ if [ -e 7_merge_anchors/anchor.merge.fasta ]; then
     ARRAY+=('merge_anchors::7_merge_anchors/anchor.merge.fasta')
 fi
 
-if [ -e 7_glue_anchors/contig.fasta ]; then
-    ARRAY+=('glue_anchors::7_glue_anchors/contig.fasta')
-fi
-if [ -e 7_fill_anchors/contig.fasta ]; then
-    ARRAY+=('fill_anchors::7_fill_anchors/contig.fasta')
-fi
-
 if [ -e 8_spades/spades.non-contained.fasta ]; then
     ARRAY+=('spades::8_spades/spades.non-contained.fasta')
 fi

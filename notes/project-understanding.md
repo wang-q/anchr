@@ -66,13 +66,13 @@ match app.get_matches().subcommand() {
   log/lru/env_logger/flate2 等），避免两边因外部 crate 版本出现行为差异。
 - 曾用 `bio`/`intspan` 外部 crate，已移除：序列 I/O 用 `pgr::libs::fmt`，
   区间用 `pgr::libs::ds::IntSpan`，分层覆盖改用 `pgr::libs::runlist`
-  （基准见 `notes/benchmarks/` 相关记录与 `benches/covered_benchmark.rs`）。
+  （`covered` 命令及 `covered_benchmark` 已废弃，覆盖基准在 pgr 侧）。
 
 ### 2.4 构建配置
 
 - `Cargo.toml`：`publish = false`；release `lto = true`；
-  `[[bench]]` 3 个（`covered_benchmark`、`fq_assemble_benchmark`、
-  `asm_map_benchmark`，criterion + rand dev 依赖）；
+  `[[bench]]` 2 个（`fq_assemble_benchmark`、`asm_map_benchmark`，
+  criterion + rand dev 依赖）；
 - `rust-toolchain.toml`：stable + rustfmt/clippy/rust-src；
 - CI：`.github/workflows/`（build/codecov/publish；publish 用 zigbuild 交叉编译）。
 
@@ -84,9 +84,8 @@ match app.get_matches().subcommand() {
 | :--- | :--- | :--- |
 | Dependence | `dep check/install` | 依赖检查 |
 | Download | `ena meta/manifest` | ENA 元数据抓取（JSON）/ 下载清单（tsv/ftp/md5/ascp） |
-| Overlaps - Standalone | `dazzname`/`show2ovlp`/`paf2ovlp`/`covered`/`restrict` | 命名、转换、覆盖统计 |
-| Overlaps - Daligner | `overlap`/`orient`/`contained`/`merge`/`overlap2` | dazzler 比对流水线（tempdir 内运行） |
-| Assembling | `trim`/`quorum`/`mergeread`/`unitigs`/`anchors`/`template` | 流程原语与模板编排 |
+| Overlaps | `contained`/`dazzname` | 包含去冗余 / 重命名（8_*/2_insert_size 用） |
+| Assembling | `trim`/`quorum`/`mergeread`/`template` | 流程原语与模板编排 |
 
 ### 3.2 `fq` 命令组（15 个，随迁自 pgr）
 
@@ -171,9 +170,9 @@ match app.get_matches().subcommand() {
 
 ### 5.4 流程命令约定
 
-Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir 内
-运行，结束后不保留中间文件；用 `cmd_lib::run_cmd!` 编排外部工具
-（LAshow、fasta2DB、daligner、hnsm 等，依赖系统 PATH）。
+`contained`/`dazzname` 为自实现 overlap 工具（无外部依赖）；dazzler
+流水线（overlap/orient/merge 及外部 LAshow/daligner）已废弃
+（2026-08-15，现代 OLC 用 `asm ovlp/layout/cns`）。
 
 ## 6. 项目现状评估
 
@@ -217,8 +216,6 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 - **pgr**：基础库提供者（git rev 锁定 + 本地 patch 双轨）；
 - **BBTools 39.38/40.01**：fq/asm 语义与 golden 的主参考（源码在
   `BBTools-40.01/`，仅作参考，被 gitignore）；
-- **dazzler 工具链**（fasta2DB/DBsplit/daligner/LAshow）与 **hnsm**：
-  流程命令的外部依赖（系统 PATH）；
 - **bcalm/canu/celera/metaMDBG/megahit/skesa/quorum**：asm 与纠错的源码参考
   （笔记见 `notes/references/`）。
 
@@ -228,9 +225,7 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 |---|---|---|---|
 | 必需 | `anchr` / `pgr` | 流程主命令 / 基础库命令（`kmer hist`、`fa split/range` 等） | 自建（cargo） |
 | 必需 | `ureq`（Rust crate） | `ena meta` 的 ENA portal API 客户端（替换 Perl LWP::Simple） | 2.12.1，`features=["json"]` |
-| 必需 | `parallel` `jq` `pigz` `faops` | 模板编排、JSON env、压缩、FASTA 工具 | cbp |
-| 必需 | `hnsm` | OLC 流水线（overlap 相关） | cbp |
-| 必需 | `daligner`（含 fasta2DB/DBsplit/LAshow） | dazzler 比对流水线（overlap/orient/contained/merge） | cbp |
+| 必需 | `parallel` `jq` `pigz` | 模板编排、JSON env、压缩 | cbp |
 | 必需 | `quast` | 最终组装质控（用户明确保留） | cbp |
 | 可选 | `fastqc` | QC 对照（`fq qc` 主参考） | 已替代但保留对照 |
 | 可选 | `spades` / `megahit` | 组装对照（用户保留参考） | 现代主路线 = multik+OLC |
@@ -243,8 +238,9 @@ Dazzler 流水线命令（`overlap`/`orient`/`contained`/`merge`）在 tempdir �
 | 已替代 | `picard` | insert size | → `asm map` + SAM TLEN |
 | 已替代 | `masurca` | quorum 脚本 PATH 依赖 | quorum 不再用时不需要 |
 
-本机 cbp 环境 2026-08-15 核对：必需项全部在位（`dazzdb` 无独立命令，
-daligner 包内含 fasta2DB/DBsplit）；`bifrost` 未装（现代流程不需要）。
+本机 cbp 环境 2026-08-15 核对：必需项全部在位；`bifrost` 未装（现代流程
+不需要）；dazzler 工具链（daligner/fasta2DB/LAshow/dazz）已随流水线废弃
+不再需要。
 
 ## 8. 关键风险与技术债
 
@@ -252,8 +248,8 @@ daligner 包内含 fasta2DB/DBsplit）；`bifrost` 未装（现代流程不需�
    `scripts/verify-migrate.sh`；本地 patch 掩盖了"发布版与本地版"差异，
    发布前需确认 patch 未影响构建；
 2. **双轨遗留**：pgr 删除后部分笔记/索引仍引用旧路径（anchr 副本待同步）；
-3. **外部工具依赖**：流程命令依赖 dazzler/hnsm 等系统工具，CI/容器环境
-   需预装；测试中缺失时跳过（可能掩盖回归）；
+3. **外部工具依赖**：流程命令依赖外部工具（bwa/picard/quast 等），CI/
+   容器环境需预装；测试中缺失时跳过（可能掩盖回归）；
 4. **`fq range` BGZF 路径**：`.gzi` 索引生成未封装 CLI，属基础层缺口；
 5. **既有 warning**：8 处 dead_code 等（迁移代码带入 + 原有），clippy
    `-D warnings` 前需清理。
@@ -267,10 +263,8 @@ daligner 包内含 fasta2DB/DBsplit）；`bifrost` 未装（现代流程不需�
 - **BBTools 替换链**：`fq clump/split/sample/clean/filter/merge/ec-*/norm`
   对照 39.38 golden；文档：`notes/design/fq-trim-replace.md`、
   `notes/design/fq-merge-replace.md`、`notes/references/bbtools.md`；
-- **Dazzler 流水线**：`overlap/orient/contained/merge` 外部工具编排；
-  文档：`docs/dazzler.md`、`docs/dazz.md`；
-- **区间与覆盖**：`covered` 命令 → `pgr::libs::runlist`；基准
-  `benches/covered_benchmark.rs`。
+- **Overlap 工具**：`contained`/`dazzname`（8_*/2_insert_size）；`covered`
+  命令已废弃（pgr runlist 替代）；基准 `benches/covered_benchmark.rs`。
 
 ## 10. 设计笔记索引（notes/design/）
 

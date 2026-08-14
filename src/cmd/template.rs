@@ -48,12 +48,7 @@ pub fn make_subcommand() -> Command {
     * --readl 100
     * --uscale 2
     * --lscale 3
-    * --redo
 
-* Extend anchors
-    * --extend
-    * --gluemin 30
-    * --fillmax 100
 
 * Validate assemblies
     * --busco
@@ -238,33 +233,6 @@ pub fn make_subcommand() -> Command {
                 .num_args(1)
                 .default_value("3"),
         )
-        .arg(
-            Arg::new("redo")
-                .long("redo")
-                .action(ArgAction::SetTrue)
-                .help("Redo anchors when merging anchors"),
-        )
-        // Extend anchors
-        .arg(
-            Arg::new("extend")
-                .long("extend")
-                .action(ArgAction::SetTrue)
-                .help("Extend anchors with other contigs"),
-        )
-        .arg(
-            Arg::new("gluemin")
-                .long("gluemin")
-                .help("Min length of overlaps to be glued")
-                .num_args(1)
-                .default_value("30"),
-        )
-        .arg(
-            Arg::new("fillmax")
-                .long("fillmax")
-                .help("Max length of gaps")
-                .num_args(1)
-                .default_value("100"),
-        )
         // Validate assemblies
         .arg(
             Arg::new("busco")
@@ -374,25 +342,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     opt.insert("readl", args.get_one::<String>("readl").unwrap());
     opt.insert("uscale", args.get_one::<String>("uscale").unwrap());
     opt.insert("lscale", args.get_one::<String>("lscale").unwrap());
-    opt.insert(
-        "redo",
-        if args.get_flag("redo") {
-            &binding_1
-        } else {
-            &binding_0
-        },
-    );
-    opt.insert(
-        "extend",
-        if args.get_flag("extend") {
-            &binding_1
-        } else {
-            &binding_0
-        },
-    );
-    opt.insert("gluemin", args.get_one::<String>("gluemin").unwrap());
-    opt.insert("fillmax", args.get_one::<String>("fillmax").unwrap());
-
     let mut context = Context::new();
     context.insert("opt", &opt);
 
@@ -454,11 +403,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         gen_mr_megahit(&context)?;
     }
     gen_stat_other_anchors(&context)?;
-
-    if args.get_flag("extend") {
-        gen_glue_anchors(&context)?;
-        gen_fill_anchors(&context)?;
-    }
 
     gen_quast(&context)?;
     gen_stat_final(&context)?;
@@ -910,40 +854,6 @@ fn gen_stat_other_anchors(context: &Context) -> anyhow::Result<()> {
             "t",
             include_str!("../../templates/9_stat_other_anchors.tera.sh"),
         ),
-    ])
-    .unwrap();
-
-    let rendered = tera.render("t", context).unwrap();
-    anchr::utils::write_lines(outname, &[rendered.as_str()])?;
-
-    Ok(())
-}
-
-fn gen_glue_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_script/7_glue_anchors.sh";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    tera.add_raw_templates(vec![
-        ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/7_glue_anchors.tera.sh")),
-    ])
-    .unwrap();
-
-    let rendered = tera.render("t", context).unwrap();
-    anchr::utils::write_lines(outname, &[rendered.as_str()])?;
-
-    Ok(())
-}
-
-fn gen_fill_anchors(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_script/7_fill_anchors.sh";
-    eprintln!("Create {}", outname);
-
-    let mut tera = Tera::default();
-    tera.add_raw_templates(vec![
-        ("header", include_str!("../../templates/header.tera.sh")),
-        ("t", include_str!("../../templates/7_fill_anchors.tera.sh")),
     ])
     .unwrap();
 

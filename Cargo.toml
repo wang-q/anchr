@@ -60,10 +60,6 @@ criterion = "0.5.1"
 rand = "0.9"
 
 [[bench]]
-name = "covered_benchmark"
-harness = false
-
-[[bench]]
 name = "fq_assemble_benchmark"
 harness = false
 

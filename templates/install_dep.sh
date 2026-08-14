@@ -15,14 +15,11 @@ for package in gatk; do
 done
 
 cbp install openjdk
-cbp install parallel jq pigz hnsm
+cbp install parallel jq pigz tsv-utils
 cbp install fastqc picard
-cbp install bbtools sickle tsv-utils
-cbp install jellyfish quorum superreads
-cbp install bwa samtools freebayes mosdepth # gatk
-cbp install bcalm bifrost
-cbp install faops intspan
-cbp install spoa
-cbp install dazzdb daligner
+cbp install bwa samtools freebayes mosdepth
+cbp install quast spades megahit
+
+cpanm Number::Format
 
 exit 0

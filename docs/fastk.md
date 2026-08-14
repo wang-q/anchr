@@ -262,17 +262,17 @@ time FastGA -v -l100 -i0.7 -1:self genome.fa
 ALNchain -v -s1000 -z100 -g20 self
 
 ALNtoPAF self |
-    anchr paf2ovlp stdin |
+    pgr paf stat |
     tsv-summarize --sum 3
 
 ALNtoPAF self.chain |
-    anchr paf2ovlp stdin |
+    pgr paf stat |
     tsv-summarize --sum 3
 
 ALNplot self.chain -p -W500 -n0
 
 ALNtoPAF self.chain |
-    anchr paf2ovlp stdin |
+    pgr paf stat |
     tsv-filter --ge 3:1000 |
     perl -nla -F"\t" -e '
         # f
