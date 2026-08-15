@@ -59,8 +59,9 @@
   （合并输出中整条被另一 contig 分两段覆盖的冗余 contig 现在会被
   `dedup_contained_ratio` 0.99 丢弃），G37 merge_anchors dup 稳定回到
   **1.000**（此前随机差的一轮为 1.205），0 mis、0 N、GF ~95.9% 不变；
-  新增测试 `dedups_multi_block_contained_contigs`。完全可复现仍可给
-  `tsv-sample` 加固定 `--seed`（待决）。
+  新增测试 `dedups_multi_block_contained_contigs`；另加 `asm anchor`
+  边界校正（contig 两端 readl/2 窗口线性缩放，GF 95.79→95.99%）。
+  完全可复现仍可给 `tsv-sample` 加固定 `--seed`（待决）。
 
 ## 低风险审计（可顺手修）
 

@@ -43,6 +43,7 @@ else
             out2=re-pair/R2.fa \
             outs=re-pair/Rs.fa \
             threads={{ opt.parallel }} \
+            -Xmx16g \
             repair overwrite
 
     # spades seems ignore non-properly paired reads
