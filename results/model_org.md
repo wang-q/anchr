@@ -341,6 +341,16 @@ bcalm 链（95.5K）都追平并超过 legacy（95.5K），multik 只有 23.4K�
 从 multik 的 4 降到 unitig/bcalm 链的 1（legacy 0）；`asm unitig` 与外部
 bcalm 等价（自研可替代外部依赖）。
 
+#### multik k0 修复（2026-08-15 追加）
+
+multik 碎片化的根因是 pass 0 骨架冻结在 k0（21/31）：迭代轮只验证/合并
+k0 的图，从不重新组装（单跑 `asm unitig -k 81` 有 53.5K/705 条，multik
+迭代却输出 21K/1455 条）。`auto_ks` k0 从 `N50/10` 改为 `N50/3`
+（clamp 31..51）后，MG1655 5 组 k0=51 全链：unitig N50 46-60K（原
+19-21K）、merge N50 **65.8K**（原 23.4K，128 contigs）、GF 97.36%
+（原 96.44）、Dup 1.000；mis 仍 4（重复区/环状 quast 误报 + merge 阶段
+重复序列 exact-overlap 错连，机制分析见 `todo.md`，未修）。
+
 #### Dup 修复（2026-08-15 追加）
 
 原两链 Dup 1.07-1.08 偏高：anchor 阶段无近似重复 contig，重复由

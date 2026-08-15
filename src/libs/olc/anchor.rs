@@ -186,9 +186,7 @@ mod tests {
     fn anchor_regions_filter_by_window() {
         // Depth 10 everywhere on ref 0; depth 10 except position 4-5 (depth 1).
         let mut covs = vec![vec![0u32; 11]; 1];
-        for p in 1..=10 {
-            covs[0][p] = 10;
-        }
+        covs[0][1..].fill(10);
         covs[0][4] = 1;
         covs[0][5] = 1;
         let opts = AnchorOptions {
@@ -213,9 +211,7 @@ mod tests {
             covs[0][i + 1] = *v;
             covs[0][20 - i] = *v;
         }
-        for p in 6..=15 {
-            covs[0][p] = 10;
-        }
+        covs[0][6..16].fill(10);
         let opts = AnchorOptions {
             min_len: 2,
             ..Default::default()

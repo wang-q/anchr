@@ -32,9 +32,14 @@ without heuristics.
 Notes:
 * Input is one or more FASTA/FASTQ files (plain or gzipped); pairing is
   irrelevant for assembly, and `--list-files` reads a one-path-per-line list
-* k-mer lengths are sorted and deduplicated internally; pass 0 uses the
-  smallest k; `--kmer auto` (default) derives the sequence from the
-  read-length N50 (21/41/61/81 for short reads, 31/61/91/121 for long reads)
+* k-mer lengths are sorted and deduplicated internally; the smallest k is
+  the master k (pass 0 skeleton), each larger k is a slave k that validates
+  the graph. Run one master per invocation (`-k 31,41,51,61,71,81` uses
+  master 31; `-k 51,61,71,81` uses master 51) and let the template drive
+  several masters in parallel, then merge their unitigs
+* `--kmer auto` (default) derives the sequence from the read-length N50
+  (~1/3 of the read length up to 51, e.g. 50/70/90/110 for 150 bp reads,
+  51/81/111 for long reads)
 * Output unitigs are written longest-first with `unitig_<id>` FASTA headers
   carrying length and coverage
 

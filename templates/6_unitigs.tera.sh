@@ -19,6 +19,9 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     mkdir -p 6_unitigs_{{ unitigger }}/MRX{1}P{2}
     cd 6_unitigs_{{ unitigger }}/MRX{1}P{2}
 
+{% set parallel2 = opt.parallel | int / 2 -%}
+{% set parallel2 = parallel2 | round(method="floor") -%}
+{% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
 {% if unitigger == "bcalm" %}    # external bcalm unitigs per k, merged across k with the modern OLC step
     for K in 31 41 51 61 71 81; do
         bcalm \
@@ -30,6 +33,7 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     done
 
     anchr asm olc --unitigs unitigs_K*.fasta \
+        --min-overlap 1000 \
         --min-contig-len 1000 \
         -o unitigs.fasta
 {% elif unitigger == "unitig" %}    # in-house BCALM-semantics unitigs per k (asm unitig), merged across k
@@ -42,12 +46,31 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     done
 
     anchr asm olc --unitigs unitigs_K*.fasta \
+        --min-overlap 1000 \
         --min-contig-len 1000 \
         -o unitigs.fasta
-{% else %}    anchr asm multik \
-        ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
-        -k 31,41,51,61,71,81 \
-        -p {{ opt.parallel }} \
+{% else %}    # per-master multik: every k builds its own skeleton (larger ks
+    # validate it), masters run in parallel, then merged across masters
+    for K in 31 41 51 61 71 81; do
+        K_LIST=""
+        for J in 31 41 51 61 71 81; do
+            if [ ${J} -ge ${K} ]; then
+                K_LIST="${K_LIST}${K_LIST:+,}${J}"
+            fi
+        done
+        (
+            anchr asm multik \
+                ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
+                -k ${K_LIST} \
+                -p {{ parallel2 }} \
+                -o unitigs_K${K}.fasta
+        ) &
+    done
+    wait
+
+    anchr asm olc --unitigs unitigs_K*.fasta \
+        --min-overlap 1000 \
+        --min-contig-len 1000 \
         -o unitigs.fasta
 {% endif %}
 

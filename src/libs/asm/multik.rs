@@ -21,9 +21,11 @@ use std::collections::HashSet;
 /// Options for [`assemble_multik`].
 #[derive(Debug, Clone)]
 pub struct MultikOptions {
-    /// Increasing k-mer lengths; pass 0 assembles unitigs at `ks[0]`, each
-    /// later k validates the previous unitig graph. Empty means auto-derive
-    /// from the read-length N50 (see [`auto_ks`]).
+    /// Increasing k-mer lengths; `ks[0]` is the master k (the skeleton,
+    /// assembled by pass 0) and each later k is a slave k that validates the
+    /// graph. Run one master per invocation and merge masters' outputs in
+    /// the template (bash parallel). Empty means auto-derive from the
+    /// read-length N50 (see [`auto_ks`]).
     pub ks: Vec<usize>,
     /// Solid k-mer threshold for pass 0 (same as `asm unitig`).
     pub min_count_seed: usize,
@@ -68,11 +70,29 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
     }
     ks.sort_unstable();
     ks.dedup();
-    let k0 = ks[0];
 
+    let k0 = ks[0];
+    // Single-master-skeleton iteration: `ks[0]` builds the graph and every
+    // later k validates it. One master per invocation — the template drives
+    // several masters in parallel (bash) and merges their outputs.
+    let mut chains = assemble_one(infiles, k0, &ks[1..], opts)?;
+    chains.sort_by_key(|u| std::cmp::Reverse(u.bases.len()));
+    Ok(chains)
+}
+
+/// Runs the single-skeleton iteration: pass 0 builds maximal unitigs at
+/// `k0`, every k in `later_ks` validates the graph (bridge k-mers, internal
+/// solidity, reads bridges), and validated chains are compacted into long
+/// unitigs.
+fn assemble_one(
+    infiles: &[String],
+    k0: usize,
+    later_ks: &[usize],
+    opts: &MultikOptions,
+) -> Result<Vec<MultikUnitig>> {
     // Pass 0: maximal unitigs at the first k (BCALM graph3 semantics).
     let assemble_opts = AssembleOptions {
-        k: ks[0],
+        k: k0,
         min_count_seed: opts.min_count_seed,
         parallel: opts.parallel,
         // FASTA input: FastK-style super-mer two-stage counting (the `asm
@@ -81,12 +101,12 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
         use_supermer: true,
         // Same fast paths as the `asm unitig` command: adaptive minimizer
         // length and the DFA-state walk engine.
-        supermer_m: Some((12).min((5).max(ks[0] / 4))),
+        supermer_m: Some((12).min((5).max(k0 / 4))),
         use_dfa: true,
         ..AssembleOptions::default()
     };
     let (mut unitigs, _) = assemble_unitigs_core(infiles, &assemble_opts)?;
-    let mut links = compute_links(&unitigs, ks[0]);
+    let mut links = compute_links(&unitigs, k0);
 
     // Iterative rounds: validate the graph with each larger k. Low-abundance
     // branching unitigs are pruned every round but CARRIED into the next
@@ -94,7 +114,7 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
     // strain/polymorphic sequences keep participating in assembly instead of
     // being emitted as dropped fragments only.
     let mut carried: Vec<Unitig> = Vec::new();
-    for &k in &ks[1..] {
+    for &k in later_ks {
         unitigs.append(&mut carried);
         let t_round = std::time::Instant::now();
         let t0 = std::time::Instant::now();
@@ -191,15 +211,19 @@ fn read_n50(reads: &[(Vec<u8>, Vec<u8>)]) -> usize {
 
 /// Derives an increasing k sequence from the read-length N50:
 /// `k_max = min(0.8 * N50, 128)`, starting at `clamp(N50/10, 21, 31)` with
-/// steps of `clamp(N50/100, 20, 30)`. Short reads (108 bp) yield
-/// 21/41/61/81; long reads (>= 10 kb) cap at 31/61/91/121 — mirroring
+/// steps of `clamp(N50/100, 20, 30)`. The starting k is ~1/3 of the read
+/// length (`clamp(N50/3, 31, 51)`): pass 0 builds the graph skeleton at the
+/// first k, and a too-small skeleton (21-mer on 150 bp reads) fragments the
+/// assembly at low-complexity junctions that larger k's could resolve
+/// (MG1655: N50 21K at k0=21 vs 59K at k0=51). Short reads (150 bp) yield
+/// 50/70/90/110; long reads (>= 10 kb) cap at 51/81/111 — mirroring
 /// metaMDBG's `computeLastK` (last k-min-mer spans ~2× N50).
 fn auto_ks(n50: usize) -> Vec<usize> {
     if n50 == 0 {
         return Vec::new();
     }
     let k_max = (n50 * 8 / 10).clamp(31, Kmer::MAX_K);
-    let k_min = (n50 / 10).clamp(21, 31);
+    let k_min = (n50 / 3).clamp(31, 51);
     let step = (n50 / 100).clamp(20, 30);
     let mut ks = Vec::new();
     let mut k = k_min;
@@ -1075,10 +1099,12 @@ mod tests {
 
     #[test]
     fn auto_ks_matches_read_length() {
-        // Short reads (108 bp): 21/41/61/81.
-        assert_eq!(auto_ks(108), vec![21, 41, 61, 81]);
-        // Long reads (>= 10 kb): capped at 31/61/91/121 (128 limit).
-        assert_eq!(auto_ks(15000), vec![31, 61, 91, 121]);
+        // Short reads (150 bp): k0 ~1/3 of the read length.
+        assert_eq!(auto_ks(150), vec![50, 70, 90, 110]);
+        // Short reads (108 bp): k0 = clamp(108/3, 31, 51) = 36.
+        assert_eq!(auto_ks(108), vec![36, 56, 76]);
+        // Long reads (>= 10 kb): capped at 51/81/111 (128 limit).
+        assert_eq!(auto_ks(15000), vec![51, 81, 111]);
         // Zero/empty input yields no ks.
         assert!(auto_ks(0).is_empty());
     }

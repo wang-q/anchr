@@ -130,21 +130,150 @@ fn try_merge(keeper: &[u8], cand: &[u8], min_overlap: usize) -> Option<Vec<u8>> 
 /// Dominant k-mer offset of `query` inside `keeper` (position in keeper minus
 /// position in query), the number of query k-mers supporting it, and the
 /// number of query k-mers present anywhere in `keeper`.
+///
+/// Normal inputs run the exact histogram: every (query window, keeper seed
+/// position) pair votes for its offset. Homopolymer runs make that quadratic
+/// (20k x 20k = 4e8 pairs per contig pair), so once the pair count exceeds
+/// [`EXACT_WORK_CAP`] a bounded path takes over: heavy seeds (many positions
+/// on both sides) contribute a piecewise-linear support function whose exact
+/// breakpoints come from run pairs, light seeds contribute an exact offset
+/// delta histogram, and each candidate offset is verified with an exact
+/// per-window scan. The verified maximum is exact, so repetitive inputs keep
+/// the same dominant-offset answer without the quadratic fan-out.
 fn overlap_geometry(
     index: &std::collections::HashMap<&[u8], Vec<usize>>,
     query: &[u8],
 ) -> (isize, usize, usize) {
-    let mut hist: std::collections::HashMap<isize, usize> = std::collections::HashMap::new();
     let mut matched = 0usize;
-    for (i, w) in query.windows(SEED_LEN).enumerate() {
+    let mut work = 0usize;
+    for w in query.windows(SEED_LEN) {
         if let Some(ps) = index.get(w) {
             matched += 1;
+            work += ps.len();
+        }
+    }
+    if work > EXACT_WORK_CAP {
+        return overlap_geometry_bounded(index, query, matched);
+    }
+    let mut hist: std::collections::HashMap<isize, usize> = std::collections::HashMap::new();
+    for (i, w) in query.windows(SEED_LEN).enumerate() {
+        if let Some(ps) = index.get(w) {
             for &p in ps {
                 *hist.entry(p as isize - i as isize).or_default() += 1;
             }
         }
     }
     let (offset, hits) = hist.into_iter().max_by_key(|(_, n)| *n).unwrap_or((0, 0));
+    (offset, hits, matched)
+}
+
+/// Exact-histogram pair budget; above this the bounded path runs instead.
+const EXACT_WORK_CAP: usize = 1_000_000;
+
+/// Pair budget per seed above which the seed counts as heavy (run-pair
+/// breakpoints instead of the plain pair loop).
+const HEAVY_PAIRS: usize = 4096;
+
+/// Candidate offsets verified by the exact per-window scan.
+const MAX_CANDIDATES: usize = 32;
+
+/// Maximal runs of consecutive window positions.
+fn runs(pos: &[usize]) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i < pos.len() {
+        let start = pos[i];
+        let mut j = i + 1;
+        while j < pos.len() && pos[j] == pos[j - 1] + 1 {
+            j += 1;
+        }
+        out.push((start, pos[j - 1] + 1));
+        i = j;
+    }
+    out
+}
+
+/// Bounded fallback for repetitive inputs. `matched` counts every query
+/// window present in `index` (exact). The support of a keeper-run / query-run
+/// pair is a triangle in the offset, so heavy seeds (many position pairs)
+/// propose its breakpoints; light seeds accumulate an exact delta histogram.
+/// Each candidate's support is then verified exactly over the full query, so
+/// the returned maximum matches the exact histogram whenever the true
+/// dominant offset is among the candidates.
+fn overlap_geometry_bounded(
+    index: &std::collections::HashMap<&[u8], Vec<usize>>,
+    query: &[u8],
+    matched: usize,
+) -> (isize, usize, usize) {
+    let mut qpos: std::collections::HashMap<&[u8], Vec<usize>> = std::collections::HashMap::new();
+    for (i, w) in query.windows(SEED_LEN).enumerate() {
+        if index.contains_key(w) {
+            qpos.entry(w).or_default().push(i);
+        }
+    }
+    // Heavy seeds: slope events of the support function (offset -> slope
+    // delta); a run pair contributes a +1/0/-1 triangle between its four
+    // breakpoints. Light seeds: exact offset delta histogram.
+    let mut events: std::collections::BTreeMap<isize, i64> = std::collections::BTreeMap::new();
+    let mut deltas: std::collections::HashMap<isize, usize> = std::collections::HashMap::new();
+    for (w, qs) in &qpos {
+        let ps = &index[w];
+        if ps.len() * qs.len() > HEAVY_PAIRS {
+            for (ks, ke) in runs(ps) {
+                for (qr_s, qr_e) in runs(qs) {
+                    *events.entry(ks as isize - qr_e as isize).or_default() += 1;
+                    *events.entry(ks as isize - qr_s as isize).or_default() -= 1;
+                    *events.entry(ke as isize - qr_e as isize).or_default() -= 1;
+                    *events.entry(ke as isize - qr_s as isize).or_default() += 1;
+                }
+            }
+        } else {
+            for &p in ps {
+                for &i in qs {
+                    *deltas.entry(p as isize - i as isize).or_default() += 1;
+                }
+            }
+        }
+    }
+    // Sweep the slope events to get the exact heavy-seed support at every
+    // breakpoint, then keep the strongest ones.
+    let mut heavy: Vec<(isize, i64)> = Vec::with_capacity(events.len());
+    let mut value = 0i64;
+    let mut slope = 0i64;
+    let mut prev = 0isize;
+    for (o, d) in events {
+        value += slope * (o - prev) as i64;
+        heavy.push((o, value));
+        slope += d;
+        prev = o;
+    }
+    heavy.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    heavy.truncate(MAX_CANDIDATES / 2);
+    let mut light: Vec<(isize, usize)> = deltas.into_iter().filter(|(_, c)| *c >= 2).collect();
+    light.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    light.truncate(MAX_CANDIDATES / 2);
+    let mut candidates: Vec<isize> = Vec::with_capacity(MAX_CANDIDATES);
+    candidates.extend(heavy.into_iter().map(|(o, _)| o));
+    candidates.extend(light.into_iter().map(|(o, _)| o));
+    candidates.sort_unstable();
+    candidates.dedup();
+    candidates.truncate(MAX_CANDIDATES);
+    let mut best: Option<(isize, usize)> = None;
+    for &o in &candidates {
+        let mut support = 0usize;
+        for (i, w) in query.windows(SEED_LEN).enumerate() {
+            if let Some(ps) = index.get(w) {
+                let pos = i as isize + o;
+                if pos >= 0 && ps.binary_search(&(pos as usize)).is_ok() {
+                    support += 1;
+                }
+            }
+        }
+        if best.is_none_or(|(_, b)| support > b) {
+            best = Some((o, support));
+        }
+    }
+    let (offset, hits) = best.unwrap_or((0, 0));
     (offset, hits, matched)
 }
 
@@ -253,7 +382,7 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 /// within 1%, and merges the covered intervals — a contig fully present as
 /// several blocks (small junction differences) is still detected (matching
 /// `anchr contained --idt 0.99` semantics).
-fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
+pub(crate) fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
     if needle.len() < 100 {
         return if contains(haystack, needle) { 1.0 } else { 0.0 };
     }
@@ -519,7 +648,7 @@ mod tests {
             .into_iter()
             .chain(b"ACGT".repeat(25))
             .chain(b"T".repeat(8))
-            .chain([b'G', b'G'])
+            .chain(*b"GG")
             .collect();
         let us = unitigs(
             &["u0", "u1"],
@@ -638,11 +767,11 @@ mod tests {
     #[test]
     fn merges_tail_extension_overlap() {
         let mut keeper = vec![b'A'; 5000];
-        keeper.extend(std::iter::repeat(b'C').take(20000));
-        keeper.extend(std::iter::repeat(b'T').take(5000));
+        keeper.extend(std::iter::repeat_n(b'C', 20000));
+        keeper.extend(std::iter::repeat_n(b'T', 5000));
         let mut cand = vec![b'C'; 20000];
-        cand.extend(std::iter::repeat(b'T').take(5000));
-        cand.extend(std::iter::repeat(b'G').take(3000));
+        cand.extend(std::iter::repeat_n(b'T', 5000));
+        cand.extend(std::iter::repeat_n(b'G', 3000));
         let merged = try_merge(&keeper, &cand, 5000).unwrap();
         assert_eq!(merged.len(), 33000);
         assert_eq!(&merged[..5000], &keeper[..5000]);
@@ -655,8 +784,8 @@ mod tests {
     #[test]
     fn drops_contained_candidate() {
         let mut keeper = vec![b'A'; 1000];
-        keeper.extend(std::iter::repeat(b'C').take(20000));
-        keeper.extend(std::iter::repeat(b'T').take(5000));
+        keeper.extend(std::iter::repeat_n(b'C', 20000));
+        keeper.extend(std::iter::repeat_n(b'T', 5000));
         let cand = vec![b'C'; 20000];
         let merged = try_merge(&keeper, &cand, 5000).unwrap();
         assert_eq!(merged, keeper);
@@ -666,11 +795,11 @@ mod tests {
     #[test]
     fn merges_reverse_overlap() {
         let mut keeper = vec![b'A'; 5000];
-        keeper.extend(std::iter::repeat(b'C').take(20000));
-        keeper.extend(std::iter::repeat(b'T').take(5000));
+        keeper.extend(std::iter::repeat_n(b'C', 20000));
+        keeper.extend(std::iter::repeat_n(b'T', 5000));
         let mut cand = vec![b'C'; 20000];
-        cand.extend(std::iter::repeat(b'T').take(5000));
-        cand.extend(std::iter::repeat(b'G').take(3000));
+        cand.extend(std::iter::repeat_n(b'T', 5000));
+        cand.extend(std::iter::repeat_n(b'G', 3000));
         let rc_cand: Vec<u8> = rev_comp(&cand).collect();
         let merged = try_merge(&keeper, &rc_cand, 5000).unwrap();
         assert_eq!(merged.len(), 33000);
@@ -681,12 +810,83 @@ mod tests {
     #[test]
     fn rejects_chimeric_candidate() {
         let mut keeper = vec![b'A'; 5000];
-        keeper.extend(std::iter::repeat(b'C').take(20000));
-        keeper.extend(std::iter::repeat(b'T').take(5000));
+        keeper.extend(std::iter::repeat_n(b'C', 20000));
+        keeper.extend(std::iter::repeat_n(b'T', 5000));
         let mut cand = vec![b'X'; 3000];
-        cand.extend(std::iter::repeat(b'C').take(20000));
-        cand.extend(std::iter::repeat(b'T').take(5000));
-        cand.extend(std::iter::repeat(b'G').take(3000));
+        cand.extend(std::iter::repeat_n(b'C', 20000));
+        cand.extend(std::iter::repeat_n(b'T', 5000));
+        cand.extend(std::iter::repeat_n(b'G', 3000));
         assert!(try_merge(&keeper, &cand, 5000).is_none());
+    }
+
+    /// The bounded fallback (work > [`EXACT_WORK_CAP`] pairs) must return
+    /// the same maximum as the plain histogram.
+    #[test]
+    fn bounded_geometry_matches_exact_histogram() {
+        fn exact(
+            index: &std::collections::HashMap<&[u8], Vec<usize>>,
+            query: &[u8],
+        ) -> (isize, usize, usize) {
+            let mut hist: std::collections::HashMap<isize, usize> =
+                std::collections::HashMap::new();
+            let mut matched = 0usize;
+            for (i, w) in query.windows(SEED_LEN).enumerate() {
+                if let Some(ps) = index.get(w) {
+                    matched += 1;
+                    for &p in ps {
+                        *hist.entry(p as isize - i as isize).or_default() += 1;
+                    }
+                }
+            }
+            let (offset, hits) = hist.into_iter().max_by_key(|(_, n)| *n).unwrap_or((0, 0));
+            (offset, hits, matched)
+        }
+        fn index_of(seq: &[u8]) -> std::collections::HashMap<&[u8], Vec<usize>> {
+            let mut index: std::collections::HashMap<&[u8], Vec<usize>> =
+                std::collections::HashMap::new();
+            for (i, w) in seq.windows(SEED_LEN).enumerate() {
+                index.entry(w).or_default().push(i);
+            }
+            index
+        }
+        fn run(c: u8, n: usize) -> Vec<u8> {
+            vec![c; n]
+        }
+        // Equal-length runs: unique maximum, the offset must match exactly.
+        let keeper = concat(&run(b'A', 100), &concat(&run(b'C', 1200), &run(b'T', 100)));
+        for query in [run(b'C', 1200), concat(&run(b'C', 1200), &run(b'T', 100))] {
+            let index = index_of(&keeper);
+            let got = overlap_geometry(&index, &query);
+            let want = exact(&index, &query);
+            assert_eq!(got, want, "keeper={} query={}", keeper.len(), query.len());
+        }
+        // Keeper run longer than query run: the support plateaus over a range
+        // of offsets (same maximum hits); the fallback may pick a different
+        // plateau member than the histogram, so compare the decisive values.
+        let cases: Vec<(Vec<u8>, Vec<u8>)> = vec![
+            (keeper.clone(), run(b'C', 1000)),
+            (
+                keeper.clone(),
+                concat(&run(b'X', 100), &concat(&run(b'C', 1000), &run(b'T', 100))),
+            ),
+        ];
+        for (keeper, query) in cases {
+            let index = index_of(&keeper);
+            let got = overlap_geometry(&index, &query);
+            let want = exact(&index, &query);
+            assert_eq!(
+                (got.1, got.2),
+                (want.1, want.2),
+                "keeper={} query={}",
+                keeper.len(),
+                query.len()
+            );
+        }
+    }
+
+    fn concat(a: &[u8], b: &[u8]) -> Vec<u8> {
+        let mut out = a.to_vec();
+        out.extend_from_slice(b);
+        out
     }
 }

@@ -32,7 +32,7 @@ find . -path "*${DIR_PREFIX}*" \
     > ${DIR_MERGE}/anchors.list
 
 anchr asm olc --unitigs --list-files ${DIR_MERGE}/anchors.list \
-    --min-overlap 34 --min-contig-len 1000 \
+    --min-overlap 1000 --min-contig-len 1000 \
     -o ${DIR_MERGE}/anchor.merge.fasta
 
 log_info Done.

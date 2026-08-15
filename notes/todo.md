@@ -71,6 +71,47 @@
   多块对齐拒绝——unitig 链 Dup 1.079→1.000、bcalm 链 1.068→1.001，
   GF 97.77% 不变，unitig 链 N50 提到 110.2K；mis 仍 1（contig_26
   relocation，属 multik 防嵌合任务）。
+- ~~multik 碎片化修复（auto k 序列 k0 太低）~~（2026-08-15 完成：
+  multik 的 unitig 骨架冻结在 pass 0 的 k0，k0=21/31 时 MG1655 N50 仅
+  21K（迭代轮并不切碎，1661→1661 条稳定；单跑 asm unitig k=81 就有
+  53.5K/705 条）。`auto_ks` k0 从 `N50/10` 改为 `N50/3`（clamp 31..51）：
+  MG1655 auto → 50/70/90/110，unitig N50 **21K → 58K**（687 条），
+  5 组全链 merge N50 **23.4K → 65.8K**（128 contigs），GF 97.36%；
+  395 测试全绿。k0 越高越低覆盖丢失风险，宏基因组需再验证。
+- multik 防嵌合（mis 4→0，2026-08-15 机制定位，未修）：
+  * multik unitigs 单组 mis 1-2 个，5 组合计 7 个（anchors 级同数，anchor
+    不引入新 mis）；merge 后 4 个（真嵌合 contig_2/24/37：参考相距
+    1.1M-3.7M 区域被连）。
+  * mis 成分：重复区（782bp IS 类元件双拷贝）对齐歧义 + 环状基因组跨起点
+    （quast 误报，组装正确）+ 真嵌合（merge 阶段重复序列 exact-overlap
+    错连——multik anchors 跨越重复区，olc 把共享重复序列的两段拼一起；
+    unitig/bcalm 链 anchors 在重复区断开所以无此问题）。
+  * 已排除：unitig 级平均 cov 区分（重复区只占 unitig 2.7%，cov 30.7 vs
+    median 35）；`bridge_filter`/`split_by_bridge` 60bp 探针（重复区内探针
+    有 reads 支撑）；asm anchor upper 过滤（重复区 ~80 < upper 116）。
+  * 候选修复：merge 阶段 overlap 加 reads 桥接验证（需 olc 传 reads）；
+    multik 在重复区断开（局部高覆盖检测）；探针增强。待定方向。
+- multik 多主 K 架构（2026-08-15 落地）：用户裁定 Rust 内多骨架并行太慢，
+  改为**主 K/从 K**：multik 一次只跑一个主 K（ks[0] 骨架，更大 k 验证），
+  模板（4/6_unitigs）用 bash 并行跑每个主 K（31..81），`asm olc --unitigs`
+  跨主 K 合并。G37：N50 39K/427 条 → 55.4K/**20 条**（~1 分钟）；
+  MG1655 单组：21K/1455 → **95.5K/108 条**（~8 分钟，6 主 K 并行 -p 4）。
+- **关键发现**（2026-08-15）：multik 的 mis 随主 K 增大而减少——K=31 主
+  3 mis、K=51 主 1 mis、**K=81 主 0 mis**（N50 58.8K、GF 97.88% 最高、
+  Sum 4.62M≈基因组 99.4%）；多主 K 合并（olc）引入 mis（全 K 6 个、仅
+  高 K 61/71/81 也有 3 个——跨主 K 的 unitigs 经重复序列 exact-overlap
+  错连）。**高 K 单主（无迭代）已是正确性最优**，迭代验证的价值需在
+  低覆盖/长读数据再确认；方向 2（重复区断开）待做。
+- ~~mis 根因：现代 olc `--min-overlap 34` 太松~~（2026-08-15 修正，用户
+  指出 legacy E. coli 0 mis 后复查）：legacy `orient/merge` 要求
+  **overlap ≥ 1000 bp + idt ≥ 99.9%**（daligner 全长比对），现代
+  `asm olc --unitigs` 默认**端点 17-mer 种子 + 34 bp exact overlap**——
+  短重复序列（46bp 反向重复）被当 overlap → inversion mis（contig_73
+  实测）。**min-overlap 提到 1000 后**：K=81 单主链 6→**0 mis**、unitig
+  链 6 k 合并 1→**0 mis**（N50 53.6K/146 条、GF 97.66%）；N50 略降
+  （短 overlap 不合并，宁断勿错，与 legacy 一致）。模板 7_merge 与
+  4/6_unitigs 合并已统一 `--min-overlap 1000`。低主 K（31/41）unitigs
+  自身仍有 mis（multik 迭代错连，非 olc 合并），方向 2 仍待做。
 - gz/大输入回归：默认 supermer 路径全链回归 + 峰值内存；
 - 560 bp 碎片 mis 覆盖度门槛（`asm-olc.md` §14.3，`--min-contig-len 1000`
   可滤，可选）。
