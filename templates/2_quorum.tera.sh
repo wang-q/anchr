@@ -65,18 +65,14 @@ for Q in 0 {{ opt.qual }}; do
 
             SUM_IN=$( cat env.json | jq '.SUM_IN | tonumber' )
             SUM_OUT=$( cat env.json | jq '.SUM_OUT | tonumber' )
-            EST_G=$( cat env.json | jq '.ESTIMATED_GENOME_SIZE | tonumber' )
             SECS=$( cat env.json | jq '.RUNTIME | tonumber' )
 
-            printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+            printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
                 "Q${Q}L${L}.${PREFIX}" \
                 $( perl -e "printf qq(%.1f), ${SUM_IN} / {{ opt.genome }};" ) \
                 $( perl -e "printf qq(%.1f), ${SUM_OUT} / {{ opt.genome }};" ) \
                 $( perl -e "printf qq(%.2f%%), (1 - ${SUM_OUT} / ${SUM_IN}) * 100;" ) \
-                $( cat env.json | jq '.KMER' ) \
                 $( byte_format {{ opt.genome }} ) \
-                $( byte_format ${EST_G} ) \
-                $( perl -e "printf qq(%.2f), ${EST_G} / {{ opt.genome }}" ) \
                 $( time_format ${SECS} ) \
                 > statQuorum.${PREFIX}.tsv
 
@@ -111,10 +107,6 @@ for Q in 0 {{ opt.qual }}; do
         RUNTIME=$((END_TIME-START_TIME))
         save RUNTIME
 
-        # save genome size
-        ESTIMATED_GENOME_SIZE={{ opt.genome }}
-        save ESTIMATED_GENOME_SIZE
-
     done
 done
 
@@ -130,12 +122,12 @@ if [ -e Q0L0/statQuorum.R.tsv ]; then
             done
         done
     done |
-        (printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+        (printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
                  "Name" "CovIn" "CovOut" "Discard%" \
-                 "Kmer" "RealG" "EstG" "Est/Real" \
+                 "RealG" \
                  "RunTime" \
             && cat) |
-        tva to md stdin --right 2-9 \
+        tva to md stdin --right 2-6 \
         > statQuorum.md
 
     echo -e "\nTable: statQuorum\n" >> statQuorum.md

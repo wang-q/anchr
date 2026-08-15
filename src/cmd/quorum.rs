@@ -23,20 +23,6 @@ Fastq files can be gzipped
                 .index(1),
         )
         .arg(
-            Arg::new("jf")
-                .long("coverage")
-                .help("Jellyfish hash size")
-                .num_args(1)
-                .default_value("500000000"),
-        )
-        .arg(
-            Arg::new("estsize")
-                .long("estsize")
-                .help("Estimated genome size")
-                .num_args(1)
-                .default_value("auto"),
-        )
-        .arg(
             Arg::new("prefix")
                 .long("prefix")
                 .help("Prefix of .cor.fa.gz")
@@ -67,8 +53,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
 
     // context from args
     let mut opt = HashMap::new();
-    opt.insert("jf", args.get_one::<String>("jf").unwrap());
-    opt.insert("estsize", args.get_one::<String>("estsize").unwrap());
     opt.insert("prefix", args.get_one::<String>("prefix").unwrap());
     opt.insert("parallel", args.get_one::<String>("parallel").unwrap());
 

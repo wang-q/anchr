@@ -19,10 +19,6 @@ save START_TIME
 NUM_THREADS={{ opt.parallel }}
 save NUM_THREADS
 
-# save genome size
-ESTIMATED_GENOME_SIZE={{ opt.genome }}
-save ESTIMATED_GENOME_SIZE
-
 for PREFIX in R S T; do
     if [ ! -e ../trim/${PREFIX}1.fq.gz ]; then
         continue;

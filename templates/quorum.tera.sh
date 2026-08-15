@@ -55,24 +55,6 @@ anchr fq to-fa {{ opt.prefix }}.cor.fastq \
     -o {{ opt.prefix }}.cor.fa
 
 #----------------------------#
-# Estimating genome size（jellyfish 替代）
-#----------------------------#
-log_info Estimating genome size.
-
-{% if opt.estsize == 'auto' -%}
-ESTIMATED_GENOME_SIZE=$(
-    pgr kmer gsize {{ opt.prefix }}.cor.fastq -k 31 |
-        awk '/^genome_size/ {print $2}'
-)
-save ESTIMATED_GENOME_SIZE
-log_debug "Estimated genome size: $ESTIMATED_GENOME_SIZE"
-{% else -%}
-ESTIMATED_GENOME_SIZE={{ opt.estsize }}
-save ESTIMATED_GENOME_SIZE
-log_debug "You set ESTIMATED_GENOME_SIZE of $ESTIMATED_GENOME_SIZE"
-{% endif -%}
-{# Keep a blank line #}
-#----------------------------#
 # Reads stats
 #----------------------------#
 log_debug "Reads stats with pgr fa"
@@ -80,10 +62,6 @@ SUM_IN=$( pgr fa n50 -H -N 0 -S pe.renamed.fastq )
 save SUM_IN
 SUM_OUT=$( pgr fa n50 -H -N 0 -S {{ opt.prefix }}.cor.fastq )
 save SUM_OUT
-
-# s-filter 的 k-mer 长度固定 24（quorum mer length 对齐）
-KMER=24
-save KMER
 
 #----------------------------#
 # Shuffle interleaved reads.
