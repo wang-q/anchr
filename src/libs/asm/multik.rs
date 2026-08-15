@@ -31,6 +31,12 @@ pub struct MultikOptions {
     pub min_count_seed: usize,
     /// Solid k-mer threshold for cross-round validation (metaMDBG `>= 2`).
     pub min_count_extend: usize,
+    /// Bubble merge: minimum sequence similarity of the collapsed
+    /// alternative paths (megahit `--merge-similar`, default 0.95).
+    pub merge_similar: f64,
+    /// Bubble merge: maximum alternative-path length as a multiple of the
+    /// master k (megahit `--merge-level`, default 20).
+    pub merge_len: usize,
     /// Worker threads for counting; `0` = rayon global pool.
     pub parallel: usize,
 }
@@ -41,6 +47,8 @@ impl Default for MultikOptions {
             ks: Vec::new(),
             min_count_seed: 3,
             min_count_extend: 2,
+            merge_similar: 0.95,
+            merge_len: 20,
             parallel: 0,
         }
     }
@@ -190,6 +198,19 @@ fn assemble_one(
     // join distant regions, so every surviving link needs bridging reads.
     bridge_filter(&unitigs, &mut links, infiles, k0, 30, 2)?;
 
+    // Megahit-style bubble merge: divergent paths that reconverge at the
+    // same partner collapse to the highest-coverage path, so the main path
+    // is not interrupted at variant/error sites. Removed alternatives stay
+    // independent output (megahit writes them to bubble_seq.fa).
+    let variants = bubble_merge(
+        &mut unitigs,
+        &mut links,
+        &mut branch,
+        k0,
+        opts.merge_similar,
+        opts.merge_len,
+    );
+
     // Megahit-style cleaning on the final (compacted) unitigs: drop short
     // low-depth tips and disconnect weak links (depth-proportional, see
     // megahit tip_remover / weak_link_remover). Doing this per round was
@@ -201,6 +222,10 @@ fn assemble_one(
     // Final compaction: merge validated chains into long unitigs.
     let mut chains = merge_chains(&unitigs, &links, &branch, k0)?;
     chains.extend(carried.into_iter().map(|u| MultikUnitig {
+        bases: u.bases,
+        coverage: u.coverage,
+    }));
+    chains.extend(variants.into_iter().map(|u| MultikUnitig {
         bases: u.bases,
         coverage: u.coverage,
     }));
@@ -577,6 +602,200 @@ fn weak_link_remover(unitigs: &mut [Unitig], links: &mut [Vec<Link>], local_rati
     for ls in links.iter_mut() {
         ls.retain(|l| l.to != usize::MAX);
     }
+}
+
+/// Banded edit-distance similarity between two unitig sequences (megahit
+/// `GetSimilarity`): `1 - edit_dist / max(n, m)` when the lengths are
+/// within the band, else 0. The band is `max(n,m) * (1 - min_similarity)`,
+/// so a returned value below `min_similarity` is impossible.
+fn sequence_similarity(a: &[u8], b: &[u8], min_similarity: f64) -> f64 {
+    let n = a.len();
+    let m = b.len();
+    let max_indel = (n.max(m) as f64 * (1.0 - min_similarity)) as usize;
+    if n.abs_diff(m) > max_indel || max_indel < 1 {
+        return 0.0;
+    }
+    // Row i-1 of the banded DP; dp[j] is the edit distance between a[..i]
+    // and b[..j] for |i - j| <= max_indel (entries outside the band stay
+    // MAX).
+    let mut dp: Vec<usize> = vec![usize::MAX; m + 1];
+    for (j, item) in dp.iter_mut().enumerate().take(m.min(max_indel) + 1) {
+        *item = j;
+    }
+    for i in 1..=n {
+        let mut ndp: Vec<usize> = vec![usize::MAX; m + 1];
+        if i <= max_indel {
+            ndp[0] = i;
+        }
+        let jmin = i.saturating_sub(max_indel).max(1);
+        let jmax = (i + max_indel).min(m);
+        for j in jmin..=jmax {
+            let sub = dp[j - 1].saturating_add(usize::from(a[i - 1] != b[j - 1]));
+            let del = dp[j].saturating_add(1);
+            let ins = ndp[j - 1].saturating_add(1);
+            ndp[j] = sub.min(del).min(ins);
+        }
+        dp = ndp;
+    }
+    if dp[m] == usize::MAX {
+        0.0
+    } else {
+        1.0 - dp[m] as f64 / n.max(m) as f64
+    }
+}
+
+/// Megahit-style bubble merge on the final (validated) unitig graph:
+/// when several unitigs diverge from one oriented end and reconverge at
+/// the same partner (each middle has exactly one in- and one out-link,
+/// megahit `SearchAndPopBubble`), keep the highest-coverage path and drop
+/// the alternatives — but only when every alternative is length-bounded
+/// (`merge_len * k`) and edit-distance-similar to the main path (megahit
+/// complex bubble: `>= merge_similar`). Dropped alternatives are returned
+/// as independent unitigs so variant content is not lost; the surviving
+/// chain is fused by the following recompaction.
+///
+/// Runs after all reads-based validation, so every junction already has
+/// bridging reads; branch-marked (repeat-fragment) nodes never participate.
+fn bubble_merge(
+    unitigs: &mut Vec<Unitig>,
+    links: &mut Vec<Vec<Link>>,
+    branch: &mut Vec<bool>,
+    k_build: usize,
+    merge_similar: f64,
+    merge_len: usize,
+) -> Vec<Unitig> {
+    let n = unitigs.len();
+    if n <= 2 {
+        return Vec::new();
+    }
+    let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
+    let max_len = ((merge_len * k_build) as f64 / merge_similar).round() as usize;
+
+    // Directed segment graph (the same edges recompact/merge_chains use,
+    // deduplicated: compute_links emits each junction from both ends).
+    let mut segs: Vec<(usize, usize)> = Vec::new();
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
+    for (i, ls) in links.iter().enumerate() {
+        for l in ls {
+            if branch[i] || branch[l.to] {
+                continue;
+            }
+            let Some((li, lrev, ri, rrev)) = oriented_segment(i, l, unitigs, k_build) else {
+                continue;
+            };
+            let ln = node_of(li, lrev);
+            let rn = node_of(ri, rrev);
+            if seen.insert((ln, rn)) {
+                segs.push((ln, rn));
+            }
+        }
+    }
+    let mut out_deg = vec![0usize; 2 * n];
+    let mut in_deg = vec![0usize; 2 * n];
+    let mut outs: Vec<Vec<usize>> = vec![Vec::new(); 2 * n];
+    for &(ln, rn) in &segs {
+        out_deg[ln] += 1;
+        in_deg[rn] += 1;
+        outs[ln].push(rn);
+    }
+
+    let mut deleted = vec![false; n];
+    for s in 0..2 * n {
+        if out_deg[s] <= 1 || deleted[s / 2] || branch[s / 2] {
+            continue;
+        }
+        let mut middles: Vec<(usize, bool)> = Vec::new();
+        let mut right: Option<usize> = None;
+        let mut ok = true;
+        for &m in &outs[s] {
+            let mid = m / 2;
+            let mrev = m % 2 == 1;
+            if branch[mid] || in_deg[m] != 1 || out_deg[m] != 1 {
+                ok = false;
+                break;
+            }
+            if unitigs[mid].bases.len() > max_len {
+                ok = false;
+                break;
+            }
+            let rn = outs[m][0];
+            if right.is_none() {
+                right = Some(rn);
+            } else if right != Some(rn) {
+                ok = false;
+                break;
+            }
+            middles.push((mid, mrev));
+        }
+        let Some(r) = right else { continue };
+        if !ok
+            || middles.len() < 2
+            || in_deg[r] != middles.len()
+            || deleted[r / 2]
+            || branch[r / 2]
+            || s / 2 == r / 2
+        {
+            continue;
+        }
+        if middles.iter().any(|&(mid, _)| deleted[mid]) {
+            continue;
+        }
+        // Highest-coverage middle is the main path; every other middle must
+        // be length- and sequence-similar to it.
+        let mut order = middles;
+        order.sort_by(|&(a, ar), &(b, br)| {
+            unitigs[b]
+                .coverage
+                .partial_cmp(&unitigs[a].coverage)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then((a, ar).cmp(&(b, br)))
+        });
+        let (dom, dom_rev) = order[0];
+        let dom_seq: Vec<u8> = if dom_rev {
+            rev_comp(&unitigs[dom].bases).collect()
+        } else {
+            unitigs[dom].bases.clone()
+        };
+        let mut all_similar = true;
+        for &(mid, mrev) in &order[1..] {
+            let la = (unitigs[mid].bases.len() + k_build - 1) as f64;
+            let lb = (dom_seq.len() + k_build - 1) as f64;
+            if lb * merge_similar > la || la * merge_similar > lb {
+                all_similar = false;
+                break;
+            }
+            let seq: Vec<u8> = if mrev {
+                rev_comp(&unitigs[mid].bases).collect()
+            } else {
+                unitigs[mid].bases.clone()
+            };
+            if sequence_similarity(&dom_seq, &seq, merge_similar) < merge_similar {
+                all_similar = false;
+                break;
+            }
+        }
+        if !all_similar {
+            continue;
+        }
+        for &(mid, _) in &order[1..] {
+            deleted[mid] = true;
+        }
+    }
+
+    let mut variants: Vec<Unitig> = Vec::new();
+    for (i, &d) in deleted.iter().enumerate() {
+        if d {
+            let mut u = unitigs[i].clone();
+            u.id = 0;
+            variants.push(u);
+        }
+    }
+    if !variants.is_empty() {
+        let keep: Vec<bool> = deleted.iter().map(|&d| !d).collect();
+        retain_graph(unitigs, links, branch, &keep);
+        *links = compute_links(unitigs, k_build);
+    }
+    variants
 }
 
 /// Drops unitigs whose internal current-k k-mer is missing from the solid
@@ -1185,6 +1404,115 @@ mod tests {
             circular: false,
             abundances: Vec::new(),
         }
+    }
+
+    /// Builds a two-path bubble: source `s` (right end shares `x`) branches
+    /// into `m1`/`m2` (left end `x`, right end `y`) and reconverges at `r`
+    /// (left end `y`). `m1` is the high-coverage main path, `m2` the
+    /// alternative.
+    fn mk_bubble(m1: &str, m2: &str) -> (Vec<Unitig>, Vec<Vec<Link>>, usize, usize) {
+        let x: String = "ACGTACGTACGTACGTACGTACGTACGTAC".chars().take(30).collect();
+        let y: String = "TGCATGCATGCATGCATGCATGCATGCATGCAT"
+            .chars()
+            .take(30)
+            .collect();
+        let s = format!("{}{}", "A".repeat(60), x);
+        let m1 = format!("{}{}{}", x, m1, y);
+        let m2 = format!("{}{}{}", x, m2, y);
+        let r = format!("{}{}", y, "T".repeat(60));
+        let unitigs = vec![
+            mk_unitig(&s, 100.0),
+            mk_unitig(&m1, 60.0),
+            mk_unitig(&m2, 30.0),
+            mk_unitig(&r, 100.0),
+        ];
+        let links = compute_links(&unitigs, 31);
+        (unitigs, links, 1, 2) // dominant index 1, alternative index 2
+    }
+
+    #[test]
+    fn sequence_similarity_banded() {
+        let a = b"ACGTACGTACGTACGTACGT";
+        assert!((sequence_similarity(a, a, 0.95) - 1.0).abs() < 1e-9);
+        let mut b = a.to_vec();
+        b[5] = b'G';
+        assert!(sequence_similarity(a, &b, 0.95) >= 0.95);
+        // A 50% divergent sequence falls below the threshold.
+        let c: Vec<u8> = a
+            .iter()
+            .map(|&x| if x == b'A' { b'T' } else { x })
+            .collect();
+        assert!(sequence_similarity(a, &c, 0.95) < 0.95);
+    }
+
+    #[test]
+    fn bubble_merge_keeps_dominant_path() {
+        // m1 (dominant) = C*40, m2 (variant) = C*38 + G A (2 substitutions
+        // over 100 bp -> ~98% similar): the alternative must be dropped and
+        // the main path fused through source -> m1 -> right.
+        let (mut unitigs, mut links, dom, alt) =
+            mk_bubble(&"C".repeat(40), &format!("{}GA", "C".repeat(38)));
+        let alt_bases = unitigs[alt].bases.clone();
+        let mut branch = vec![false; unitigs.len()];
+        let variants = bubble_merge(&mut unitigs, &mut links, &mut branch, 31, 0.95, 20);
+        assert_eq!(variants.len(), 1);
+        assert_eq!(variants[0].bases, alt_bases);
+        assert!(!unitigs[dom].bases.is_empty());
+        // The surviving graph is one unique chain source -> dom -> right.
+        let chains = merge_chains(&unitigs, &links, &branch, 31).unwrap();
+        let expected = 60 + 30 + 40 + 30 + 60; // s + m1[30..] + r[30..]
+        assert_eq!(chains[0].bases.len(), expected);
+    }
+
+    #[test]
+    fn bubble_merge_rejects_divergent_paths() {
+        // m2 = G*40: 40/100 substitutions -> similarity 0.6 < 0.95, so no
+        // merge happens and both paths stay.
+        let (mut unitigs, mut links, _dom, alt) = mk_bubble(&"C".repeat(40), &"G".repeat(40));
+        let mut branch = vec![false; unitigs.len()];
+        let variants = bubble_merge(&mut unitigs, &mut links, &mut branch, 31, 0.95, 20);
+        assert!(variants.is_empty());
+        assert_eq!(unitigs.len(), 4);
+        assert_eq!(unitigs[alt].bases.len(), 100);
+    }
+
+    #[test]
+    fn bubble_merge_rejects_long_middles() {
+        // merge_len=2 -> max_len ~65 bp, middles are 100 bp: no merge.
+        let (mut unitigs, mut links, _dom, _alt) = mk_bubble(&"C".repeat(40), &"C".repeat(40));
+        let mut branch = vec![false; unitigs.len()];
+        let variants = bubble_merge(&mut unitigs, &mut links, &mut branch, 31, 0.95, 2);
+        assert!(variants.is_empty());
+        assert_eq!(unitigs.len(), 4);
+    }
+
+    #[test]
+    fn bubble_merge_rejects_different_sinks() {
+        // A second right unitig with a different shared y-mer: the two
+        // middles converge at different sinks, so no bubble.
+        let x: String = "ACGTACGTACGTACGTACGTACGTACGTAC".chars().take(30).collect();
+        let y1: String = "TGCATGCATGCATGCATGCATGCATGCATGCAT"
+            .chars()
+            .take(30)
+            .collect();
+        let y2: String = "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGG".chars().take(30).collect();
+        let s = format!("{}{}", "A".repeat(60), x);
+        let m1 = format!("{}{}{}", x, "C".repeat(40), y1);
+        let m2 = format!("{}{}{}", x, "C".repeat(40), y2);
+        let r1 = format!("{}{}", y1, "T".repeat(60));
+        let r2 = format!("{}{}", y2, "T".repeat(60));
+        let mut unitigs = vec![
+            mk_unitig(&s, 100.0),
+            mk_unitig(&m1, 60.0),
+            mk_unitig(&m2, 30.0),
+            mk_unitig(&r1, 100.0),
+            mk_unitig(&r2, 100.0),
+        ];
+        let mut links = compute_links(&unitigs, 31);
+        let mut branch = vec![false; unitigs.len()];
+        let variants = bubble_merge(&mut unitigs, &mut links, &mut branch, 31, 0.95, 20);
+        assert!(variants.is_empty());
+        assert_eq!(unitigs.len(), 5);
     }
 
     /// The bridge k-mer covering a u→v junction equals

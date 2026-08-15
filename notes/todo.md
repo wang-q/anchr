@@ -7,6 +7,29 @@
 
 ## 待实现
 
+- ~~G37 megahit/spades 策略对比分析~~（2026-08-16 完成，见
+  `benchmarks/g37-megahit-spades.md`）：结论——GF 缺口 76% 是低复杂度/重复区
+  （anchor 上界过滤排除）；外部组装器的 mis 全部在重复区边界；最大单项改进
+  是提高主 K 上限（MR 链 31..81→31..121，7 组全链实验 N50 55.0K→83.6K、
+  GF 96.96→98.63%、0 mis 保持）。
+- ~~模板主 K 上限~~（2026-08-16 完成：`{4,6}_unitigs.tera.sh` 三 unitigger
+  分支统一 `KS`，4_ 链 31..91、6_ MR 链 31..121；G37 MR 链全链复测 N50
+  55.0K→83.6K、GF +1.7 pp、0 mis，见 `g37-megahit-spades.md` §7/§8）。
+- ~~multik 气泡合并~~（2026-08-16 完成：`multik.rs` `bubble_merge` 按
+  megahit `SearchAndPopBubble` 语义（两端唯一 + banded 相似度 ≥0.95 +
+  ≤20k，branch 节点不参与，备选路径独立输出），CLI `--merge-similar`/
+  `--merge-len`；G37 MR 链实测 contigs 13→12、Dup 1.005→1.001、0 mis、
+  N50 持平、GF -0.05 pp；5 个单元测试 + CLI 冒烟测试，见 §8）。
+- ~~unitig 端点本地组装/缺口闭合~~（2026-08-16 完成：新命令
+  `anchr asm extend CONTIGS READS...`，base-by-base reads k-mer 图游走 +
+  严格多数（`--min-support` 且 `>=2x` 次高）防错连；`{4,6}_unitigs`
+  三 unitigger 分支在 olc 合并后自动调用。G37 MR 链 GF 98.585→98.809%、
+  未覆盖 8,210→6,907 bp、0 mis，见 `g37-megahit-spades.md` §8/§10）；
+- 重复区解析（P2，剩余 7,928 bp：高 k 单主取用 + 双端连接证据裁决，歧义
+  保持断开）——§8；
+- QUAST 口径：mm/indel 按覆盖 bp 归一化 + reads-vs-consensus 一致率列
+  （P2，G37 高 k 链 mm 上升是 reads 与 NC_000908 在低复杂度区的真实差异，
+  非 consensus 劣化）——§8。
 - ~~`fq range` 剩余~~（2026-08-15 全部完成：双端感知 S2 已核对 +
   BGZF `.gzi` 自动生成已实现，见 `design/fq-range.md` §7）；
 - ~~`dep`/`ena`/`template` 的外部工具版本核对~~（2026-08-15 完成：

@@ -78,6 +78,20 @@ Examples:
                 .help("Solid k-mer count threshold for cross-round validation (default 2)"),
         )
         .arg(
+            Arg::new("merge_similar")
+                .long("merge-similar")
+                .num_args(1)
+                .value_parser(value_parser!(f64))
+                .help("Bubble merge: minimum similarity of collapsed alternative paths (default 0.95)"),
+        )
+        .arg(
+            Arg::new("merge_len")
+                .long("merge-len")
+                .num_args(1)
+                .value_parser(value_parser!(usize))
+                .help("Bubble merge: maximum alternative-path length as k multiples (default 20)"),
+        )
+        .arg(
             Arg::new("parallel")
                 .long("parallel")
                 .short('p')
@@ -128,6 +142,11 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             .get_one::<usize>("min_count_extend")
             .copied()
             .unwrap_or(2),
+        merge_similar: args
+            .get_one::<f64>("merge_similar")
+            .copied()
+            .unwrap_or(0.95),
+        merge_len: args.get_one::<usize>("merge_len").copied().unwrap_or(20),
         parallel: *args.get_one::<usize>("parallel").unwrap(),
     };
     let outfile = crate::cmd::args::get_outfile(args);

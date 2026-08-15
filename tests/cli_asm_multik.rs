@@ -264,6 +264,49 @@ fn command_asm_multik_auto_k_long_reads() {
     );
 }
 
+/// The bubble-merge knobs are wired through the CLI and do not change the
+/// result of a clean single-path assembly.
+#[test]
+fn command_asm_multik_bubble_merge_options_accepted() {
+    let dir = tempfile::tempdir().unwrap();
+    let reads = dir.path().join("reads.fa");
+    let mut rng = 42u64;
+    let mut genome = Vec::new();
+    for _ in 0..500 {
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        genome.push(b"ACGT"[(rng >> 33) as usize % 4]);
+    }
+    let mut fa = String::new();
+    for i in 0..30 {
+        fa.push_str(&format!(">r{i}\n"));
+        fa.push_str(&String::from_utf8(genome.clone()).unwrap());
+        fa.push('\n');
+    }
+    fs::write(&reads, fa).unwrap();
+    let out = dir.path().join("out.fa");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "multik",
+            reads.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--kmer",
+            "21,51",
+            "--merge-similar",
+            "0.99",
+            "--merge-len",
+            "5",
+        ])
+        .run();
+    assert_eq!(stderr, "");
+    let u = parse_unitigs(&fs::read_to_string(&out).unwrap());
+    let longest = u.iter().map(|&(_, l, _)| l).max().unwrap();
+    assert_eq!(longest, genome.len());
+}
+
 /// Full circular coverage (reads wrapping the genome origin) compacts into
 /// a single unitig whose length equals the genome — the decisive "N-free
 /// chromosome" end-to-end check (k-mer multiset equals the genome).
