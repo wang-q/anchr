@@ -107,6 +107,16 @@ fn assemble_one(
     };
     let (mut unitigs, _) = assemble_unitigs_core(infiles, &assemble_opts)?;
     let mut links = compute_links(&unitigs, k0);
+    // Repeat fragments (a repeated element's shared k-mers fan into four or
+    // more flanking unitigs at the master k) connect to four or more
+    // partners. Snapshot that branch status at pass 0: a chain through such
+    // a node picks one of several genomic contexts and joins distant loci,
+    // so its links never participate in recompaction. The flag propagates
+    // through every unitig reindexing below.
+    let mut branch: Vec<bool> = links
+        .iter()
+        .map(|ls| ls.iter().map(|l| l.to).collect::<HashSet<_>>().len() >= 4)
+        .collect();
 
     // Iterative rounds: validate the graph with each larger k. Low-abundance
     // branching unitigs are pruned every round but CARRIED into the next
@@ -114,8 +124,10 @@ fn assemble_one(
     // strain/polymorphic sequences keep participating in assembly instead of
     // being emitted as dropped fragments only.
     let mut carried: Vec<Unitig> = Vec::new();
+    let mut carried_branch: Vec<bool> = Vec::new();
     for &k in later_ks {
         unitigs.append(&mut carried);
+        branch.append(&mut carried_branch);
         let t_round = std::time::Instant::now();
         let t0 = std::time::Instant::now();
         let table = count_at(&unitigs, infiles, k, opts.parallel)?;
@@ -139,7 +151,7 @@ fn assemble_one(
         }
         // 2. Chimeric-unitig cleanup (removeUnsupportedUnitigs): every
         // internal current-k k-mer of a long-enough unitig must be solid.
-        remove_unsupported(&mut unitigs, &mut links, &table, k, threshold)?;
+        remove_unsupported(&mut unitigs, &mut links, &mut branch, &table, k, threshold)?;
         // 2.5 Reads-bridge validation: every surviving link must have reads
         // fully covering a probe spanning the junction. Chimeric links (two
         // distant regions joined by a shared k-mer) have no bridging reads
@@ -150,10 +162,12 @@ fn assemble_one(
         // (metaMDBG recompacts after every abundance-removal round). No
         // abundance pruning here — that is deferred to the final filter, so
         // single-genome coverage fluctuation never drops real content.
-        recompact_graph(&mut unitigs, &mut links, k0);
+        recompact_graph(&mut unitigs, &mut links, &mut branch, k0);
         // 4. Prune low-abundance branching/isolated unitigs and carry them
         // into the next round (the final round's carry becomes output).
-        carried = progressive_filter(&mut unitigs, &mut links, k0);
+        let (kept, kept_branch) = progressive_filter(&mut unitigs, &mut links, &mut branch, k0);
+        carried = kept;
+        carried_branch = kept_branch;
         if std::env::var_os("ANCHR_MULTIK_TIMING").is_some() {
             let n = unitigs.len();
             let bp: usize = unitigs.iter().map(|u| u.bases.len()).sum();
@@ -171,7 +185,7 @@ fn assemble_one(
     // unitig — the source of G37 relocations). Every 100-mer window of a
     // unitig must occur in the reads; an unsupported window is a chimeric
     // junction and the unitig is cut there.
-    split_by_bridge(&mut unitigs, &mut links, infiles, k0, 30, 1)?;
+    split_by_bridge(&mut unitigs, &mut links, &mut branch, infiles, k0, 30, 1)?;
     // Re-verify the links recomputed by the split: the new extremities may
     // join distant regions, so every surviving link needs bridging reads.
     bridge_filter(&unitigs, &mut links, infiles, k0, 30, 2)?;
@@ -181,11 +195,11 @@ fn assemble_one(
     // megahit tip_remover / weak_link_remover). Doing this per round was
     // too aggressive on the k0=21 fragments (G37 longest 52.8k -> 32.6k);
     // after compaction the tips are real and few.
-    tip_remover(&mut unitigs, &mut links, k0 * 2, 20.0);
+    tip_remover(&mut unitigs, &mut links, &mut branch, k0 * 2, 20.0);
     weak_link_remover(&mut unitigs, &mut links, 0.05);
 
     // Final compaction: merge validated chains into long unitigs.
-    let mut chains = merge_chains(&unitigs, &links, k0)?;
+    let mut chains = merge_chains(&unitigs, &links, &branch, k0)?;
     chains.extend(carried.into_iter().map(|u| MultikUnitig {
         bases: u.bases,
         coverage: u.coverage,
@@ -409,6 +423,7 @@ fn bridge_filter(
 fn split_by_bridge(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
+    branch: &mut Vec<bool>,
     infiles: &[String],
     k0: usize,
     probe_half: usize,
@@ -421,10 +436,12 @@ fn split_by_bridge(
     let reads = read_records(infiles)?;
     let table = RefineTable::build_supermer(reads, probe_len, None)?;
     let mut out: Vec<Unitig> = Vec::new();
-    for u in unitigs.iter() {
+    let mut out_branch: Vec<bool> = Vec::new();
+    for (u, &is_branch) in unitigs.iter().zip(branch.iter()) {
         let n = u.bases.len();
         if n < probe_len {
             out.push(u.clone());
+            out_branch.push(is_branch);
             continue;
         }
         // Mark windows without read support.
@@ -442,6 +459,7 @@ fn split_by_bridge(
         }
         if cut.is_empty() {
             out.push(u.clone());
+            out_branch.push(is_branch);
             continue;
         }
         // Split at the cut positions.
@@ -467,10 +485,12 @@ fn split_by_bridge(
             nu.bases = u.bases[pos..pos + len].to_vec();
             nu.id = 0;
             out.push(nu);
+            out_branch.push(is_branch);
             pos += len;
         }
     }
     *unitigs = out;
+    *branch = out_branch;
     *links = compute_links(unitigs, k0);
     Ok(())
 }
@@ -481,6 +501,7 @@ fn split_by_bridge(
 fn tip_remover(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
+    branch: &mut Vec<bool>,
     max_tip_len: usize,
     depth_ratio: f32,
 ) {
@@ -516,7 +537,7 @@ fn tip_remover(
             u.coverage * depth_ratio < max_neighbour
         })
         .collect();
-    retain_graph(unitigs, links, &keep);
+    retain_graph(unitigs, links, branch, &keep);
 }
 
 /// Megahit-style weak-link disconnection: at a branching unitig end
@@ -565,6 +586,7 @@ fn weak_link_remover(unitigs: &mut [Unitig], links: &mut [Vec<Link>], local_rati
 fn remove_unsupported(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
+    branch: &mut Vec<bool>,
     table: &RefineTable,
     k: usize,
     threshold: u32,
@@ -595,12 +617,17 @@ fn remove_unsupported(
             missing <= max_missing
         })
         .collect();
-    retain_graph(unitigs, links, &keep);
+    retain_graph(unitigs, links, branch, &keep);
     Ok(())
 }
 
 /// Removes dropped unitigs and remaps surviving ids and link targets.
-fn retain_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, keep: &[bool]) {
+fn retain_graph(
+    unitigs: &mut Vec<Unitig>,
+    links: &mut Vec<Vec<Link>>,
+    branch: &mut Vec<bool>,
+    keep: &[bool],
+) {
     let mut remap = vec![usize::MAX; keep.len()];
     let mut n = 0usize;
     for (i, &k) in keep.iter().enumerate() {
@@ -611,6 +638,7 @@ fn retain_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, keep: &[b
     }
     let mut kept_unitigs: Vec<Unitig> = Vec::with_capacity(n);
     let mut kept_links: Vec<Vec<Link>> = Vec::with_capacity(n);
+    let mut kept_branch: Vec<bool> = Vec::with_capacity(n);
     for (i, (u, ls)) in unitigs.iter().zip(links.iter()).enumerate() {
         if !keep[i] {
             continue;
@@ -628,9 +656,11 @@ fn retain_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, keep: &[b
             .collect();
         kept_unitigs.push(u2);
         kept_links.push(ls2);
+        kept_branch.push(branch[i]);
     }
     *unitigs = kept_unitigs;
     *links = kept_links;
+    *branch = kept_branch;
 }
 
 /// Progressive abundance filter (metaMDBG `removeAbundanceNoQueue`):
@@ -643,10 +673,11 @@ fn retain_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, keep: &[b
 fn progressive_filter(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
+    branch: &mut Vec<bool>,
     k_build: usize,
-) -> Vec<Unitig> {
+) -> (Vec<Unitig>, Vec<bool>) {
     if unitigs.is_empty() {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
     // The cutoff climbs from 1.1 but stops at 25% of the median coverage:
     // metaMDBG's "up to the graph maximum" assumes the main path is one
@@ -659,6 +690,7 @@ fn progressive_filter(
     let median = covs[covs.len() / 2];
     let cutoff_cap = (median * 0.25).max(1.1);
     let mut dropped: Vec<Unitig> = Vec::new();
+    let mut dropped_branch: Vec<bool> = Vec::new();
     let mut t = 1.1f32;
     while t < cutoff_cap && !unitigs.is_empty() {
         // Main-path protection: unitigs on a unique chain (both ends have
@@ -702,20 +734,21 @@ fn progressive_filter(
                 let mut d = unitigs[i].clone();
                 d.id = 0;
                 dropped.push(d);
+                dropped_branch.push(branch[i]);
             }
         }
         if keep.iter().all(|&k| k) {
             t += (t * 0.1).min(10.0);
             continue; // nothing below the current cutoff, raise it
         }
-        retain_graph(unitigs, links, &keep);
+        retain_graph(unitigs, links, branch, &keep);
         // Recompact after removal so the main path grows (metaMDBG
         // recompacts every round); chimeric junctions possibly fused here
         // are cut back by `split_by_bridge` right after this filter.
-        recompact_graph(unitigs, links, k_build);
+        recompact_graph(unitigs, links, branch, k_build);
         t += (t * 0.1).min(10.0);
     }
-    dropped
+    (dropped, dropped_branch)
 }
 
 /// Resolves a directed link into its oriented chain segment `(left node,
@@ -731,7 +764,14 @@ fn oriented_segment(
 ) -> Option<(usize, bool, usize, bool)> {
     let u = &unitigs[i];
     let v = &unitigs[l.to];
-    if u.bases.len() < k_build - 1 || v.bases.len() < k_build - 1 {
+    // A unitig shorter than two (k-1)-mer extremities (or 90 bp at small
+    // master k) has overlapping begin/end k-mers: a link through it is
+    // ambiguous (the same k-mer can pair either end, folding the chain back
+    // on itself — chimeric junction bridges from erroneous merged reads).
+    // Such fragments stay independent output instead of being compacted
+    // into the main path.
+    let min_chain_len = (2 * (k_build - 1)).max(90);
+    if u.bases.len() < min_chain_len || v.bases.len() < min_chain_len {
         return None;
     }
     let (li, lrev, ri, rrev) = if !l.from_rc {
@@ -765,7 +805,12 @@ fn oriented_segment(
 /// merged unitig keeps the chain head's begin (from_rc=true) links and the
 /// chain tail's end (from_rc=false) links; external edges pointing into
 /// the chain are redirected to the merged unitig.
-fn recompact_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, k_build: usize) {
+fn recompact_graph(
+    unitigs: &mut Vec<Unitig>,
+    links: &mut Vec<Vec<Link>>,
+    branch: &mut Vec<bool>,
+    k_build: usize,
+) {
     let n = unitigs.len();
     if n <= 1 {
         return;
@@ -787,6 +832,9 @@ fn recompact_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, k_buil
     let mut seen: HashSet<(usize, usize)> = HashSet::new();
     for (i, ls) in links.iter().enumerate() {
         for l in ls {
+            if branch[i] || branch[l.to] {
+                continue;
+            }
             let Some((li, lrev, ri, rrev)) = oriented_segment(i, l, unitigs, k_build) else {
                 continue;
             };
@@ -829,6 +877,7 @@ fn recompact_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, k_buil
     // remap[old_id] = new merged unitig id (None when not yet assigned).
     let mut remap: Vec<Option<usize>> = vec![None; n];
     let mut new_unitigs: Vec<Unitig> = Vec::new();
+    let mut new_branch: Vec<bool> = Vec::new();
     // Head/tail of each merged chain, per new id (for link relinking).
     let mut heads: Vec<usize> = Vec::new();
     let mut tails: Vec<usize> = Vec::new();
@@ -879,6 +928,7 @@ fn recompact_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, k_buil
         for &old in &chain {
             remap[old] = Some(new_id);
         }
+        new_branch.push(chain.iter().any(|&old| branch[old]));
         new_unitigs.push(Unitig {
             bases: seq,
             id: new_id,
@@ -898,6 +948,7 @@ fn recompact_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, k_buil
     // by the merge disappear.
     *unitigs = new_unitigs;
     *links = compute_links(unitigs, k_build);
+    *branch = new_branch;
 }
 
 /// Compacts validated links into maximal chains (u + partner[(k-1)..]).
@@ -911,6 +962,7 @@ fn recompact_graph(unitigs: &mut Vec<Unitig>, links: &mut Vec<Vec<Link>>, k_buil
 fn merge_chains(
     unitigs: &[Unitig],
     links: &[Vec<Link>],
+    branch: &[bool],
     k_build: usize,
 ) -> Result<Vec<MultikUnitig>> {
     let n = unitigs.len();
@@ -929,6 +981,9 @@ fn merge_chains(
     let mut seen: HashSet<(usize, usize)> = HashSet::new();
     for (i, ls) in links.iter().enumerate() {
         for l in ls {
+            if branch[i] || branch[l.to] {
+                continue;
+            }
             let Some((li, lrev, ri, rrev)) = oriented_segment(i, l, unitigs, k_build) else {
                 continue;
             };
@@ -1209,7 +1264,8 @@ mod tests {
             }],
             Vec::new(),
         ];
-        let dropped = progressive_filter(&mut unitigs, &mut links, 21);
+        let mut branch = vec![false; unitigs.len()];
+        let (dropped, _) = progressive_filter(&mut unitigs, &mut links, &mut branch, 21);
         assert_eq!(unitigs.len(), 2, "unique chain must survive the filter");
         assert!(dropped.is_empty());
     }
@@ -1221,7 +1277,8 @@ mod tests {
         let iso = mk_unitig(&"C".repeat(60), 2.0);
         let mut unitigs = vec![a, iso];
         let mut links = vec![Vec::new(), Vec::new()];
-        let dropped = progressive_filter(&mut unitigs, &mut links, 21);
+        let mut branch = vec![false; unitigs.len()];
+        let (dropped, _) = progressive_filter(&mut unitigs, &mut links, &mut branch, 21);
         assert_eq!(
             unitigs.len(),
             1,
@@ -1238,9 +1295,9 @@ mod tests {
     fn recompact_merges_chain_and_drops_stale_links() {
         let s1 = "ACGTACGTACGTACGTACGT";
         let s2 = "GATCGATCGATCGATCGATC";
-        let a = mk_unitig(&format!("{}{}", "A".repeat(40), s1), 30.0);
-        let b = mk_unitig(&format!("{}{}{}", s1, "G".repeat(40), s2), 30.0);
-        let c = mk_unitig(&format!("{}{}", s2, "C".repeat(40)), 30.0);
+        let a = mk_unitig(&format!("{}{}", "A".repeat(80), s1), 30.0);
+        let b = mk_unitig(&format!("{}{}{}", s1, "G".repeat(60), s2), 30.0);
+        let c = mk_unitig(&format!("{}{}", s2, "C".repeat(80)), 30.0);
         let mut unitigs = vec![a, b, c];
         let mut links = vec![
             vec![Link {
@@ -1255,10 +1312,11 @@ mod tests {
             }],
             Vec::new(),
         ];
-        recompact_graph(&mut unitigs, &mut links, 21);
-        // A(60) + B[20..](60) + C[20..](40) = 160.
+        let mut branch = vec![false; unitigs.len()];
+        recompact_graph(&mut unitigs, &mut links, &mut branch, 21);
+        // A(100) + B[20..](80) + C[20..](80) = 260.
         assert_eq!(unitigs.len(), 1);
-        assert_eq!(unitigs[0].bases.len(), 160);
+        assert_eq!(unitigs[0].bases.len(), 260);
     }
 
     /// A convergence node (two predecessors) is not swallowed into either
@@ -1267,11 +1325,10 @@ mod tests {
     #[test]
     fn merge_chains_keeps_convergence_split() {
         let s1 = "ACGTACGTACGTACGTACGT";
-        let s2 = "GATCGATCGATCGATCGATC";
         // u's end == v's begin == w's end: v has two predecessors.
-        let u = mk_unitig(&format!("{}{}", "A".repeat(40), s1), 30.0);
-        let v = mk_unitig(&format!("{}{}", s1, "G".repeat(40)), 30.0);
-        let w = mk_unitig(&format!("{}{}", s2, s1), 30.0);
+        let u = mk_unitig(&format!("{}{}", "A".repeat(80), s1), 30.0);
+        let v = mk_unitig(&format!("{}{}", s1, "G".repeat(80)), 30.0);
+        let w = mk_unitig(&format!("{}{}", "T".repeat(80), s1), 30.0);
         let unitigs = vec![u, v, w];
         let links = vec![
             vec![Link {
@@ -1286,10 +1343,11 @@ mod tests {
                 to_rc: false,
             }],
         ];
-        let out = merge_chains(&unitigs, &links, 21).unwrap();
+        let branch = vec![false; unitigs.len()];
+        let out = merge_chains(&unitigs, &links, &branch, 21).unwrap();
         assert_eq!(out.len(), 3, "v must not merge with either predecessor");
         let total: usize = out.iter().map(|u| u.bases.len()).sum();
-        assert_eq!(total, 60 + 60 + 40, "no unitig is fused at the junction");
+        assert_eq!(total, 300, "no unitig is fused at the junction");
         drop(links);
         drop(unitigs);
     }
@@ -1300,10 +1358,9 @@ mod tests {
     #[test]
     fn recompact_keeps_convergence_split() {
         let s1 = "ACGTACGTACGTACGTACGT";
-        let s2 = "GATCGATCGATCGATCGATC";
-        let u = mk_unitig(&format!("{}{}", "A".repeat(40), s1), 30.0);
-        let v = mk_unitig(&format!("{}{}", s1, "G".repeat(40)), 30.0);
-        let w = mk_unitig(&format!("{}{}", s2, s1), 30.0);
+        let u = mk_unitig(&format!("{}{}", "A".repeat(80), s1), 30.0);
+        let v = mk_unitig(&format!("{}{}", s1, "G".repeat(80)), 30.0);
+        let w = mk_unitig(&format!("{}{}", "T".repeat(80), s1), 30.0);
         let mut unitigs = vec![u, v, w];
         let mut links = vec![
             vec![Link {
@@ -1318,7 +1375,8 @@ mod tests {
                 to_rc: false,
             }],
         ];
-        recompact_graph(&mut unitigs, &mut links, 21);
+        let mut branch = vec![false; unitigs.len()];
+        recompact_graph(&mut unitigs, &mut links, &mut branch, 21);
         // v keeps both incoming links (it was not absorbed), so the merged
         // graph still has three segments and v's begin retains two edges.
         assert_eq!(unitigs.len(), 3);

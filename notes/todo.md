@@ -32,6 +32,31 @@
 
 ## 挂账 / 待决
 
+- `fq merge` 嵌合 reads（2026-08-16 验证，暂不修）：bbmerge 语义在 IS 倒转
+  重复（TIR 基序 `TTGGTTTGGGAGAA` 附近 20-28 bp 重叠）会把不同位点的两条
+  reads 错接成嵌合 merged reads（全量 11M reads 中 6 条）。已尝试修复均
+  不可行：`--min-overlap 30` 砍掉 85% 合法 merge（该文库 insert ~270-290 bp，
+  短 overlap 是主流）且 28 bp 精确重叠 + 错误延伸仍残留；bbnet（make-vector）
+  同样拦不住（28 bp 高质量重叠对网络正常）；merge 后加 `fq s-filter`
+  （quorum 同款参数）也抓不到——嵌合 junction 的 24-mer 在原始 reads 里
+  有 66-83 次支持（TIR 倒转重复两个位点都覆盖），k-mer 计数信号完全正常，
+  6 条嵌合全部留在 kept。本质是短读 merge 无法区分"重复序列重叠"与
+  "真实 insert 重叠"，bbmerge 上游同样存在；且该嵌合属重复介导歧义连接，
+  reads 层面（k-mer 计数/覆盖度/探针）无信号，只在图结构层面（multik
+  分支节点检测）可抓。架构上由 multik 图防御兜底（见 asm-multik.md
+  §9.8）；若要彻底需重叠区 k-mer 计数（成本高、信号被 reads 错误稀释至
+  ~1.1×，收益 0.00005%）或长读验证。
+- `fq merge` 嵌合 reads 的 Tn 数据库方案（2026-08-16 验证，放弃）：
+  曾考虑"reads 含危险区段（Tn/IS）k-mer 就不参与 merge"，直接用
+  `pgr rept e-kmer`/`e-align`（对照 `~/data/repeats/tncentral.fa.gz`，
+  6093 条 IS 参考）验证，对 reads 全部不可靠：k=17 假阳 27% 且嵌合漏检
+  5/6；k=17+min-len 30/40/60 全 0（嵌合也丢）；k=24/31 嵌合全漏（数据库
+  参考与基因组拷贝有差异）；e-align（容错比对）0 命中。原因：reads ~1%
+  错误使 k-mer 命中稀疏、短 reads 形不成连续命中区，而 e-kmer/e-align 的
+  设计目标是长而准的基因组序列（对 MG1655 参考跑出 861 个 IS 区，正常）。
+  若以后要做，方向是 unitig/contig 层标记（组装产物长且准，e-kmer 有效）
+  或参考已知时标基因组 IS 区 + reads 映射；与 multik 现有分支检测大概率
+  重叠，收益存疑。
 - pgr rev 更新流程 + `.cargo/config.toml` patch 发布差异
   （`project-understanding.md` §8.1）；
 - pgr supermer 质量门控：落地后 FASTQ 可去掉 direct 回退
@@ -78,7 +103,7 @@
   MG1655 auto → 50/70/90/110，unitig N50 **21K → 58K**（687 条），
   5 组全链 merge N50 **23.4K → 65.8K**（128 contigs），GF 97.36%；
   395 测试全绿。k0 越高越低覆盖丢失风险，宏基因组需再验证。
-- multik 防嵌合（mis 4→0，2026-08-15 机制定位，未修）：
+- ~~multik 防嵌合（mis 4→0）~~（2026-08-16 完成，机制定位 2026-08-15）：
   * multik unitigs 单组 mis 1-2 个，5 组合计 7 个（anchors 级同数，anchor
     不引入新 mis）；merge 后 4 个（真嵌合 contig_2/24/37：参考相距
     1.1M-3.7M 区域被连）。
@@ -89,8 +114,23 @@
   * 已排除：unitig 级平均 cov 区分（重复区只占 unitig 2.7%，cov 30.7 vs
     median 35）；`bridge_filter`/`split_by_bridge` 60bp 探针（重复区内探针
     有 reads 支撑）；asm anchor upper 过滤（重复区 ~80 < upper 116）。
-  * 候选修复：merge 阶段 overlap 加 reads 桥接验证（需 olc 传 reads）；
-    multik 在重复区断开（局部高覆盖检测）；探针增强。待定方向。
+  * 机制（2026-08-16 复核，非覆盖度问题）：嵌合在 multik 迭代轮内形成，
+    两类源头——① bbmerge/`fq merge` 在 IS 倒转重复处错接出的嵌合 merged
+    reads 产生 84-122 bp 桥接 unitig（k-mer 图通过嵌合 reads 连通两侧）；
+    ② 多拷贝重复的核心片段（如 925/1097/2835 kb 三拷贝重复）在 pass 0
+    连接 4 个侧翼 unitig，bridge_filter 修剪后链接看似唯一，recompact
+    折返链将其跨重复连接（contig_7 型 171 kb 缺失式嵌合）。
+  * 修复（multik.rs，`assemble_one`/`oriented_segment`/`recompact_graph`/
+    `merge_chains`）：
+    - 链连接最短 unitig 长度 `max(2×(k−1), 90)`：排除嵌合 reads 桥接片段
+      （begin/end k-mer 重叠，链接方向可折返）；
+    - pass 0 快照 ≥4 个不同链接伙伴的 unitig 为分支节点，其链接永不参与
+      链压实（重复核心的 4 个侧翼），标志随 retain/recompact/split/carry
+      传播；气泡（≤3 伙伴）不受影响。
+  * 验证：MG1655 5 组 multik51 全链 **mis 4→0**（N50 65.8K→60.3K，
+    GF 97.36%→97.22%，宁断勿错）；G37 MRX40P000 6 主 K 链保持 0 mis
+    （N50 55.4K→37.6K，GF 97.05%→96.97%——G37 的重复/分支节点链原本
+    正确，现被保守断开，N50 代价为正确性取舍）；397 测试全绿。
 - multik 多主 K 架构（2026-08-15 落地）：用户裁定 Rust 内多骨架并行太慢，
   改为**主 K/从 K**：multik 一次只跑一个主 K（ks[0] 骨架，更大 k 验证），
   模板（4/6_unitigs）用 bash 并行跑每个主 K（31..81），`asm olc --unitigs`

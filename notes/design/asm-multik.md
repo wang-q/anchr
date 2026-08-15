@@ -643,6 +643,46 @@ fraction 基本持平（95.99%）。**无错连优先于最长 contig**（符合
 正确性 > 完整性）。真实数据上错连与最长 contig 的权衡可后续调
 （探针长度/阈值/是否切 vs 保留）。
 
+### 8. 2026-08-16 补充：MG1655 重复介导嵌合（mis 4→0）
+
+`bridge_filter`/`split_by_bridge`（层次 3）把 G37 的 relocation 压到 0，
+但 MG1655 5 组合并后仍有 4 个真嵌合（contig_2/24/37 + contig_7）。逐链
+复核确认嵌合在 **multik 迭代轮内**形成（非 merge 阶段），两类源头：
+
+1. **嵌合 merged reads 桥接**：`fq merge`（bbmerge 语义）在 IS 倒转重复
+   （`TTGGTTTGGGAGAA` 14 bp TIR 基序）处把两条 reads 错接成 300-400 bp
+   嵌合 reads；其 k-mer 在 pass 0 形成 84-122 bp 桥接 unitig（如
+   `unitig_679` = [侧翼 rc][IS 起始]），通过 reads 表使 60-mer 探针 count
+   ≥2，桥接链接通过验证，recompact 折返链把侧翼与 IS 连成
+   `rc(flank)+IS`。
+2. **重复核心片段**：多拷贝重复（如 ref 925/1097/2835 kb 三拷贝）的核心
+   在 pass 0 连接 4 个侧翼 unitig（2 in + 2 out，如 `unitig_445` 122 bp）。
+   严格端唯一性在 4 链接时本应断链，但 `bridge_filter` 修剪掉一个链接后
+   其度降至唯一，recompact 折返链跨重复连接两拷贝 → 171 kb 缺失式嵌合
+   （contig_7）。
+
+**修复**（`multik.rs`）：
+
+* 链连接最短 unitig 长度 `max(2×(k−1), 90)`（`oriented_segment`）：排除
+  嵌合 reads 桥接片段——其 begin/end (k−1)-mer 重叠，链接方向可折返；
+  短片段保持独立输出（宁断勿错）。
+* pass 0 快照 ≥4 个不同链接伙伴的 unitig 为分支节点（重复核心），其链接
+  永不参与链压实；标志随 `retain_graph`/`recompact_graph`/`split_by_bridge`/
+  `progressive_filter` 的 unitig 重索引传播。气泡（≤3 伙伴，菌株分歧）由
+  丰度过滤解析，不受影响。
+
+**验证**：
+
+| 数据集 | 修复前 | 修复后 |
+| :--- | :--- | :--- |
+| MG1655 5 组 multik51 全链 | 4 mis，N50 65.8K，GF 97.36% | **0 mis**，N50 60.3K，GF 97.22% |
+| G37 MRX40P000 6 主 K 链 | 0 mis，N50 55.4K，GF 97.05% | 0 mis，N50 37.6K，GF 96.97% |
+
+G37 的重复/分支节点链原本正确，现在被保守断开，N50 代价 ~32% 是
+**宁断勿错**的正确性取舍（GF 基本持平）；MG1655 的代价仅 ~8%。397 测试
+全绿、fmt/clippy 干净。待真实宏基因组/长读数据到位后评估该保守策略是否
+过度（可在 `min_chain_len`/伙伴数阈值上调参）。
+
 <!-- 以下内容并入自 `metaMDBG-vs-multik.md`（2026-08-15 文档合并） -->
 
 ## 10. metaMDBG 与 multik 实现对比
