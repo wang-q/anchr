@@ -37,7 +37,7 @@ fn lambda(args: &[&str], out: &str, outu: Option<&str>, ihist: Option<&str>) {
 fn command_fq_merge_rejects_outu_same_as_outfile() {
     // Data safety: --outu equal to -o would open two writers to the same path
     // and corrupt the output; it must be rejected up front (before any writer
-    // is opened). --no-make-vector avoids needing a --net file.
+    // is opened).
     let (_, stderr) = AnchrCmd::new()
         .args(&[
             "fq",
@@ -48,41 +48,9 @@ fn command_fq_merge_rejects_outu_same_as_outfile() {
             "out.fq",
             "--outu",
             "out.fq",
-            "--no-make-vector",
         ])
         .run_fail();
     assert!(stderr.contains("must be distinct"), "stderr: {stderr}");
-}
-
-#[test]
-fn command_fq_merge_join_matches_bbtools_golden() {
-    // `bbmerge.sh ... strict` (net filter on): merged + unmerged + ihist.
-    let out_dir = tempfile::tempdir().unwrap();
-    let out = out_dir.path().join("merged.fq");
-    let outu = out_dir.path().join("unmerged.fq");
-    let ihist = out_dir.path().join("ihist2.txt");
-    lambda(
-        &[
-            "--strict",
-            "--net",
-            "tests/bbtools/Lambda/golden/bbmerge.bbnet",
-        ],
-        out.to_str().unwrap(),
-        Some(outu.to_str().unwrap()),
-        Some(ihist.to_str().unwrap()),
-    );
-    assert_eq!(
-        std::fs::read(&out).unwrap(),
-        read_gz("tests/bbtools/Lambda/golden/merge.merged.fq.gz")
-    );
-    assert_eq!(
-        std::fs::read(&outu).unwrap(),
-        read_gz("tests/bbtools/Lambda/golden/merge.unmerged.fq.gz")
-    );
-    assert_eq!(
-        std::fs::read(&ihist).unwrap(),
-        std::fs::read("tests/bbtools/Lambda/golden/merge.ihist2.txt").unwrap()
-    );
 }
 
 #[test]
@@ -92,7 +60,7 @@ fn command_fq_merge_novector_matches_bbtools_golden() {
     let out = out_dir.path().join("merged.fq");
     let outu = out_dir.path().join("unmerged.fq");
     lambda(
-        &["--strict", "--no-make-vector"],
+        &["--strict"],
         out.to_str().unwrap(),
         Some(outu.to_str().unwrap()),
         None,
@@ -128,7 +96,6 @@ fn command_fq_merge_extend2_rem_matches_bbtools_golden() {
             "--ihist",
             ihist.to_str().unwrap(),
             "--strict",
-            "--no-make-vector",
             "--extend2",
             "80",
             "--rem",
@@ -147,23 +114,6 @@ fn command_fq_merge_extend2_rem_matches_bbtools_golden() {
         std::fs::read(&ihist).unwrap(),
         std::fs::read("tests/bbtools/Lambda/golden/merge4.ihist.txt").unwrap()
     );
-}
-
-#[test]
-fn command_fq_merge_requires_net_in_make_vector_mode() {
-    let out_dir = tempfile::tempdir().unwrap();
-    let out = out_dir.path().join("out.fq");
-    AnchrCmd::new()
-        .args(&[
-            "fq",
-            "merge",
-            "tests/bbtools/Lambda/R1.fq.gz",
-            "tests/bbtools/Lambda/R2.fq.gz",
-            "-o",
-            out.to_str().unwrap(),
-        ])
-        .assert()
-        .failure();
 }
 
 #[test]
@@ -195,7 +145,6 @@ fn command_fq_merge_efilter_keeps_noisy_overlap_that_pfilter_would_reject() {
             "--outu",
             outu.to_str().unwrap(),
             "--strict",
-            "--no-make-vector",
         ])
         .assert()
         .success();
@@ -242,7 +191,6 @@ fn command_fq_merge_joins_perfect_overlap() {
             "merge",
             in1.to_str().unwrap(),
             in2.to_str().unwrap(),
-            "--no-make-vector",
             "-o",
             out.to_str().unwrap(),
             "--outu",
@@ -291,7 +239,6 @@ fn command_fq_merge_keeps_non_overlapping_pairs_unmerged() {
             "merge",
             in1.to_str().unwrap(),
             in2.to_str().unwrap(),
-            "--no-make-vector",
             "-o",
             out.to_str().unwrap(),
             "--outu",

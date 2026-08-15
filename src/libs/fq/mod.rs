@@ -5,7 +5,6 @@
 //! FASTA/FASTQ reader also stays in pgr (`pgr::libs::fmt::seq`); `scan`
 //! here is the zero-copy FASTQ scanner used by the QC hot path.
 
-pub mod bbnet;
 pub mod clump;
 pub mod merge;
 pub mod norm;

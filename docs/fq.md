@@ -567,10 +567,6 @@ anchr fq merge [OPTIONS] <infiles>...
     6).
 *   `--pfilter <float>`: Probability filter; 0 disables it (default
     0.00004).
-*   `--no-make-vector`: Disable the BBMerge MAKE_VECTOR behavior (ratio
-    maxratio 0.7), using the classic overlap filters instead of the net.
-*   `--net <file>`: BBMerge overlap-filter net file (`bbmerge.bbnet`);
-    required in make-vector mode (the default).
 *   `--extend2 <int>`: Extend unmerged pairs by up to this many bases and
     retry (bbmerge-auto: `extend2`).
 *   `--rem`: Require the extended overlap to match the unextended one
@@ -677,23 +673,19 @@ anchr fq ec-overlap [OPTIONS] <infiles>...
     6).
 *   `--pfilter <float>`: Probability filter; 0 disables it (default
     0.00004).
-*   `--no-make-vector`: Disable the BBMerge MAKE_VECTOR behavior (ratio
-    maxratio 0.7), using the classic overlap filters instead of the net.
-*   `--net <file>`: BBMerge overlap-filter net file (`bbmerge.bbnet`);
-    required in make-vector mode (the default).
 
 ### Examples
 
 1.  **Error-correct by overlap, keeping all pairs (anchr phase 1)**:
     ```bash
     anchr fq ec-overlap R1.fq.gz R2.fq.gz -o ecco.fq.gz --vstrict \
-        --net bbmerge.bbnet --ihist ihist.merge1.txt
+        --ihist ihist.merge1.txt
     ```
 
 2.  **Only corrected pairs to the output**:
     ```bash
     anchr fq ec-overlap in.fq.gz -o ecco.fq.gz --outu rest.fq.gz \
-        --no-mix --no-make-vector
+        --no-mix
     ```
 
 ---

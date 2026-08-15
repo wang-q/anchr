@@ -51,13 +51,13 @@ on a 2000-pair subset (`R1.2k.fq.gz` / `R2.2k.fq.gz`, the first 2000 pairs of
 `R1.fq.gz` / `R2.fq.gz`). bbmerge processes each pair independently, so the
 2k-subset goldens are byte-identical to the corresponding records of a
 40000-pair run; the subset keeps the test data ~10x smaller
-(the merge flow needs the bundled `bbmerge.bbnet`, committed here as
-`bbmerge.bbnet`):
+(make-vector 路径已随 `fq merge` 的 classic 化移除（2026-08-16），golden
+只保留 makevector=f / extend2 对照):
 
 ```bash
-# net path (vstrict ecco, anchr merge phase 1; default makevector=true)
-bbmerge.sh in=R1.2k.fq in2=R2.2k.fq out=merge.ecco.fq.gz \
-    ihist=merge.ihist1.txt threads=1 ecco mix vstrict ordered=t overwrite
+# classic path (vstrict ecco, anchr merge phase 1; makevector=f)
+bbmerge.sh in=R1.2k.fq in2=R2.2k.fq out=merge.novector.ecco.fq.gz \
+    threads=1 ecco mix vstrict makevector=f ordered=t overwrite
 
 # net path (strict join)
 bbmerge.sh in=R1.2k.fq in2=R2.2k.fq out=merge.merged.fq.gz outu=merge.unmerged.fq.gz \
@@ -147,8 +147,8 @@ java -Xmx4g -cp BBTools-40.01/current jgi.BBMerge \
     ihist=merge4.ihist.txt threads=1 strict k=81 extend2=80 rem overwrite
 ```
 
-The output is byte-identical to `anchr fq merge ... --strict --no-make-vector
---extend2 80 --rem` (merged, unmerged, and ihist). Key semantics: BBMerge
+The output is byte-identical to `anchr fq merge ... --strict --extend2 80
+--rem` (merged, unmerged, and ihist). Key semantics: BBMerge
 snapshots the pre-extension reads and restores them for unmerged output;
 `lengthSum` for the rem acceptance rule is the *unextended* length; the
 extend2 extension uses `includeJunctionBase=false` and never checks left

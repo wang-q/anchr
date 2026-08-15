@@ -38,7 +38,7 @@ printf "%s\t%s\t%s\t%s\n" \
 log_info "Error-correct: overlap"
 anchr fq ec-overlap \
     temp.fq \
-    --no-make-vector --vstrict \
+    --vstrict \
     --ihist {{ opt.prefixm }}.ihist.merge1.txt \
 -o ecco.fq
 rm temp.fq; ln -s ecco.fq temp.fq
@@ -70,7 +70,7 @@ rm -f clumped.fq ecco.fq ecct.fq
 log_info "Read merging"
 anchr fq merge \
     temp.fq \
-    --no-make-vector --strict --extend2 80 --rem \
+    --strict --extend2 80 --rem \
     --ihist {{ opt.prefixm }}.ihist.merge.txt \
     -o merged.raw.fq \
     --outu unmerged.raw.fq

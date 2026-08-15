@@ -1,4 +1,3 @@
-use crate::libs::fq::bbnet::CellNet;
 use crate::libs::fq::merge::{merge, write_ihist, MergeOptions, Preset};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
@@ -24,22 +23,20 @@ Notes:
 * `--strict` applies the bbmerge strict parameter set; explicit options
   override the preset values
 * `--ihist` writes the insert-size histogram in the bbmerge `ihist` format
-* By default the BBMerge overlap net (bbmerge.bbnet) filters merges, so
-  `--net FILE` is required unless `--no-make-vector` is given
 * Processing is ordered and deterministic (equivalent to `threads=1`)
 * Supports both plain text and gzipped (.gz) files
 
 Examples:
 1. Merge overlapping pairs, unmerged to outu (anchr phase 4):
    anchr fq merge in.fq.gz -o merged.fq.gz --outu unmerged.fq.gz \
-       --strict --no-make-vector --ihist ihist.merge.txt
+       --strict --ihist ihist.merge.txt
 
 2. Tune the overlap parameters explicitly:
    anchr fq merge R1.fq R2.fq -o out.fq --min-overlap 11 --max-ratio 0.075
 
 3. Merge with tadpole extension retry (anchr merge phase 4):
    anchr fq merge in.fq.gz -o merged.fq.gz --outu unmerged.fq.gz \
-       --strict --no-make-vector --extend2 80 --rem --ihist ihist.merge.txt
+       --strict --extend2 80 --rem --ihist ihist.merge.txt
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
@@ -150,18 +147,6 @@ Examples:
                 .help("Probability filter; 0 disables it"),
         )
         .arg(
-            Arg::new("no_make_vector")
-                .long("no-make-vector")
-                .action(clap::ArgAction::SetTrue)
-                .help("Disable the BBMerge MAKE_VECTOR behavior (ratio maxratio 0.7)"),
-        )
-        .arg(
-            Arg::new("net")
-                .long("net")
-                .num_args(1)
-                .help("BBMerge overlap-filter net file (bbmerge.bbnet)"),
-        )
-        .arg(
             Arg::new("extend2")
                 .long("extend2")
                 .num_args(1)
@@ -229,27 +214,10 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     if let Some(x) = args.get_one::<f32>("pfilter") {
         opts.pfilter = *x;
     }
-    if args.get_flag("no_make_vector") {
-        opts.make_vector = false;
-    }
-    if let Some(path) = args.get_one::<String>("net") {
-        opts.net = Some(CellNet::load(path)?);
-    }
     if let Some(x) = args.get_one::<usize>("extend2") {
         opts.extend2 = *x;
     }
     opts.rem = args.get_flag("rem");
-    if opts.extend2 > 0 {
-        // bbmerge-auto forces MAKE_VECTOR=false whenever a tadpole (extend2 /
-        // eccTadpole / kfilter) is active.
-        opts.make_vector = false;
-    }
-    if opts.make_vector && opts.net.is_none() {
-        anyhow::bail!(
-            "make-vector mode (the default) requires --net with a bbmerge.bbnet \
-             file; use --no-make-vector for the classic overlap filters"
-        );
-    }
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(String::as_str))?;
     if let Some(p) = &outu {
         crate::cmd::args::ensure_outfile_distinct(p, infiles.iter().map(String::as_str))?;

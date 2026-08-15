@@ -2,7 +2,6 @@
 //! (BBMerge-compatible).
 
 use crate::libs::asm::refine::{extend_read_right, RefineOptions, RefineTable};
-use crate::libs::fq::bbnet::CellNet;
 use crate::libs::fq::overlap;
 use anyhow::Result;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
@@ -59,16 +58,9 @@ pub struct MergeOptions {
     pub ecco: bool,
     /// `mix`: also write unmerged reads to the main output.
     pub mix: bool,
-    /// BBMerge `MAKE_VECTOR` state: bbmerge.sh always runs with it true,
-    /// which forces the ratio pre-screen `maxratio` to 0.7 and disables the
-    /// ambiguity/pfilter rejections. bbmerge-auto with a tadpole resets it.
-    pub make_vector: bool,
-    /// Optional BBMerge overlap-filter net (bbmerge.bbnet); required when
-    /// `make_vector` is true.
-    pub net: Option<CellNet>,
     /// `extend2`: extend unmerged reads by up to this many bases per attempt
     /// (via the tadpole k-mer graph) and retry the overlap, mirroring
-    /// `bbmerge-auto.sh ... extend2=N`. Forces `make_vector=false`.
+    /// `bbmerge-auto.sh ... extend2=N`.
     pub extend2: usize,
     /// `rem` / `requireExtensionMatch`: require the extended overlap to match
     /// the unextended one before accepting an extended merge.
@@ -96,8 +88,6 @@ impl MergeOptions {
                 max_bad: 20,
                 ecco: false,
                 mix: false,
-                make_vector: true,
-                net: None,
                 extend2: 0,
                 rem: false,
             },
@@ -238,13 +228,6 @@ pub fn process_pair(
         min_overlap_from_entropy(&seq1, &rc2, opts.min_entropy).max(opts.min_overlap);
     let min0 = opts.min_overlap0 as isize - opts.ratio_reduction as isize;
     let min = min_overlap_entropy as isize - opts.ratio_reduction as isize;
-    // BBMerge sets MAKE_VECTOR=true in main(), forcing maxRatio=0.7 in the
-    // ratio pre-screen (BBMergeOverlapper.mateByOverlapRatioJava).
-    let max_ratio = if opts.make_vector {
-        0.7
-    } else {
-        opts.max_ratio
-    };
     let res = overlap::mate_by_overlap_ratio(
         &seq1,
         &rc2,
@@ -252,103 +235,47 @@ pub fn process_pair(
         min.max(0) as usize,
         min_insert0,
         min_insert,
-        max_ratio,
+        opts.max_ratio,
         opts.min_second_ratio,
         opts.ratio_margin,
         opts.ratio_offset,
         0.95,
         0.95,
-        opts.make_vector,
     );
     let mut best_insert = res.insert;
     let best_bad = res.bad;
 
-    if opts.make_vector {
-        // With MAKE_VECTOR=true BBMerge skips the ambiguity return, restores
-        // the ratio insert even when the selection fell through, and guards
-        // the pfilter rejection behind !MAKE_VECTOR, so every positive ratio
-        // insert is accepted -- unless the overlap-filter net rejects it.
-        if best_insert > 0 {
-            let qual1 = to_phred(&seq1, &raw1);
-            let mut v = Vec::with_capacity(23);
-            v.push(min_overlap_entropy as f32 * 0.1);
-            let max_bases = (seq1.len().max(seq2.len())).min(
-                seq1.len()
-                    .saturating_add(seq2.len())
-                    .saturating_sub(min_insert),
-            );
-            v.push(expected_tip_errors(&seq1, &qual1, max_bases));
-            v.push(expected_tip_errors(&rc2, &qual2, max_bases));
-            v.push((seq1.len() as f32 - 100.0) * 0.01);
-            v.push((seq2.len() as f32 - 100.0) * 0.01);
-            v.push(res.insert as f32 * 0.004);
-            v.push(res.best_overlap as f32 / (res.best_overlap as f32 + 50.0));
-            v.push((res.best_bad + 1.0) / (res.best_bad + 5.0));
-            v.push((res.best_good + 1.0) / (res.best_good + 5.0));
-            v.push(res.best_ratio);
-            v.push((res.bad as f32 + 1.0) / (res.bad as f32 + 5.0));
-            v.push(res.second_insert as f32 * 0.004);
-            v.push(res.second_overlap as f32 / (res.second_overlap as f32 + 50.0));
-            v.push((res.second_bad + 1.0) / (res.second_bad + 5.0));
-            v.push((res.second_good + 1.0) / (res.second_good + 5.0));
-            v.push(res.second_ratio);
-            v.push(res.second_bad_int as f32 / (res.second_bad_int as f32 + 5.0));
-            v.push((res.second_ratio + 1.0) / (res.best_ratio + 1.0));
-            v.push(res.second_bad / (res.best_bad + 8.0));
-            v.push(res.second_good / (res.best_good + 8.0));
-            v.push(
-                (res.best_overlap as f32 + 1.0)
-                    / (res.second_overlap as f32 + res.best_overlap as f32 + 1.0),
-            );
-            v.push(expected_mismatches(
-                &seq1,
-                &rc2,
-                &qual1,
-                &qual2,
-                best_insert,
-            ));
-            v.push(probability(&seq1, &rc2, &qual1, &qual2, best_insert).sqrt() + 0.0000015);
-            debug_assert_eq!(v.len(), 23);
-            let net = opts.net.as_ref().expect("net required in make-vector mode");
-            let score = net.feed_forward(&v);
-            if score < net.cutoff {
-                stats.no_solution += 1;
-                return Outcome::NoSolution;
+    let mut ambig = res.ambig;
+    // BBMerge trips ambig on a bad mismatch count before the filters.
+    if best_bad > opts.max_bad as i32 {
+        ambig = true;
+    }
+    if !ambig && best_insert > 0 && has_qual {
+        // BBMerge converts ASCII quality to phred (applyQualOffset, -33)
+        // at parse time; both filters work on phred values. The expected
+        // error filter sets ambig (suppressing the probability filter),
+        // protecting pairs whose observed mismatches match the quality
+        // expectation from being discarded by pfilter.
+        let qual1 = to_phred(&seq1, &raw1);
+        let mut efilter_ambig = false;
+        if let Some(ef) = opts.efilter {
+            let expected = expected_mismatches(&seq1, &rc2, &qual1, &qual2, best_insert);
+            if (expected + opts.efilter_offset) * ef < best_bad as f32 {
+                efilter_ambig = true;
             }
         }
-    } else {
-        let mut ambig = res.ambig;
-        // BBMerge trips ambig on a bad mismatch count before the filters.
-        if best_bad > opts.max_bad as i32 {
-            ambig = true;
-        }
-        if !ambig && best_insert > 0 && has_qual {
-            // BBMerge converts ASCII quality to phred (applyQualOffset, -33)
-            // at parse time; both filters work on phred values. The expected
-            // error filter sets ambig (suppressing the probability filter),
-            // protecting pairs whose observed mismatches match the quality
-            // expectation from being discarded by pfilter.
-            let qual1 = to_phred(&seq1, &raw1);
-            let mut efilter_ambig = false;
-            if let Some(ef) = opts.efilter {
-                let expected = expected_mismatches(&seq1, &rc2, &qual1, &qual2, best_insert);
-                if (expected + opts.efilter_offset) * ef < best_bad as f32 {
-                    efilter_ambig = true;
-                }
-            }
-            if !efilter_ambig && opts.pfilter > 0.0 {
-                let prob = probability(&seq1, &rc2, &qual1, &qual2, best_insert);
-                if prob < opts.pfilter {
-                    best_insert = -1;
-                }
+        if !efilter_ambig && opts.pfilter > 0.0 {
+            let prob = probability(&seq1, &rc2, &qual1, &qual2, best_insert);
+            if prob < opts.pfilter {
+                best_insert = -1;
             }
         }
-        // BBMerge routes a failed ratio scan through the "else" branch with
-        // bestBad=99999, which trips the MAX_MISMATCHES_R check -> RET_AMBIG.
-        if ambig || res.insert <= 0 {
-            stats.ambiguous += 1;
-            return Outcome::Ambiguous;
-        }
+    }
+    // BBMerge routes a failed ratio scan through the "else" branch with
+    // bestBad=99999, which trips the MAX_MISMATCHES_R check -> RET_AMBIG.
+    if ambig || res.insert <= 0 {
+        stats.ambiguous += 1;
+        return Outcome::Ambiguous;
     }
     if best_insert <= 0 {
         stats.no_solution += 1;
@@ -537,35 +464,6 @@ fn expected_mismatches(a: &[u8], b: &[u8], aqual: &[u8], bqual: &[u8], insert: i
     expected
 }
 
-/// `Read.expectedTipErrors`: expected errors in the 3' tail.
-fn expected_tip_errors(bases: &[u8], quals: &[u8], max_bases: usize) -> f32 {
-    if quals.is_empty() {
-        return 0.0;
-    }
-    let limit0 = max_bases.min(quals.len());
-    let limit = quals.len() - limit0;
-    let mut sum = 0f32;
-    let mut i = quals.len() as isize - 1;
-    while i >= limit as isize {
-        let b = bases[i as usize];
-        let q = quals[i as usize];
-        if is_fully_defined(b) {
-            sum += prob_error(q);
-        }
-        i -= 1;
-    }
-    sum
-}
-
-/// `QualityTools.PROB_ERROR`: phred quality to error probability.
-fn prob_error(q: u8) -> f32 {
-    match q {
-        0 => 0.75,
-        1 => 0.7,
-        _ => 10f32.powf(-0.1 * q as f32),
-    }
-}
-
 /// `Read.joinRead`: builds the merged read by walking the overlap from the
 /// 3' end. `b` is reverse-complemented.
 fn join_reads(a: &[u8], b: &[u8], aqual: &[u8], bqual: &[u8], insert: usize) -> (Vec<u8>, Vec<u8>) {
@@ -674,12 +572,6 @@ pub fn merge<W: Write>(
     mut outu: Option<&mut W>,
     opts: &MergeOptions,
 ) -> Result<MergeStats> {
-    if opts.make_vector && opts.net.is_none() {
-        anyhow::bail!(
-            "make-vector mode requires a BBMerge overlap net (bbmerge.bbnet); \
-             pass --net or use --no-make-vector"
-        );
-    }
     let mut stats = MergeStats {
         insert_min: usize::MAX,
         ..MergeStats::default()
@@ -695,8 +587,7 @@ pub fn merge<W: Write>(
 
     // `extend2` (bbmerge-auto / tadpole mode) builds a k-mer table from the
     // input reads and extends unmerged pairs, mirroring BBMerge's
-    // `extendAndMerge` retry. BBMerge forces MAKE_VECTOR=false in this mode;
-    // the CLI does the same before calling this function.
+    // `extendAndMerge` retry.
     let table = if opts.extend2 > 0 {
         let reads: Vec<(Vec<u8>, Vec<u8>)> = {
             let mut r1 = SeqRecord::new();

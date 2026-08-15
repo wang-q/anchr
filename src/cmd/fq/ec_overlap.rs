@@ -1,4 +1,3 @@
-use crate::libs::fq::bbnet::CellNet;
 use crate::libs::fq::merge::{merge, write_ihist, MergeOptions, Preset};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgMatches, Command};
@@ -24,19 +23,17 @@ Notes:
 * `--strict`/`--vstrict` apply the bbmerge strict/vstrict parameter sets;
   explicit options override the preset values
 * `--ihist` writes the insert-size histogram in the bbmerge `ihist` format
-* By default the BBMerge overlap net (bbmerge.bbnet) filters merges, so
-  `--net FILE` is required unless `--no-make-vector` is given
 * Processing is ordered and deterministic (equivalent to `threads=1`)
 * Supports both plain text and gzipped (.gz) files
 
 Examples:
 1. Error-correct by overlap, keeping all pairs (anchr merge phase 1):
    anchr fq ec-overlap R1.fq.gz R2.fq.gz -o ecco.fq.gz --vstrict \
-       --net bbmerge.bbnet --ihist ihist.merge1.txt
+       --ihist ihist.merge1.txt
 
 2. Only corrected pairs to the output, the rest to outu:
    anchr fq ec-overlap in.fq.gz -o ecco.fq.gz --outu rest.fq.gz \
-       --no-mix --no-make-vector
+       --no-mix
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
@@ -158,18 +155,6 @@ Examples:
                 .value_parser(value_parser!(f32))
                 .help("Probability filter; 0 disables it"),
         )
-        .arg(
-            Arg::new("no_make_vector")
-                .long("no-make-vector")
-                .action(clap::ArgAction::SetTrue)
-                .help("Disable the BBMerge MAKE_VECTOR behavior (ratio maxratio 0.7)"),
-        )
-        .arg(
-            Arg::new("net")
-                .long("net")
-                .num_args(1)
-                .help("BBMerge overlap-filter net file (bbmerge.bbnet)"),
-        )
 }
 
 /// Execute the ec-overlap command.
@@ -232,12 +217,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     }
     if let Some(x) = args.get_one::<f32>("pfilter") {
         opts.pfilter = *x;
-    }
-    if args.get_flag("no_make_vector") {
-        opts.make_vector = false;
-    }
-    if let Some(net) = args.get_one::<String>("net") {
-        opts.net = Some(CellNet::load(net).context("failed to load overlap net")?);
     }
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(String::as_str))?;
     if let Some(p) = &outu {

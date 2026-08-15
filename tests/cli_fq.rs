@@ -285,7 +285,7 @@ fn command_fq_merge_output_same_as_input_rejected() {
     std::fs::write(&path, "@SEQ\nACGT\n+\n!!!!\n").unwrap();
 
     AnchrCmd::new()
-        .args(&["fq", "merge", &path, "-o", &path, "--no-make-vector"])
+        .args(&["fq", "merge", &path, "-o", &path])
         .assert()
         .failure()
         .stderr(predicates::str::contains("is also an input file"));
@@ -305,16 +305,7 @@ fn command_fq_merge_outu_same_as_input_rejected() {
     std::fs::write(&path, "@SEQ\nACGT\n+\n!!!!\n").unwrap();
 
     AnchrCmd::new()
-        .args(&[
-            "fq",
-            "merge",
-            &path,
-            "-o",
-            "out.fq",
-            "--outu",
-            &path,
-            "--no-make-vector",
-        ])
+        .args(&["fq", "merge", &path, "-o", "out.fq", "--outu", &path])
         .assert()
         .failure()
         .stderr(predicates::str::contains("is also an input file"));

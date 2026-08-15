@@ -295,25 +295,29 @@ merge/clean/split`（phase 2 clumpify ecc 按 §3.3 跳过），Lambda 端到端
 **`anchr fq merge` 已实现并通过 BBTools 40.01 黑盒逐字节对照**（Lambda 40k
 pairs，`tests/cli_fq_merge.rs`）：
 
-* `--ecco --mix --vstrict --net bbmerge.bbnet` ≡ `bbmerge.sh ecco mix vstrict`
+* `--ecco --mix --vstrict` ≡ `bbmerge.sh ecco mix vstrict makevector=f`
   （anchr merge phase 1，ihist 也一致）；
-* `--strict --net` ≡ `bbmerge.sh strict`（merged + unmerged + ihist 一致）；
-* `--no-make-vector` ≡ `bbmerge.sh ... makevector=f`（经典 efilter/pfilter
-  路径，vstrict/strict、ecco/join 全一致）。
+* `--strict` ≡ `bbmerge.sh ... strict makevector=f`（merged + unmerged +
+  ihist 一致）；
+* **make-vector（bbmerge 默认的 bbnet 神经网络路径）已移除**（2026-08-16）：
+  `fq merge`/`fq ec-overlap` 只走经典 efilter/pfilter 路径，主流程模板
+  本来就用 `--no-make-vector`，且实测 net 与 classic 输出一致（见 §7.3）；
+  同时删除 `libs/fq/bbnet.rs`、`--net`/`--no-make-vector` 参数与
+  `bbmerge.bbnet` 测试资产。
 
 关键发现（BBTools 40.01）：
 
 1. **`BBMerge.main()` 无条件置 `MAKE_VECTOR=true`**（除非用 tadpole），把
    ratio 预筛 `maxratio` 强制成 0.7，并跳过 ambig/pfilter 拒绝；最终合并
    与否由 **bbmerge.bbnet 神经网络**（23 维特征，6 层稠密网络，`##ctf`
-   阈值）决定。pgr 移植了该 net 的推理（`libs/fq/bbnet.rs`，含 SIG/TANH/
-   MSIG/RSLOG 激活与 SIMD.fma 点积语义）；
+   阈值）决定。anchr 曾移植该推理（`libs/fq/bbnet.rs`），2026-08-16 已移除
+   （主流程用 classic 路径，net 实测无额外收益）；
 2. **质量值在解析时转 phred**（`applyQualOffset`，-33；N 碱基置 0，ACGT
    至少 2），输出写回 +33 —— 未合并 reads 的碱基/质量也会被规范化；
 3. no-quality 路径的 `bestGood/secondBestGood` **永远为 0**（40.01 未赋值），
    是 net 特征的重要输入；
-4. `fq merge` 默认走 net（与 bbmerge.sh 一致），`--net` 必填；classic 路径
-   用 `--no-make-vector`。
+4. `fq merge` 现只走 classic（`makevector=f` 语义），无 `--net`/`--no-make-vector`
+   参数；与 bbmerge.sh 默认（make-vector）的兼容范围收窄为 classic。
 
 ## 7. 实现状态（tadpole ecc/extend 迁移完成，2026-08-11）
 
@@ -326,8 +330,10 @@ G37 Q25L60 50k 对（100k reads）实测（输入相同，两边分别跑）：
 * **带 extend2=80 rem（老流程/模板参数）**：fq merge 与 `bbmerge-auto.sh
   strict k=81 extend2=80 rem` 差 **2 条 / 50k 对（0.004%）**——fq 多合并
   （ERR486835.274849、ERR486835.282548，merged 275-276 bp）；
-* **net vs classic 路径**：`--net bbmerge.bbnet` 与 `--no-make-vector`
-  在此数据上输出完全一致（模板的 classic 路径无额外差异）；
+* **net vs classic 路径**（make-vector 移除前实测）：`--net bbmerge.bbnet`
+  与 `--no-make-vector` 在此数据上输出完全一致——这是移除 make-vector 的
+  依据之一（全量 MG1655 上两者差异大，make-vector 过度过滤，见
+  `fq-merge-replace.md` §9.2）；
 * **根因定位**：差异只在 extend2 路径。BBTools rem 接受规则
   （`BBMerge.java:2788`：`bestInsertE > approxMaxOverlappingInsert &&
   extension >= minExt`）与 fq 实现（`insert > pre_len_sum-26 && e1+e2 >= 12`）

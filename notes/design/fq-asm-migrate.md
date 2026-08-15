@@ -49,7 +49,7 @@ FASTA/FASTQ 读入（`libs/fmt/`）与 FA 读取一样永远留在 pgr；Phred �
 
 | 文件 | 说明 |
 | :--- | :--- |
-| `libs/fq/`（除 qual.rs/pairs.rs/trim.rs 的 detect_quality_base） | trim/trim_adapter/merge/norm/sample/split/clump/bbnet/overlap 业务 |
+| `libs/fq/`（除 qual.rs/pairs.rs/trim.rs 的 detect_quality_base） | trim/trim_adapter/merge/norm/sample/split/clump/overlap 业务（bbnet 已移除，2026-08-16） |
 | `libs/asm/`（assemble.rs/tadpole.rs/mod.rs） | tadpole 组装、unitig 逻辑 |
 | `libs/olc/`（consensus.rs/layout.rs/overlap.rs/mod.rs） | OLC 三阶段 |
 | `cmd_pgr/fq/`（16 文件） | 命令壳 |
@@ -200,7 +200,6 @@ docs），依赖 pgr crate 的基础模块：
 
 | 源（pgr） | 目标（anchr） | 说明 |
 | :--- | :--- | :--- |
-| `fq/bbnet.rs` | `fq/bbnet.rs` | 业务 |
 | `fq/clump.rs` | `fq/clump.rs` | 业务 |
 | `fq/merge.rs` | `fq/merge.rs` | 业务（依赖 `asm::refine`） |
 | `fq/norm.rs` | `fq/norm.rs` | 业务（依赖 `kmer`，pgr 基础） |
@@ -253,7 +252,7 @@ libs 内嵌 `#[cfg(test)]`（qual.rs 的 detect 测试留 pgr，其余随 libs �
 2. **批 2：`fq` libs 基础**（trim/trim_adapter/sample/split/overlap）——
    只依赖 pgr 基础（fmt/qual；overlap.rs 无 crate::libs 依赖；trim 已无
    qual 定义）；
-3. **批 3：`fq` libs 进阶**（merge→依赖批 1 tadpole；norm/clump/bbnet）——
+3. **批 3：`fq` libs 进阶**（merge→依赖批 1 tadpole；norm/clump）——
    norm 依赖 pgr `kmer`（base_codes/count_keys 已 pub）；
 4. **批 4：`fq` cmd**（15 个）+ `asm` cmd（8 个）——cmd 壳 + 复制 args
    helper；
