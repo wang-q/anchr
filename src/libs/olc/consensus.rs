@@ -66,7 +66,153 @@ pub fn consensus_with_ratio(
             contigs.push(Contig { seq, coverage });
         }
     }
-    Ok(dedup_contained_ratio(contigs, ratio))
+    let contigs = dedup_contained_ratio(contigs, ratio);
+    if ratio < 1.0 {
+        // Cross-group anchor sets re-cover the same locus with different
+        // boundaries; stich boundary-differing near-duplicates into one
+        // contig (exact overlap detection cannot join them).
+        Ok(merge_overlapping_contigs(contigs, MIN_OVERLAP))
+    } else {
+        Ok(contigs)
+    }
+}
+
+/// Minimum approximate overlap (bases) for stiching two contigs.
+const MIN_OVERLAP: usize = 5000;
+
+/// Seed length for locating approximate overlaps between contigs.
+const SEED_LEN: usize = 31;
+
+/// Merges boundary-differing near-duplicate contigs: a shorter contig whose
+/// head aligns inside a longer one and whose tail extends past its end (or
+/// the symmetric head-before case, either strand) is stitched into one
+/// contig. Only single dominant high-identity alignments are merged, so
+/// chimeric contigs with multi-block alignments are left untouched.
+fn merge_overlapping_contigs(mut contigs: Vec<Contig>, min_overlap: usize) -> Vec<Contig> {
+    contigs.sort_by_key(|c| std::cmp::Reverse(c.seq.len()));
+    let mut kept: Vec<Contig> = Vec::with_capacity(contigs.len());
+    for c in contigs {
+        let mut merged = false;
+        for k in kept.iter_mut() {
+            if let Some(seq) = try_merge(&k.seq, &c.seq, min_overlap) {
+                k.seq = seq;
+                merged = true;
+                break;
+            }
+        }
+        if !merged {
+            kept.push(c);
+        }
+    }
+    kept
+}
+
+/// Stitches `cand` into `keeper` when they are the same locus with different
+/// boundaries; returns `None` when no single dominant high-identity overlap
+/// exists. Either strand is handled (the result follows `keeper`'s strand).
+fn try_merge(keeper: &[u8], cand: &[u8], min_overlap: usize) -> Option<Vec<u8>> {
+    if keeper.len() < 2 * SEED_LEN || cand.len() < 2 * SEED_LEN {
+        return None;
+    }
+    let mut index: std::collections::HashMap<&[u8], Vec<usize>> = std::collections::HashMap::new();
+    for (i, w) in keeper.windows(SEED_LEN).enumerate() {
+        index.entry(w).or_default().push(i);
+    }
+    let rc: Vec<u8> = rev_comp(cand).collect();
+    let direct = overlap_geometry(&index, cand);
+    if let Some(seq) = merge_geometry(keeper, cand, false, direct, min_overlap) {
+        return Some(seq);
+    }
+    let rev = overlap_geometry(&index, &rc);
+    merge_geometry(keeper, cand, true, rev, min_overlap)
+}
+
+/// Dominant k-mer offset of `query` inside `keeper` (position in keeper minus
+/// position in query), the number of query k-mers supporting it, and the
+/// number of query k-mers present anywhere in `keeper`.
+fn overlap_geometry(
+    index: &std::collections::HashMap<&[u8], Vec<usize>>,
+    query: &[u8],
+) -> (isize, usize, usize) {
+    let mut hist: std::collections::HashMap<isize, usize> = std::collections::HashMap::new();
+    let mut matched = 0usize;
+    for (i, w) in query.windows(SEED_LEN).enumerate() {
+        if let Some(ps) = index.get(w) {
+            matched += 1;
+            for &p in ps {
+                *hist.entry(p as isize - i as isize).or_default() += 1;
+            }
+        }
+    }
+    let (offset, hits) = hist.into_iter().max_by_key(|(_, n)| *n).unwrap_or((0, 0));
+    (offset, hits, matched)
+}
+
+/// Stitches when `query` (either `cand` or its reverse complement) starts
+/// inside `keeper` and extends past its end, or starts before it and shares
+/// a high-identity tail overlap with `keeper`'s head.
+#[allow(clippy::too_many_arguments)]
+fn merge_geometry(
+    keeper: &[u8],
+    cand: &[u8],
+    query_is_rc: bool,
+    geometry: (isize, usize, usize),
+    min_overlap: usize,
+) -> Option<Vec<u8>> {
+    let (off, hits, matched) = geometry;
+    if hits < 100 || hits * 10 < matched * 8 {
+        // Too short, or the query aligns to several loci (chimeric).
+        return None;
+    }
+    let query: Vec<u8> = if query_is_rc {
+        rev_comp(cand).collect()
+    } else {
+        cand.to_vec()
+    };
+    if off >= 0 {
+        let off = off as usize;
+        if off >= keeper.len() {
+            return None;
+        }
+        let ov = (keeper.len() - off).min(query.len());
+        if ov < min_overlap || keeper.get(off..off + SEED_LEN) != Some(&query[..SEED_LEN]) {
+            // The query head must anchor inside the keeper; a chimeric head
+            // aligned elsewhere drops the identity below the threshold.
+            return None;
+        }
+        if identity(&keeper[off..off + ov], &query[..ov]) < 0.99 {
+            return None;
+        }
+        if off + query.len() <= keeper.len() {
+            // Fully contained; the dedup step above should already have
+            // dropped it, but keep the longer representative regardless.
+            return Some(keeper.to_vec());
+        }
+        let mut seq = keeper.to_vec();
+        seq.extend_from_slice(&query[ov..]);
+        Some(seq)
+    } else {
+        let head = (-off) as usize;
+        if head >= query.len() {
+            return None;
+        }
+        let ov = (query.len() - head).min(keeper.len());
+        if ov < min_overlap || keeper.get(..SEED_LEN) != query.get(head..head + SEED_LEN) {
+            return None;
+        }
+        if identity(&keeper[..ov], &query[head..head + ov]) < 0.99 {
+            return None;
+        }
+        let mut seq = query;
+        seq.extend_from_slice(&keeper[ov..]);
+        Some(seq)
+    }
+}
+
+/// Identity of two equally long slices.
+fn identity(a: &[u8], b: &[u8]) -> f64 {
+    let mm = a.iter().zip(b).filter(|(x, y)| x != y).count();
+    1.0 - mm as f64 / a.len() as f64
 }
 
 /// Drops contigs whose sequence is covered by >= `ratio` of a longer kept
@@ -485,5 +631,62 @@ mod tests {
         assert_eq!(contigs.len(), 2);
         assert_eq!(contigs[0].seq, b"AAAACCCCGGGG");
         assert_eq!(contigs[1].seq, b"TTTTCCCCAAAA");
+    }
+
+    /// A candidate whose head aligns inside the keeper and whose tail
+    /// extends past the keeper's end is stitched into one contig.
+    #[test]
+    fn merges_tail_extension_overlap() {
+        let mut keeper = vec![b'A'; 5000];
+        keeper.extend(std::iter::repeat(b'C').take(20000));
+        keeper.extend(std::iter::repeat(b'T').take(5000));
+        let mut cand = vec![b'C'; 20000];
+        cand.extend(std::iter::repeat(b'T').take(5000));
+        cand.extend(std::iter::repeat(b'G').take(3000));
+        let merged = try_merge(&keeper, &cand, 5000).unwrap();
+        assert_eq!(merged.len(), 33000);
+        assert_eq!(&merged[..5000], &keeper[..5000]);
+        assert_eq!(&merged[5000..25000], &cand[..20000]);
+        assert_eq!(&merged[25000..30000], &keeper[25000..]);
+        assert_eq!(&merged[30000..], &cand[25000..]);
+    }
+
+    /// A candidate fully inside the keeper is dropped (keeper kept).
+    #[test]
+    fn drops_contained_candidate() {
+        let mut keeper = vec![b'A'; 1000];
+        keeper.extend(std::iter::repeat(b'C').take(20000));
+        keeper.extend(std::iter::repeat(b'T').take(5000));
+        let cand = vec![b'C'; 20000];
+        let merged = try_merge(&keeper, &cand, 5000).unwrap();
+        assert_eq!(merged, keeper);
+    }
+
+    /// Reverse-complement overlap merges with the keeper's strand.
+    #[test]
+    fn merges_reverse_overlap() {
+        let mut keeper = vec![b'A'; 5000];
+        keeper.extend(std::iter::repeat(b'C').take(20000));
+        keeper.extend(std::iter::repeat(b'T').take(5000));
+        let mut cand = vec![b'C'; 20000];
+        cand.extend(std::iter::repeat(b'T').take(5000));
+        cand.extend(std::iter::repeat(b'G').take(3000));
+        let rc_cand: Vec<u8> = rev_comp(&cand).collect();
+        let merged = try_merge(&keeper, &rc_cand, 5000).unwrap();
+        assert_eq!(merged.len(), 33000);
+        assert_eq!(&merged[30000..], &b"G".repeat(3000)[..]);
+    }
+
+    /// A chimeric candidate (head aligned elsewhere) is left untouched.
+    #[test]
+    fn rejects_chimeric_candidate() {
+        let mut keeper = vec![b'A'; 5000];
+        keeper.extend(std::iter::repeat(b'C').take(20000));
+        keeper.extend(std::iter::repeat(b'T').take(5000));
+        let mut cand = vec![b'X'; 3000];
+        cand.extend(std::iter::repeat(b'C').take(20000));
+        cand.extend(std::iter::repeat(b'T').take(5000));
+        cand.extend(std::iter::repeat(b'G').take(3000));
+        assert!(try_merge(&keeper, &cand, 5000).is_none());
     }
 }

@@ -40,7 +40,7 @@ pub fn make_subcommand() -> Command {
 
 * Down sampling, unitigs, and anchors
     * --cov "40 80"
-    * --unitigger "multik bcalm"
+    * --unitigger "multik unitig bcalm"
     * --splitp 20
     * --statp 2
     * --uscale 2
@@ -180,7 +180,7 @@ pub fn make_subcommand() -> Command {
             Arg::new("unitigger")
                 .long("unitigger")
                 .short('u')
-                .help("Unitigger(s) used: multik or bcalm; space-separated list")
+                .help("Unitigger(s) used: multik, unitig, or bcalm; space-separated list")
                 .num_args(1)
                 .default_value("multik"),
         )

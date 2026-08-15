@@ -90,6 +90,26 @@ fn command_template() -> anyhow::Result<()> {
     assert!(master.contains("4_unitigs_bcalm"));
     assert!(master.contains("statUnitigsBcalm.md"));
 
+    // anchr template --unitigger unitig (in-house BCALM-semantics engine)
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("template")
+        .arg("--unitigger")
+        .arg("unitig")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+
+    assert!(stderr.contains("4_unitigs_unitig.sh"));
+    assert!(&tempdir
+        .path()
+        .join("0_script/4_unitigs_unitig.sh")
+        .is_file());
+    let unitig_script =
+        std::fs::read_to_string(tempdir.path().join("0_script/4_unitigs_unitig.sh"))?;
+    assert!(unitig_script.contains("anchr asm unitig"));
+    assert!(unitig_script.contains("anchr asm olc --unitigs unitigs_K*.fasta"));
+
     // cleanup
     assert!(env::set_current_dir(&curdir).is_ok());
     assert!(tempdir.close().is_ok());

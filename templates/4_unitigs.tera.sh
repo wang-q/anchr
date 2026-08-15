@@ -32,6 +32,18 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
     anchr asm olc --unitigs unitigs_K*.fasta \
         --min-contig-len 1000 \
         -o unitigs.fasta
+{% elif unitigger == "unitig" %}    # in-house BCALM-semantics unitigs per k (asm unitig), merged across k
+    for K in 31 41 51 61 71 81; do
+        anchr asm unitig \
+            ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
+            -k ${K} \
+            -p {{ opt.parallel }} \
+            -o unitigs_K${K}.fasta
+    done
+
+    anchr asm olc --unitigs unitigs_K*.fasta \
+        --min-contig-len 1000 \
+        -o unitigs.fasta
 {% else %}    anchr asm multik \
         ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
         -k 31,41,51,61,71,81 \

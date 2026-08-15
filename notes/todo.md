@@ -23,11 +23,12 @@
   8_megahit 奇数交错 reads（`--12` 需偶数）、7_merge_anchors 第三次
   合并的 find 遗漏 `anchor.merge.fasta`、`asm anchor` 新增 `--stats`
   输出（Mapped/median/MAD/lower/upper/SumOthers，替代旧 env.json 统计）。
-- ~~`anchr template --unitigger` 恢复 bcalm~~（2026-08-15 完成：`--unitigger`
-  重新支持外部 bcalm（legacy unitigger，默认仍为 multik）；4/6_unitigs、
-  0_master/0_bsub、0_cleanup、9_quast 全部按 unitigger 参数化；bcalm 每 k
-  独立 unitigs（31..81）后用 `asm olc --unitigs` 跨 k 合并——G37 端到端
-  验证 N50 31199 与 legacy bcalm 链 31199 一致）。
+- ~~`anchr template --unitigger` 恢复 bcalm + 加入自研 unitig~~（2026-08-15
+  完成：`--unitigger` 支持 multik（默认）/ unitig / bcalm 空格分隔列表；
+  4/6_unitigs、0_master/0_bsub、0_cleanup、9_quast 全部按 unitigger 参数化；
+  unitig/bcalm 每 k 独立 unitigs（31..81）后用 `asm olc --unitigs` 跨 k
+  合并——G37 bcalm 链 N50 31199 与 legacy 一致；MG1655 全链验证 `asm
+  unitig` 与 bcalm 等价（见下）。
 
 ## 挂账 / 待决
 
@@ -55,11 +56,21 @@
   breaking 覆盖度阈值（`references/canu.md` §8）；
 - ~~大规模真实数据全链~~（2026-08-15 G37 全量：`fq → asm → template`
   跑通，结果见 `results/model_org.md`；统计核对完成）；
-- MG1655 multik vs bcalm 对照（2026-08-15 初步数据，legacy down-sampling
-  reads 同输入）：MRX40 unitig N50 multik 21.2K/1455 条 vs bcalm 53.6K/158
-  条；MRX80 19.3K/1525 vs 37.5K/209——bcalm unitigs 长 2-2.5×、条数约
-  1/9；最终 N50 legacy bcalm 合并 63-78K vs 现代 28K，需 bcalm 链端到端
-  （anchor → olc）确认差距来源；
+- ~~MG1655 multik vs bcalm 初步对照~~（2026-08-15 初步数据，详见下条
+  端到端对照）
+- ~~MG1655 bcalm 链端到端对照~~（2026-08-15 完成，5 组同输入
+  MRX40P000/P001/P002 + MRX80P000/P001，唯一变量 unitigger）：unitig N50
+  bcalm 42-58K、`asm unitig` 51-61K vs multik 19-21K；最终 merge N50
+  **unitig 链 105.7K / bcalm 链 95.5K vs multik 23.4K**——N50 差距基本
+  全部来自 multik unitig 碎片化，`asm unitig` 与外部 bcalm 等价且略优
+  （自研可替代外部依赖）；mis 4→1（legacy 0）。
+- ~~merge 近似重叠去重（dup 1.07-1.08）~~（2026-08-15 完成：
+  `asm olc` consensus 后新增 `merge_overlapping_contigs`：跨组 anchors
+  边界不一致导致 exact overlap 连不上、残留同区域不同边界的 contig 对；
+  现用 31-mer 定位主导 offset + 头部锚定 + 重叠区 ≥99% 一致才合并，嵌合
+  多块对齐拒绝——unitig 链 Dup 1.079→1.000、bcalm 链 1.068→1.001，
+  GF 97.77% 不变，unitig 链 N50 提到 110.2K；mis 仍 1（contig_26
+  relocation，属 multik 防嵌合任务）。
 - gz/大输入回归：默认 supermer 路径全链回归 + 峰值内存；
 - 560 bp 碎片 mis 覆盖度门槛（`asm-olc.md` §14.3，`--min-contig-len 1000`
   可滤，可选）。

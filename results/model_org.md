@@ -302,6 +302,57 @@ Table: statFinal
 
 Table: statQuast
 
+### mg1655: multik vs bcalm 对照（2026-08-15）
+
+同一批 `6_down_sampling` reads（MRX40P000/P001/P002 + MRX80P000/P001，
+5 组），唯一变量是 unitigger：`asm multik` vs `asm unitig`（自研 BCALM
+语义）vs 外部 bcalm（每 k 31..81 独立 unitigs + `asm olc --unitigs` 跨 k
+合并），下游 anchor/OLC 合并参数完全相同。
+
+#### unitig / anchor 阶段（N50 / 条数 / Sum）
+
+| 组        | multik unitigs | unitig unitigs | bcalm unitigs |
+| --------- | -------------: | -------------: | ------------: |
+| MRX40P000 |  21238 / 1455  |  61235 / 131   |  56477 / 142  |
+| MRX40P001 |  19872 / 1455  |  61235 / 129   |  54908 / 147  |
+| MRX40P002 |  21238 / 1455  |  59716 / 130   |  57961 / 143  |
+| MRX80P000 |  19331 / 1525  |  53834 / 158   |  42412 / 194  |
+| MRX80P001 |  20068 / 1525  |  50795 / 163   |  42234 / 195  |
+
+multik 的 unitigs 比 bcalm/unitig 短约 2.5-3 倍、条数多约 9-11 倍；
+`asm unitig`（自研）与 bcalm 等价且略优；两链 anchor Sum ≈ 4.53M，比
+multik 的 4.47M 更接近基因组。
+
+#### 最终合并（`asm olc --unitigs`，5 组合并）与 QUAST
+
+| 指标      | unitig 链（自研） | bcalm 链（现代） | multik 链（现代，同输入） | legacy bcalm | legacy merge_anchors |
+| --------- | ----------------: | ---------------: | ------------------------: | ------------: | --------------------: |
+| # contigs |               102 |              108 |                       317 |           101 |                   103 |
+| N50       |           105,719 |           95,478 |                    23,403 |        78,596 |                95,484 |
+| Largest   |          246,019 |          202,937 |                    73,030 |       174,107 |               204,605 |
+| # mis     |                 1 |                1 |                         4 |             0 |                     0 |
+| GF%       |            97.77 |            97.77 |                     96.44 |         97.26 |                 97.67 |
+| Dup       |           1.000 |           1.001 |                      1.003 |         1.000 |                  1.000 |
+| mm/100k   |            0.27 |            0.04 |                      0.18 |          0.00 |                  0.40 |
+| indel/100k|            0.29 |            0.23 |                      0.02 |          0.02 |                  0.13 |
+
+结论：N50 差距基本全部来自 unitig 阶段——`asm unitig` 链（105.7K）与
+bcalm 链（95.5K）都追平并超过 legacy（95.5K），multik 只有 23.4K；mis
+从 multik 的 4 降到 unitig/bcalm 链的 1（legacy 0）；`asm unitig` 与外部
+bcalm 等价（自研可替代外部依赖）。
+
+#### Dup 修复（2026-08-15 追加）
+
+原两链 Dup 1.07-1.08 偏高：anchor 阶段无近似重复 contig，重复由
+`asm olc --unitigs` 跨组合并产生（跨组 anchors 边界不一致，exact overlap
+检测连不上，残留同区域不同边界的 contig 对）。`asm olc` 现在在 consensus
+后增加近似 overlap 合并（`consensus::merge_overlapping_contigs`：31-mer
+定位主导 offset + 头部锚定 + 重叠区 ≥99% 一致才合并，嵌合 contig 的
+多块对齐被拒绝）：unitig 链 Dup **1.079 → 1.000**、bcalm 链 **1.068 →
+1.001**，GF 97.77% 不变，unitig 链 N50 105.7K → 110.2K（93 contigs），
+bcalm 链 N50 95.5K → 88.1K（102 contigs）。mis 仍为 1（contig_26
+relocation，嵌合修复属另一任务）。
+
 ## *E. coli* str. K-12 substr. MG1655
 
 ### mg1655: reference
