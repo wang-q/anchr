@@ -683,6 +683,21 @@ G37 的重复/分支节点链原本正确，现在被保守断开，N50 代价 ~
 全绿、fmt/clippy 干净。待真实宏基因组/长读数据到位后评估该保守策略是否
 过度（可在 `min_chain_len`/伙伴数阈值上调参）。
 
+**unitig/bcalm 链 mis 归属修正**：旧报告（2026-08-15 生成）里 unitig/bcalm
+链各 1 mis 不是它们本身的问题，而是 **旧 OLC 生成方式的遗留**——unitig
+链 mis（contig_1）由两个各自干净的 unitig（contig_24 → ref 2.76Mb 连续、
+contig_107 → ref 280-290kb 连续）经 **80 bp exact overlap** 在 olc 合并时
+错连（80 bp ≪ min-overlap 1000）；用当前 `asm olc --unitigs
+--min-overlap 1000` 重跑 unitig/bcalm 链均为 0 mis（unitig：N50 78.8K/
+112 contigs/GF 97.73%；bcalm：N50 73.7K/118/GF 97.76%）。multik 链的
+4 mis 才是 multik 自身（unitig 内嵌合），已由本修复归零。
+
+**unitig / bcalm / multik 三链端到端对比**（同输入、统一口径）：multik
+N50 95.5K / 107 contigs / GF 97.61%，unitig 与 bcalm 均为 N50 67.4K /
+121 / GF 97.54%，三链 0 mis。multik 全面占优（N50 +42%），unitig 与
+bcalm 等价（自研可替代外部依赖）。详见
+`benchmarks/mg1655-unitig-bcalm-multik.md`。
+
 <!-- 以下内容并入自 `metaMDBG-vs-multik.md`（2026-08-15 文档合并） -->
 
 ## 10. metaMDBG 与 multik 实现对比

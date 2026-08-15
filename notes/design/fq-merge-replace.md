@@ -460,3 +460,53 @@ extend2+rem / clumpify 去重 / bbduk qtrim / repair）。
 outu（`else if(listb!=null)`），pgr 语义一致，无需修复；
 `from_phred` 的 saturating 与 Java byte 溢出的差异仅 phred>122 可达，
 内部质量上限（merge≤50、tadpole≤32）使该分支实际不可达，保持现状。
+
+## 9. 嵌合 reads 分析与 merge 取舍（2026-08-16）
+
+### 9.1 嵌合机制
+
+`fq merge`（bbmerge 语义）在 IS 倒转重复处会把不同位点的两条 reads 错接
+成嵌合 merged reads：IS 的 TIR 基序 `TTGGTTTGGGAGAA` 附近存在 20-28 bp
+反向重复，侧翼区 reads 与 IS 区 reads 在该重叠处被 bbmerge 当成真实
+insert overlap 合并。MG1655 全量 11M reads 中有 6 条嵌合 merged reads
+（0.00005%），它们通过 k-mer 图使 multik 在迭代轮内形成嵌合 unitig
+（侧翼+IS 折返链），最终造成 4 个 mis（已由 multik 图防御兜底归零，
+见 `asm-multik.md` §9.8）。
+
+### 9.2 尝试过的修复（全部不可行，有实测数据）
+
+| 方案 | 结果 |
+| :--- | :--- |
+| `--min-overlap 30` | 砍掉 85% 合法 merge（该文库 insert ~270-290 bp，短 overlap 是主流）；且 28 bp 精确重叠 + 错误延伸仍残留 1 条 |
+| bbnet（make-vector） | 拦不住（28 bp 高质量重叠对神经网络也正常） |
+| merge 后 `fq s-filter` | 抓不到（嵌合 junction 24-mer 在原始 reads 有 66-83 次支持，k-mer 计数信号正常，6 条全留在 kept） |
+| Tn 数据库匹配（`pgr rept e-kmer`/`e-align` 对照 tncentral.fa.gz） | 对 reads 全不可靠：k=17 假阳 27% 且漏检 5/6；k=17+min-len 30/40/60 全 0；k=24/31 全漏（数据库与基因组拷贝有差异）；e-align 0 命中。原因：reads ~1% 错误使 k-mer 命中稀疏、短 reads 形不成连续命中区。e-kmer/e-align 设计目标是长而准的基因组序列（对 MG1655 参考跑出 861 个 IS 区，正常） |
+
+本质：短读 merge 无法区分"重复序列重叠"与"真实 insert 重叠"；该嵌合属
+重复介导歧义连接，reads 层面（k-mer 计数/覆盖度/探针）无信号，只在图
+结构层面（multik 分支节点检测）可抓。bbmerge 上游同样存在此问题。
+
+### 9.3 merge vs no-merge 端到端（决定保留 merge）
+
+同覆盖度对照（merge 组 `6_down_sampling/MRX*` vs no-merge 组
+`4_down_sampling/Q0L0X*`，总碱基一致 ~185.7M，唯一变量是否 merge）：
+
+| 指标 | merge 组 | no-merge 组 |
+| :--- | ---: | ---: |
+| N50 | **60.3K** | 39.2K |
+| contigs (≥1 kb) | 140 | 200 |
+| # misassemblies | 0 | 0 |
+| Genome fraction | 97.24% | 97.21% |
+
+**merge 使 N50 提升 54%**（merged reads 在 multik 迭代桥接验证中提供更长
+的 k-mer 延伸支持），mis 两组均为 0（multik 图防御兜底生效）。结论：
+**保留 merge**；此前"multik 不依赖 reads 长度、merge 收益有限"的推测被
+数据否定。待真实宏基因组/长读数据到位后重审。
+
+### 9.4 若未来要根治的方向
+
+* 重叠区 k-mer 计数：成本高、信号被 reads 错误稀释至 ~1.1×，收益
+  0.00005%，不推荐；
+* unitig/contig 层 Tn 标记（组装产物长且准，e-kmer 有效）或参考已知时标
+  基因组 IS 区 + reads 映射：与 multik 现有分支检测大概率重叠，收益存疑；
+* 长读（HiFi/ONT）跨越共享区是唯一彻底方案，等真实数据。
