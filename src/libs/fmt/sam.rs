@@ -90,7 +90,11 @@ pub fn ihist<R: BufRead, W: Write>(reader: R, writer: &mut W) -> Result<()> {
     let mut insert_sizes: Vec<u32> = Vec::new();
 
     for result in reader.record_bufs(&header) {
-        let record = result.context("failed to read SAM record")?;
+        // A malformed record (e.g. missing SEQ/QUAL fields) is skipped
+        // instead of failing the whole histogram.
+        let Ok(record) = result else {
+            continue;
+        };
         let flags = record.flags();
         if !flags.is_segmented() {
             continue;
