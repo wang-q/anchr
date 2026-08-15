@@ -4,6 +4,7 @@
 # Run
 #----------------------------#
 log_warn 0_cleanup.sh
+{% set unitiggers = opt.unitigger | split(pat=" ") -%}
 {# Keep a blank line #}
 # Illumina
 parallel --no-run-if-empty --linebuffer -k -j 1 "
@@ -35,8 +36,10 @@ if [ -d 2_illumina ]; then
 fi
 
 # down sampling
-find . -type f -path "*4_unitigs_multik/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
-find . -type f -path "*6_unitigs_multik/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+{% for u in unitiggers -%}
+find . -type f -path "*4_unitigs_{{ u }}/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_unitigs_{{ u }}/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+{% endfor -%}
 {# Keep a blank line #}
 # tempdir
 find . -type d -name "\?" | xargs rm -fr
@@ -81,16 +84,20 @@ if [ -e statAnchors.md ]; then
     cat statAnchors.md;
     echo;
 fi
-if [ -e 9_markdown/statUnitigsMultik.md ]; then
+{% for u in unitiggers -%}
+if [ -e 9_markdown/statUnitigs{{ u | title }}.md ]; then
     echo;
-    cat 9_markdown/statUnitigsMultik.md
-    echo;
-fi
-if [ -e 9_markdown/statMRUnitigsMultik.md ]; then
-    echo;
-    cat 9_markdown/statMRUnitigsMultik.md;
+    cat 9_markdown/statUnitigs{{ u | title }}.md;
     echo;
 fi
+{% if opt.merge == "1" and opt.se == "0" -%}
+if [ -e 9_markdown/statMRUnitigs{{ u | title }}.md ]; then
+    echo;
+    cat 9_markdown/statMRUnitigs{{ u | title }}.md;
+    echo;
+fi
+{% endif -%}
+{% endfor -%}
 if [ -e 9_markdown/statMergeAnchors.md ]; then
     echo;
     cat 9_markdown/statMergeAnchors.md;

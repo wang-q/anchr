@@ -23,6 +23,11 @@
   8_megahit 奇数交错 reads（`--12` 需偶数）、7_merge_anchors 第三次
   合并的 find 遗漏 `anchor.merge.fasta`、`asm anchor` 新增 `--stats`
   输出（Mapped/median/MAD/lower/upper/SumOthers，替代旧 env.json 统计）。
+- ~~`anchr template --unitigger` 恢复 bcalm~~（2026-08-15 完成：`--unitigger`
+  重新支持外部 bcalm（legacy unitigger，默认仍为 multik）；4/6_unitigs、
+  0_master/0_bsub、0_cleanup、9_quast 全部按 unitigger 参数化；bcalm 每 k
+  独立 unitigs（31..81）后用 `asm olc --unitigs` 跨 k 合并——G37 端到端
+  验证 N50 31199 与 legacy bcalm 链 31199 一致）。
 
 ## 挂账 / 待决
 
@@ -50,6 +55,11 @@
   breaking 覆盖度阈值（`references/canu.md` §8）；
 - ~~大规模真实数据全链~~（2026-08-15 G37 全量：`fq → asm → template`
   跑通，结果见 `results/model_org.md`；统计核对完成）；
+- MG1655 multik vs bcalm 对照（2026-08-15 初步数据，legacy down-sampling
+  reads 同输入）：MRX40 unitig N50 multik 21.2K/1455 条 vs bcalm 53.6K/158
+  条；MRX80 19.3K/1525 vs 37.5K/209——bcalm unitigs 长 2-2.5×、条数约
+  1/9；最终 N50 legacy bcalm 合并 63-78K vs 现代 28K，需 bcalm 链端到端
+  （anchor → olc）确认差距来源；
 - gz/大输入回归：默认 supermer 路径全链回归 + 峰值内存；
 - 560 bp 碎片 mis 覆盖度门槛（`asm-olc.md` §14.3，`--min-contig-len 1000`
   可滤，可选）。

@@ -51,6 +51,45 @@ fn command_template() -> anyhow::Result<()> {
     assert!(stderr.contains("2_quorum.sh"));
     assert!(&tempdir.path().join("0_script/2_quorum.sh").is_file());
 
+    // anchr template --unitigger bcalm (no multik script)
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("template")
+        .arg("--unitigger")
+        .arg("bcalm")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+
+    assert!(stderr.contains("4_unitigs_bcalm.sh"));
+    assert!(!stderr.contains("4_unitigs_multik.sh"));
+    assert!(&tempdir.path().join("0_script/4_unitigs_bcalm.sh").is_file());
+
+    let bcalm_script = std::fs::read_to_string(tempdir.path().join("0_script/4_unitigs_bcalm.sh"))?;
+    assert!(bcalm_script.contains("bcalm \\"));
+    assert!(bcalm_script.contains("anchr asm olc --unitigs unitigs_K*.fasta"));
+
+    // anchr template --unitigger "multik bcalm" --merge
+    let mut cmd = Command::cargo_bin("anchr")?;
+    let output = cmd
+        .arg("template")
+        .arg("--unitigger")
+        .arg("multik bcalm")
+        .arg("--merge")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+
+    assert!(stderr.contains("4_unitigs_multik.sh"));
+    assert!(stderr.contains("4_unitigs_bcalm.sh"));
+    assert!(stderr.contains("6_unitigs_bcalm.sh"));
+    assert!(&tempdir.path().join("0_script/6_unitigs_bcalm.sh").is_file());
+
+    let master = std::fs::read_to_string(tempdir.path().join("0_script/0_master.sh"))?;
+    assert!(master.contains("4_unitigs_multik"));
+    assert!(master.contains("4_unitigs_bcalm"));
+    assert!(master.contains("statUnitigsBcalm.md"));
+
     // cleanup
     assert!(env::set_current_dir(&curdir).is_ok());
     assert!(tempdir.close().is_ok());

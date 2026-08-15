@@ -40,6 +40,7 @@ pub fn make_subcommand() -> Command {
 
 * Down sampling, unitigs, and anchors
     * --cov "40 80"
+    * --unitigger "multik bcalm"
     * --splitp 20
     * --statp 2
     * --uscale 2
@@ -176,6 +177,14 @@ pub fn make_subcommand() -> Command {
                 .default_value("40 80"),
         )
         .arg(
+            Arg::new("unitigger")
+                .long("unitigger")
+                .short('u')
+                .help("Unitigger(s) used: multik or bcalm; space-separated list")
+                .num_args(1)
+                .default_value("multik"),
+        )
+        .arg(
             Arg::new("splitp")
                 .long("splitp")
                 .help("Parts of splitting")
@@ -290,6 +299,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     );
 
     opt.insert("cov", args.get_one::<String>("cov").unwrap());
+    opt.insert("unitigger", args.get_one::<String>("unitigger").unwrap());
     opt.insert("splitp", args.get_one::<String>("splitp").unwrap());
     opt.insert("statp", args.get_one::<String>("statp").unwrap());
     opt.insert("uscale", args.get_one::<String>("uscale").unwrap());
@@ -333,14 +343,28 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     gen_quorum(&context)?;
     gen_down_sampling(&context)?;
 
-    gen_unitigs(&context)?;
+    let unitiggers = args
+        .get_one::<String>("unitigger")
+        .unwrap()
+        .split_ascii_whitespace()
+        .collect::<Vec<_>>();
+    anyhow::ensure!(
+        !unitiggers.is_empty(),
+        "--unitigger must name at least one unitigger"
+    );
+
+    for u in &unitiggers {
+        gen_unitigs(&context, u)?;
+    }
     gen_anchors(&context)?;
     gen_stat_anchors(&context)?;
 
     if !args.get_flag("se") && args.get_flag("merge") {
         gen_merge(&context)?;
         gen_mr_down_sampling(&context)?;
-        gen_mr_unitigs(&context)?;
+        for u in &unitiggers {
+            gen_mr_unitigs(&context, u)?;
+        }
         gen_mr_anchors(&context)?;
         gen_stat_mr_anchors(&context)?;
     }
@@ -577,13 +601,13 @@ fn gen_mr_down_sampling(context: &Context) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn gen_unitigs(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_script/4_unitigs_multik.sh";
+fn gen_unitigs(context: &Context, unitigger: &str) -> anyhow::Result<()> {
+    let outname = format!("0_script/4_unitigs_{unitigger}.sh");
     eprintln!("Create {}", outname);
 
-    let mut con = Context::new();
-    con.insert("outname", outname);
-    con.extend(context.clone());
+    let mut con = context.clone();
+    con.insert("outname", outname.as_str());
+    con.insert("unitigger", unitigger);
 
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
@@ -593,18 +617,18 @@ fn gen_unitigs(context: &Context) -> anyhow::Result<()> {
     .unwrap();
 
     let rendered = tera.render("t", &con).unwrap();
-    anchr::utils::write_lines(outname, &[rendered.as_str()])?;
+    anchr::utils::write_lines(&outname, &[rendered.as_str()])?;
 
     Ok(())
 }
 
-fn gen_mr_unitigs(context: &Context) -> anyhow::Result<()> {
-    let outname = "0_script/6_unitigs_multik.sh";
+fn gen_mr_unitigs(context: &Context, unitigger: &str) -> anyhow::Result<()> {
+    let outname = format!("0_script/6_unitigs_{unitigger}.sh");
     eprintln!("Create {}", outname);
 
-    let mut con = Context::new();
-    con.insert("outname", outname);
-    con.extend(context.clone());
+    let mut con = context.clone();
+    con.insert("outname", outname.as_str());
+    con.insert("unitigger", unitigger);
 
     let mut tera = Tera::default();
     tera.add_raw_templates(vec![
@@ -614,7 +638,7 @@ fn gen_mr_unitigs(context: &Context) -> anyhow::Result<()> {
     .unwrap();
 
     let rendered = tera.render("t", &con).unwrap();
-    anchr::utils::write_lines(outname, &[rendered.as_str()])?;
+    anchr::utils::write_lines(&outname, &[rendered.as_str()])?;
 
     Ok(())
 }

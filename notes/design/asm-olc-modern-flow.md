@@ -47,7 +47,9 @@ reads（每覆盖度子集）
 * **fastk/GeneScope 替代 = `pgr kmer gsize --model`**（GenomeScope 拟合，
   `libs/kmer/genomescope.rs`）；
 * **spades/megahit = 可选参考**（保留用于对照，不实现不替代）；
-* 唯一保留外部组件：**quast**（用户要求最终质量确认）。
+* 唯一保留外部组件：**quast**（用户要求最终质量确认）；bcalm 作为
+  对照 unitigger 随 `anchr template --unitigger` 恢复（2026-08-15，见
+  `todo.md`），用于与现代 multik 做 unitig/最终 N50 的 A/B 对照。
 
 ### 2.3 multik 验证与基准
 
@@ -91,6 +93,12 @@ reads（每覆盖度子集）
   `.git` 只读需用户本机 commit；
 * 文档：asm-olc.md §14（改造+时间分析）、anchr-legacy-pipeline.md §5
   （替代对照）、multik 基准、todo 全部同步。
+
+* 2026-08-15 追加：`--unitigger` 恢复 bcalm（multik 默认；bcalm 每 k
+  unitigs + `asm olc --unitigs` 跨 k 合并，G37 N50 31199 与 legacy 一致）；
+  MG1655 对照显示 multik unitigs 比 bcalm 短 2-2.5×（MRX40：21.2K/1455
+  条 vs 53.6K/158 条），最终 N50 28K vs legacy 63-97K —— 差距来源待
+  bcalm 链端到端确认。
 
 ## 4. 下一步（详见 todo）
 
