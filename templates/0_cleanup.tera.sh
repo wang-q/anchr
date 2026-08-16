@@ -7,12 +7,12 @@ log_warn 0_cleanup.sh
 {% set unitiggers = opt.unitigger | split(pat=" ") -%}
 {# Keep a blank line #}
 # Illumina
-parallel --no-run-if-empty --linebuffer -k -j 1 "
-    if [ -e 2_illumina/{}.fq.gz ]; then
-        rm 2_illumina/{}.fq.gz;
-        touch 2_illumina/{}.fq.gz;
+for NAME in clumpify sample trim filter; do
+    if [ -e 2_illumina/${NAME}.fq.gz ]; then
+        rm 2_illumina/${NAME}.fq.gz;
+        touch 2_illumina/${NAME}.fq.gz;
     fi
-    " ::: clumpify sample trim filter
+done
 
 # insertSize
 rm -f 2_illumina/insert_size/*contig.fasta

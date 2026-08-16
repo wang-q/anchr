@@ -110,9 +110,13 @@ fi
 cd ${BASH_DIR}/..
 cd 2_illumina
 
-parallel --no-run-if-empty --linebuffer -k -j 2 "
-    ln -fs ./trim/Q{1}L{2}/ ./Q{1}L{2}
-    " ::: {{ opt.qual }} ::: {{ opt.len }}
+# Plain bash loops replace the former `parallel -j 2 ... :::` argument grid;
+# ln -fs is instantaneous, so no background jobs are needed.
+for Q in {{ opt.qual }}; do
+    for L in {{ opt.len }}; do
+        ln -fs ./trim/Q${Q}L${L}/ ./Q${Q}L${L}
+    done
+done
 ln -fs ./trim ./Q0L0
 
 log_info Done.

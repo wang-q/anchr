@@ -8,11 +8,13 @@ log_warn 0_real_clean.sh
 # Illumina
 rm -f 2_illumina/Q*
 
-parallel --no-run-if-empty --linebuffer -k -j 1 "
-    if [ -e 2_illumina/{1}.{2}.fq.gz ]; then
-        rm 2_illumina/{1}.{2}.fq.gz;
-    fi
-    " ::: R1 R2 Rs ::: uniq shuffle sample bbduk clean
+for PREFIX in R1 R2 Rs; do
+    for NAME in uniq shuffle sample bbduk clean; do
+        if [ -e 2_illumina/${PREFIX}.${NAME}.fq.gz ]; then
+            rm 2_illumina/${PREFIX}.${NAME}.fq.gz;
+        fi
+    done
+done
 
 rm -fr 2_illumina/trim/
 rm -fr 2_illumina/merge/

@@ -142,11 +142,17 @@ rm -f filter.fq
 # Sickle
 #----------------------------#
 log_info "sickle ::: Qual {{ opt.qual }} ::: Len {{ opt.len }}"
-parallel --no-run-if-empty --linebuffer -k -j 2 "
-    mkdir -p Q{1}L{2}
-    cd Q{1}L{2}
+# Plain bash loops replace the former `parallel -j 2 ... :::` argument grid
+# (nested double-quoted templates need \$ / \" escaping that breaks
+# silently). Jobs run one at a time in the foreground, each pigz with the
+# full opt.parallel thread budget.
+for Q in {{ opt.qual }}; do
+    for L in {{ opt.len }}; do
+        (
+    mkdir -p Q${Q}L${L}
+    cd Q${Q}L${L}
 
-    printf '==> Qual-Len: %s\n'  Q{1}L{2}
+    printf '==> Qual-Len: %s\n' "Q${Q}L${L}"
     if [ -e {{ opt.prefix }}1.fq ]; then
         echo '    {{ opt.prefix }}1.fq already presents'
         exit;
@@ -154,29 +160,31 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
 
 {% if args.1 -%}
     anchr fq trim-qual \
-        -q {1} \
-        -l {2} \
+        -q ${Q} \
+        -l ${L} \
         ../{{ opt.prefix }}1.fq \
         ../{{ opt.prefix }}2.fq \
         -o {{ opt.prefix }}1.fq \
         --outfile-2 {{ opt.prefix }}2.fq \
         --outfile-single {{ opt.prefix }}s.fq
     anchr fq trim-qual \
-        -q {1} \
-        -l {2} \
+        -q ${Q} \
+        -l ${L} \
         ../{{ opt.prefix }}s.fq \
         -o {{ opt.prefix }}s.temp.fq
     cat {{ opt.prefix }}s.temp.fq >> {{ opt.prefix }}s.fq
     rm {{ opt.prefix }}s.temp.fq
 {% else -%}
     anchr fq trim-qual \
-        -q {1} \
-        -l {2} \
+        -q ${Q} \
+        -l ${L} \
         ../{{ opt.prefix }}1.fq \
         -o {{ opt.prefix }}1.fq
 {% endif -%}
 
-    pigz *.fq
-    " ::: {{ opt.qual }} ::: {{ opt.len }}
+    pigz -p {{ opt.parallel }} *.fq
+        )
+    done
+done
 
 exit 0
