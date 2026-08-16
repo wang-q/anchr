@@ -101,6 +101,17 @@ Examples:
                 .help("Worker threads for counting; 0 = all cores"),
         )
         .arg(
+            Arg::new("guide_contigs")
+                .long("guide-contigs")
+                .num_args(1)
+                .help(
+                    "Previous-master unitigs for megahit-style guidance: each contig's full \
+                     sequence feeds the master-k count as pseudo-reads (repeated to the solid \
+                     threshold), so a low-k master's structure carries into higher-k rounds \
+                     (e.g. K192 on 450 bp reads: unitig N50 37.6K -> 81.6K)",
+                ),
+        )
+        .arg(
             Arg::new("list_files")
                 .long("list-files")
                 .action(ArgAction::SetTrue)
@@ -115,6 +126,24 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     for f in args.get_many::<String>("infiles").unwrap() {
         infiles.extend(pgr::libs::par::resolve_paths(f, is_list)?);
     }
+    let min_count_seed = args
+        .get_one::<usize>("min_count_seed")
+        .copied()
+        .unwrap_or(3);
+    // megahit `seq2sdbg --contig` guidance: the previous master's unitigs
+    // seed the current master-k count as pseudo-reads (each full-length
+    // contig repeated up to the solid threshold), so low-k structure
+    // carries into higher-k rounds that would otherwise fragment from
+    // insufficient read support.
+    // The temp dir stays alive (as `_guide_keep`) until the assembly
+    // finishes, so the pseudo-read file exists while it is read.
+    let _guide_keep = if let Some(guide) = args.get_one::<String>("guide_contigs") {
+        let (dir, guide_path) = write_guide_pseudo_reads(guide, min_count_seed)?;
+        infiles.push(guide_path);
+        Some(dir)
+    } else {
+        None
+    };
     anyhow::ensure!(
         !infiles.is_empty(),
         "--list-files resolved to no input files"
@@ -134,10 +163,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     };
     let opts = MultikOptions {
         ks,
-        min_count_seed: args
-            .get_one::<usize>("min_count_seed")
-            .copied()
-            .unwrap_or(3),
+        min_count_seed,
         min_count_extend: args
             .get_one::<usize>("min_count_extend")
             .copied()
@@ -169,4 +195,37 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     }
     out.flush()?;
     Ok(())
+}
+
+/// Writes a previous master's unitigs as full-length pseudo-reads (each
+/// contig repeated up to the solid threshold) and returns the temp dir
+/// holding the file plus its path. Callers must keep the temp dir alive
+/// until the assembly consumes the infiles.
+fn write_guide_pseudo_reads(
+    guide: &str,
+    min_count_seed: usize,
+) -> anyhow::Result<(tempfile::TempDir, String)> {
+    use anyhow::Context;
+    let contigs = crate::libs::map::read_fasta(std::slice::from_ref(&guide.to_string()))
+        .with_context(|| format!("failed to read guide contigs {guide}"))?;
+    let dir =
+        tempfile::tempdir().with_context(|| "failed to create temp dir for guide pseudo-reads")?;
+    let guide_file = dir.path().join("guide.fa");
+    let mut out = pgr::libs::io::writer(guide_file.to_str().unwrap()).with_context(|| {
+        format!(
+            "failed to open guide pseudo-read file {}",
+            guide_file.display()
+        )
+    })?;
+    for (i, r) in contigs.iter().enumerate() {
+        for rep in 0..min_count_seed {
+            writeln!(out, ">g{i}_{rep}")?;
+            for chunk in r.seq.chunks(70) {
+                out.write_all(chunk)?;
+                out.write_all(b"\n")?;
+            }
+        }
+    }
+    out.flush()?;
+    Ok((dir, guide_file.to_string_lossy().into_owned()))
 }

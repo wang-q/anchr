@@ -516,6 +516,39 @@ megahit 用 iterate 边把跨 contig 的 reads 证据带进新图；multik 用 b
 下一轮 unitigs 回灌（megahit bubble 回灌 + metaMDBG unitig 反馈结合），
 G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
 §4.11）。
+
+**可变 k 机制精读（2026-08-16 晚，针对 pgr K 上限 256 的对照）**：
+* **k 序列**：megahit 默认 `[21,29,39,59,79,99,119,141]`（`src/megahit`
+  `Options.__init__`），auto 模式只按读长裁剪——`set_max_k_by_lib` 把
+  `k >= max_read_len + 20` 的项去掉，无更复杂的推导；相邻 k 差强制 ≤28
+  （`--k-step` 校验，step 必须偶数、k 必须奇数）。
+* **kMax = 255**（`sdbg/sdbg_def.h` `kMaxK`，`megahit_core kmax` 查询）——
+  pgr 的 `Kmer::MAX_K = 256` 与其几乎一致（上游 128→256 是对标 megahit）。
+* **迭代引导的两半**（缺一不可）：`seq2sdbg -k next --kmer_from cur` 的输入
+  同时包含 **上一轮 contigs 全长**（`--contig`/`--bubble`/`--addi_contig`）
+  和 **iterate 迭代边**（`--input_prefix`）：`iterate/contig_flank_index.h`
+  `FeedBatchContigs` 存每个 contig 端点 (k+1)-mer + 延伸序列（`ext_seq`，
+  最多 step-1 碱基），`FindNextKmersFromReads` 在 reads 里锚定端点后收集
+  跨端点的 (k+step+1)-mer 作新 k 图的种子。
+* **实验结论（G37 MRX40P000，450 bp reads）**：把上一轮 unitigs 的反馈从
+  "全长"改成"仅两端各 k 片段"（简化版端点引导），或把 K31 端点片段重复喂给
+  K160 主 K，unitig 输出均与基线完全一致（752/12,310；K160 100/72,998）
+  ——高覆盖短读下 k-mer 本来就在 reads 里，碎片化是图结构分支而非缺种子，
+  简单引导无增量。真正的 megahit 式引导（seq2sdbg 重建 + 迭代边）价值在
+  低覆盖/长读场景（reads 支持不足，需低 k 结构引导），multik 暂无此类数据
+  验证；`count_at` 保持全长反馈（与 megahit `--contig` 全长引导一致）。
+* **引导实施与端到端结论（2026-08-16 深夜）**：`asm multik` 新增
+  `--guide-contigs <fasta>`（cmd 层把上一主 K unitigs 全长作为伪 reads 写
+  临时文件，重复到 solid 阈值后并入计数，对应 megahit `seq2sdbg --contig`）。
+  单主验证：K192 用 K31 unitigs 引导，unitig N50 37.6K→**81.6K**（+117%）、
+  K224 16.4K→37.9K、K256 6.0K→25.9K——**全长引导有效**（reads 高 k 覆盖
+  不足时低 k 结构真实起引导作用）；500/1000 bp 端点片段引导无效（结构信息
+  不足）。**端到端（G37 7 组，31..192 + 只 K192 引导）：GF 98.849→
+  99.602%（+0.75 pp）但 Dup 1.000→**1.210**（K192 引导 unitigs 复制 K31
+  全部结构，跨主 K 近似重复去重不足）+ **1 mis**（引导传播 K31 骨架的重复
+  区嵌合，下游 bridge/anchor 未全部拦截）——**不进模板**。`--guide-contigs`
+  保留为能力（低覆盖/长读数据可启用），但需先解决跨主 K 冗余去重与引导嵌合
+  的拦截（P2 方向）。
 6. **本地组装（§4.5）**：MEGAHIT 用 reads 回帖 + IDBA-UD 内核做 contig 端点延伸，
    与 anchr `fq extend`（tadpole 沿图延伸）目标相近；其 `min_mapping_len=75`、
    `LocalRange = min(2*mean, mean+3*sd)` 封顶 650 等参数可对照。
@@ -535,14 +568,14 @@ G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
 （tadpole contigMode，`TadpoleTable = HashMap<Kmer,u32>` 全内存），`asm olc` 走
 `libs/olc/`（多 k unitig → overlap → layout → cns），`asm map` 是 `libs/map.rs`
 完美回帖；pgr `KmerTable` 提供 packed bytes + radix sort + rayon 精确计数。
-**注意 anchr 的 `Kmer::MAX_K = 128`，不是 MEGAHIT 的 255**——所有 k/step 校验按
-128 来。
+**anchr 的 `Kmer::MAX_K` 跟随 pgr（2026-08-16 起 256，对标 MEGAHIT 的 255）**
+——k/step 校验动态取 `Kmer::MAX_K`，无需硬编码。
 
 | 效果 | anchr 现状 | 需要补什么 | 放置 / 门槛 |
 |---|---|---|---|
 | 单 k 内存图组装 | ✅ 已具备（`assemble.rs`） | 无需补；MEGAHIT 的 unitig 判据（§3.1 `NextSimplePathEdge`）与 `assemble.rs` 的 `unique_solid_out/in` 语义一致，可加**交叉验证测试** | — / 低 |
 | 图清洗（tip / weak link / low depth） | ⚠️ 只有 `pop_bubbles` | 新增 `libs/asm/clean.rs`：`RemoveTips`（倍增阈值 + `8×` 深度比，§5 Tip）、`DisconnectWeakLinks`（0.1× 总深度断开）、`RemoveLocalLowDepth`（端点局部宽度窗口深度参照）；深度直接复用 `Unitig` 的 `coverage/min_cov/max_cov`，邻接复用现有 `Link`/`EdgeRef` | `libs/asm/clean.rs` / 中 |
-| 多 k 迭代 + 上一轮引导 | ⚠️ `asm olc` 多 k 但无反馈（`notes/design/asm-olc.md`） | 每轮 unitigs 序列回灌为下一轮 k 的输入（对应 `seq2sdbg`，§4.3）；迭代边提取（对应 `iterate`，§4.6）用 `HashMap<Kmer,Vec<pos>>` 建端点索引 + pgr `KmerTable` 精确计数替代 `KmerCollector`；k 奇数、step 偶数 ≤28、k+step≤128 | `libs/olc/` 或 `libs/asm/iterate.rs` / 中 |
+| 多 k 迭代 + 上一轮引导 | ⚠️ multik 图级反馈（unitigs 全长回灌计数 + 验证边），无 seq2sdbg 式"旧 contigs 建新 k 图" | 每轮 unitigs 序列回灌为下一轮 k 的输入（对应 `seq2sdbg`，§4.3，multik 已做全长回灌）；迭代边提取（对应 `iterate`，§4.6）用端点索引 + reads 锚定收集跨端点 k-mer——高覆盖短读验证无增量（§8.6 实验结论），价值在低覆盖/长读，待数据验证 | `libs/asm/iterate.rs` / 中 |
 | 本地组装（contig 端点延伸） | ⚠️ `fq extend` 做 reads 延伸、`map.rs` 完美回帖，未组合 | 新增 `libs/asm/local.rs` 编排：`map.rs` 回帖（对应 `hash_mapper`）→ 按 insert 取端点局部区间（`min(2*mean, mean+3*sd)` 封顶 650，§4.5）→ 区间内跑 `assemble`（对应 IDBA-UD 内核）延伸端点 | `libs/asm/local.rs` / 低-中 |
 | **低内存超大基因组（外部排序计数）** | ❌ `TadpoleTable`/`KmerTable` 全内存 | 新增 `libs/asm/externalsort.rs`：65536 桶（前 8 碱基）→ Lv0 统计桶大小降序分批 → Lv1 4 字节差分偏移（>2^31 进 `special_offsets`）→ Lv2 每桶取出明文排序计数、滤 `solid_threshold`（§4.1）；edges 按桶前缀分片落盘。排序用 std / 已有 radix，**无需新 crate** | `libs/asm/externalsort.rs` / **重（核心里程碑）** |
 | succinct 位向量图（SdBG） | ❌ 无对应（图全内存） | 新增 `libs/asm/sdbg.rs`：自写 `Vec<u64>` + popcount 前缀表的 rank/select（约几百行，避免引入 `sucds` 等新依赖），`w/last/tip` 三数组 + RC 位 + `tip_lables` 旁存 + 前缀查找表二分（§3.1）。独立于外部排序，做磁盘图格式时才需要 | `libs/asm/sdbg.rs` / 重 |
@@ -574,7 +607,8 @@ G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
   组装应复用 `map.rs` 而非照搬 seed-and-extend。可直接借的技巧：`sparsity=8` 抽样
   建索引、`pos_count<=3` 防覆盖度虚高、insert 只统计"同 contig 不同链"配对、
   `insert>=len` 入直方图、`Trim(0.01)` 去尾（§4.5）。
-- **k 上限**：MEGAHIT 255 vs anchr `Kmer::MAX_K=128`——iterate 的 `k+step≤128`、
+- **k 上限**：MEGAHIT 255 vs anchr `Kmer::MAX_K=256`（pgr，2026-08-16）——
+  iterate 的 `k+step≤256`、
   所有 k/step 校验按 128。
 - **多重度精度**：MEGAHIT 饱和 uint16（`kMaxMul`），anchr 是精确 u64 计数，更优；
   清洗阈值语义按 anchr 精确计数**重算默认值**，不照搬饱和行为。

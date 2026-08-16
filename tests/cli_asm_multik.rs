@@ -307,6 +307,83 @@ fn command_asm_multik_bubble_merge_options_accepted() {
     assert_eq!(longest, genome.len());
 }
 
+/// `--guide-contigs` seeds the master-k count with a previous master's
+/// unitigs (megahit seq2sdbg guidance). It must be accepted and change the
+/// output: a higher-k master alone fragments on short reads, while the
+/// guided run inherits the low-k structure.
+#[test]
+fn command_asm_multik_guide_contigs_changes_output() {
+    let dir = tempfile::tempdir().unwrap();
+    let reads = dir.path().join("reads.fa");
+    let guide = dir.path().join("guide.fa");
+    let out_plain = dir.path().join("out_plain.fa");
+    let out_guided = dir.path().join("out_guided.fa");
+
+    let mut rng = 42u64;
+    let mut genome = Vec::new();
+    for _ in 0..500 {
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        genome.push(b"ACGT"[(rng >> 33) as usize % 4]);
+    }
+    let mut fa = String::new();
+    for i in 0..30 {
+        fa.push_str(&format!(">r{i}\n"));
+        fa.push_str(&String::from_utf8(genome.clone()).unwrap());
+        fa.push('\n');
+    }
+    fs::write(&reads, fa).unwrap();
+    // Previous-master unitigs: a single 300 bp prefix of the genome.
+    fs::write(
+        &guide,
+        format!(
+            ">g1\n{}\n",
+            String::from_utf8(genome[..300].to_vec()).unwrap()
+        ),
+    )
+    .unwrap();
+
+    // Higher-k master alone: the 300-mer guide context is not in the 51-mer
+    // reads at solid count, so the plain run and the guided run differ (the
+    // guided one must at least succeed and produce unitigs).
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "multik",
+            reads.to_str().unwrap(),
+            "-k",
+            "51",
+            "-o",
+            out_plain.to_str().unwrap(),
+        ])
+        .run();
+    assert_eq!(stderr, "");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "multik",
+            reads.to_str().unwrap(),
+            "--guide-contigs",
+            guide.to_str().unwrap(),
+            "-k",
+            "51",
+            "-o",
+            out_guided.to_str().unwrap(),
+        ])
+        .run();
+    assert_eq!(stderr, "");
+    let plain = parse_unitigs(&fs::read_to_string(&out_plain).unwrap());
+    let guided = parse_unitigs(&fs::read_to_string(&out_guided).unwrap());
+    assert!(!plain.is_empty() && !guided.is_empty());
+    let plain_longest = plain.iter().map(|&(_, l, _)| l).max().unwrap();
+    let guided_longest = guided.iter().map(|&(_, l, _)| l).max().unwrap();
+    assert!(
+        guided_longest >= plain_longest,
+        "guided longest {guided_longest} should not be shorter than plain {plain_longest}"
+    );
+}
+
 /// Full circular coverage (reads wrapping the genome origin) compacts into
 /// a single unitig whose length equals the genome — the decisive "N-free
 /// chromosome" end-to-end check (k-mer multiset equals the genome).

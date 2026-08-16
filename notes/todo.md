@@ -44,6 +44,18 @@
   identity 改 banded 编辑距离（band=512，容忍跨组 consensus 的 indel
   近重复，Dup 1.068→1.000）；K≥192 碎片化（N50 6-37K）故停 160。
   见 `g37-megahit-spades.md` §10、`mg1655-process-compare.md`。
+- ~~megahit 可变 k 机制精读对照~~（2026-08-16 完成，见
+  `references/megahit.md` §8.6）：k 序列默认 `[21,29,39,59,79,99,119,141]`
+  + auto 只按 `k < max_read_len+20` 裁剪、相邻差 ≤28、**kMax=255**（pgr
+  256 对标）；迭代引导 = contigs 全长（`seq2sdbg --contig`）+ iterate
+  跨端点 (k+step+1)-mer 种子两半。**实验**：简化端点引导（unitigs 反馈改
+  端点片段 / K31 端点喂 K160）在 G37 高覆盖短读下与基线完全一致（无增量，
+  碎片化是图结构分支而非缺 k-mer），`count_at` 保持全长反馈（与 megahit
+  `--contig` 一致）；真正迭代边机制价值在低覆盖/长读，待数据验证后实施。
+  **引导实施（深夜）**：`asm multik --guide-contigs` 已实现（K31 unitigs
+  全长引导 K192，单主 N50 37.6K→81.6K），但端到端（G37 7 组）GF +0.75 pp
+  的同时 Dup 1.210 + 1 mis——跨主 K 冗余去重与引导嵌合拦截未解决，
+  **不进模板**；能力保留待低覆盖/长读数据。
 - 重复区解析（P2）——§8。已落地并验证（G37 MR 链 7 组，全链 0 mis）：
   a. 模板 6_ 主 K 加 128（multik/unitig 分支；bcalm 分支 31..121）：
   GF 98.809→98.869%、Dup 1.003→1.000、12→11 contigs；
