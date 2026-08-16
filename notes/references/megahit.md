@@ -1,6 +1,7 @@
 # MEGAHIT（1.2.9）：succinct de Bruijn 图宏基因组组装器（源码分析）
 
-> 2026-08-13 整理，纯源码分析（`megahit-1.2.9/`，版本 `v1.2.9`）。MEGAHIT 是面向
+> 2026-08-13 整理、2026-08-17 对照源码逐项复核修订，纯源码分析（`megahit-1.2.9/`，
+> 版本 `v1.2.9`）。MEGAHIT 是面向
 > NGS 短读（尤其宏基因组）的**超快、内存友好**组装器，论文 [MEGAHIT: An
 > ultra-fast single-node solution for large and complex metagenomics assembly
 > via succinct de Bruijn graph](https://doi.org/10.1093/bioinformatics/btv033)
@@ -32,6 +33,33 @@
 - **命令形态**：`megahit`（Python 驱动）+ `megahit_core <sub>`（C++ 底层步：
   `assemble/local/iterate/buildlib/count/read2sdbg/seq2sdbg/contig2fastg/
   readstat/filterbylen/checkcpu/checkpopcnt/checkbmi2/dumpversion/kmax`）。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：reads 的 (k+1)-mer 经**外部多趟排序**计数（§4.1）滤出 solid 边 → 压成
+**succinct de Bruijn 图**（位向量 + rank/select，§3.1）→ unitig 压缩 + 多轮**图清洗**
+（tip/bubble/weak-link/low-depth，§5）→ **迭代多 k**：每轮用上一轮 contigs 引导建更大
+k 的图、用 reads 补迭代边、对 contig 端点做本地组装（§4.3-4.6）→ 各轮产物合并输出。
+
+```
+buildlib → (count | read2sdbg[1pass]) → build_graph[k_min] → assemble[k_min]
+  ┌─────────────────────────────┐
+  while cur_k < k_max:          │
+    local_assemble(cur_k)       │  contig 端点本地延伸（IDBA-UD 内核，k∈[11,next_k)）
+    iterate(cur_k, step)        │  reads 补跨端点的 (k+step+1)-mer 迭代边
+    build_graph(next_k, cur_k)  │  上一轮 contig/bubble/local 全长引导建新 k 图
+    assemble(next_k)            │  unitig 化 + 四件套清洗
+  merge_final(k_max)            │  cat *.final.contigs.fa + filterbylen
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| 外部排序计数 | 65536 桶（前 8 碱基）→ Lv0 桶大小统计降序分批 → Lv1 4 字节差分偏移 → Lv2 排序计数滤 solid | §3.4、§4.1 |
+| SdBG 位向量图 | 边 = canonical (k+1)-mer 排序数组，`w/last/tip` 位向量 + rank/select 实现 Forward/Backward | §3.1 |
+| unitig 压缩 | `NextSimplePathEdge`：唯一出边且该边唯一入边才继续延伸 | §3.1 |
+| 图清洗 | tip（2 起倍增阈值 + 8× 深度比）、naive/complex bubble（banded 相似度 0.95）、weak link（0.1× 断开 = 截短一格）、low depth（局部窗口 `min(min_depth, mean×ratio)`） | §5 |
+| 多 k 引导 | 上一轮 contigs/bubbles/local **全长**喂 `seq2sdbg` 作新 k 图的种子；`iterate` 另从 reads 收集跨 contig 端点的迭代边 | §4.3、§4.6 |
+| 本地组装 | reads 回帖 contig 端点（seed 31、sparsity 8、只信唯一最佳）→ insert size 定区间（封顶 650）→ IDBA 多 k 延伸 | §4.5 |
 
 ## 2. 仓库结构
 
@@ -263,12 +291,14 @@ buildlib → (count | read2sdbg[kmin-1pass]) → build_graph[kmin] → assemble[
 3. **输出**：`OutputContigs` 写 `contigs.fa`（非最终轮）/ `addi.fa`（prune 后残余）
    / `final.contigs.fa`（`output_standalone` 或最终轮）；`careful_bubble` 时把被
    合并的气泡写 `bubble_seq.fa`（`main_assemble.cpp:251-301`，`contig_output`）。
+   `careful_bubble` 由驱动**仅在非最终轮**附加、最终轮加 `--is_final_round`、
+   `--no-local` 加 `--output_standalone`（`megahit:891-898`）。
    `min_standalone` 由驱动算：`max(min(k_max*3-1, min_contig_len*1.5),
-   min_contig_len)`（`megahit:868`）。
+   min_contig_len)`（`megahit:867`）。
 
 ### 4.5 local：本地组装（`main_local_assemble.cpp` + `localasm/`）
 
-对上一轮 contig 的**端点**做局部延伸（默认 `kmin=11, kmax=41, step=6,
+对上一轮 contig 的**端点**做局部延伸（C++ 默认 `kmin=11, kmax=41, step=6,
 seed_kmer=31, sparsity=8, similarity=0.8, min_mapping_len=75`），完整流程：
 
 1. `HashMapper` 建索引 + 回帖（`hash_mapper.cpp`）：
@@ -290,6 +320,9 @@ seed_kmer=31, sparsity=8, similarity=0.8, min_mapping_len=75`），完整流程�
    strand 收集落在端点局部区间的 read（`AddSingle`/`AddMate`）；`min_num_reads =
    local_range/max_read_len` 以下不值得组装；**同一映射位置最多取 3 条 read**
    （`pos_count<=3`，防覆盖度虚高）；`contig_end` = contig 端点 `local_range` 的序列。
+   > 驱动只传 `--kmax`（= 下一轮的 k，`local_assemble(cur_k, next_k)`，
+   > `megahit:908-913,1010`），其余用 C++ 默认——即 IDBA 本地组装的 k 区间实际是
+   > `[11, next_k)`，专门补"下一轮 k 之前"的缺口证据。
 5. `LaunchIDBA`（`local_assemble.cpp:28-81`）：对局部 read + `contig_end` 做多 k
    迭代组装（k 从 `kmin` 到 `min(kmax, max_read_len)`，`step` 递增）；每 k 用
    `HashGraph` 插入 k-mer，覆盖度直方图 `percentile(1 - local_range/num_vertices)`
@@ -303,7 +336,8 @@ seed_kmer=31, sparsity=8, similarity=0.8, min_mapping_len=75`），完整流程�
 用上一轮 contig/bubble 的端点 k-mer 建 `ContigFlankIndex`，扫 reads（`KmerCollector`
 ），把"能从 contig 端继续延伸的 (k+step+1)-mer"作为**迭代边**写
 `<prefix>.edges.0`，供下一轮 `build_graph` 用（`main_iterate.cpp:117-222`）。
-校验：`step` 为偶数且 `1<=step<=28`，`kmer_k+step` 小于 `Kmer<4>::max_size()`
+校验：`step` 为偶数且 `1<=step<=28`，`kmer_k+step` 小于
+`max(Kmer<4>::max_size(), GenericKmer::max_size())`
 （`main_iterate.cpp:77-96`）。这就是 MEGAHIT 多 k 桥接的另一种方式——**用 reads
 证据补出高 k 才有的边**，避免丢失低 k 被过滤的序列。
 
@@ -385,7 +419,7 @@ unitig 入度 1、出度 1，且都汇到同一右节点（`right.b() == possibl
 | `-t/--num-cpu-threads` | 逻辑核数 | 线程；超硬件上限 WARNING 并钳制 |
 | `--min-count` | 2 | solid (k+1)-mer 最小频次；==1 强制 `kmin-1pass`+`no-mercy` |
 | `--k-list` | `21,29,39,59,79,99,119,141` | 显式 k 列表（全奇数，15..kmax，相邻差≤28） |
-| `--k-min/--k-max/--k-step` | 21/141/12 | 替代 `--k-list`（step 偶数 ≤28） |
+| `--k-min/--k-max/--k-step` | 21/141/10（帮助文本误写 `[12]`） | 替代 `--k-list`（step 偶数 ≤28） |
 | `--kmin-1pass` | off | 1pass 建 k_min 图（低深度省内存） |
 | `--no-mercy` | off | 不加 mercy 边 |
 | `--max-tip-len` | -1(=2k) | 尖端长度上限 |
@@ -416,7 +450,13 @@ unitig 入度 1、出度 1，且都汇到同一右节点（`right.b() == possibl
   `kUint32PerKmerMaxK=(255+1+15)/16=16` 个字（`definitions.h:45`）；驱动校验
   `k_list[-1] <= kmax`。
 - **k 必须奇数**（驱动强制，`megahit:527-529`）；`iterate` 的 `step` 必须偶数且
-  ≤28，`kmer_k+step < Kmer<4>::max_size()`（`main_iterate.cpp:92`）。
+  ≤28，`kmer_k+step < max(Kmer<4>::max_size(), GenericKmer::max_size())`
+  （`main_iterate.cpp:92`）。
+- **`--k-step` 帮助与代码默认不一致**：帮助文本 `[12]`（`megahit:61`），代码
+  `k_step = 10`（`megahit:170`）；默认 `k_list` 显式给定，该默认仅在用户改用
+  min/max/step 生成 k 列表时才生效。
+- **驱动 `assemble_cmd` 重复传参**：`--cleaning_rounds` 在同一条命令里出现两次
+  （`megahit:879,882`），值相同无影响——复制粘贴痕迹。
 - **`seq2sdbg` 要求 k≥9**（`main_sdbg_build.cpp:203-205`）；`count`/`read2sdbg`
   要求显式 `--host_mem` 非 0（`main_sdbg_build.cpp:70-72,124-126`）。
 - **`--min-count 1` 的隐式联动**：驱动设 `kmin_1pass=True` 且 `no_mercy=True`
@@ -430,11 +470,11 @@ unitig 入度 1、出度 1，且都汇到同一右节点（`right.b() == possibl
 - **`--max-tip-len -1` 的三处默认不同**：SdBG 层 `RemoveTips`（
   `sdbg_pruning`）与 unitig 层（`main_assemble.cpp:143-145`）都是 `2k`；但驱动在
   `assemble()` 里若 `cur_k*3-1 > min_contig_len*1.5` 会把 `--max_tip_len` 设成
-  `max(1, min_contig_len*1.5+1-cur_k)`（`megahit:887-890`）——当 k 较小时用
+  `max(1, min_contig_len*1.5+1-cur_k)`（`megahit:886-887`）——当 k 较小时用
   `min_contig_len` 相关的阈值替代 2k。
 - **`min_standalone` 计算**：`max(min(k_max*3-1, min_contig_len*1.5),
-  min_contig_len)`（`megahit:868`）；`--max-tip-len>=0` 时改为
-  `max(max_tip_len+k_max-1, min_contig_len)`（`megahit:869-870`）。
+  min_contig_len)`（`megahit:867`）；`--max-tip-len>=0` 时改为
+  `max(max_tip_len+k_max-1, min_contig_len)`（`megahit:868-869`）。
 - **multplicity 饱和**：`mul_t=uint16`，计数超过 65535 封顶（`kMaxMul`，
   `PackEdge` 里 `min(count, kMaxMul)`）；`small_mul` 的 255 是"查 large_mul"哨兵
   （`sdbg_def.h:11-19`），所以常规小多重度不占 phmap 内存。
@@ -494,7 +534,7 @@ multi-k 迭代与之**同族但机制不同**：
 
 | | megahit | `asm multik` |
 |---|---|---|
-| 迭代步 | k 列表 21→141（+8/+10/+20），每轮**重建**更大 k 的图 | auto 21/41/61/81/101/121，unitig 图结构保留 |
+| 迭代步 | k 列表 21→141（+8/+10/+20），每轮**重建**更大 k 的图 | auto 按 read N50 推导（`k_max=0.8×N50` clamp 31..256，150 bp→[50,70,90,110]；模板显式 KS=31..192），unitig 图结构保留 |
 | 上一轮产物 | **序列级引导**：contigs/bubbles 喂 `seq2sdbg` 建新 k 图 | **图级反馈**：unitig 图 + compute_links 边保留，跨接验证选边 |
 | reads 桥接 | `iterate`：contig 端点索引 + reads 回帖，提取跨端点的 (k+step+1)-mer 迭代边（**建图素材**） | `bridge_filter`：60-mer 探针验证 unitig 间连接（**验证边**） |
 | unitig 生成 | 每轮 `assemble` 重新压缩（`NextSimplePathEdge`） | pass 0 一次，后续轮只验证/压实（不重新 unitig 化） |
@@ -627,8 +667,8 @@ G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
   建索引、`pos_count<=3` 防覆盖度虚高、insert 只统计"同 contig 不同链"配对、
   `insert>=len` 入直方图、`Trim(0.01)` 去尾（§4.5）。
 - **k 上限**：MEGAHIT 255 vs anchr `Kmer::MAX_K=256`（pgr，2026-08-16）——
-  iterate 的 `k+step≤256`、
-  所有 k/step 校验按 128。
+  anchr 的 k/step 校验**动态取 `Kmer::MAX_K`**（multik 的 k 合法域
+  `(1..=Kmer::MAX_K)`、`auto_ks` 的 `k_max` 亦 clamp 到 256），无硬编码数字。
 - **多重度精度**：MEGAHIT 饱和 uint16（`kMaxMul`），anchr 是精确 u64 计数，更优；
   清洗阈值语义按 anchr 精确计数**重算默认值**，不照搬饱和行为。
 - **unitig 判据交叉验证**：`NextSimplePathEdge`（唯一出边 + 该出边唯一入边，
