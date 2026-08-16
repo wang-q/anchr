@@ -22,21 +22,26 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
 {% set parallel2 = opt.parallel | int / 2 -%}
 {% set parallel2 = parallel2 | round(method="floor") -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
+{# Bounded master concurrency for the multik branch: concurrent masters x
+   parallel2 threads each == opt.parallel cores. #}
+{% set max_jobs = opt.parallel | int / parallel2 -%}
+{% set max_jobs = max_jobs | int -%}
+{% if max_jobs < 1 %}{% set max_jobs = 1 %}{% endif -%}
 {# The multik branch derives its master-k list from the read-length N50
    (anchr asm multik --print-ks) instead of hard-coding values, so the
    pipeline adapts to any read length. The static KS below is only the
    fallback for the unitig branch (per-k independent unitigs) and the
    bcalm cap (bcalm rejects k>127). #}
-KS="31 41 51 61 71 81 101 121 128 160 192"
-KS_BCALM="31 41 51 61 71 81 101 121"
+KS=\"31 41 51 61 71 81 101 121 128 160 192\"
+KS_BCALM=\"31 41 51 61 71 81 101 121\"
 {% if unitigger == "bcalm" %}    # external bcalm unitigs per k, merged across k with the modern OLC step
-    for K in ${KS_BCALM}; do
+    for K in \${KS_BCALM}; do
         bcalm \
             -in ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
-            -kmer-size ${K} -abundance-min 3 -verbose 0 \
+            -kmer-size \${K} -abundance-min 3 -verbose 0 \
             -nb-cores {{ opt.parallel }} \
-            -out K${K}
-        mv K${K}.unitigs.fa unitigs_K${K}.fasta
+            -out K\${K}
+        mv K\${K}.unitigs.fa unitigs_K\${K}.fasta
     done
 
     anchr asm olc --unitigs unitigs_K*.fasta \
@@ -50,12 +55,12 @@ KS_BCALM="31 41 51 61 71 81 101 121"
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% elif unitigger == "unitig" %}    # in-house BCALM-semantics unitigs per k (asm unitig), merged across k
-    for K in ${KS}; do
+    for K in \${KS}; do
         anchr asm unitig \
             ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
-            -k ${K} \
+            -k \${K} \
             -p {{ opt.parallel }} \
-            -o unitigs_K${K}.fasta
+            -o unitigs_K\${K}.fasta
     done
 
     anchr asm olc --unitigs unitigs_K*.fasta \
@@ -79,26 +84,38 @@ KS_BCALM="31 41 51 61 71 81 101 121"
     # they cover low-complexity gap regions without chimeras (G37: GF
     # 98.869->99.083%, 0 mis; bcalm/unitig branches keep 1000 because their
     # raw unitigs do produce chimeric short fragments).
-    KS=$(anchr asm multik ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz --print-ks)
-    K0=$(echo ${KS} | awk '{print $1}')
-    V0=$(echo ${KS} | awk '{for(i=4;i<=NF;i+=3) printf "%s,", $i}' | sed 's/,$//')
-    if [ -n \"${V0}\" ]; then K0_LIST=\"${K0},${V0}\"; else K0_LIST=\"${K0}\"; fi
+    KS=\$(anchr asm multik ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz --print-ks)
+    K0=\$(echo \${KS} | awk '{print \$1}')
+    # The first master is the serial prefix of this stage and only needs to
+    # produce the guide skeleton: at most two validation rounds (median +
+    # largest k, the strictest check) instead of the full every-third-k
+    # chain. Parallel masters keep the dense rule — they are the wall-clock
+    # majority and their output feeds the final OLC merge.
+    V0=\$(echo \${KS} | awk 'NF>=5{printf \"%s,%s\", \$(int(NF/2)+1), \$NF} NF>=2&&NF<5{printf \"%s\", \$NF}')
+    if [ -n \"\${V0}\" ]; then K0_LIST=\"\${K0},\${V0}\"; else K0_LIST=\"\${K0}\"; fi
     anchr asm multik \
         ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
-        -k ${K0_LIST} \
+        -k \${K0_LIST} \
         -p {{ parallel2 }} \
-        -o unitigs_K${K0}.fasta
+        -o unitigs_K\${K0}.fasta
 
-    for K in $(echo ${KS} | awk '{for(i=2;i<=NF;i++) print $i}'); do
-        VK=$(echo ${KS} | awk -v k=${K} '{for(i=1;i<=NF;i++) if($i>k && (i-1)%3==0) printf "%s,", $i}' | sed 's/,$//')
-        if [ -n \"${VK}\" ]; then K_LIST=\"${K},${VK}\"; else K_LIST=\"${K}\"; fi
+    # Bounded master concurrency: each master process is capped at
+    # parallel2 rayon threads (-p), so at most MAX_JOBS masters run at
+    # once — MAX_JOBS*parallel2 == opt.parallel cores, no oversubscription.
+    MAX_JOBS={{ max_jobs }}
+    for K in \$(echo \${KS} | awk '{for(i=2;i<=NF;i++) print \$i}'); do
+        while [ \"\$(jobs -rp | wc -l)\" -ge \"\${MAX_JOBS}\" ]; do
+            wait -n
+        done
+        VK=\$(echo \${KS} | awk -v k=\${K} '{for(i=1;i<=NF;i++) if(\$i>k && (i-1)%3==0) printf \"%s,\", \$i}' | sed 's/,\$//')
+        if [ -n \"\${VK}\" ]; then K_LIST=\"\${K},\${VK}\"; else K_LIST=\"\${K}\"; fi
         (
             anchr asm multik \
                 ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
-                --guide-contigs unitigs_K${K0}.fasta \
-                -k ${K_LIST} \
+                --guide-contigs unitigs_K\${K0}.fasta \
+                -k \${K_LIST} \
                 -p {{ parallel2 }} \
-                -o unitigs_K${K}.fasta
+                -o unitigs_K\${K}.fasta
         ) &
     done
     wait

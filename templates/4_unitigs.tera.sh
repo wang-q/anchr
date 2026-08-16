@@ -22,16 +22,21 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
 {% set parallel2 = opt.parallel | int / 2 -%}
 {% set parallel2 = parallel2 | round(method="floor") -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
+{# Bounded master concurrency for the multik branch: concurrent masters x
+   parallel2 threads each == opt.parallel cores. #}
+{% set max_jobs = opt.parallel | int / parallel2 -%}
+{% set max_jobs = max_jobs | int -%}
+{% if max_jobs < 1 %}{% set max_jobs = 1 %}{% endif -%}
 {# Per-master k range: 150 bp reads cap at 91 (k near read length fragments) #}
-KS="31 41 51 61 71 81 91"
+KS=\"31 41 51 61 71 81 91\"
 {% if unitigger == "bcalm" %}    # external bcalm unitigs per k, merged across k with the modern OLC step
-    for K in ${KS}; do
+    for K in \${KS}; do
         bcalm \
             -in ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
-            -kmer-size ${K} -abundance-min 3 -verbose 0 \
+            -kmer-size \${K} -abundance-min 3 -verbose 0 \
             -nb-cores {{ opt.parallel }} \
-            -out K${K}
-        mv K${K}.unitigs.fa unitigs_K${K}.fasta
+            -out K\${K}
+        mv K\${K}.unitigs.fa unitigs_K\${K}.fasta
     done
 
     anchr asm olc --unitigs unitigs_K*.fasta \
@@ -45,12 +50,12 @@ KS="31 41 51 61 71 81 91"
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% elif unitigger == "unitig" %}    # in-house BCALM-semantics unitigs per k (asm unitig), merged across k
-    for K in ${KS}; do
+    for K in \${KS}; do
         anchr asm unitig \
             ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
-            -k ${K} \
+            -k \${K} \
             -p {{ opt.parallel }} \
-            -o unitigs_K${K}.fasta
+            -o unitigs_K\${K}.fasta
     done
 
     anchr asm olc --unitigs unitigs_K*.fasta \
@@ -64,20 +69,27 @@ KS="31 41 51 61 71 81 91"
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% else %}    # per-master multik: every k builds its own skeleton (larger ks
-    # validate it), masters run in parallel, then merged across masters
-    for K in ${KS}; do
+    # validate it), masters run in parallel, then merged across masters.
+    # Bounded master concurrency: each master process is capped at
+    # parallel2 rayon threads (-p), so at most MAX_JOBS masters run at
+    # once — MAX_JOBS*parallel2 == opt.parallel cores, no oversubscription.
+    MAX_JOBS={{ max_jobs }}
+    for K in \${KS}; do
         K_LIST=\"\"
-        for J in ${KS}; do
-            if [ ${J} -ge ${K} ]; then
-                K_LIST=\"${K_LIST}${K_LIST:+,}${J}\"
+        for J in \${KS}; do
+            if [ \${J} -ge \${K} ]; then
+                K_LIST=\"\${K_LIST}\${K_LIST:+,}\${J}\"
             fi
+        done
+        while [ \"\$(jobs -rp | wc -l)\" -ge \"\${MAX_JOBS}\" ]; do
+            wait -n
         done
         (
             anchr asm multik \
                 ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
-                -k ${K_LIST} \
+                -k \${K_LIST} \
                 -p {{ parallel2 }} \
-                -o unitigs_K${K}.fasta
+                -o unitigs_K\${K}.fasta
         ) &
     done
     wait

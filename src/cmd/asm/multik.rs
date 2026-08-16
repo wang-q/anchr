@@ -204,7 +204,19 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     };
     let outfile = crate::cmd::args::get_outfile(args);
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
-    let unitigs = assemble_multik(&infiles, &opts)?;
+    // One rayon pool for the whole pipeline (per-round supermer counting +
+    // pass-0 DFA classification). Without this the counting runs on the
+    // global pool and `-p` is silently ignored — oversubscription when the
+    // template runs several masters concurrently, each with `-p parallel/2`.
+    let unitigs = if opts.parallel > 0 {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(opts.parallel)
+            .build()
+            .with_context(|| "failed to build assembly thread pool")?;
+        pool.install(|| assemble_multik(&infiles, &opts))?
+    } else {
+        assemble_multik(&infiles, &opts)?
+    };
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;
     for (i, u) in unitigs.iter().enumerate() {
