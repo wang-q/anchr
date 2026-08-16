@@ -46,7 +46,7 @@ Examples:
                 .num_args(1)
                 .default_value("17")
                 .value_parser(value_parser!(usize))
-                .help("Seed k-mer length (1..=128, clamped to the shortest unitig)"),
+                .help("Seed k-mer length (1..=256, clamped to the shortest unitig)"),
         )
         .arg(
             Arg::new("min_overlap")

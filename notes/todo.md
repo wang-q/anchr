@@ -37,10 +37,13 @@
   （MG1655 单组 9 主池数小时→3m15s，G37 池输出逐位一致）。
 - ~~pgr K 上限 128→256 适配~~（2026-08-16 完成）：上游 `Kmer::MAX_K`
   256（`20069ca`）+ radix_sort 修复（`508a9f3`）；anchr 同步 CLI help、
-  `auto_ks`、`refine::get_count` 固定缓冲、上限测试。高 K 实验结论：
-  K160 单主 N50 72.9K 但 7 组全链 Dup 1.068/GF -0.13 pp，K≥192 碎片化
-  （N50 6-37K）——**模板 KS 保持 31..128**，见 `g37-megahit-spades.md`
-  §10。
+  `auto_ks`、`refine::get_count` 固定缓冲、上限测试。**大 K 科学整合**：
+  K160 主 K 进模板（6_ multik/unitig 分支 KS 含 160；bcalm 31..121）——
+  G37 MR 7 组 N50 83.8K→**121.5K**、Dup 1.000、0 mis；MG1655 5 组
+  GF 98.364→**98.523%**、0 mis。配套修复：`merge_overlapping_contigs`
+  identity 改 banded 编辑距离（band=512，容忍跨组 consensus 的 indel
+  近重复，Dup 1.068→1.000）；K≥192 碎片化（N50 6-37K）故停 160。
+  见 `g37-megahit-spades.md` §10、`mg1655-process-compare.md`。
 - 重复区解析（P2）——§8。已落地并验证（G37 MR 链 7 组，全链 0 mis）：
   a. 模板 6_ 主 K 加 128（multik/unitig 分支；bcalm 分支 31..121）：
   GF 98.809→98.869%、Dup 1.003→1.000、12→11 contigs；

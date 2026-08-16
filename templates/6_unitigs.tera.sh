@@ -22,11 +22,14 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
 {% set parallel2 = opt.parallel | int / 2 -%}
 {% set parallel2 = parallel2 | round(method="floor") -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
-{# Per-master k range: merged reads (~450 bp) support masters up to 128.
-   K128 crosses low-complexity gaps that 121 leaves broken (G37: GF +0.06 pp,
-   Dup 1.003->1.000, 0 mis; see notes/benchmarks/g37-megahit-spades.md P2).
-   bcalm rejects k=128, so its branch keeps the old cap. #}
-KS="31 41 51 61 71 81 101 121 128"
+{# Per-master k range: merged reads (~450 bp) support masters up to 160.
+   K128 crosses low-complexity gaps that 121 leaves broken; K160 adds a
+   long-unitig layer that lifts the final N50 (G37 MR: 83.8K->121.5K,
+   Dup 1.000, 0 mis after the indel-tolerant near-duplicate merge;
+   see notes/benchmarks/g37-megahit-spades.md P2). k>=192 fragments on
+   450 bp reads, so the list stops at 160. bcalm rejects k>127, so its
+   branch keeps the old cap. #}
+KS="31 41 51 61 71 81 101 121 128 160"
 KS_BCALM="31 41 51 61 71 81 101 121"
 {% if unitigger == "bcalm" %}    # external bcalm unitigs per k, merged across k with the modern OLC step
     for K in ${KS_BCALM}; do

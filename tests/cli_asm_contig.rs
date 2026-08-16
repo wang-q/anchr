@@ -186,7 +186,7 @@ fn command_asm_contig_rejects_zero_kmer() {
         .failure();
 }
 
-/// A k-mer above the 128-base key limit must fail cleanly instead of
+/// A k-mer above the 256-base key limit must fail cleanly instead of
 /// panicking in `Kmer::new().expect()` (zero-panic policy).
 #[test]
 fn command_asm_contig_rejects_kmer_above_limit() {

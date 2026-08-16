@@ -425,10 +425,64 @@ fn merge_geometry(
     }
 }
 
-/// Identity of two equally long slices.
+/// Identity of two equally long slices with a small-band edit-distance
+/// tolerance for indels. A plain zip comparison misaligns after the first
+/// indel and under-reports identity for near-duplicate contigs that differ
+/// by a few indels (cross-group consensus of the same locus), which would
+/// otherwise skip their merge.
 fn identity(a: &[u8], b: &[u8]) -> f64 {
-    let mm = a.iter().zip(b).filter(|(x, y)| x != y).count();
-    1.0 - mm as f64 / a.len() as f64
+    debug_assert_eq!(a.len(), b.len());
+    let n = a.len();
+    if n == 0 {
+        return 1.0;
+    }
+    // Banded Levenshtein distance: only cells with |i - j| <= band are
+    // evaluated, so a few scattered indels do not cascade the comparison.
+    // 512 covers cross-group consensus indels of up to half a kilobase
+    // (e.g. a 108 bp insertion seen on G37 K160 contigs) while keeping the
+    // O(n * 2*band) cost bounded.
+    const BAND: usize = 512;
+    let band = BAND.min(n);
+    let width = 2 * band + 1;
+    // dp[j] = edit distance for the current row; offsets are `j - band`
+    // relative to the row index (all uninitialized cells are INF).
+    let inf = usize::MAX / 4;
+    let mut prev = vec![inf; width];
+    let mut cur = vec![inf; width];
+    prev[band] = 0; // dp[0][0]
+    for (i, &ai) in a.iter().enumerate() {
+        cur.fill(inf);
+        let j_lo = i.saturating_sub(band);
+        let j_hi = (i + band).min(n - 1);
+        for (jj, &bj) in b[j_lo..=j_hi].iter().enumerate() {
+            let j = j_lo + jj;
+            let c = j + band - i;
+            if c >= width {
+                continue;
+            }
+            let mut best = inf;
+            // substitution / match
+            if i > 0 && j > 0 {
+                let d = prev[c] + usize::from(ai != bj);
+                best = best.min(d);
+            } else if i == 0 && j == 0 {
+                best = 0;
+            }
+            // deletion (consume a[i] only)
+            if i > 0 && c + 1 < width {
+                best = best.min(prev[c + 1] + 1);
+            }
+            // insertion (consume b[j] only)
+            if j > 0 && c >= 1 {
+                best = best.min(cur[c - 1] + 1);
+            }
+            cur[c] = best;
+        }
+        std::mem::swap(&mut prev, &mut cur);
+    }
+    let ed = prev[band + n - 1 - (n - 1)];
+    let ed = if ed >= inf { n } else { ed };
+    1.0 - ed as f64 / n as f64
 }
 
 /// Drops contigs whose sequence is covered by >= `ratio` of a longer kept
