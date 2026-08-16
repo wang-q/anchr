@@ -249,6 +249,19 @@ impl RefineTable {
         })
     }
 
+    /// Borrowing variant of [`RefineTable::build_supermer`] with the
+    /// adaptive minimizer length: callers that keep their sequence buffers
+    /// alive (multik reuses one reads buffer across rounds) count without
+    /// moving or copying anything.
+    pub(crate) fn build_supermer_slices(seqs: &[&[u8]], k: usize) -> anyhow::Result<Self> {
+        let table = pgr::libs::kmer::supermer::build_table_slices(seqs, k)?;
+        Ok(Self {
+            table,
+            prefix_index: OnceLock::new(),
+            sorted: OnceLock::new(),
+        })
+    }
+
     /// Streaming direct counter: reads `infiles` record-by-record, fans out
     /// to `threads` workers that emit packed keys in bounded chunks and
     /// merge per-worker count tables. Unlike `build_threaded` this never
