@@ -108,7 +108,7 @@ fi
 {% if opt.merge == "1" and opt.se == "0" -%}
 {% for u in unitiggers -%}
 if [ -e 0_script/7_merge_anchors.sh ]; then
-    bash 0_script/7_merge_anchors.sh 6_unitigs_{{ u }} 7_merge_mr_unitigs_{{ u }}
+    bash 0_script/7_merge_anchors.sh 6_unitigs_{{ u }} 7_merge_mr_unitigs_{{ u }} {% if u == "multik" %}200{% else %}1000{% endif %}
 fi
 {% endfor -%}
 {% endif -%}

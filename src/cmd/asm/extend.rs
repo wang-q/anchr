@@ -80,6 +80,14 @@ Examples:
                 .value_parser(value_parser!(usize))
                 .help("Minimum total extension to keep (default 0)"),
         )
+        .arg(
+            Arg::new("min_len")
+                .long("min-len")
+                .num_args(1)
+                .default_value("1000")
+                .value_parser(value_parser!(usize))
+                .help("Minimum input contig length to extend (shorter contigs pass through unchanged; default 1000)"),
+        )
 }
 
 /// Execute the extend command.
@@ -99,6 +107,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let opts = ExtendOptions {
         k: *args.get_one::<usize>("kmer").unwrap(),
         max_extend: *args.get_one::<usize>("max_extend").unwrap(),
+        min_len: *args.get_one::<usize>("min_len").unwrap(),
         min_support: *args.get_one::<u32>("min_support").unwrap(),
         min_extend: *args.get_one::<usize>("min_extend").unwrap(),
     };

@@ -25,11 +25,31 @@
   严格多数（`--min-support` 且 `>=2x` 次高）防错连；`{4,6}_unitigs`
   三 unitigger 分支在 olc 合并后自动调用。G37 MR 链 GF 98.585→98.809%、
   未覆盖 8,210→6,907 bp、0 mis，见 `g37-megahit-spades.md` §8/§10）；
-- 重复区解析（P2，剩余 7,928 bp：高 k 单主取用 + 双端连接证据裁决，歧义
-  保持断开）——§8；
+- ~~MG1655 新链处理与对比~~（2026-08-16 完成，见
+  `benchmarks/mg1655-process-compare.md`）：5 组（MRX40P000-002 +
+  MRX80P000-001）K31..128 + bubble + extend --min-len 1000 + min200：
+  N50 95.5K→**124.0K**、GF 97.61→**98.364%**、0 mis；与外部同输入口径
+  下超 megahit（82.8K/1 mis）与 spades（125.6K 持平），mr_spades
+  （148.6K，全量输入）仍更高。过程中修复两处：
+  a. `asm extend` 新增 `--min-len`（默认 1000）——extend 短碎片会把重复
+  元件拷贝接成嵌合（MG1655 238 bp 碎片长成 1,238 bp relocation，3 mis）；
+  b. `consensus_with_ratio` 去重/边界拼接 O(n²×L) 改种子索引预筛
+  （MG1655 单组 9 主池数小时→3m15s，G37 池输出逐位一致）。
+- 重复区解析（P2）——§8。已落地并验证（G37 MR 链 7 组，全链 0 mis）：
+  a. 模板 6_ 主 K 加 128（multik/unitig 分支；bcalm 分支 31..121）：
+  GF 98.809→98.869%、Dup 1.003→1.000、12→11 contigs；
+  b. multik 分支 `--min-contig-len 1000→200`（per-group olc +
+  `7_merge_anchors.sh` 新第 3 参 `MIN_CL`，`0_master` 仅 multik 传 200）：
+  GF 98.869→**99.083%**、N50 83.8K 不变、21 contigs、0 mis；
+  bcalm/unitig 分支保持 1000（其短碎片有嵌合，已实测）。
+  结论：剩余 bwa 真缺口仅 1,594 bp（85650-85978、167438-167513、
+  229535-229849），junction 处 **reads 本身二义**（229657 A80/G78、
+  350523 G56/A46、389489 T116/C91、428849 支持稀疏；4_ 未 merge reads
+  同证），无唯一路径可接——保持断开是正确决策，不再强行拼接。
 - QUAST 口径：mm/indel 按覆盖 bp 归一化 + reads-vs-consensus 一致率列
   （P2，G37 高 k 链 mm 上升是 reads 与 NC_000908 在低复杂度区的真实差异，
-  非 consensus 劣化）——§8。
+  非 consensus 劣化）；另注意 QUAST minimap 会漏对齐低复杂度区短 contig，
+  报告未覆盖 bp 时需注明对齐器口径——§8。
 - ~~`fq range` 剩余~~（2026-08-15 全部完成：双端感知 S2 已核对 +
   BGZF `.gzi` 自动生成已实现，见 `design/fq-range.md` §7）；
 - ~~`dep`/`ena`/`template` 的外部工具版本核对~~（2026-08-15 完成：

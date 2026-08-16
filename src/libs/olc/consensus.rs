@@ -90,21 +90,108 @@ const SEED_LEN: usize = 31;
 /// chimeric contigs with multi-block alignments are left untouched.
 fn merge_overlapping_contigs(mut contigs: Vec<Contig>, min_overlap: usize) -> Vec<Contig> {
     contigs.sort_by_key(|c| std::cmp::Reverse(c.seq.len()));
+    // A merge is only possible when `cand`'s head (or its reverse
+    // complement) is inside the keeper, or the keeper's head (or its rc) is
+    // inside `cand` (the two anchor conditions of `merge_geometry`). Those
+    // O(1) set checks reject the overwhelming majority of the O(n^2) pairs
+    // before the expensive seed-index/identity verification in `try_merge`.
+    // Keeper sequences grow on merge, so each kept contig carries its own
+    // up-to-date seed set and head seeds.
     let mut kept: Vec<Contig> = Vec::with_capacity(contigs.len());
+    let mut kept_seeds: Vec<std::collections::HashSet<u64>> = Vec::new();
+    let mut kept_heads: Vec<[u64; 2]> = Vec::new();
     for c in contigs {
+        if c.seq.len() < min_overlap {
+            // Both sides need at least `min_overlap` bases for a stitch.
+            kept.push(c);
+            kept_seeds.push(std::collections::HashSet::new());
+            kept_heads.push([0; 2]);
+            continue;
+        }
+        let [cand_head, cand_rc_head] = boundary_seeds(&c.seq);
+        let cand_seeds = seed_set(&c.seq);
         let mut merged = false;
-        for k in kept.iter_mut() {
-            if let Some(seq) = try_merge(&k.seq, &c.seq, min_overlap) {
-                k.seq = seq;
+        for pos in 0..kept.len() {
+            if kept[pos].seq.len() < min_overlap {
+                continue;
+            }
+            let k_has =
+                kept_seeds[pos].contains(&cand_head) || kept_seeds[pos].contains(&cand_rc_head);
+            let c_has = cand_seeds.contains(&kept_heads[pos][0])
+                || cand_seeds.contains(&kept_heads[pos][1]);
+            if !k_has && !c_has {
+                continue;
+            }
+            if let Some(seq) = try_merge(&kept[pos].seq, &c.seq, min_overlap) {
+                let old_len = kept[pos].seq.len();
+                let appended_start = if seq.starts_with(&kept[pos].seq) {
+                    Some(old_len)
+                } else if seq.ends_with(&kept[pos].seq) {
+                    Some(seq.len() - old_len)
+                } else {
+                    None
+                };
+                kept[pos].seq = seq;
+                if let Some(start) = appended_start {
+                    extend_seed_set(&mut kept_seeds[pos], &kept[pos].seq, start);
+                    if start == 0 {
+                        kept_heads[pos] = boundary_seeds(&kept[pos].seq);
+                    }
+                }
                 merged = true;
                 break;
             }
         }
         if !merged {
             kept.push(c);
+            kept_seeds.push(cand_seeds);
+            kept_heads.push([cand_head, cand_rc_head]);
         }
     }
     kept
+}
+
+/// Packs a 31-mer into a u64 (2 bits per base; exact for 31 bases).
+/// Returns [`u64::MAX`] for non-ACGT bases, which no packed seed can equal.
+fn seed_u64(w: &[u8]) -> u64 {
+    let mut v = 0u64;
+    for &b in w {
+        v = (v << 2)
+            | match b {
+                b'A' => 0,
+                b'C' => 1,
+                b'G' => 2,
+                b'T' => 3,
+                _ => return u64::MAX,
+            };
+    }
+    v
+}
+
+/// The forward and reverse-complement head seeds of a sequence.
+fn boundary_seeds(seq: &[u8]) -> [u64; 2] {
+    let head = seed_u64(&seq[..SEED_LEN]);
+    let rc_head = seed_u64(&rev_comp(&seq[..SEED_LEN]).collect::<Vec<_>>());
+    [head, rc_head]
+}
+
+/// Distinct 31-mer seeds of a sequence. Only called on ACGT-only sequences
+/// (the caller checks the boundary seeds first).
+fn seed_set(seq: &[u8]) -> std::collections::HashSet<u64> {
+    let mut set = std::collections::HashSet::new();
+    for w in seq.windows(SEED_LEN) {
+        set.insert(seed_u64(w));
+    }
+    set
+}
+
+/// Adds the seeds of the newly appended part (plus the junction windows)
+/// after a merge. `start` is the index of the first appended base.
+fn extend_seed_set(set: &mut std::collections::HashSet<u64>, seq: &[u8], start: usize) {
+    let from = start.saturating_sub(SEED_LEN - 1);
+    for w in seq[from..].windows(SEED_LEN) {
+        set.insert(seed_u64(w));
+    }
 }
 
 /// Stitches `cand` into `keeper` when they are the same locus with different
@@ -352,23 +439,77 @@ fn identity(a: &[u8], b: &[u8]) -> f64 {
 /// longest representative is kept.
 fn dedup_contained_ratio(mut contigs: Vec<Contig>, ratio: f64) -> Vec<Contig> {
     contigs.sort_by_key(|c| std::cmp::Reverse(c.seq.len()));
+    // Candidate prefilter: a shorter contig can only be contained in a
+    // longer one when they share at least one 31-mer (either strand) — the
+    // exact 100-mer anchors of `coverage` (and the exact-substring test for
+    // short needles) imply such a shared seed. One global seed index answers
+    // the candidate query in O(length) per contig instead of comparing every
+    // kept pair with an O(length) window scan.
+    let index = build_seed_index(&contigs);
     let mut kept: Vec<Contig> = Vec::with_capacity(contigs.len());
-    for c in contigs {
+    let mut kept_ids: Vec<usize> = Vec::with_capacity(contigs.len());
+    for (id, c) in contigs.iter().enumerate() {
         let rc = rev_comp(&c.seq).collect::<Vec<u8>>();
-        let contained = if ratio >= 1.0 {
+        let contained = if c.seq.len() < SEED_LEN || c.seq.contains(&b'N') || rc.contains(&b'N') {
+            // No 31-mer prefilter applies (too short or non-ACGT): fall back
+            // to the exhaustive scan.
+            kept.iter()
+                .any(|k| contains(&k.seq, &c.seq) || contains(&k.seq, &rc))
+        } else if ratio >= 1.0 {
             // Exact substring semantics (historical behaviour).
             kept.iter()
                 .any(|k| contains(&k.seq, &c.seq) || contains(&k.seq, &rc))
         } else {
             // Approximate containment: boundary-differing near-duplicates.
-            kept.iter()
-                .any(|k| coverage(&k.seq, &c.seq) >= ratio || coverage(&k.seq, &rc) >= ratio)
+            let mut cands: Vec<u32> = Vec::new();
+            for w in c.seq.windows(SEED_LEN) {
+                push_candidates(&index, seed_u64(w), &mut cands);
+                let rc_w: Vec<u8> = rev_comp(w).collect();
+                push_candidates(&index, seed_u64(&rc_w), &mut cands);
+            }
+            cands.sort_unstable();
+            cands.dedup();
+            cands.into_iter().any(|k| {
+                kept_ids.binary_search(&(k as usize)).is_ok()
+                    && (coverage(&contigs[k as usize].seq, &c.seq) >= ratio
+                        || coverage(&contigs[k as usize].seq, &rc) >= ratio)
+            })
         };
         if !contained {
-            kept.push(c);
+            kept_ids.push(id);
+            kept.push(Contig {
+                seq: c.seq.clone(),
+                coverage: c.coverage,
+            });
         }
     }
     kept
+}
+
+/// One global 31-mer seed -> contig-id index over all contigs (forward
+/// strand only; non-ACGT windows are skipped, the N-fallback covers them).
+fn build_seed_index(contigs: &[Contig]) -> std::collections::HashMap<u64, Vec<u32>> {
+    let mut map: std::collections::HashMap<u64, Vec<u32>> = std::collections::HashMap::new();
+    for (id, c) in contigs.iter().enumerate() {
+        for w in c.seq.windows(SEED_LEN) {
+            let s = seed_u64(w);
+            if s != u64::MAX {
+                map.entry(s).or_default().push(id as u32);
+            }
+        }
+    }
+    map
+}
+
+/// Appends the contig ids of a seed to `out` (no-op for non-ACGT seeds).
+fn push_candidates(
+    index: &std::collections::HashMap<u64, Vec<u32>>,
+    seed: u64,
+    out: &mut Vec<u32>,
+) {
+    if let Some(ids) = index.get(&seed) {
+        out.extend_from_slice(ids);
+    }
 }
 
 /// Exact substring test.

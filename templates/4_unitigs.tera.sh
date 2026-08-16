@@ -41,6 +41,7 @@ KS="31 41 51 61 71 81 91"
 
     anchr asm extend unitigs.fasta \
         ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
+        --min-len 1000 \
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% elif unitigger == "unitig" %}    # in-house BCALM-semantics unitigs per k (asm unitig), merged across k
@@ -59,6 +60,7 @@ KS="31 41 51 61 71 81 91"
 
     anchr asm extend unitigs.fasta \
         ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
+        --min-len 1000 \
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% else %}    # per-master multik: every k builds its own skeleton (larger ks
@@ -87,6 +89,7 @@ KS="31 41 51 61 71 81 91"
 
     anchr asm extend unitigs.fasta \
         ../../4_down_sampling/Q{1}L{2}X{3}P{4}/pe.cor.fa.gz \
+        --min-len 1000 \
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% endif %}

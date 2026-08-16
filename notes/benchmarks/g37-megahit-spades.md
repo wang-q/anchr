@@ -214,15 +214,67 @@ MRX80P000-001），唯一改动：主 K 从 31..81 扩到 31..121（8 个主 K�
 ### P2 重复区解析（高风险，大工作量，GF 100% 的关键）
 剩余 7,928 bp 全部是低复杂度区且 reads 覆盖充足，需要：
 1. 高 k 单主（121/128）unitigs 若已穿过该区，直接取用（本实验已自动完成
-   一部分：17,419→7,928 bp）；
+   一部分：17,419→7,928 bp）。
+   **2026-08-16 后续实验：主 K 加 128 已验证并落地**（`6_unitigs.tera.sh`
+   multik/unitig 分支 `KS` 含 128；bcalm 分支保持 31..121，bcalm 拒绝
+   k=128）。7 组全链（31..121+128，extend k=31 不变）QUAST：N50 83.8K
+   持平、contigs 12→**11**、GF 98.809→**98.869%**、Dup 1.003→**1.000**、
+   largest 122.9K→**236.5K**（跨复制起点的环形连接）、**0 mis 保持**；
+   未覆盖 6,907→6,560 bp（QUAST 口径），其中缺口 1/2（167338-169157、
+   226307-227147）实际已被 K128 桥接 unitig（contig_10/11）按 bwa 覆盖。
 2. 对仍未接上的重复边界用双端/merge reads 的连接证据裁决：两侧唯一锚 +
    insert 一致 + 无竞争连接才接，否则保持断开。这是 spades 重复解析的
    核心逻辑，也是"0 mis"红线的边界，必须做歧义检测。
-（待做，见 `todo.md`。）
+
+**2026-08-16 再实验：保留短 reads 支持的碎片（multik 分支
+`--min-contig-len 1000→200`）已落地并验证**（含 extend 安全门槛修正）：
+* per-group olc 与最终合并同时降到 200 后，7 组全链（K31..121+128 +
+  bubble + extend `--min-len 1000` + min 200）QUAST：**GF 98.869→
+  98.983%**、0 mis 保持、N50 83.8K 不变、# contigs 11→18、Dup 1.000→
+  1.002；bwa 口径真实未覆盖约 1.6K bp（350428/389482/428465 缺口被碎片
+  覆盖，QUAST 因 minimap 漏对齐短 contig 仍报为缺口）。
+* **extend 必须加 `--min-len 1000` 门槛**：extend 短碎片在重复区会把元件
+  拷贝接成嵌合体。G37 上 extend-all 的 GF 99.083% 是"幸运"（碎片都干净），
+  MG1655 同配置出现 3 mis（238 bp 碎片被长成 1,238 bp 双块 relocation）；
+  加 `--min-len 1000` 后两数据集均 0 mis（G37 98.983%、MG1655 98.364%，
+  见 `mg1655-process-compare.md`）。
+* 阈值必须 6_ 链 per-group 和最终合并同时降（只降 per-group 无收益）；
+  **只限 multik 分支**：bcalm/unitig 分支的原始 unitig 短碎片有嵌合
+  （bcalm 单组实测 58 条中 2 条远距离嵌合，如 contig_6 两段相距 545K），
+  保持 1000。模板实现：`6_unitigs.tera.sh` multik 分支
+  `--min-contig-len 200`；`7_merge_anchors.sh` 增加第 3 参
+  `MIN_CL`（默认 1000）；`0_master` 仅对 multik 的 6_ 合并传 200。
+
+**已排除的方案与关键证据**（决定 P2 剩余工作量）：
+* **extend 直接换 k=128 不安全**：全链（K128 主 + extend k=128）GF 升到
+  99.007% 但引入 **1 mis（relocation）**——contig_8 把缺口 2 左翼
+  （222,156-226,306）接到 55K 外的缺口 1 区（166,756-167,492），
+  contig_11/12 也出现缺口 1↔3 嵌合。低复杂度区多拷贝使延伸跨到错误位点，
+  缺的正是"竞争连接检测"。
+* **K128 桥接 unitig 与主 contig 无法精确 overlap 拼接**：contig_10/11
+  相对参考仅 87-94% 一致（与 §7.1 reads-vs-参考 5% 差异一致，多为真实
+  菌株差异），与两侧主 contig 在交界处序列不一致（连 31-mer 精确重叠都
+  没有），安全拼接需要**错误容忍对齐 + reads 裁决**，而非 exact overlap。
+* **QUAST 低估短 contig 覆盖**：contig_10/11 被 minimap 标记 unaligned
+  （bwa 实际对齐 1,979/1,207 bp），报告缺口 > 真实缺口；指标改进见下节。
+* **剩余缺口处的 reads 本身二义，无法安全闭合**：逐碱基游走（k=31，
+  严格多数 = 当前碱基支持 ≥2× 次高）在四处 junction 全部失败——
+  229657（A80/G78 平手）、350523（G56/A46）、389489（T116/C91）、
+  428849（支持稀疏，游走 384 bp 后无延伸 reads）；128-mer 上下文下
+  229657 四种碱基几乎均分（G 56/170，无主导），未 merge 的 4_ 双端
+  reads 同样二义（非 merge 伪影）。即**这些区域 reads 不存在唯一路径，
+  保持断开是正确决策**（0 mis 红线的边界），剩余"缺口"多为 QUAST 口径
+  假象 + 数据二义，非可修复的组装缺陷。
+
+剩余真缺口（bwa 口径）仅 1,594 bp：85650-85978（329 bp，复制起点）、
+167438-167513（76 bp）、229535-229849（315 bp，reads 二义区）。
+重复区解析到此收敛：reads 二义区保持断开是 0 mis 红线内的正确决策；
+后续仅剩指标口径（下节）与数据相关验证（见 `todo.md`）。
 
 ### P2 指标口径
 QUAST mm/indel 按覆盖 bp 归一化 + 补 reads-vs-consensus 一致率列，避免
-把真实菌株差异当组装错误（§7.1）。
+把真实菌株差异当组装错误（§7.1）。另注意 QUAST minimap 对低复杂度区短
+contig（如 K128 桥接 unitig）会漏对齐，报告口径需注明对齐器差异。
 （待做，见 `todo.md`。）
 
 ## 9. 关联
@@ -240,9 +292,22 @@ QUAST mm/indel 按覆盖 bp 归一化 + 补 reads-vs-consensus 一致率列，�
 | + 主 K 31..121（P0） | 83,618 | 13 | 98.633 | 1.005 | 7,928 | 0 |
 | + 气泡合并（P1） | 83,618 | 12 | 98.585 | 1.001 | 8,210 | 0 |
 | + 端点延伸（P1） | 83,756 | 12 | 98.809 | 1.003 | 6,907 | 0 |
+| + 主 K 128（P2 部分，extend k=31 不变） | 83,756 | 11 | 98.869 | 1.000 | 6,560* | 0 |
+| + multik 分支 min-contig-len 200 + extend --min-len 1000（P2 部分） | 83,756 | 18 | 98.983 | 1.002 | ~5.5K* | 0 |
 
-改动文件：`templates/{4,6}_unitigs.tera.sh`（KS 上限 + extend 步）、
+*QUAST 未覆盖口径，含对短 contig（contig_10/11 等）的漏对齐；bwa 口径下
+最终链真缺口约 1.6K bp（85650-85978、167438-167513、229535-229849），
+其余为 QUAST 漏报或 reads 二义区。extend-all 的 99.083%（1.003 Dup）已
+因 MG1655 3 mis 弃用，见 `mg1655-process-compare.md`。
+
+改动文件：`templates/{4,6}_unitigs.tera.sh`（KS 上限 + extend 步；
+6_ 的 multik/unitig 分支 KS 含 128，bcalm 分支 KS_BCALM 保持 31..121；
+multik 分支 `--min-contig-len 200`；extend 统一 `--min-len 1000`）、
+`templates/7_merge_anchors.tera.sh`
+（新增 `MIN_CL` 第 3 参，默认 1000）、`templates/0_master.tera.sh`
+（仅 multik 的 6_ 合并传 200）、
 `src/libs/asm/multik.rs`（bubble_merge）、`src/libs/asm/extend.rs`（新）、
 `src/cmd/asm/{multik,extend}.rs`、`src/cmd/asm/mod.rs`、
-`tests/cli_asm_multik.rs`、`tests/cli_asm_extend.rs`（新）。
-`cargo test -- --test-threads=1` 408 全绿；fmt/clippy `-D warnings` 干净。
+`tests/cli_asm_multik.rs`、`tests/cli_asm_extend.rs`（新）、
+`src/libs/olc/consensus.rs`（O(n²) 去重/拼接改种子索引预筛，输出逐位一致）。
+`cargo test -- --test-threads=1` 全绿；fmt/clippy `-D warnings` 干净。

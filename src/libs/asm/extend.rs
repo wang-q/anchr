@@ -16,6 +16,9 @@ use rayon::prelude::*;
 pub struct ExtendOptions {
     /// Seed k-mer length for the extension walk.
     pub k: usize,
+    /// Contigs shorter than this are passed through unextended (short
+    /// fragments in repeat contexts join copies of the same element).
+    pub min_len: usize,
     /// Maximum extension in bases per contig end.
     pub max_extend: usize,
     /// Minimum read support for each appended base.
@@ -29,6 +32,7 @@ impl Default for ExtendOptions {
         Self {
             k: 31,
             max_extend: 500,
+            min_len: 1000,
             min_support: 2,
             min_extend: 0,
         }
@@ -108,7 +112,7 @@ pub fn extend_contigs(
     let extended: Vec<(String, Vec<u8>)> = contigs
         .par_iter()
         .map(|(name, seq)| {
-            if seq.len() < opts.k {
+            if seq.len() < opts.min_len || seq.len() < opts.k {
                 return (name.clone(), seq.clone());
             }
             let right = walk_right(
@@ -174,6 +178,7 @@ mod tests {
         let opts = ExtendOptions {
             k: 11,
             max_extend: 60,
+            min_len: 0,
             min_support: 2,
             min_extend: 0,
         };
@@ -207,6 +212,7 @@ mod tests {
         let opts = ExtendOptions {
             k: 11,
             max_extend: 60,
+            min_len: 0,
             min_support: 2,
             min_extend: 0,
         };
@@ -229,6 +235,7 @@ mod tests {
         let opts = ExtendOptions {
             k: 11,
             max_extend: 60,
+            min_len: 0,
             min_support: 2,
             min_extend: 0,
         };

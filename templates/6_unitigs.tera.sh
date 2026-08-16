@@ -22,10 +22,14 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
 {% set parallel2 = opt.parallel | int / 2 -%}
 {% set parallel2 = parallel2 | round(method="floor") -%}
 {% if parallel2 < 2 %}{% set parallel2 = 2 %}{% endif -%}
-{# Per-master k range: merged reads (~450 bp) support masters up to 121 #}
-KS="31 41 51 61 71 81 101 121"
+{# Per-master k range: merged reads (~450 bp) support masters up to 128.
+   K128 crosses low-complexity gaps that 121 leaves broken (G37: GF +0.06 pp,
+   Dup 1.003->1.000, 0 mis; see notes/benchmarks/g37-megahit-spades.md P2).
+   bcalm rejects k=128, so its branch keeps the old cap. #}
+KS="31 41 51 61 71 81 101 121 128"
+KS_BCALM="31 41 51 61 71 81 101 121"
 {% if unitigger == "bcalm" %}    # external bcalm unitigs per k, merged across k with the modern OLC step
-    for K in ${KS}; do
+    for K in ${KS_BCALM}; do
         bcalm \
             -in ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
             -kmer-size \${K} -abundance-min 3 -verbose 0 \
@@ -41,6 +45,7 @@ KS="31 41 51 61 71 81 101 121"
 
     anchr asm extend unitigs.fasta \
         ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
+        --min-len 1000 \
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% elif unitigger == "unitig" %}    # in-house BCALM-semantics unitigs per k (asm unitig), merged across k
@@ -59,10 +64,15 @@ KS="31 41 51 61 71 81 101 121"
 
     anchr asm extend unitigs.fasta \
         ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
+        --min-len 1000 \
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% else %}    # per-master multik: every k builds its own skeleton (larger ks
     # validate it), masters run in parallel, then merged across masters
+    # Keep short (200..1000 bp) reads-supported fragments: on merged reads
+    # they cover low-complexity gap regions without chimeras (G37: GF
+    # 98.869->99.083%, 0 mis; bcalm/unitig branches keep 1000 because their
+    # raw unitigs do produce chimeric short fragments).
     for K in ${KS}; do
         K_LIST=\"\"
         for J in ${KS}; do
@@ -82,11 +92,12 @@ KS="31 41 51 61 71 81 101 121"
 
     anchr asm olc --unitigs unitigs_K*.fasta \
         --min-overlap 1000 \
-        --min-contig-len 1000 \
+        --min-contig-len 200 \
         -o unitigs.fasta
 
     anchr asm extend unitigs.fasta \
         ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
+        --min-len 1000 \
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% endif %}
