@@ -1,6 +1,6 @@
 # SKESA / skesa-rs：de Bruijn 图短读组装器（源码分析）
 
-> 2026-08-13 整理，纯源码分析。SKESA（`SKESA-master/`，C++）是 NCBI 的微生物
+> 2026-08-13 整理、2026-08-17 对照源码逐项复核修订，纯源码分析。SKESA（`SKESA-master/`，C++）是 NCBI 的微生物
 > 基因组 de-novo 短读组装器，论文 [SKESA: strategic k-mer extension for
 > scrupulous assemblies](https://doi.org/10.1186/s13059-018-1540-z)（Genome
 > Biology 2018）；`skesa-rs/` 是基于 SKESA v2.4.0 / SAUTE v1.3.0 快照（commit
@@ -40,6 +40,35 @@
   Rust 文件基本一一对应；Rust 在 `--cores 4` 基准上与 C++ 时间/RSS **基本持平**
   （README 快照 wall 0.972x、RSS 1.000x，contigs 输出 SHA-256 一致）。
 - **未移植**：SAUTE / saute-prot / gfa-connector 完整对等、SRA 输入（Rust 显式拒绝）。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：reads 计数（排序外部归并 或 bloom+分块哈希，§3.2/§3.3）滤出可信 k-mer
+建 canonical de Bruijn 图（§3.4）→ **保守扩展**：四层后继过滤 + 可逆性检查 +
+"前驱唯一且可回退"不变量，在 fork 处宁可断裂（§4）→ **迭代多 k**：k 从 21 增到
+max_kmer，每轮用旧 contig 标 visited 引导新种子、并清理已用 reads，渐进解重复
+（§5）→ paired-end 连接补长插 → 输出。
+
+```
+reads → 计数（排序归并 | --hash_count: bloom+分块表）→ 首图 @ k=21
+      （高覆盖时自动抬 min_count = coverage/50）
+  → 保守组装 seeds（fork 处断，宁断勿错）
+  loop k: 21 → max_kmer（steps=11 轮等距、一律取奇）:
+    ConverToSContigAndMarkVisited   # 旧 contig 用到的 k-mer 标 visited
+    GenerateNewSeeds                # 只从未 visited 区组装新种子
+    ExtendContigsJob                # 从旧 contig 边缘 k-mer 继续扩展
+    CleanReads                      # 剔除完全落在 contig 内的 reads（逐轮递减）
+  若 insert N50 > 1.5×max_kmer: 长插三轮 [1.25×max, 中点, insert_N50]
+  connect_pairs（3×N50 限内连 mate）→ 输出（--min-contig 200）
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| k-mer 计数 | 排序计数（canonical、外部归并、确定性）或 blocked bloom filter（128B 块）+ 分块哈希表（`--hash_count`，省内存） | §3.2、§3.3 |
+| de Bruijn 图 | canonical k-mer 排序数组；Node 偶正奇负 + `Index()=m_node/2-1`；count 打包 total(32)+branch(8)+plus-fraction(16) 一个 u64 | §3.4 |
+| 保守扩展 | 四层后继过滤（低丰度 fork `≤0.1×Σ`、GGT/ACC 链特异噪音、不可扩展 fork <100bp、strand 平衡）+ 可逆性检查 + 前驱唯一不变量；fork 处断 | §4 |
+| 迭代多 k | k: 21→max_kmer（steps=11）；旧 contig visited 引导 + `CleanReads` 移除已用 reads（read 集逐轮递减） | §5 |
+| paired 连接 | 抽样 10000 对估 insert N50，`3×N50` 限内连 mate；N50 > 1.5×max_kmer 时另加长插三轮 | §5 |
 
 ## 2. C++ 仓库结构（SKESA-master/）
 
@@ -190,7 +219,7 @@ Rust `src/` 同名对应：`concurrent_hash.rs`、`sorted_counter.rs`/
    （从 k-mer histogram 的 `CalculateGenomeSize`）。
 2. **自动抬阈值**（`assembler.hpp:963-981`，Rust `assembler.rs:177-198`）：
    若 coverage 过高，`new_min_count = coverage/50`、`new_max_kmer_count =
-   coverage/10`，并 `remove_low_count` 剪枝。
+   max(10, coverage/10)`（下限 10），并 `remove_low_count` 剪枝。
 3. **GenerateNewSeeds → ImproveContigs**：`graph_digger` 保守组装出 seed contig
    （jump=0 的保守版，`ImproveContigs` 见 `assembler.hpp:713`）；有 `--seeds`
    则从种子扩展；`ConverToSContigAndMarkVisited`（`assembler.hpp:730`）把上一轮
