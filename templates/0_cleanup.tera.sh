@@ -38,7 +38,9 @@ fi
 # down sampling
 {% for u in unitiggers -%}
 find . -type f -path "*4_unitigs_{{ u }}/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*4_unitigs_{{ u }}/*" -name "unitigs_all.fasta" | parallel --no-run-if-empty -j 1 rm
 find . -type f -path "*6_unitigs_{{ u }}/*" -name "unitigs_K*.fasta"  | parallel --no-run-if-empty -j 1 rm
+find . -type f -path "*6_unitigs_{{ u }}/*" -name "unitigs_all.fasta" | parallel --no-run-if-empty -j 1 rm
 {% endfor -%}
 {# Keep a blank line #}
 # tempdir

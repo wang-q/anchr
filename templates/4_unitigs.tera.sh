@@ -69,24 +69,19 @@ KS="31 41 51 61 71 81 91"
         --min-len 1000 \
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
-{% else %}    # per-master multik: every k builds its own skeleton (larger ks
-    # validate it), then merged across masters. Masters run one at a
-    # time, each with the full opt.parallel thread budget.
-    for K in ${KS}; do
-        K_LIST=""
-        for J in ${KS}; do
-            if [ ${J} -ge ${K} ]; then
-                K_LIST="${K_LIST}${K_LIST:+,}${J}"
-            fi
-        done
-        anchr asm multik \
-            ../../4_down_sampling/Q${Q}L${L}X${X}P${P}/pe.cor.fa.gz \
-            -k ${K_LIST} \
-            -p {{ opt.parallel }} \
-            -o unitigs_K${K}.fasta
-    done
+{% else %}    # single-invocation multi-master multik: every k in KS builds its own
+    # skeleton validated by the larger ks (k-major order, the reads count
+    # at each k is built once and shared by every master), the first
+    # master's unitigs guiding the rest. Replaces the per-master loop
+    # that re-counted the reads once per (master, round).
+    anchr asm multik \
+        ../../4_down_sampling/Q${Q}L${L}X${X}P${P}/pe.cor.fa.gz \
+        -k $(echo ${KS} | tr ' ' ',') \
+        --all-masters --use-guide \
+        -p {{ opt.parallel }} \
+        -o unitigs_all.fasta
 
-    anchr asm olc --unitigs unitigs_K*.fasta \
+    anchr asm olc --unitigs unitigs_all.fasta \
         --min-overlap 1000 \
         --min-contig-len 1000 \
         -o unitigs.fasta

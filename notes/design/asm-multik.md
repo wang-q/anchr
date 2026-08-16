@@ -822,3 +822,51 @@ multik 面向通用/无 N（碱基空间、大步长、单菌株保护、完美�
 单菌株特有的问题（覆盖波动误删、recompact 固化错连），是 metaMDBG 不
 需要的。跨接验证与丰度过滤是共同骨架，实现细节因空间（minimizer vs
 碱基）而异。
+
+## 2026-08-17 all-masters 单次调用重构
+
+### 动机
+
+模板曾按 master 逐个调用 multik（每个 master 一条命令，validated by
+larger ks）：M 个 master、K 个 k 时 reads 计数次数为 O(K²/2)（每个 master
+在其验证链的每个 k 全量重计 reads），且每次调用重复解压/解析输入。G37
+（K=6）串行 25.2 s；MG1655（K=9）串行 7:23（release、-p 4）。
+
+### 设计（`assemble_all_masters`，k-major 顺序）
+
+单次调用内每个 k 都是一个 master（`--all-masters`），按 k 升序迭代：
+
+1. 每个 k：建该 k 的 reads 计数表一次，供 (a) master-k 自身的 pass 0，
+   (b) 所有更早 master 在该 k 的验证 round 共享（master 自身 unitig 单独
+   计数，`SumView` 查表求和 = 联合计数）。
+2. round 之间各 master 状态独立 → `par_iter_mut` 并发跑（图遍历是串行
+   代码，正好填满线程池；输出与串行逐字节一致）。
+3. `--use-guide`：第一阶段 ks[0] 跑完整阶梯产出 guide（finalize 后按
+   solid 阈值重复为伪 reads）；第二阶段其余 master 每 k 直接对
+   reads+guide×reps 联合计数一次（与"缓存表+merge_counts"算术等价）。
+
+### 内存教训
+
+第一版把第一阶段每 k 的表全部缓存供第二阶段 merge 复用：K 张表同时存活，
+MG1655 (K=11, auto 51..251) 峰值 26.6 GB，5 组并发直接打爆 88 GB 机器。
+修正：表即建即弃（第二阶段重建联合表），峰值 ~2 张表（MG1655 单进程
+实测 5.7 GB）。代价是 guided 模式 reads 计数 ~2K 次而非 K 次。
+
+### auto 阶梯（`auto_ks`）
+
+旧公式 `k_min=clamp(N50/3,31,51)、step=clamp(N50/100,20,30)、
+k_max=min(0.8*N50,256)` 对 MG1655 (N50=339) 产出 51..251：k≥211 的
+master 被残余错误打碎（一个错误杀死所有覆盖它的窗口，k≈0.6×N50 时几乎
+每个窗口都覆盖某个错误），guide 也救不回（N50 9.4K、5 mis）。改为固定
+验证阶梯 `31,41,51,61,71,81,101,121,128,160,192` 截断于
+`clamp(N50/2, 81, 192)`（MG1655→31..160，G37→31..192，150bp→31..81），
+数据集调优用显式 `--kmer`。
+
+### 验证结论（release、-p 4）
+
+- G37 MRX40P000（N50 408）：auto 31..192 → 0 mis、N50 121K（旧 31..81
+  为 31K）、GF 98.54%（+0.75），单组 36.5 s（内存 869 MB）；rounds 并行
+  后 28.3 s，输出逐字节一致。
+- MG1655 MRX40P000（N50 339）：新旧在 31..128 下质量完全一致（均 2 mis
+  单组、GF 99.40）；guide 与否无差异；0 mis 依赖 5 组 anchor 合并投票
+  （见 benchmarks）。单组 5:04（同 k 旧串行 7:23）。

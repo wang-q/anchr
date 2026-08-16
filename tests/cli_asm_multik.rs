@@ -479,3 +479,67 @@ fn command_asm_multik_empty_input_is_error() {
         "too-short reads must produce no unitigs"
     );
 }
+
+/// `--all-masters` runs every k as a master in one invocation and merges
+/// all masters' unitigs; `--use-guide` requires `--all-masters` (clap
+/// `requires` rejects the lone flag).
+#[test]
+fn command_asm_multik_all_masters() {
+    let dir = tempfile::tempdir().unwrap();
+    let reads = dir.path().join("reads.fa");
+    let mut rng = 42u64;
+    let mut genome = Vec::new();
+    for _ in 0..500 {
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        genome.push(b"ACGT"[(rng >> 33) as usize % 4]);
+    }
+    let mut fa = String::new();
+    for i in 0..30 {
+        fa.push_str(&format!(">r{i}\n"));
+        fa.push_str(&String::from_utf8(genome.clone()).unwrap());
+        fa.push('\n');
+    }
+    fs::write(&reads, fa).unwrap();
+    let out = dir.path().join("out.fa");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "multik",
+            reads.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "-k",
+            "21,51",
+            "--all-masters",
+            "--use-guide",
+        ])
+        .run();
+    assert_eq!(stderr, "");
+    let u = parse_unitigs(&fs::read_to_string(&out).unwrap());
+    assert!(!u.is_empty(), "expected at least one unitig");
+    // Both masters compact the clean genome to full length, so the merged
+    // output carries at least two genome-length unitigs.
+    let full = u.iter().filter(|&&(_, l, _)| l == genome.len()).count();
+    assert!(
+        full >= 2,
+        "expected >= 2 full-length unitigs across masters (got {full})"
+    );
+    // --use-guide without --all-masters is rejected.
+    let out2 = dir.path().join("out2.fa");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "multik",
+            reads.to_str().unwrap(),
+            "-o",
+            out2.to_str().unwrap(),
+            "--use-guide",
+        ])
+        .run_fail();
+    assert!(
+        stderr.contains("--all-masters"),
+        "clap must name the missing --all-masters requirement"
+    );
+}

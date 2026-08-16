@@ -10,12 +10,14 @@
 //! monotonically instead of being re-split by a larger k.
 
 use super::assemble::{
-    assemble_unitigs_core, compute_links, read_records, AssembleOptions, Link, Unitig,
+    assemble_unitigs_core, assemble_unitigs_from_table, compute_links, read_records,
+    AssembleOptions, Link, Unitig,
 };
 use super::refine::{base_code, Kmer as TdKmer, RefineTable};
 use anyhow::Result;
 use pgr::libs::kmer::key::Kmer;
 use pgr::libs::nt::rev_comp;
+use rayon::prelude::*;
 use std::collections::HashSet;
 
 /// Options for [`assemble_multik`].
@@ -39,6 +41,18 @@ pub struct MultikOptions {
     pub merge_len: usize,
     /// Worker threads for counting; `0` = rayon global pool.
     pub parallel: usize,
+    /// Every k in `ks` is a master that builds its own skeleton (validated
+    /// by every larger k) — the multi-master scheme the templates merge
+    /// across masters. One invocation shares the reads-only count table at
+    /// each k across all masters (k-major order), instead of the template
+    /// running one invocation per master and recounting the reads each
+    /// time.
+    pub all_masters: bool,
+    /// With `all_masters`: the first master's validated output guides the
+    /// later masters (megahit `seq2sdbg --contig` guidance) — each contig
+    /// feeds their counts as pseudo-reads repeated to the solid threshold,
+    /// so a low-k master's structure carries into higher-k skeletons.
+    pub use_guide: bool,
 }
 
 impl Default for MultikOptions {
@@ -50,6 +64,8 @@ impl Default for MultikOptions {
             merge_similar: 0.95,
             merge_len: 20,
             parallel: 0,
+            all_masters: false,
+            use_guide: false,
         }
     }
 }
@@ -83,11 +99,14 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
     ks.sort_unstable();
     ks.dedup();
 
-    let k0 = ks[0];
+    if opts.all_masters && ks.len() > 1 {
+        let mut chains = assemble_all_masters(&reads, &ks, opts)?;
+        chains.sort_by_key(|u| std::cmp::Reverse(u.bases.len()));
+        return Ok(chains);
+    }
     // Single-master-skeleton iteration: `ks[0]` builds the graph and every
-    // later k validates it. One master per invocation — the template drives
-    // several masters in parallel (bash) and merges their outputs.
-    let mut chains = assemble_one(infiles, &reads, k0, &ks[1..], opts)?;
+    // later k validates it.
+    let mut chains = assemble_one(infiles, &reads, ks[0], &ks[1..], opts)?;
     chains.sort_by_key(|u| std::cmp::Reverse(u.bases.len()));
     Ok(chains)
 }
@@ -101,6 +120,245 @@ pub fn auto_ks_for_reads(infiles: &[String]) -> Result<Vec<usize>> {
     Ok(auto_ks(read_n50(&read_records(infiles)?)))
 }
 
+/// Pass-0 assemble options (BCALM graph3 semantics, same fast paths as the
+/// `asm unitig` command: super-mer counting, adaptive minimizer length, and
+/// the DFA-state walk engine).
+fn pass0_opts(k0: usize, opts: &MultikOptions) -> AssembleOptions {
+    AssembleOptions {
+        k: k0,
+        min_count_seed: opts.min_count_seed,
+        parallel: opts.parallel,
+        use_supermer: true,
+        supermer_m: Some((12).min((5).max(k0 / 4))),
+        use_dfa: true,
+        ..AssembleOptions::default()
+    }
+}
+
+/// Read-only count lookup for validation steps. Implemented for a single
+/// table and for the sum of two disjoint tables: a shared reads-only table
+/// plus the master's own unitig-only table, whose summed counts equal the
+/// joint count over both inputs (so per-master rounds reuse the shared
+/// reads table instead of recounting the reads at every k).
+trait CountView {
+    fn count(&self, kmer: &TdKmer) -> u32;
+}
+
+impl CountView for RefineTable {
+    fn count(&self, kmer: &TdKmer) -> u32 {
+        self.get_count(kmer)
+    }
+}
+
+struct SumView<'a>(&'a RefineTable, &'a RefineTable);
+
+impl CountView for SumView<'_> {
+    fn count(&self, kmer: &TdKmer) -> u32 {
+        self.0.get_count(kmer).saturating_add(self.1.get_count(kmer))
+    }
+}
+
+/// One master's iterative state: the pass-0 skeleton at `k0`, the graph
+/// mutated by every validation round, and the finalized output chains.
+struct Master {
+    k0: usize,
+    unitigs: Vec<Unitig>,
+    links: Vec<Vec<Link>>,
+    branch: Vec<bool>,
+    /// Low-abundance unitigs pruned by the last round's progressive filter;
+    /// re-fed into the next round's graph (megahit bubble re-feeding).
+    carried: Vec<Unitig>,
+    carried_branch: Vec<bool>,
+    /// Finalized output (set by [`Master::finalize`]).
+    out: Vec<MultikUnitig>,
+}
+
+impl Master {
+    /// Pass 0 from a prebuilt reads(-only) count table at `k0`.
+    fn pass0(table: &RefineTable, k0: usize, opts: &MultikOptions) -> Self {
+        let unitigs = assemble_unitigs_from_table(table, &pass0_opts(k0, opts));
+        Self::from_unitigs(unitigs, k0)
+    }
+
+    /// Pass 0 from already-built unitigs (the FASTQ fallback path counts
+    /// inside `assemble_unitigs_core` with quality gating).
+    fn from_unitigs(unitigs: Vec<Unitig>, k0: usize) -> Self {
+        let links = compute_links(&unitigs, k0);
+        // Repeat fragments (a repeated element's shared k-mers fan into four
+        // or more flanking unitigs at the master k) connect to four or more
+        // partners. Snapshot that branch status at pass 0: a chain through
+        // such a node picks one of several genomic contexts and joins
+        // distant loci, so its links never participate in recompaction. The
+        // flag propagates through every unitig reindexing below.
+        let branch = links
+            .iter()
+            .map(|ls| ls.iter().map(|l| l.to).collect::<HashSet<_>>().len() >= 4)
+            .collect();
+        Self {
+            k0,
+            unitigs,
+            links,
+            branch,
+            carried: Vec::new(),
+            carried_branch: Vec::new(),
+            out: Vec::new(),
+        }
+    }
+
+    /// Single-round master (no larger k validates it): still cut chimeric
+    /// junctions — internal k-mers without read support (the joined
+    /// sequence does not exist in the reads) mark a chimeric unitig, which
+    /// validation rounds would otherwise catch. `base` counts the reads
+    /// (plus a guide, when the invocation is guided).
+    fn cut(&mut self, base: &RefineTable, threshold: u32) -> Result<()> {
+        let seqs: Vec<&[u8]> = self.unitigs.iter().map(|u| u.bases.as_slice()).collect();
+        let unitig_table = RefineTable::build_supermer_slices(&seqs, self.k0)?;
+        let view = SumView(base, &unitig_table);
+        remove_unsupported(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            &view,
+            self.k0,
+            threshold,
+        );
+        Ok(())
+    }
+
+    /// One validation round at `k` (k > k0): re-feed the carried unitigs,
+    /// validate every link's bridge k-mer and every unitig's internal
+    /// k-mers against `base` + this master's unitigs, filter links by
+    /// reads bridges, recompact, and prune low-abundance unitigs into the
+    /// carry. `probe` is the shared reads-only probe table.
+    fn round(
+        &mut self,
+        k: usize,
+        base: &RefineTable,
+        probe: &RefineTable,
+        probe_half: usize,
+        opts: &MultikOptions,
+    ) -> Result<()> {
+        let t_round = std::time::Instant::now();
+        self.unitigs.append(&mut self.carried);
+        self.branch.append(&mut self.carried_branch);
+        let t0 = std::time::Instant::now();
+        let seqs: Vec<&[u8]> = self.unitigs.iter().map(|u| u.bases.as_slice()).collect();
+        let unitig_table = RefineTable::build_supermer_slices(&seqs, k)?;
+        let view = SumView(base, &unitig_table);
+        let t_count = t0.elapsed().as_secs_f64();
+        let threshold = opts.min_count_extend as u32;
+        let k0 = self.k0;
+        // 1. Cross-round link validation (solveEdges): the bridge k-mer
+        // covering the junction must be solid at the current k.
+        for (i, ls) in self.links.iter_mut().enumerate() {
+            ls.retain(|l| {
+                let u = &self.unitigs[i];
+                let v = &self.unitigs[l.to];
+                // Short unitigs (shorter than the current k-1 window) cannot
+                // provide a full bridge k-mer; skip their validation and let
+                // the final compaction decide via actual extremity matching
+                // (the link is guaranteed to share a (k0-1)-mer).
+                if u.bases.len() < k - 1 || v.bases.len() < k - 1 {
+                    return true;
+                }
+                bridge_kmer(u, v, l, k, k0).is_some_and(|km| view.count(&km) >= threshold)
+            });
+        }
+        // 2. Chimeric-unitig cleanup (removeUnsupportedUnitigs): every
+        // internal current-k k-mer of a long-enough unitig must be solid.
+        remove_unsupported(&mut self.unitigs, &mut self.links, &mut self.branch, &view, k, threshold);
+        // 2.5 Reads-bridge validation: every surviving link must have reads
+        // fully covering a probe spanning the junction. Chimeric links (two
+        // distant regions joined by a shared k-mer) have no bridging reads
+        // and are dropped BEFORE recompaction, so the per-round merge cannot
+        // fix them into the main path (prevents relocation misassemblies).
+        bridge_filter(&self.unitigs, &mut self.links, probe, k0, probe_half, 2);
+        // 3. Recompact unique chains so the main path grows between rounds
+        // (metaMDBG recompacts after every abundance-removal round). No
+        // abundance pruning here — that is deferred to the final filter, so
+        // single-genome coverage fluctuation never drops real content.
+        recompact_graph(&mut self.unitigs, &mut self.links, &mut self.branch, k0);
+        // 4. Prune low-abundance branching/isolated unitigs and carry them
+        // into the next round (the final round's carry becomes output).
+        let (dropped, dropped_branch) =
+            progressive_filter(&mut self.unitigs, &mut self.links, &mut self.branch, k0);
+        self.carried = dropped;
+        self.carried_branch = dropped_branch;
+        if std::env::var_os("ANCHR_MULTIK_TIMING").is_some() {
+            let n = self.unitigs.len();
+            let bp: usize = self.unitigs.iter().map(|u| u.bases.len()).sum();
+            let edges: usize = self.links.iter().map(|l| l.len()).sum();
+            eprintln!(
+                "master k0={k0} round k={k}: {n} unitigs, {bp} bp, {edges} edges, count {t_count:.3}s graph {:.3}s total {:.3}s",
+                t_round.elapsed().as_secs_f64() - t_count,
+                t_round.elapsed().as_secs_f64()
+            );
+        }
+        Ok(())
+    }
+
+    /// Final steps after the last validation round: split unitigs at
+    /// reads-unsupported windows, re-verify links, merge bubbles, clean
+    /// tips/weak links, and compact validated chains into the output.
+    fn finalize(&mut self, probe: &RefineTable, probe_half: usize, opts: &MultikOptions) -> Result<()> {
+        let k0 = self.k0;
+        // Split unitigs at internal positions that have no reads support
+        // (the abundance filter's recompaction can fuse chimeric links into
+        // a single unitig — the source of G37 relocations). Every probe
+        // window of a unitig must occur in the reads; an unsupported window
+        // is a chimeric junction and the unitig is cut there.
+        split_by_bridge(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            probe,
+            k0,
+            probe_half,
+            1,
+        );
+        // Re-verify the links recomputed by the split: the new extremities
+        // may join distant regions, so every surviving link needs bridging
+        // reads.
+        bridge_filter(&self.unitigs, &mut self.links, probe, k0, probe_half, 2);
+
+        // Megahit-style bubble merge: divergent paths that reconverge at the
+        // same partner collapse to the highest-coverage path, so the main
+        // path is not interrupted at variant/error sites. Removed
+        // alternatives stay independent output (megahit writes them to
+        // bubble_seq.fa).
+        let variants = bubble_merge(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            k0,
+            opts.merge_similar,
+            opts.merge_len,
+        );
+
+        // Megahit-style cleaning on the final (compacted) unitigs: drop
+        // short low-depth tips and disconnect weak links (depth-proportional,
+        // see megahit tip_remover / weak_link_remover). Doing this per round
+        // was too aggressive on the k0=21 fragments (G37 longest 52.8k ->
+        // 32.6k); after compaction the tips are real and few.
+        tip_remover(&mut self.unitigs, &mut self.links, &mut self.branch, k0 * 2, 20.0);
+        weak_link_remover(&mut self.unitigs, &mut self.links, 0.05);
+
+        // Final compaction: merge validated chains into long unitigs.
+        let mut chains = merge_chains(&self.unitigs, &self.links, &self.branch, k0)?;
+        chains.extend(std::mem::take(&mut self.carried).into_iter().map(|u| MultikUnitig {
+            bases: u.bases,
+            coverage: u.coverage,
+        }));
+        chains.extend(variants.into_iter().map(|u| MultikUnitig {
+            bases: u.bases,
+            coverage: u.coverage,
+        }));
+        chains.sort_by_key(|u| std::cmp::Reverse(u.bases.len()));
+        self.out = chains;
+        Ok(())
+    }
+}
+
 /// Runs the single-skeleton iteration: pass 0 builds maximal unitigs at
 /// `k0`, every k in `later_ks` validates the graph (bridge k-mers, internal
 /// solidity, reads bridges), and validated chains are compacted into long
@@ -112,33 +370,19 @@ fn assemble_one(
     later_ks: &[usize],
     opts: &MultikOptions,
 ) -> Result<Vec<MultikUnitig>> {
-    // Pass 0: maximal unitigs at the first k (BCALM graph3 semantics).
-    let assemble_opts = AssembleOptions {
-        k: k0,
-        min_count_seed: opts.min_count_seed,
-        parallel: opts.parallel,
-        // FASTA input: FastK-style super-mer two-stage counting (the `asm
-        // unitig` default); FASTQ falls back to the direct path inside
-        // `assemble_unitigs_core`.
-        use_supermer: true,
-        // Same fast paths as the `asm unitig` command: adaptive minimizer
-        // length and the DFA-state walk engine.
-        supermer_m: Some((12).min((5).max(k0 / 4))),
-        use_dfa: true,
-        ..AssembleOptions::default()
+    let read_seqs: Vec<&[u8]> = reads.iter().map(|(s, _)| s.as_slice()).collect();
+    // FASTA input: count straight from the cached reads buffer (FastK-style
+    // super-mer counting, no quality gating — byte-identical to the direct
+    // path); FASTQ falls back to `assemble_unitigs_core`'s quality-gated
+    // counting, which re-reads the infiles.
+    let fasta_input = reads.iter().all(|(_, q)| q.is_empty());
+    let mut master = if fasta_input {
+        let table = RefineTable::build_supermer_slices(&read_seqs, k0)?;
+        Master::pass0(&table, k0, opts)
+    } else {
+        let (unitigs, _) = assemble_unitigs_core(infiles, &pass0_opts(k0, opts))?;
+        Master::from_unitigs(unitigs, k0)
     };
-    let (mut unitigs, _) = assemble_unitigs_core(infiles, &assemble_opts)?;
-    let mut links = compute_links(&unitigs, k0);
-    // Repeat fragments (a repeated element's shared k-mers fan into four or
-    // more flanking unitigs at the master k) connect to four or more
-    // partners. Snapshot that branch status at pass 0: a chain through such
-    // a node picks one of several genomic contexts and joins distant loci,
-    // so its links never participate in recompaction. The flag propagates
-    // through every unitig reindexing below.
-    let mut branch: Vec<bool> = links
-        .iter()
-        .map(|ls| ls.iter().map(|l| l.to).collect::<HashSet<_>>().len() >= 4)
-        .collect();
 
     // Reads-only probe table (probe_half*2-mers), shared by every round's
     // bridge_filter and the final split/bridge validation: its inputs never
@@ -146,131 +390,126 @@ fn assemble_one(
     // (R+2 identical full counts per run before).
     let probe_half = 30;
     let probe_len = probe_half * 2;
-    let read_seqs: Vec<&[u8]> = reads.iter().map(|(s, _)| s.as_slice()).collect();
     let probe_table = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
 
-    // Iterative rounds: validate the graph with each larger k. Low-abundance
-    // branching unitigs are pruned every round but CARRIED into the next
-    // round's graph (megahit bubble re-feeding + metaMDBG unitig feedback):
-    // strain/polymorphic sequences keep participating in assembly instead of
-    // being emitted as dropped fragments only.
-    let mut carried: Vec<Unitig> = Vec::new();
-    let mut carried_branch: Vec<bool> = Vec::new();
+    let threshold = opts.min_count_extend as u32;
     if later_ks.is_empty() {
-        // Single-master run (e.g. a guided high-k master): still cut
-        // chimeric junctions — internal k-mers without read support (the
-        // joined sequence does not exist in the reads) mark a chimeric
-        // unitig, which validation rounds would otherwise catch.
-        let table = count_at(&unitigs, reads, k0)?;
-        let threshold = opts.min_count_extend as u32;
-        remove_unsupported(&mut unitigs, &mut links, &mut branch, &table, k0, threshold);
+        let table = RefineTable::build_supermer_slices(&read_seqs, k0)?;
+        master.cut(&table, threshold)?;
     }
     for &k in later_ks {
-        unitigs.append(&mut carried);
-        branch.append(&mut carried_branch);
-        let t_round = std::time::Instant::now();
-        let t0 = std::time::Instant::now();
-        let table = count_at(&unitigs, reads, k)?;
-        let t_count = t0.elapsed().as_secs_f64();
-        let threshold = opts.min_count_extend as u32;
-        // 1. Cross-round link validation (solveEdges): the bridge k-mer
-        // covering the junction must be solid at the current k.
-        for (i, ls) in links.iter_mut().enumerate() {
-            ls.retain(|l| {
-                let u = &unitigs[i];
-                let v = &unitigs[l.to];
-                // Short unitigs (shorter than the current k-1 window) cannot
-                // provide a full bridge k-mer; skip their validation and let
-                // the final compaction decide via actual extremity matching
-                // (the link is guaranteed to share a (k0-1)-mer).
-                if u.bases.len() < k - 1 || v.bases.len() < k - 1 {
-                    return true;
-                }
-                bridge_kmer(u, v, l, k, k0).is_some_and(|km| table.get_count(&km) >= threshold)
-            });
+        let table = RefineTable::build_supermer_slices(&read_seqs, k)?;
+        master.round(k, &table, &probe_table, probe_half, opts)?;
+    }
+    master.finalize(&probe_table, probe_half, opts)?;
+    Ok(master.out)
+}
+
+/// Multi-master iteration in k-major order: every k in `ks` is a master
+/// whose skeleton the larger ks validate, and the count table at each k is
+/// built once and shared by every master's pass 0 and validation rounds at
+/// that k (a master's own unitigs are counted separately and summed on
+/// lookup, which equals the joint count). This replaces the template's one
+/// invocation per master — M masters cost M pass-0 walks plus one reads
+/// count per k, not one per (master, round). Each per-k table is dropped at
+/// the end of its iteration, so peak memory stays at ~two tables (count +
+/// probe) regardless of how many ks are in the ladder.
+///
+/// With `use_guide` the first master runs first (phase 1) and its validated
+/// output guides every later master (megahit `seq2sdbg --contig`): each
+/// contig feeds the later masters' counts and probe table as pseudo-reads
+/// repeated to the solid threshold. Phase 2 rebuilds reads + guide jointly
+/// per k (one direct count, arithmetically the merged counts), so the
+/// guided ladder costs ~2 reads counts per k but keeps the same bounded
+/// memory.
+fn assemble_all_masters(
+    reads: &[(Vec<u8>, Vec<u8>)],
+    ks: &[usize],
+    opts: &MultikOptions,
+) -> Result<Vec<MultikUnitig>> {
+    let read_seqs: Vec<&[u8]> = reads.iter().map(|(s, _)| s.as_slice()).collect();
+    let probe_half = 30;
+    let probe_len = probe_half * 2;
+    let threshold = opts.min_count_extend as u32;
+    let last_k = *ks.last().unwrap();
+    let mut out: Vec<MultikUnitig> = Vec::new();
+
+    if opts.use_guide {
+        // Phase 1: the guide producer runs its full ladder. Each per-k
+        // reads table is built for the round and dropped right after —
+        // no cache, so memory stays at ~one table regardless of |ks|.
+        let probe = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
+        let mut guide_master = {
+            let t = RefineTable::build_supermer_slices(&read_seqs, ks[0])?;
+            Master::pass0(&t, ks[0], opts)
+        };
+        for &k in ks.iter().skip(1) {
+            let t = RefineTable::build_supermer_slices(&read_seqs, k)?;
+            guide_master.round(k, &t, &probe, probe_half, opts)?;
         }
-        // 2. Chimeric-unitig cleanup (removeUnsupportedUnitigs): every
-        // internal current-k k-mer of a long-enough unitig must be solid.
-        remove_unsupported(&mut unitigs, &mut links, &mut branch, &table, k, threshold);
-        // 2.5 Reads-bridge validation: every surviving link must have reads
-        // fully covering a probe spanning the junction. Chimeric links (two
-        // distant regions joined by a shared k-mer) have no bridging reads
-        // and are dropped BEFORE recompaction, so the per-round merge cannot
-        // fix them into the main path (prevents relocation misassemblies).
-        bridge_filter(&unitigs, &mut links, &probe_table, k0, probe_half, 2);
-        // 3. Recompact unique chains so the main path grows between rounds
-        // (metaMDBG recompacts after every abundance-removal round). No
-        // abundance pruning here — that is deferred to the final filter, so
-        // single-genome coverage fluctuation never drops real content.
-        recompact_graph(&mut unitigs, &mut links, &mut branch, k0);
-        // 4. Prune low-abundance branching/isolated unitigs and carry them
-        // into the next round (the final round's carry becomes output).
-        let (kept, kept_branch) = progressive_filter(&mut unitigs, &mut links, &mut branch, k0);
-        carried = kept;
-        carried_branch = kept_branch;
-        if std::env::var_os("ANCHR_MULTIK_TIMING").is_some() {
-            let n = unitigs.len();
-            let bp: usize = unitigs.iter().map(|u| u.bases.len()).sum();
-            let edges: usize = links.iter().map(|l| l.len()).sum();
-            eprintln!(
-                "round k={k}: {n} unitigs, {bp} bp, {edges} edges, count {t_count:.3}s graph {:.3}s total {:.3}s",
-                t_round.elapsed().as_secs_f64() - t_count,
-                t_round.elapsed().as_secs_f64()
-            );
+        guide_master.finalize(&probe, probe_half, opts)?;
+
+        // Guide pseudo-reads: each contig repeated to the solid threshold
+        // (the same records `--guide-contigs` writes as a FASTA infile).
+        let mut guide_out = std::mem::take(&mut guide_master.out);
+        let reps = opts.min_count_seed.max(1);
+        let guide_seqs: Vec<&[u8]> = guide_out
+            .iter()
+            .flat_map(|u| std::iter::repeat(u.bases.as_slice()).take(reps))
+            .collect();
+
+        // Phase 2: every later master counts reads + guide in one direct
+        // build (equal to the merged reads-only + guide counts) and probes
+        // reads + guide, matching a per-master invocation whose infiles
+        // include the guide file. The joint table is dropped after its k
+        // iteration — peak memory stays at ~two tables (joint + probe).
+        let mut seqs_with_guide: Vec<&[u8]> = read_seqs.clone();
+        seqs_with_guide.extend_from_slice(&guide_seqs);
+        let probe2 = RefineTable::build_supermer_slices(&seqs_with_guide, probe_len)?;
+        let mut masters: Vec<Master> = Vec::new();
+        for &k in ks.iter().skip(1) {
+            let table = RefineTable::build_supermer_slices(&seqs_with_guide, k)?;
+            masters.push(Master::pass0(&table, k, opts));
+            if k == last_k {
+                masters.last_mut().unwrap().cut(&table, threshold)?;
+            }
+            // Independent per-master rounds run concurrently on the worker
+            // pool (each master's graph walk is serial, so lanes interleave
+            // with the counting tasks); results are unchanged.
+            let earlier = masters.len() - 1;
+            masters
+                .par_iter_mut()
+                .take(earlier)
+                .try_for_each(|m| m.round(k, &table, &probe2, probe_half, opts))?;
+        }
+        for m in &mut masters {
+            m.finalize(&probe2, probe_half, opts)?;
+            out.append(&mut m.out);
+        }
+        out.append(&mut guide_out);
+    } else {
+        let probe = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
+        let mut masters: Vec<Master> = Vec::new();
+        for &k in ks {
+            let table = RefineTable::build_supermer_slices(&read_seqs, k)?;
+            masters.push(Master::pass0(&table, k, opts));
+            if k == last_k {
+                masters.last_mut().unwrap().cut(&table, threshold)?;
+            }
+            // Independent per-master rounds run concurrently on the worker
+            // pool; results are unchanged (each master's state is private).
+            let earlier = masters.len() - 1;
+            masters
+                .par_iter_mut()
+                .take(earlier)
+                .try_for_each(|m| m.round(k, &table, &probe, probe_half, opts))?;
+        }
+        for m in &mut masters {
+            m.finalize(&probe, probe_half, opts)?;
+            out.append(&mut m.out);
         }
     }
-
-    // Split unitigs at internal positions that have no reads support (the
-    // abundance filter's recompaction can fuse chimeric links into a single
-    // unitig — the source of G37 relocations). Every 100-mer window of a
-    // unitig must occur in the reads; an unsupported window is a chimeric
-    // junction and the unitig is cut there.
-    split_by_bridge(
-        &mut unitigs,
-        &mut links,
-        &mut branch,
-        &probe_table,
-        k0,
-        probe_half,
-        1,
-    );
-    // Re-verify the links recomputed by the split: the new extremities may
-    // join distant regions, so every surviving link needs bridging reads.
-    bridge_filter(&unitigs, &mut links, &probe_table, k0, probe_half, 2);
-
-    // Megahit-style bubble merge: divergent paths that reconverge at the
-    // same partner collapse to the highest-coverage path, so the main path
-    // is not interrupted at variant/error sites. Removed alternatives stay
-    // independent output (megahit writes them to bubble_seq.fa).
-    let variants = bubble_merge(
-        &mut unitigs,
-        &mut links,
-        &mut branch,
-        k0,
-        opts.merge_similar,
-        opts.merge_len,
-    );
-
-    // Megahit-style cleaning on the final (compacted) unitigs: drop short
-    // low-depth tips and disconnect weak links (depth-proportional, see
-    // megahit tip_remover / weak_link_remover). Doing this per round was
-    // too aggressive on the k0=21 fragments (G37 longest 52.8k -> 32.6k);
-    // after compaction the tips are real and few.
-    tip_remover(&mut unitigs, &mut links, &mut branch, k0 * 2, 20.0);
-    weak_link_remover(&mut unitigs, &mut links, 0.05);
-
-    // Final compaction: merge validated chains into long unitigs.
-    let mut chains = merge_chains(&unitigs, &links, &branch, k0)?;
-    chains.extend(carried.into_iter().map(|u| MultikUnitig {
-        bases: u.bases,
-        coverage: u.coverage,
-    }));
-    chains.extend(variants.into_iter().map(|u| MultikUnitig {
-        bases: u.bases,
-        coverage: u.coverage,
-    }));
-    chains.sort_by_key(|u| std::cmp::Reverse(u.bases.len()));
-    Ok(chains)
+    Ok(out)
 }
 
 /// Read-length N50 of the input records (used to derive the k sequence).
@@ -288,40 +527,24 @@ fn read_n50(reads: &[(Vec<u8>, Vec<u8>)]) -> usize {
     0
 }
 
-/// Derives an increasing k sequence from the read-length N50:
-/// `k_max = min(0.8 * N50, Kmer::MAX_K)`, starting at
-/// `clamp(N50/10, 21, 31)` with steps of `clamp(N50/100, 20, 30)`. The
-/// starting k is ~1/3 of the read length (`clamp(N50/3, 31, 51)`): pass 0
-/// builds the graph skeleton at the first k, and a too-small skeleton
-/// (21-mer on 150 bp reads) fragments the assembly at low-complexity
-/// junctions that larger k's could resolve (MG1655: N50 21K at k0=21 vs 59K
-/// at k0=51). Short reads (150 bp) yield 50/70/90/110; long reads
-/// (>= 10 kb) run to `Kmer::MAX_K` (256) — mirroring metaMDBG's
-/// `computeLastK` (last k-min-mer spans ~2× N50).
+/// Derives the master-k ladder from the read-length N50: the fixed
+/// validated ladder `31,41,51,61,71,81,101,121,128,160,192` truncated at
+/// `k_max = clamp(N50/2, 81, 192)` (MG1655 N50 339 -> 31..160, G37 N50 408
+/// -> 31..192; 150 bp unmerged reads -> 31..81). The top is capped at 192:
+/// higher master ks fragment on residual read errors (an error kills every
+/// window overlapping it, and at k ~ 0.6×N50 nearly every window overlaps
+/// one), which the guide cannot repair (MG1655 auto 51..251: N50 9.4K, 5
+/// mis). Low-k masters start at 31 — they anchor low-complexity regions
+/// the larger ks validate. Tune per dataset with an explicit `--kmer`.
 fn auto_ks(n50: usize) -> Vec<usize> {
     if n50 == 0 {
         return Vec::new();
     }
-    let k_max = (n50 * 8 / 10).clamp(31, Kmer::MAX_K);
-    let k_min = (n50 / 3).clamp(31, 51);
-    let step = (n50 / 100).clamp(20, 30);
-    let mut ks = Vec::new();
-    let mut k = k_min;
-    while k <= k_max {
-        ks.push(k);
-        k += step;
-    }
-    ks
-}
-
-/// Counts current-k k-mers over the cached reads plus the previous unitigs
-/// (no quality gating: unitigs carry no phred scores; the supermer path
-/// handles both). Borrows both as slices — no re-parse, no sequence copies.
-fn count_at(unitigs: &[Unitig], reads: &[(Vec<u8>, Vec<u8>)], k: usize) -> Result<RefineTable> {
-    let mut seqs: Vec<&[u8]> = Vec::with_capacity(reads.len() + unitigs.len());
-    seqs.extend(reads.iter().map(|(s, _)| s.as_slice()));
-    seqs.extend(unitigs.iter().map(|u| u.bases.as_slice()));
-    RefineTable::build_supermer_slices(&seqs, k)
+    let k_max = (n50 / 2).clamp(81, 192);
+    [31usize, 41, 51, 61, 71, 81, 101, 121, 128, 160, 192]
+        .into_iter()
+        .filter(|&k| k <= k_max)
+        .collect()
 }
 
 /// Encodes a base slice into the assembly k-mer key (canonical lookup is
@@ -864,7 +1087,7 @@ fn remove_unsupported(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
     branch: &mut Vec<bool>,
-    table: &RefineTable,
+    table: &impl CountView,
     k: usize,
     threshold: u32,
 ) {
@@ -894,7 +1117,7 @@ fn remove_unsupported(
                 if j > 0 {
                     km.push_right(base_code(u.bases[j + k - 1]));
                 }
-                let ok = table.get_count(&km) >= threshold;
+                let ok = table.count(&km) >= threshold;
                 if !ok {
                     missing += 1;
                     run += 1;

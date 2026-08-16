@@ -384,6 +384,17 @@ pooling + heuristic layout): junctions are accepted only when the larger k's
 k-mer count supports them, which selects bubble branches without heuristics
 and avoids the multi-k redundancy of pooled OLC.
 
+By default the smallest k is the master k (its pass-0 skeleton is validated
+by every larger k). With `--all-masters` every k is a master in one
+invocation, k-major order: the count table at each k is built once and
+shared by every master's pass 0 and validation rounds, and all masters'
+unitigs are merged into the output — replacing the template's one
+invocation per master (which re-counted the reads once per master and
+round). Each per-k table is dropped after its iteration, so peak memory
+stays at ~two tables regardless of the ladder length. With
+`--all-masters --use-guide` the first master's validated unitigs guide the
+later masters (megahit `seq2sdbg --contig` semantics).
+
 Input is one or more FASTA/FASTQ files, plain or gzipped; pairing is
 irrelevant for assembly (BCALM semantics), and `--list-files` accepts a
 one-path-per-line list.
@@ -395,9 +406,11 @@ anchr asm multik [OPTIONS] <infiles>...
 ### Options
 
 *   `-k, --kmer <int,int,...|auto>`: Comma-separated increasing k-mer
-    lengths, or `auto` (default) to derive them from the read-length N50
-    (21/41/61/81 for short reads, 31/61/91/121 for long reads; each k in
-    1..=128; sorted and deduplicated internally).
+    lengths, or `auto` (default): the fixed ladder
+    `31,41,51,61,71,81,101,121,128,160,192` truncated at
+    `clamp(N50/2, 81, 192)`. The top stays at 192 because higher master ks
+    fragment on residual read errors; tune per dataset with explicit ks
+    (sorted and deduplicated internally).
 *   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
 *   `--min-count-seed <int>`: Solid k-mer count threshold for pass 0
     (default 3).
@@ -405,6 +418,17 @@ anchr asm multik [OPTIONS] <infiles>...
     cross-round validation (default 2).
 *   `-p, --parallel <int>`: Worker threads for counting (default 0 = all
     cores).
+*   `--all-masters`: Every k in `--kmer` is a master validated by the
+    larger ks; one invocation shares the reads count per k across masters
+    (k-major order) and merges all masters' unitigs into the output.
+*   `--use-guide`: With `--all-masters`: the first master's validated
+    unitigs guide the later masters (each contig feeds their counts as
+    pseudo-reads repeated to the solid threshold).
+*   `--guide-contigs <file>`: Extra contig FASTA counted as pseudo-reads
+    (each record repeated to `--min-count-seed`) alongside the reads, the
+    file-based counterpart of `--use-guide` for single-master invocations.
+*   `--print-ks`: Print the k-mer lengths derived from the read-length N50
+    (same list `--kmer auto` uses) and exit.
 *   `--list-files`: Treat `<infiles>` as list files, one sequence file path
     per line (blank lines and `#` comments are ignored).
 
@@ -420,7 +444,12 @@ anchr asm multik [OPTIONS] <infiles>...
     anchr asm multik reads.fq.gz -o unitigs.fa --kmer 21,51,81
     ```
 
-3.  **Raise the validation threshold**:
+3.  **Multi-master single invocation with guide**:
+    ```bash
+    anchr asm multik reads.fa -o unitigs.fa --all-masters --use-guide
+    ```
+
+4.  **Raise the validation threshold**:
     ```bash
     anchr asm multik reads.fa -o unitigs.fa --min-count-extend 3
     ```

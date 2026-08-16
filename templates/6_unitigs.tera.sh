@@ -72,45 +72,25 @@ KS_BCALM="31 41 51 61 71 81 101 121"
         --min-len 1000 \
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
-{% else %}    # per-master multik: every k builds its own skeleton (larger ks
-    # validate it). The master-k list comes from the read-length N50 (no
-    # hard-coded k values); the first master runs first and its unitigs
-    # guide the rest (megahit seq2sdbg --contig guidance), so high-k
-    # masters do not fragment on reads with thin high-k support. Every
-    # master validates against every third later k (fixed spacing rule:
-    # intermediate rounds re-count with little added signal).
+{% else %}    # single-invocation multi-master multik: --kmer auto (default) derives
+    # the master-k list from the read-length N50 (no hard-coded k values),
+    # every k builds its own skeleton validated by the larger ks (k-major
+    # order, the reads count at each k is built once and shared by every
+    # master), and the first master's unitigs guide the rest (megahit
+    # seq2sdbg --contig guidance), so high-k masters do not fragment on
+    # reads with thin high-k support. Replaces the per-master loop with
+    # its guide files and repeated reads counting.
     # Keep short (200..1000 bp) reads-supported fragments: on merged reads
     # they cover low-complexity gap regions without chimeras (G37: GF
     # 98.869->99.083%, 0 mis; bcalm/unitig branches keep 1000 because their
     # raw unitigs do produce chimeric short fragments).
-    KS=$(anchr asm multik ../../6_down_sampling/MRX${X}P${P}/pe.cor.fa.gz --print-ks)
-    K0=$(echo ${KS} | awk '{print $1}')
-    # The first master is the serial prefix of this stage and only needs to
-    # produce the guide skeleton: at most two validation rounds (median +
-    # largest k, the strictest check) instead of the full every-third-k
-    # chain. Later masters keep the dense rule — their output feeds the
-    # final OLC merge.
-    V0=$(echo ${KS} | awk 'NF>=5{printf "%s,%s", $(int(NF/2)+1), $NF} NF>=2&&NF<5{printf "%s", $NF}')
-    if [ -n "${V0}" ]; then K0_LIST="${K0},${V0}"; else K0_LIST="${K0}"; fi
     anchr asm multik \
         ../../6_down_sampling/MRX${X}P${P}/pe.cor.fa.gz \
-        -k ${K0_LIST} \
+        --all-masters --use-guide \
         -p {{ opt.parallel }} \
-        -o unitigs_K${K0}.fasta
+        -o unitigs_all.fasta
 
-    # Masters run one at a time, each with the full opt.parallel budget.
-    for K in $(echo ${KS} | awk '{for(i=2;i<=NF;i++) print $i}'); do
-        VK=$(echo ${KS} | awk -v k=${K} '{for(i=1;i<=NF;i++) if($i>k && (i-1)%3==0) printf "%s,", $i}' | sed 's/,$//')
-        if [ -n "${VK}" ]; then K_LIST="${K},${VK}"; else K_LIST="${K}"; fi
-        anchr asm multik \
-            ../../6_down_sampling/MRX${X}P${P}/pe.cor.fa.gz \
-            --guide-contigs unitigs_K${K0}.fasta \
-            -k ${K_LIST} \
-            -p {{ opt.parallel }} \
-            -o unitigs_K${K}.fasta
-    done
-
-    anchr asm olc --unitigs unitigs_K*.fasta \
+    anchr asm olc --unitigs unitigs_all.fasta \
         --min-overlap 1000 \
         --min-contig-len 200 \
         -o unitigs.fasta

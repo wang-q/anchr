@@ -458,12 +458,28 @@ pub(crate) fn assemble_unitigs_core(
         )
     };
 
+    let unitigs = assemble_unitigs_from_table(&table, opts);
+    let stats = AssembleStats {
+        reads_in,
+        ..AssembleStats::default()
+    };
+    Ok((unitigs, stats))
+}
+
+/// Classifies solid k-mers and walks maximal unitigs from a prebuilt count
+/// table (the shared tail of [`assemble_unitigs_core`]). multik reuses one
+/// reads-only table per k across every master's pass 0 instead of
+/// recounting the reads for each master.
+pub(crate) fn assemble_unitigs_from_table(
+    table: &RefineTable,
+    opts: &AssembleOptions,
+) -> Vec<Unitig> {
     let t_walk = std::time::Instant::now();
     let mut unitigs = if opts.use_dfa {
-        let states = VertexStates::classify(&table, opts.min_count_seed as u32, opts.parallel);
-        build_unitigs_dfa(&table, opts, &states)
+        let states = VertexStates::classify(table, opts.min_count_seed as u32, opts.parallel);
+        build_unitigs_dfa(table, opts, &states)
     } else {
-        build_unitigs(&table, opts)
+        build_unitigs(table, opts)
     };
     unitigs.sort_by(unitig_cmp);
     if std::env::var_os("ANCHR_SM_TIMING").is_some() {
@@ -473,11 +489,7 @@ pub(crate) fn assemble_unitigs_core(
             unitigs.len()
         );
     }
-    let stats = AssembleStats {
-        reads_in,
-        ..AssembleStats::default()
-    };
-    Ok((unitigs, stats))
+    unitigs
 }
 
 /// One directed unitig link. `from_rc` selects the BCALM FASTA prefix:

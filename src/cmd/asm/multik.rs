@@ -32,11 +32,17 @@ without heuristics.
 Notes:
 * Input is one or more FASTA/FASTQ files (plain or gzipped); pairing is
   irrelevant for assembly, and `--list-files` reads a one-path-per-line list
-* k-mer lengths are sorted and deduplicated internally; the smallest k is
-  the master k (pass 0 skeleton), each larger k is a slave k that validates
-  the graph. Run one master per invocation (`-k 31,41,51,61,71,81` uses
-  master 31; `-k 51,61,71,81` uses master 51) and let the template drive
-  several masters in parallel, then merge their unitigs
+* k-mer lengths are sorted and deduplicated internally; by default the
+  smallest k is the master k (pass 0 skeleton) and each larger k is a slave
+  k that validates the graph. `--all-masters` makes every k a master in one
+  invocation (k-major order, the reads count at each k is built once and
+  shared by every master) and merges all masters' unitigs into the output —
+  replacing the template's per-master parallel runs that re-counted the
+  reads once per master
+* `--use-guide` (with `--all-masters`): the first master's validated
+  unitigs guide the later masters (each contig feeds their counts as
+  pseudo-reads repeated to the solid threshold), the built-in counterpart
+  of `--guide-contigs`
 * `--kmer auto` (default) derives the sequence from the read-length N50
   (~1/3 of the read length up to 51, e.g. 50/70/90/110 for 150 bp reads,
   51/81/111 for long reads)
@@ -48,6 +54,8 @@ Examples:
    anchr asm multik reads.fq.gz -o unitigs.fa --kmer 21,51,81
 2. Raise the validation threshold:
    anchr asm multik reads.fa -o unitigs.fa --min-count-extend 3
+3. Multi-master single invocation with guide:
+   anchr asm multik reads.fa -o unitigs.fa -k 51,71,91 --all-masters --use-guide
 "###,
         )
         .arg(crate::cmd::args::infiles_arg_with_numargs(
@@ -109,6 +117,26 @@ Examples:
                      sequence feeds the master-k count as pseudo-reads (repeated to the solid \
                      threshold), so a low-k master's structure carries into higher-k rounds \
                      (e.g. K192 on 450 bp reads: unitig N50 37.6K -> 81.6K)",
+                ),
+        )
+        .arg(
+            Arg::new("all_masters")
+                .long("all-masters")
+                .action(ArgAction::SetTrue)
+                .help(
+                    "Every k in --kmer is a master validated by the larger ks; one \
+                     invocation shares the reads count per k across masters (k-major \
+                     order) and merges all masters' unitigs into the output",
+                ),
+        )
+        .arg(
+            Arg::new("use_guide")
+                .long("use-guide")
+                .action(ArgAction::SetTrue)
+                .requires("all_masters")
+                .help(
+                    "With --all-masters: the first master's validated unitigs guide the \
+                     later masters (pseudo-reads at the solid threshold)",
                 ),
         )
         .arg(
@@ -201,6 +229,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             .unwrap_or(0.95),
         merge_len: args.get_one::<usize>("merge_len").copied().unwrap_or(20),
         parallel: *args.get_one::<usize>("parallel").unwrap(),
+        all_masters: args.get_flag("all_masters"),
+        use_guide: args.get_flag("use_guide"),
     };
     let outfile = crate::cmd::args::get_outfile(args);
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
