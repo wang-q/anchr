@@ -132,8 +132,9 @@ fn command_asm_ovlp_deterministic() {
 fn command_asm_ovlp_rejects_overlap_k_above_limit() {
     let out_dir = tempfile::tempdir().unwrap();
     let a = out_dir.path().join("a.fa");
-    // A 200 bp unitig is above `Kmer::MAX_K` (128).
-    let seq = "A".repeat(200);
+    // A 300 bp unitig with a 300-mer overlap seed is above `Kmer::MAX_K`
+    // (256); the seed is clamped to the shortest unitig before validation.
+    let seq = "A".repeat(300);
     fs::write(&a, format!(">u1\n{seq}\n")).unwrap();
     AnchrCmd::new()
         .args(&[
@@ -141,13 +142,13 @@ fn command_asm_ovlp_rejects_overlap_k_above_limit() {
             "ovlp",
             a.to_str().unwrap(),
             "--overlap-k",
-            "200",
+            "300",
             "--min-overlap",
             "10",
         ])
         .assert()
         .failure()
-        .stderr(predicates::str::contains("at most 128"));
+        .stderr(predicates::str::contains("at most 256"));
 }
 
 /// `anchr asm layout` chains ovlp output into one layout with coordinates.

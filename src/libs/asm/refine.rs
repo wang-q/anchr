@@ -381,14 +381,14 @@ impl RefineTable {
     /// Count of the canonical form of `kmer` (0 when absent).
     pub(crate) fn get_count(&self, kmer: &Kmer) -> u32 {
         let kb = self.table.key_bytes();
-        let mut qbuf = [0u8; 32];
+        let mut qbuf = [0u8; key::Kmer::MAX_K / 4];
         // Whole-byte k (k % 4 == 0): packed rc via a byte table (kb lookups
         // + half-byte canonical compare) instead of `key::Kmer::canonical`,
         // which recomputes the rc base-by-base (O(k)); at k=100 the
         // traversal's get_count canonicalization was ~30% of runtime.
         if self.table.k.is_multiple_of(4) {
             let fw = kmer.0.to_bytes();
-            let mut rc = [0u8; 32];
+            let mut rc = [0u8; key::Kmer::MAX_K / 4];
             for i in 0..kb {
                 rc[kb - 1 - i] = REVCOMP_BYTE[fw[i] as usize];
             }

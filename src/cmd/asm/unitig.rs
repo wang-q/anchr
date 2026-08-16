@@ -59,7 +59,7 @@ Examples:
                 .num_args(1)
                 .default_value("31")
                 .value_parser(clap::builder::RangedU64ValueParser::<usize>::new().range(1..))
-                .help("K-mer length (1..=128)"),
+                .help("K-mer length (1..=256)"),
         )
         .arg(
             Arg::new("min_contig_len")

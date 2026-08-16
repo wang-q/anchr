@@ -414,7 +414,7 @@ fn command_asm_unitig_links_no_dangling() {
     assert!(links > 0, "expected L: entries between kept unitigs");
 }
 
-/// A k-mer above the 128-base key limit must fail cleanly instead of
+/// A k-mer above the 256-base key limit must fail cleanly instead of
 /// panicking in `Kmer::new().expect()` (zero-panic policy).
 #[test]
 fn command_asm_unitig_rejects_kmer_above_limit() {
@@ -429,7 +429,7 @@ fn command_asm_unitig_rejects_kmer_above_limit() {
             "-o",
             out.to_str().unwrap(),
             "--kmer",
-            "129",
+            "257",
         ])
         .assert()
         .failure();

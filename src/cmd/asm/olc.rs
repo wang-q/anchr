@@ -65,7 +65,7 @@ Examples:
                 .short('k')
                 .num_args(1)
                 .default_value("21,51,81")
-                .help("Comma-separated k-mer lengths (1..=128) for the unitig sets"),
+                .help("Comma-separated k-mer lengths (1..=256) for the unitig sets"),
         )
         .arg(
             Arg::new("min_count_seed")
@@ -81,7 +81,7 @@ Examples:
                 .num_args(1)
                 .default_value("17")
                 .value_parser(value_parser!(usize))
-                .help("Seed k-mer length for overlap detection (1..=128)"),
+                .help("Seed k-mer length for overlap detection (1..=256)"),
         )
         .arg(
             Arg::new("min_overlap")

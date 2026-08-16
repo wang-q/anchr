@@ -249,14 +249,15 @@ fn read_n50(reads: &[(Vec<u8>, Vec<u8>)]) -> usize {
 }
 
 /// Derives an increasing k sequence from the read-length N50:
-/// `k_max = min(0.8 * N50, 128)`, starting at `clamp(N50/10, 21, 31)` with
-/// steps of `clamp(N50/100, 20, 30)`. The starting k is ~1/3 of the read
-/// length (`clamp(N50/3, 31, 51)`): pass 0 builds the graph skeleton at the
-/// first k, and a too-small skeleton (21-mer on 150 bp reads) fragments the
-/// assembly at low-complexity junctions that larger k's could resolve
-/// (MG1655: N50 21K at k0=21 vs 59K at k0=51). Short reads (150 bp) yield
-/// 50/70/90/110; long reads (>= 10 kb) cap at 51/81/111 — mirroring
-/// metaMDBG's `computeLastK` (last k-min-mer spans ~2× N50).
+/// `k_max = min(0.8 * N50, Kmer::MAX_K)`, starting at
+/// `clamp(N50/10, 21, 31)` with steps of `clamp(N50/100, 20, 30)`. The
+/// starting k is ~1/3 of the read length (`clamp(N50/3, 31, 51)`): pass 0
+/// builds the graph skeleton at the first k, and a too-small skeleton
+/// (21-mer on 150 bp reads) fragments the assembly at low-complexity
+/// junctions that larger k's could resolve (MG1655: N50 21K at k0=21 vs 59K
+/// at k0=51). Short reads (150 bp) yield 50/70/90/110; long reads
+/// (>= 10 kb) run to `Kmer::MAX_K` (256) — mirroring metaMDBG's
+/// `computeLastK` (last k-min-mer spans ~2× N50).
 fn auto_ks(n50: usize) -> Vec<usize> {
     if n50 == 0 {
         return Vec::new();
@@ -1377,8 +1378,8 @@ mod tests {
         assert_eq!(auto_ks(150), vec![50, 70, 90, 110]);
         // Short reads (108 bp): k0 = clamp(108/3, 31, 51) = 36.
         assert_eq!(auto_ks(108), vec![36, 56, 76]);
-        // Long reads (>= 10 kb): capped at 51/81/111 (128 limit).
-        assert_eq!(auto_ks(15000), vec![51, 81, 111]);
+        // Long reads (>= 10 kb): step 30 from k0=51 up to MAX_K (256).
+        assert_eq!(auto_ks(15000), vec![51, 81, 111, 141, 171, 201, 231]);
         // Zero/empty input yields no ks.
         assert!(auto_ks(0).is_empty());
     }

@@ -201,7 +201,7 @@ fn command_asm_contig_rejects_kmer_above_limit() {
             "-o",
             out.to_str().unwrap(),
             "--kmer",
-            "129",
+            "257",
         ])
         .assert()
         .failure();

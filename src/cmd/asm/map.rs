@@ -70,7 +70,7 @@ Examples:
                 .num_args(1)
                 .default_value("31")
                 .value_parser(value_parser!(usize))
-                .help("Seed k-mer length (1..=128)"),
+                .help("Seed k-mer length (1..=256)"),
         )
         .arg(
             Arg::new("outm")

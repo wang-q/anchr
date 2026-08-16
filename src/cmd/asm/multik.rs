@@ -61,7 +61,7 @@ Examples:
                 .short('k')
                 .num_args(1)
                 .default_value("auto")
-                .help("Comma-separated increasing k-mer lengths (1..=128), or auto (default) to derive from the read-length N50"),
+                .help("Comma-separated increasing k-mer lengths (1..=256), or auto (default) to derive from the read-length N50"),
         )
         .arg(
             Arg::new("min_count_seed")
