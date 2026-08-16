@@ -133,6 +133,15 @@ fn assemble_one(
     // being emitted as dropped fragments only.
     let mut carried: Vec<Unitig> = Vec::new();
     let mut carried_branch: Vec<bool> = Vec::new();
+    if later_ks.is_empty() {
+        // Single-master run (e.g. a guided high-k master): still cut
+        // chimeric junctions — internal k-mers without read support (the
+        // joined sequence does not exist in the reads) mark a chimeric
+        // unitig, which validation rounds would otherwise catch.
+        let table = count_at(&unitigs, infiles, k0, opts.parallel)?;
+        let threshold = opts.min_count_extend as u32;
+        remove_unsupported(&mut unitigs, &mut links, &mut branch, &table, k0, threshold)?;
+    }
     for &k in later_ks {
         unitigs.append(&mut carried);
         branch.append(&mut carried_branch);
@@ -824,14 +833,25 @@ fn remove_unsupported(
             // whose internal k-mers are largely unsupported are dropped.
             let max_missing = (n_kmers / 50).max(1);
             let mut missing = 0usize;
+            // A chimeric junction has a run of consecutive unsupported
+            // windows (the joined k-mers do not exist in the reads), while
+            // plain coverage fluctuation is isolated single windows; any
+            // run of >= 2 marks the unitig as chimeric.
+            let mut run = 0usize;
             for j in 0..n_kmers {
                 let ok = kmer_from_bases(&u.bases[j..j + k], k)
                     .is_some_and(|km| table.get_count(&km) >= threshold);
                 if !ok {
                     missing += 1;
+                    run += 1;
+                    if run >= 2 {
+                        return false;
+                    }
                     if missing > max_missing {
                         break;
                     }
+                } else {
+                    run = 0;
                 }
             }
             missing <= max_missing

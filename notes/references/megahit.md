@@ -537,18 +537,27 @@ G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
   简单引导无增量。真正的 megahit 式引导（seq2sdbg 重建 + 迭代边）价值在
   低覆盖/长读场景（reads 支持不足，需低 k 结构引导），multik 暂无此类数据
   验证；`count_at` 保持全长反馈（与 megahit `--contig` 全长引导一致）。
-* **引导实施与端到端结论（2026-08-16 深夜）**：`asm multik` 新增
+* **引导实施与端到端（2026-08-16 深夜—08-17，已落地）**：`asm multik` 新增
   `--guide-contigs <fasta>`（cmd 层把上一主 K unitigs 全长作为伪 reads 写
   临时文件，重复到 solid 阈值后并入计数，对应 megahit `seq2sdbg --contig`）。
   单主验证：K192 用 K31 unitigs 引导，unitig N50 37.6K→**81.6K**（+117%）、
   K224 16.4K→37.9K、K256 6.0K→25.9K——**全长引导有效**（reads 高 k 覆盖
   不足时低 k 结构真实起引导作用）；500/1000 bp 端点片段引导无效（结构信息
-  不足）。**端到端（G37 7 组，31..192 + 只 K192 引导）：GF 98.849→
-  99.602%（+0.75 pp）但 Dup 1.000→**1.210**（K192 引导 unitigs 复制 K31
-  全部结构，跨主 K 近似重复去重不足）+ **1 mis**（引导传播 K31 骨架的重复
-  区嵌合，下游 bridge/anchor 未全部拦截）——**不进模板**。`--guide-contigs`
-  保留为能力（低覆盖/长读数据可启用），但需先解决跨主 K 冗余去重与引导嵌合
-  的拦截（P2 方向）。
+  不足）。端到端首轮（G37 7 组，31..192 + 只 K192 引导）：GF 98.849→
+  99.602% 但 Dup 1.210 + 1 mis。**三项修复后全链：N50 83.8K→318.1K、
+  GF 98.849→99.642%、Dup 1.000、0 mis**：
+  1. `consensus::coverage` 加 dominant 31-mer offset + banded identity 路径
+     （容忍跨组 consensus 的大 indel——120 bp 插入让旧 3 种子锚点漏尾部，
+     跨主 K 近似重复去重失效，Dup 1.210→1.001）；
+  2. `multik` 单主模式也执行 `remove_unsupported`（内部 k-mer solidity +
+     连续 unsupported 窗口判嵌合）——切断引导传播的嵌合 junction；
+  3. `olc` 布局增加**目标端竞争检测**（`is_repeat` 不只查当前端，拼接前也
+     查目标端——anchor_6 尾有 3 条 ~1.07K 竞争 overlap，mutual-best 只看
+     best 指回漏掉，任选一条拼成 350473-389481+390412-429551 relocation）。
+  模板：`6_unitigs` multik 分支 `KS` 含 192；K31 主 K 先跑（K_LIST 到
+  192），其余主 K 并行 + `--guide-contigs unitigs_K31.fasta`。MG1655 验证
+  因大 reads 计算成本过高暂缓（K192 引导 ~20 min/组 + 下游 olc 更慢），
+  G37 端到端已支撑落地。
 6. **本地组装（§4.5）**：MEGAHIT 用 reads 回帖 + IDBA-UD 内核做 contig 端点延伸，
    与 anchr `fq extend`（tadpole 沿图延伸）目标相近；其 `min_mapping_len=75`、
    `LocalRange = min(2*mean, mean+3*sd)` 封顶 650 等参数可对照。

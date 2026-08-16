@@ -52,10 +52,13 @@
   端点片段 / K31 端点喂 K160）在 G37 高覆盖短读下与基线完全一致（无增量，
   碎片化是图结构分支而非缺 k-mer），`count_at` 保持全长反馈（与 megahit
   `--contig` 一致）；真正迭代边机制价值在低覆盖/长读，待数据验证后实施。
-  **引导实施（深夜）**：`asm multik --guide-contigs` 已实现（K31 unitigs
-  全长引导 K192，单主 N50 37.6K→81.6K），但端到端（G37 7 组）GF +0.75 pp
-  的同时 Dup 1.210 + 1 mis——跨主 K 冗余去重与引导嵌合拦截未解决，
-  **不进模板**；能力保留待低覆盖/长读数据。
+  **引导实施（深夜—08-17，已落地）**：`asm multik --guide-contigs`（K31
+  unitigs 全长引导高主 K）+ 三项配套修复：coverage dominant-offset 去重
+  （Dup 1.210→1.001）、单主 remove_unsupported 嵌合切断、olc 布局目标端
+  竞争检测（mis 1→0）。G37 7 组全链 **N50 318.1K、GF 99.642%、0 mis**，
+  模板 `6_unitigs` multik 分支 KS 含 192 + K31 先跑 + guide。MG1655 大
+  reads 下 K192 引导计算成本过高（~20 min/组 + olc 更慢），验证暂缓，
+  待性能优化。
 - 重复区解析（P2）——§8。已落地并验证（G37 MR 链 7 组，全链 0 mis）：
   a. 模板 6_ 主 K 加 128（multik/unitig 分支；bcalm 分支 31..121）：
   GF 98.809→98.869%、Dup 1.003→1.000、12→11 contigs；

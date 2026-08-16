@@ -166,6 +166,13 @@ fn extend(
         if placed[e.to] {
             break;
         }
+        // The target's junction end must also be unambiguous: its best edge
+        // may point back (mutual best) while the end still has near-equal
+        // competing edges to other targets (repeat context). Joining there
+        // picks an arbitrary copy — keep the contig broken instead.
+        if is_repeat(ends, e.to, e.to_end) {
+            break;
+        }
         // Mutual-best junction: the target's best edge at the junction end
         // must point back to us (avoids joining through ambiguous branches).
         if best_edge(ends, e.to, e.to_end).map(|b| b.to) != Some(cur) {

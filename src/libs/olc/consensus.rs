@@ -581,6 +581,35 @@ pub(crate) fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
     if needle.len() < 100 {
         return if contains(haystack, needle) { 1.0 } else { 0.0 };
     }
+    // Indel-tolerant path: a dominant 31-mer offset locates `needle` inside
+    // `haystack` even across large internal indels (a 120 bp insertion made
+    // the fixed 100-mer anchors below miss the tail); the banded identity
+    // then measures how much of `needle` is covered.
+    if let Some((off, hits, matched)) = dominant_offset(haystack, needle) {
+        let ratio = hits as f64 / matched.max(1) as f64;
+        // A large internal indel splits the offset histogram into two peaks
+        // (e.g. a 120 bp insertion leaves 76% at one offset); the banded
+        // identity below tolerates the indel, so the peak-ratio bar is only
+        // a candidate filter — the >=99% identity check does the judging.
+        if hits >= 100 && ratio >= 0.7 {
+            let hay_len = haystack.len() as isize;
+            let nd_len = needle.len() as isize;
+            let start = off.max(0) as usize;
+            let end = (off + nd_len).clamp(0, hay_len) as usize;
+            if end > start {
+                let a = &haystack[start..end];
+                let nstart = if off < 0 { off.unsigned_abs() } else { 0 };
+                let nend = nstart + (end - start);
+                if nend <= needle.len() {
+                    let idy = identity(a, &needle[nstart..nend]);
+                    let covered = (end - start) as f64 * idy / nd_len as f64;
+                    if covered >= 0.99 {
+                        return covered.min(1.0);
+                    }
+                }
+            }
+        }
+    }
     let seed_len = 100usize;
     let seeds = [
         0usize,
@@ -640,6 +669,34 @@ pub(crate) fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
     }
     covered += cur_end - cur_start;
     covered.min(needle.len()) as f64 / needle.len() as f64
+}
+
+/// Dominant 31-mer offset of `needle` inside `haystack` (position in
+/// haystack minus position in needle), its hit count, and the number of
+/// needle windows present anywhere in `haystack`. Returns `None` for empty
+/// or too-short inputs.
+fn dominant_offset(haystack: &[u8], needle: &[u8]) -> Option<(isize, usize, usize)> {
+    let k = SEED_LEN;
+    if needle.len() < k || haystack.len() < k {
+        return None;
+    }
+    let mut index: std::collections::HashMap<&[u8], Vec<usize>> = std::collections::HashMap::new();
+    for (p, w) in haystack.windows(k).enumerate() {
+        index.entry(w).or_default().push(p);
+    }
+    let mut hist: std::collections::HashMap<isize, usize> = std::collections::HashMap::new();
+    let mut matched = 0usize;
+    for (i, w) in needle.windows(k).enumerate() {
+        if let Some(ps) = index.get(w) {
+            matched += 1;
+            for &p in ps {
+                *hist.entry(p as isize - i as isize).or_default() += 1;
+            }
+        }
+    }
+    hist.into_iter()
+        .max_by_key(|(_, n)| *n)
+        .map(|(o, n)| (o, n, matched))
 }
 
 #[cfg(test)]
