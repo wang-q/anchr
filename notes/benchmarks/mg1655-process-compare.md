@@ -26,7 +26,7 @@
 2. **与外部组装器同口径（5 组）对比**：我们的 N50 123,988 已超过 megahit
    （82,825）与 spades（125,603 持平），且 0 mis vs megahit 1 mis；
    mr_spades 148.6K 仍更高（其输入为全量 reads，非同一口径）。
-3. **mm/indel 极低**：mismatches 0.41/100 kbp、indels 0.09/100 kbp——
+3. **mm/indel 极低**：mismatches 0.22/100 kbp、indels 0.09/100 kbp——
    MG1655 与参考同株，consensus 高度准确。
 
 ## extend 安全门槛（本次发现并修复）
