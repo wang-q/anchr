@@ -1,6 +1,6 @@
 # cuttlefish (Cuttlefish 2)：紧凑 de Bruijn 图构建（源码分析）
 
-> 2026-08-14 整理，纯源码分析（`cuttlefish-2.2.0/`）。Cuttlefish 是 Jamshed Khan &
+> 2026-08-14 整理、2026-08-17 对照源码逐项复核修订，纯源码分析（`cuttlefish-2.2.0/`）。Cuttlefish 是 Jamshed Khan &
 > Rob Patro 等人的紧凑 de Bruijn 图（compacted de Bruijn graph, cdBG）构建工具：
 > Cuttlefish 1 只接受**参考序列**（可输出 GFA），Cuttlefish 2 同时支持**测序 reads
 > 与参考**（目前只输出 FASTA）。两篇论文：Cuttlefish (Bioinformatics 2021,
@@ -29,6 +29,38 @@
 - **与 BCALM 2 的定位差异**：BCALM 2 用 minimizer 分桶 + 桶内压缩 + UF 全局拼接；
   Cuttlefish 不做 minimizer 分桶，改用"KMC 精确枚举 + MPHF + DFA 状态分类"，
   一次扫描即得每个顶点的度信息，unitig 提取时按状态即可确定起止。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：KMC3 精确枚举顶点（k-mer）与边（(k+1)-mer，edge-centric）→ BBHash
+MPHF 把顶点集映射到 `[0,n)` → 紧凑位向量每顶点只存 **5/6 位 DFA 状态码** →
+并行扫描序列/边做**状态分类**（CAS 读-改-写，失败重试）→ 按状态提取最大
+unitig（单入单出 = 可穿越，分支/复杂 = 端点）——全程无显式图结构、无 minimizer
+分桶、无跨桶边落盘。
+
+```
+reads/refs
+  → KMC3 枚举
+      Cuttlefish 1（ref）: 顶点库（cutoff=1，counter_max=1 去重不计数）
+      Cuttlefish 2（read/ref）: 边库 ((k+1)-mer，cutoff 过滤)
+                                → 以边库为输入再派生顶点库
+  → BBHash MPHF + 紧凑位向量（ref 5 位 / read 6 位）存 DFA 状态
+  → 状态分类（并行扫描，CAS 更新）
+      ref:  逐序列滑窗，孤立/最左/最右/内部四情形做状态转移
+      read: 逐边扫，每端 add_incident_edge（首边记碱基、异边标 N=分支）
+  → 提取最大 unitig
+      read: FASTA（DCC 环状旋转到最小顶点；--path-cover 变体）
+      ref:  另支持 GFA1/GFA2/GFA-reduced + 参考拼贴 tiling
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| k-mer 枚举 | KMC3 外包（min 3 GB、2000 bins、`-cs 1` 跳过计数） | §6.1 |
+| 顶点索引 | BBHash MPHF（gamma 2.0-10.0 内存/速度折衷）+ compact_vector 位向量 + Sparse_Lock CAS | §4.3 |
+| DFA 状态 | ref 5 位（状态类 + 首尾碱基）/ read 6 位（两侧 Extended_Base）；非法码 exit(1) | §4.4 |
+| 状态分类 | 单遍扫描读-改-写、失败 while 重试；自环/回文由 exit/entrance side 判定自然吸收 | §5 |
+| unitig 提取 | 单入单出 = 可穿越，多入多出 / 单侧分支 = 端点；canonical 方向稳定输出 | §7 |
+| 模板调度 | `Application<k>` 按奇数 k 递归实例化，MAX_K = 2×INSTANCE_COUNT−1（默认 63） | §2.1 |
 
 ## 2. 仓库结构
 

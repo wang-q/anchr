@@ -1,6 +1,7 @@
 # bcalm (BCALM 2)：紧凑 de Bruijn 图构建（源码分析）
 
-> 2026-08-13 整理，纯源码分析（`bcalm/`，版本 `v2.2.3`）。BCALM 2 是
+> 2026-08-13 整理、2026-08-17 对照源码逐项复核修订，纯源码分析（`bcalm/`，版本
+> `v2.2.3`）。BCALM 2 是
 > Rayan Chikhi 等人的紧凑 de Bruijn 图（compacted de Bruijn graph, cdBG）构建
 > 工具，ISMB 2016 / Bioinformatics 32(12): i201–i208。**后续更新**：用户补全了
 > `gatb-core` 子模块（`git submodule` 已检出到 `gatb-core/gatb-core/`），核心算法
@@ -35,6 +36,36 @@
   RC 后只出现一次）；unitig 方向不保证跨 run 一致。
 - **输入输出**：`-in`（单文件或多文件列表 `ls -1 *.fastq > list_reads`）；
   输出默认 `<prefix>.unitigs.fa`；GFA 需用 `scripts/convertToGFA.py` 后处理。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：DSK **外部排序精确计数** solid k-mer（阈值过滤推迟到消费侧，§3.1）→
+按 minimizer 分桶（超级桶 = DSK partition，frequency-based minimizer 均衡负载），
+桶内 `graph3` 局部压缩产出带 lmark/rmark 端点标记的部分 unitig（§3.1/§3.3）→
+端点哈希 + BooPHF MPHF + **无锁并查集**把各桶片段 glue 成完整 unitig（§3.2/§3.4）→
+`LinkTigs` 用端点 (k-1)-mer 哈希重算 unitig 间 `L:` 边（§3.5）。
+
+```
+reads ──DSK──▶ .h5（精确计数，无 Bloom；丰度阈值消费时才判）
+  │
+  ▼ bcalm2（逐 partition，按 minimizer 序）
+  │   InsertIntoQueues：左右 minimizer 双侧入桶；跨桶 k-mer 落盘 traveller
+  │   graph3 桶内压缩（首/尾 (k-1)-mer 建索引，排序双指针合并 overlap）
+  │   → prefix.glue.<thread>（comment = "lmark rmark 丰度向量"）
+  ▼ bglue
+  │   端点哈希 → BooPHF MPHF → unionFind 并到同类
+  │   按 UF 类分片 → 从链端点拼链（环状 unitig 兜底断开）
+  ▼ link_tigs（端点 (k-1)-mer 分 8 趟磁盘哈希）
+  ▼ <prefix>.unitigs.fa（LN/KC/km/L: 注释；GFA 交给 convertToGFA.py）
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| 分桶 | minimizer（默认 frequency-based，偏罕见 m-mer）→ `Repartitor` 均衡分区；同一 k-mer 可进左右两桶；跨桶 traveller 落盘延迟处理 | §3.1、§6 |
+| 桶内压缩 graph3 | 首/尾 (k-1)-mer 建 left/right 索引 → 排序双指针匹配 → `compaction` 4 方向拼接；被吸收端写数字索引作"压缩痕迹"（`isNumber`） | §3.3 |
+| 全局拼接 bglue | 端点哈希（容忍碰撞）+ BooPHF MPHF（γ=3）+ 无锁 UF（CAS 路径压缩+按秩）；UF 类分片后从链端点拼链，环状 unitig 砍 1 碱基防自闭合 | §3.2、§3.4 |
+| 算边 LinkTigs | 端点 (k-1)-mer 取 4 特征碱基编码 `% 8` 分趟；canonical 同向性判定 + 回文特例放宽 | §3.5 |
+| 图语义 | 双向图 5 元组边 + 镜像约束；unitig = 内部顶点度 ≤2 的极大路径；`L:` 边按 spelling rule 解读 | §4 |
 
 ## 2. 仓库结构
 
@@ -109,9 +140,11 @@ BCALM 2 把 cdBG 构建拆成三段：**分桶压缩（bcalm2）→ UF 全局拼
 
 
 1. **扩展超级桶**（`InsertIntoQueues`）：对 partition 内每个 solid k-mer，若丰度
-   ≥ 阈值则保留；用 `modelK1`（k-1 长 minimizer 模型）求其**左/右 minimizer**；
-   凡 minimizer 属于本 partition `p` 的，把 `(minimizer, kmer, abundance, leftmin,
-   rightmin)` 元组推入**本线程的 flat bucket queue**。
+   ≥ 阈值则保留；用 `modelK1`（k-1 长 minimizer 模型）求其**左/右 minimizer**
+   （左 minimizer 取 `current >> 2`——GATB 编码最低位是序列最右碱基，
+   `bcalm_algo.cpp:188-189`）；凡 minimizer 属于本 partition `p` 的，把
+   `(minimizer, kmer, abundance, leftmin, rightmin)` 元组推入**本线程的 flat
+   bucket queue**。
 2. **traveller k-mers**：当一个 k-mer 的左右 minimizer 落在**不同 partition**（跨
    桶），把它以 ASCII 落到 `prefix.doubledKmers.<p>` 文件（注释里存丰度），等轮到
    `repart(max_minimizer)` 那个 partition 时再读回——这是"跨超级桶的边"，只能串
@@ -136,12 +169,13 @@ BCALM 2 把 cdBG 构建拆成三段：**分桶压缩（bcalm2）→ UF 全局拼
 > 多次调阈值。
 >
 > 更多源码细节（`bcalm_algo.cpp` / `bcalm_algo.hpp`）：
-> - **一个 k-mer 可进多个桶**：`InsertIntoQueues::operator()`（`bcalm_algo.hpp#L182-223`）
+> - **一个 k-mer 可进多个桶**：`InsertIntoQueues::operator()`（`bcalm_algo.cpp:183-230`，
+>   类声明也在 cpp `:124`；hpp 仅 42 行放队列 typedef）
 >   当 `leftMin != rightMin` 时，k-mer 既按 leftMin 入桶（若 `repart(leftMin)==p`）又按
 >   rightMin 入桶（若 `repart(rightMin)==p`）——同一 k-mer 可能被**多个 minimizer 桶重复
 >   压缩**（每个桶各产出一份 unitig），最终靠 bglue 的 lmark/rmark 标记再接起来。这也
 >   解释了为何 `nb_left_min_diff_right_min`（左右 minimizer 不同的 k-mer 计数）被单列统计。
-> - **traveller 落盘前置检查**（`bcalm_algo.hpp#L215-216`）：断言 `repart(max_minimizer) >=
+> - **traveller 落盘前置检查**（`bcalm_algo.cpp:215-216`）：断言 `repart(max_minimizer) >=
 >   repart(min_minimizer)`，违反则打印错误并 `exit(1)`——这正是必须**按 minimizer 顺序迭代
 >   partition** 的原因：traveller 一定落在"更靠后"的 partition，等轮到时再读回
 >   （`bcalm_algo.cpp#L447-453` 注释详述了这一设计取舍）。

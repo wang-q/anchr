@@ -1,6 +1,6 @@
 # cutadapt: Mott/BWA 式质量修剪与接头去除
 
-> 整理于 2026-08-13，源自对 `cutadapt-main/`（v5.2, 2025-10-23）源码的分析。最初承接 [sickle.md](./sickle.md) 中"现代质量修剪算法对比"的结论——滑窗仍是默认，cutadapt 的 `-q` 提供了**唯一真正不同的算法方向**（Mott/BWA 累积质量法），故初稿聚焦**按质量分数修剪**，为 pgr 的 `fq trim-qual` 提供算法与 CLI 参考。后按需求补充了**接头（adapter）去除**的完整算法（indel-aware 半全局比对、多适配器匹配、修饰器与配对端处理），本文现同时覆盖质量修剪与接头去除两条主线。pgr 当前主要关心质量修剪，接头部分为算法参考。
+> 整理于 2026-08-13、2026-08-17 对照源码逐项复核修订，源自对 `cutadapt-main/`（v5.2, 2025-10-23）源码的分析。最初承接 [sickle.md](./sickle.md) 中"现代质量修剪算法对比"的结论——滑窗仍是默认，cutadapt 的 `-q` 提供了**唯一真正不同的算法方向**（Mott/BWA 累积质量法），故初稿聚焦**按质量分数修剪**，为 pgr 的 `fq trim-qual` 提供算法与 CLI 参考。后按需求补充了**接头（adapter）去除**的完整算法（indel-aware 半全局比对、多适配器匹配、修饰器与配对端处理），本文现同时覆盖质量修剪与接头去除两条主线。pgr 当前主要关心质量修剪，接头部分为算法参考。
 
 ## 1. 简介
 
@@ -11,6 +11,35 @@
 - **算法来源**：注释明确说明与 **BWA 的 `bwa_trim_read`** 相同（`qualtrim.pyx:29-33`）。这与经典 Mott 算法同源（BWA `-q` 即 Mott 算法），累计和取最小。
 - **变体**：`nextseq_trim_index`（NextSeq polyG 暗循环）、`poly_a_trim_index`（poly-A/poly-T）、`expected_errors`（Edgar 2015 期望错误数）。
 - **接头去除主线**：见 §3——Cython 半全局比对器 `Aligner`（indel-aware、混合 cost/score）+ k-mer 预过滤 + 多适配器索引，配以 `AdapterCutter` 修饰器与配对端变体。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：read 依次过**修饰器流水线**（cut → nextseq → 质量修剪 → 去接头 →
+poly-A → 缩短/重命名），再过过滤器（长度/EE/N/casava）写出——质量修剪用
+Mott/BWA 累积质量法（§2），去接头用 indel-aware 半全局 DP + k-mer 预过滤 +
+锚定索引三段加速（§3），多接头竞争取 score 最高。
+
+```
+FASTQ read
+  → 修饰器链（cli.make_pipeline_from_args 固定顺序）:
+    1. --cut UnconditionalCutter     # 无条件切头尾
+    2. --nextseq-trim                 # polyG：G 质量置 cutoff-1 后走 3' 累积法
+    3. -q QualityTrimmer              # ★ Mott/BWA 累积质量法（§2）
+    4. -a/-g/-b AdapterCutter         # ★ 半全局 DP 去接头（§3），先 k-mer 预过滤
+    5. --poly-a                       # poly-A/T 修剪（位置相关错误率）
+    6. -l Shortener / --trim-n / --rename 等
+  → 过滤器（TooShort/TooLong/MaxEE/MaxN/...；配对 any/both/first 模式）
+  → sink 输出
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| 质量修剪 | Mott/BWA：`cutoff-q` 累积和，局部最大点为切点；两端独立单遍 O(n) | §2 |
+| 接头比对 | 半全局 DP：cost/score 双矩阵 + Ukkonen 带状剪枝 + N 前缀计数 + origin 回溯 | §3.2 |
+| 接头类型 | `Where` 位标志（FRONT/BACK/PREFIX/SUFFIX/ANYWHERE/非内部）；anchored 且禁 indel 走 Comparer 逐位快路径 | §3.3 |
+| k-mer 预过滤 | 分段"必需 k-mer" + shift-and 位并行多模式匹配（64-bit 字内拼多条 k-mer） | §3.5 |
+| 多接头 | score 竞争（同分取 error 少）；锚定接头建编辑环境索引 O(1) 查表，歧义串剔除不修剪 | §3.6 |
+| 配对端 | 独立修饰 / `--revcomp` 正反双向取高分 / `--pair-adapters` 成对约束（互斥） | §3.8 |
 
 > **范围说明 / 落地状态**：初稿时 pgr 的 `fq trim-qual` 还是设计提案；现已实现于 `src/cmd/fq/trim_qual.rs` + `src/libs/fq/trim.rs`，`quality_trim_index`（Mott/BWA 累积质量法）作为 `--method mott`，与继承自 sickle 的滑窗（`--method sliding`）并存。§5 已从"设计提案"改写为"已实现对照 + 剩余借鉴点"。
 
@@ -70,7 +99,7 @@ return (start, stop)
 1. **`nextseq_trim_index`**（`--nextseq-trim`）：NextSeq 双色编码中"暗循环"（无颜色）通常被读成高质量 G，出现在读段 3' 端。算法与 `quality_trim_index` 的 3' 端相同，但把 **G 碱基的质量强制设为 `cutoff - 1`**（`qualtrim.pyx:107-108`）。效果与直觉相反：正常算法里高质量 G（`q >> cutoff`）会贡献强负值使 `s<0` 提前 break、从而把 G 尾**保住**；而把 G 的 `q` 设为 `cutoff-1` 后，每个 G 对累积和只贡献固定的 `+1`（`s += cutoff - (cutoff-1) = 1`），G 尾不再触发提前终止，累积和最大点落到 G 尾左缘，从而把 polyG 尾巴当低质量去掉。
 2. **`poly_a_trim_index`**（`--poly-a`）：poly-A/poly-T 尾巴检测，'A'(或'T') 得 +1，其他碱基 −2，累计 score 最大处为切点。错误率上限 0.2 的校验是**位置相关的**：5' 端（polyT head）为 `errors * 5 <= i+1`、3' 端（polyA tail）为 `errors * 5 <= n-i`（`qualtrim.pyx:147,161`），即错误按"当前已扫到的尾巴长度"而非整条读长计。长度 < 3 的尾巴忽略（`best_index < 3` → 0；`best_index > n-3` → n）。
    - **quirk**：错误率约束 `errors * 5 <= ...` 只在 `score > best_score`（即要更新切点）**同一条 if 里**评估（qualtrim.pyx:147,161）。一旦某位置累积错误率超过 20%，`best_index` 便**冻结在之前的位置**不再后移，但扫描**继续**（不 break）——即"错误率超限后切点锁定，而非终止检测"。
-3. **`expected_errors`**（`--max-ee`）：用 Edgar et al. (2015) 公式从 Phred 质量计算期望错误数 `sum(10^(-Q/10))`，用于按总错误数过滤（非修剪）。C 实现 `expected_errors_from_phreds`（`qualtrim.pyx:15`）。
+3. **`expected_errors`**（`--max-ee`）：用 Edgar et al. (2015) 公式从 Phred 质量计算期望错误数 `sum(10^(-Q/10))`，用于按总错误数过滤（非修剪）。C 实现 `expected_errors_from_phreds`（`qualtrim.pyx:16`）。
 
 ## 3. adapter 修剪算法：indel-aware 半全局比对
 

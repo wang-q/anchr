@@ -1,6 +1,6 @@
 # Celera Assembler（wgs-8.3rc2）：原版 OLC 组装器源码分析
 
-> 2026-08-13 整理，纯源码分析（`wgs-8.3rc2/`，revision 4627，2015-05-24 发布，
+> 2026-08-13 整理、2026-08-17 对照源码逐项复核修订，纯源码分析（`wgs-8.3rc2/`，revision 4627，2015-05-24 发布，
 > 即 CABOG / wgs-assembler）。与 `references/canu.md` 配套：Canu fork 自 Celera
 > **r4587**（更早），8.3rc2 是主干上更晚的 r4627——两条线随后分化。本文档记录
 > 原版 OLC（overlap → unitig → consensus → scaffold）结构，并逐组件与 Canu
@@ -23,6 +23,40 @@
 - **流水线**：merTrim（k-mer 修剪）→ overlap（mer overlapper）→ overlap error
   correction → finalTrim → unitig（utg/bog/bogart 三选一）→ consensus
   （cns/seqan/pbdagcon/pbutgcns）→ scaffold（CGW）→ 输出。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：reads 入 gkpStore（clear range 多档版本化）→ merTrim k-mer 修剪 →
+OlapFromSeeds overlap（k=9 seed + banded edit distance 概率上界扩展 + 454
+homopolymer 纠错，§4）→ finalTrim overlap 证据修剪（§5）→ BOG/BOGART unitig
+（best-edge greedy + 覆盖度证据 repeat split + mate 六层分类，§6）→ AS_CNS 列投票
+consensus（可选 pbdagcon 模板+DAG，§7）→ CGW mate 链接 scaffold（§8）。
+
+```
+reads (FRG) → gatekeeper/gkpStore（clear range 17 档，只改区间不动序列）
+  → merTrim（meryl k-mer 判定修剪）→ mercy（k-mer 纠错）
+  → overlap: OlapFromSeeds（k=9 seed 哈希 → banded edit distance 双侧扩展
+              → dovetail / contain；顺带 454 homopolymer 投票）
+  → overlap error correction（CorrectOlaps/FragCorrect 消费投票）
+  → OBT finalTrim（bestEdge/evidenceBased/largestCovered 定 clear range）
+  → unitig: utg/bog（BOG）或 bogart（AS_BAT）
+       greedy best-edge 布局 + placeContains/placeZombies
+       + mergeSplitJoin（bubble merge / repeat split / join，覆盖度证据 6/15）
+       + mate 证据（classifyMates 六层搜索 / InsertSizes 逐库估计）
+  → consensus: cns（MultiAlign bead/column 列投票）
+       或 pbdagcon/pbutgcns（模板 + POA-DAG，PacBio 路线）
+  → scaffold: CGW（mate 链接 + biconnected 组件）
+  → 输出
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| overlap | OlapFromSeeds：k=9 seed → banded edit distance（概率上界 1e-4）先左定位再右扩展；dovetail/contain 二分 | §4 |
+| 修剪 | merTrim（k-mer 计数）+ finalTrim（overlap 证据写 clear range，序列不动） | §5 |
+| unitig | BOG/bogart：best-edge 图 + greedy 布局 + contained 放置 + mergeSplitJoin（非 unitig 覆盖 >6 与 ≥15 reads 确认才断 repeat）+ mate 驱动 | §6 |
+| consensus | AS_CNS：reads 按 overlap 布成 bead/column 十字链 MA → 逐列投票（质量加权 / 等位基因拆分 / SNP phasing）；pbdagcon 为模板+DAG 可选项 | §7 |
+| scaffold | CGW：mate 距离约束 + biconnected 组件合并（missing mates 容忍度可调） | §8 |
+| 存储 | gkpStore/ovlStore/tigStore 三库 + BAT 内存 bank（位打包 12B/overlap + erate 查找表 + mmap） | §9 |
 
 ## 2. 仓库结构（`src/`）
 
@@ -98,7 +132,7 @@ wgs-8.3rc2/
 
 1. **seed 查找**（`Get_Seeds_From_Store:2623` / `Read_Seeds:4335`）：k-mer seed，
    默认 `DEFAULT_KMER_LEN=9`（`OlapFromSeedsOVL.H:74`），候选按位置存储
-   （`Olap_Info_t`，含 `a_hang/b_hang/orient/k_count`，`:201-208`）。
+   （`Olap_Info_t`，含 `a_hang/b_hang/orient/k_count`，`OlapFromSeedsOVL.H:201-208`）。
 2. **扩展验证**（`Process_Seed:3868`）：对每个 seed 候选做 **banded edit distance**
    （`Edit_Array`/`Edit_Space`/`Edit_Match_Limit`，`EDIT_DIST_PROB_BOUND=1e-4`
    `OlapFromSeedsOVL.H:82`，对应 `NORMAL_DISTRIB_THOLD=3.62`、`ERRORS_FOR_FREE=1`），
@@ -159,10 +193,10 @@ setParentAndHang(518) / 输出
 ```
 
 - **bubble/repeat 判定用覆盖度证据**（`AS_BAT_MergeSplitJoin.C:46-48`）：
-  `SPURIOUS_COVERAGE_THRESHOLD=6`（非 unitig reads 覆盖 >6 才算 repeat 区）、
-  `ISECT_NEEDED_TO_BREAK=15`（确认 repeat junction 的最少 reads 数，同文件
-  `REGION_END_WEIGHT=15` 在 repeat 区端点虚构的 intersections 数，`:941/1396/1458`）——
-  比 Canu 的相似度阈值更"证据驱动"。
+  `SPURIOUS_COVERAGE_THRESHOLD=6`（非 unitig reads 覆盖 >6 才算 repeat 区，用例
+  `:941`）、`ISECT_NEEDED_TO_BREAK=15`（确认 repeat junction 的最少 reads 数，
+  用例 `:1458`）、`REGION_END_WEIGHT=15` 在 repeat 区端点虚构的 intersections 数
+  （用例 `:1396/:1401`）——比 Canu 的相似度阈值更"证据驱动"。
 - 辅助程序：`splitUnitigs.C`、`markRepeatUnique.C`、`computeCoverageStat.C`、
   `classifyMates*.C`（mate 分类）、`petey.C`。
 
@@ -221,7 +255,7 @@ mate（paired-end）是原版 unitig/scaffold 的核心证据（Canu 长读版�
    - `BaseCallQuality` 不只是多数：把某列 beads 按 **best allele / 其他等位基因 /
      guides（非 read 的 unitig 序列）** 三组分类（`BaseCall.C:118-144`），支持
      等位基因拆分（`split_alleles`）与 **SNP phasing**（`CNS_OPTIONS_DO_PHASING_
-     DEFAULT=1`，`MultiAlignment_CNS.H:38-40`）；majority 版才退化回"计数+平局
+     DEFAULT=1`，`MultiAlignment_CNS.H:41`）；majority 版才退化回"计数+平局
      用 QV 和打破"（`BaseCall.C:65-70`）。pgr 若做 polish，多数版已是够用的最简
      模型。
 3. **精炼**：`AbacusRefine.C`（abacus）、`MergeMultiAligns.C`、`ApplyAlignment.C`、
@@ -306,7 +340,7 @@ bestPath + min-coverage 修剪（为高噪声长读设计）。**pgr 完美匹�
 - 每条 unitig/contig 存为一个 **MultiAlign**（`MultiAlign.C`），dump 支持
   `properties / frags / unitigs / consensus / consensusGapped / layout /
   multialign / matepair / sizes / coverage / thinoverlap / fmap` 12 种视图
-  （`tigStore.C:35-46`）。其中
+  （分发在 `tigStore.C:904-941` 的 strcmp 链）。其中
   **layout** 视图即 read 在 contig 上的 placement（方向 + 坐标），是 pgr
   `asm layout` 输出的对应物。
 - BAT / CGW / consensus 各阶段读写同一 tigStore，靠 `unitig_status`
@@ -323,7 +357,7 @@ unitigger 把磁盘三库载入内存以提速（pgr `asm layout` 同款思路�
 - `OverlapCache`（`AS_BAT_OverlapCache.H:119-184`）：overlap 内存堆，`BAToverlapInt`
   位打包 **默认 12B/条**（8B word + 4B `b_iid`；仅在 read 长度位 <13 时才用 8B 变体，
   `:50` 注释 "12 bytes per overlap"）。字段为 `AS_OVS_HNGBITS` hang（各 19bit）+ `error`
-  `AS_BAT_ERRBITS`（`MIN 7 ~ MAX=AS_OVS_ERRBITS(12)`，`AS_BAT_OverlapCache.H:34-35`）
+  `AS_BAT_ERRBITS`（`MIN 7 ~ MAX=AS_OVS_ERRBITS(12)`，`AS_BAT_OverlapCache.H:35-36`）
   + `flipped` + `b_iid`（`:51-57` 为 12B 变体），工作态展开为 32B 的 `BAToverlap`（`:82-93`）。
   用 **memory-mapped
   cache 文件**（`AS_BAT/memoryMappedFile.H`）避免重读 ovlStore；用 `_OVSerate→_BATerate`
@@ -384,7 +418,7 @@ unitigger 把磁盘三库载入内存以提速（pgr `asm layout` 同款思路�
 | trimming | `AS_MER/merTrim.C` / `AS_OBT/finalTrim.C` | k-mer / overlap 修剪 |
 | unitig | `AS_BOG/BuildUnitigs.C` | BOG unitigger（utg/bog） |
 | unitig | `AS_BAT/bogart.C:416-519` | BOGART 主流程（placeContains:434/placeZombies:460/mergeSplitJoin:469/extendByMates:477/reconstructRepeats:486） |
-| unitig | `AS_BAT/AS_BAT_MergeSplitJoin.C:45-46` | bubble/repeat 覆盖度阈值 6/15 |
+| unitig | `AS_BAT/AS_BAT_MergeSplitJoin.C:46-48` | bubble/repeat 覆盖度阈值 6/15 |
 | unitig | `AS_BAT/classifyMates.C:34-73` | mate 分类（spur/chimera/BFS/DFS/RFS/suspicious） |
 | unitig | `AS_BAT/AS_BAT_InsertSizes.H:30-52` | 每库 insert size mean/stddev |
 | read 库 | `AS_PER/gkFragment.H` | gkpStore（Packed/Normal/Strobe + clear range 17 档 + mate 方向） |

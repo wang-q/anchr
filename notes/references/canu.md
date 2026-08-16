@@ -1,6 +1,7 @@
 # Canu（2.3）：OLC 组装器源码分析（overlap / layout / consensus）
 
-> 2026-08-13 整理，纯源码分析（`canu-2.3/`，版本 2.3，GitHub `marbl/canu`）。
+> 2026-08-13 整理、2026-08-17 对照源码逐项复核修订，纯源码分析（`canu-2.3/`，
+> 版本 2.3，GitHub `marbl/canu`）。
 > Canu 是 Celera Assembler r4587（`wgs-assembler`）的 fork，面向高噪声单分子
 > 长读（PacBio CLR/ONT）。**与 pgr 的关系**：不是要对 reads 做 OLC，而是用户
 > 的设计意图——**把不同 k 各自生成的 unitigs 当"伪 reads"，在 unitig 层做
@@ -25,19 +26,43 @@
 - **流水线四步**（`pipelines/canu.pl`，1209 行）：①correction ②trimming
   ③unitigging（= assembly）④outputs；每步各自 meryl 计数 + overlap。
 
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：三段各自"meryl 计数 → overlap → 下游"——correction（MHAP overlap +
+FALCON 列 DP 把 raw reads 纠成高精度 reads，§4.2/§6）→ trimming（overlapInCore
++ 修剪）→ unitigging（overlapInCore + bogart best-edge greedy 布局 + repeat
+breaking + utgcns POA consensus，§5/§6）→ 输出 contigs/GFA/BAM。
+
+```
+raw reads
+  ├─① correction:  meryl → overlap(mhap) → falconConsensus ─▶ corrected reads
+  ├─② trimming:    meryl → overlap(ovl=overlapInCore) → trimReads/splitReads
+  └─③ unitigging:  meryl → overlap(ovl) → readErrorDetection → overlapErrorAdjustment
+                     → bogart（best-edge 图 → greedy tig → repeat breaking）
+                     → utgcns（template stitch + edlib + POA-DAG bestPath）
+                     → contigs.fasta / GFA / BAM
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| overlap | cor 默认 MHAP（MinHash sketch + tf-idf 式加权 + LSH）；obt/utg 默认 overlapInCore（k-mer seed 哈希 → 对角合并 → Myers 位向量扩展；按 read id 分块建索引控内存） | §4 |
+| 布局 bogart | 每 read 5'/3' 各选一个 best edge（覆盖不足 80% 自动放宽误差率重算）→ 互惠种子按 chunk 长度降序 greedy 建 tig → contained/orphan/bubble 收尾 → repeat breaking（confused-edge + 外部 reads 证据，无跨越则打断） | §5 |
+| consensus utgcns | 按 layout 顺序 edlib 逐步"缝"成模板（期望 overlap 局部窗口）→ reads 重比对 → POA-DAG heaviest path + min-coverage 修剪（默认 0 不裁） | §6 |
+| 纠错 falconConsensus | overlap 布局的证据 reads → 列 DP + link 回溯（非 POA） | §6 |
+
 ## 2. 仓库结构（OLC 相关）
 
 ```
 canu-2.3/src/
 ├── pipelines/canu.pl        # 总流水线（cor/obt/utg 三阶段调度）
-├── meryl/                   # k-mer 计数（每阶段先统计 abundance，供 overlap/纠错用）
-│   ├── overlapInCore/           # ★ Celera 经典 k-mer seed overlap（obt/utg 阶段默认，见 §3）
-│   ├── overlapInCore.C              # 入口 + 全局哈希表
+├── overlapInCore/           # ★ Celera 经典 k-mer seed overlap（obt/utg 阶段默认，见 §3）
+│   ├── overlapInCore.C              # 入口 + 全局哈希表（分块建索引控内存）
 │   ├── overlapInCore-Build_Hash_Index.C   # 全 reads k-mer 建哈希索引
 │   ├── overlapInCore-Find_Overlaps.C      # ★ 滑窗查哈希 → 候选命中（Find_Overlaps:235）
 │   ├── overlapInCore-Process_String_Overlaps.C  # ★ 对角合并 → Myers 扩展（:581/:442）
 │   ├── edalign.C                   # Myers 位向量扩展（Extend_Alignment）
 │   └── overlapPair.C               # overlap 记录/质量
+├── meryl/                   # k-mer 计数（每阶段先统计 abundance，供 overlap/纠错用）
 ├── mhap/                    # MHAP 2.1.3 jar + mhapConvert（correction 默认 overlapper；obt/utg 默认 ovl，见 §3）
 ├── bogart/                  # ★ unitigger（BOG，Celera 血统）
 │   ├── bogart.C                     # ★ 主流程（阶段标记见 §5）
@@ -82,7 +107,8 @@ doUnitigging(1179)  meryl → overlap(utg, ovl) → readErrorDetection →
                     → generateOutputs
 ```
 
-- overlapper 默认**并非三段全用 mhap**：`Defaults.pm:955-957` 设
+- overlapper 默认**并非三段全用 mhap**：`pipelines/canu/Defaults.pm:955-957` 经
+  `setOverlapDefaults()` 设
   `corOverlapper=mhap`、`obtOverlapper=ovl`、`utgOverlapper=ovl`（correction 用
   MHAP，trimming/unitigging 用 overlapInCore）；只有 `-fast` 模式才把三段全设成
   `mhap`（`canu.pl:125-127`）。`canu.pl:710-720` 有醒目的 `DO-NOT-USE` /
@@ -235,7 +261,7 @@ consensus 算法字符分发：
      失败则降 min overlap、升误差率重试（`alignAgain` 标签，`:427` 起）。
   2. 所有 reads 用 edlib 重比对到模板（`alignEdLib:675`：band 递增、错误率
      递增重试；`ERROR_RATE_FACTOR=4`、`NUM_BANDS=2` ⇒ `MAX_RETRIES=8`，
-     见 `unitigConsensus.C:34-36`）。
+     见 `unitigConsensus.C:35-37`）。
   3. 比对建成 PacBio 的 AlnGraphBoost POA-DAG（`libpbutgcns/AlnGraphBoost.C`），
      `mergeNodes:188` 合并等价节点。
   4. `bestPath:490`（heaviest path）→ `consensusNoSplit:386`：沿 best path 取
