@@ -1,6 +1,6 @@
 # fairy（fairy-prime）：FracMinHash 稀疏采样 + 宏基因组 coverage（源码分析）
 
-> 2026-08-13 整理，基于本地 `fairy-prime/`（v0.5.8，2024 Microbiome，
+> 2026-08-13 整理、2026-08-17 对照源码逐项复核修订，基于本地 `fairy-prime/`（v0.5.8，2024 Microbiome，
 > bluenote-1577/fairy，从 sylph fork）。功能：多样本宏基因组 MAG binning
 > 的 contig coverage 计算，替代 all-to-all read alignment（BWA/minimap2），
 > 声称快 100-1000×。对应 pgr 语境：`pgr fq norm` 大数据量方案调研中
@@ -22,6 +22,41 @@
 - **入口**：`main.rs` 把 `coverage` 恒以 pseudotax=true 调用
   （`contain(args, true)`）→ 实际走 pseudotax 分支；sketch 的 dedup
   默认关闭（见 §8 quirk）。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：`fairy sketch`（reads → FracMinHash 1/50 采样 → 每样本
+kmer→multiplicity 表落盘 `.bcsp`）+ `fairy coverage`（contig sketch ×
+样本表查询 → 泊松剪枝 + λ 四种估计 + pseudotax 二次分配 → MetaBAT2 兼容
+cov/var 矩阵）——用"稀疏 kmer 计数查询"替代 all-to-all read alignment。
+
+```
+fairy sketch <reads...>
+  → FracMinHash 采样（hash < u64::MAX/c，默认 c=50 ≈ 1/50）
+      标量滚动 2-bit canonical / AVX2 4 通道（仅 k=21/31）
+  → read 去重（默认关闭 --no-dedup=true；开启时 pair marker k=16 指纹
+      门控计数：同一 read-pair 对每 kmer 只贡献一次）
+  → kmer_counts: FxHashMap<u64,u32> → SequencesSketchEncode → bincode .bcsp
+
+fairy coverage <contigs...> <sketches...>
+  → contig sketch（sketch_genome_individual：FracMinHash + min-spacing=30；
+      重复 kmer 去重被 || true 短路禁用，见 §8）
+  → 逐 contig 的 genome_kmers 查样本表 → covs 向量
+  → get_stats：median → 泊松剪枝（median<30）→ λ 估计（默认 ratio，
+      隐藏 --mme/--nb/--mle）→ 100×bootstrap CI（固定种子）
+  → pseudotax（main 恒 true）：winner_table 按 ANI 最高重归属共享 kmer
+      → 二次 get_stats → 输出（round-2 校正被注释，见 §8）
+  → MetaBAT2 / MaxBin2(--maxbin-format) / aemb(--aemb-format) TSV
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| FracMinHash 采样 | `hash < u64::MAX/c`，canonical 2-bit 直接 murmur64；AVX2 仅 k=21/31 | §3 |
+| sketch 存储 | FxHashMap 内存 + `Vec<(u64,u32)>` bincode 落盘（序列化快一个量级） | §4 |
+| read 去重 | pair marker（k=16 偶/奇位指纹）+ 按 kmer 计数门控；默认整体关闭 | §4/§8 |
+| coverage 统计 | median → 泊松剪枝 → λ（ratio/mme/nb/mle）→ bootstrap CI | §5 |
+| pseudotax | 共享 kmer 按 ANI 最高 genome 重归属，消除跨物种重复计数 | §5 |
+| 输出 | contig×样本 cov/var 矩阵（MetaBAT2 兼容 + 两种变体） | §5 |
 
 ## 2. 架构
 

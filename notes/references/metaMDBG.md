@@ -1,6 +1,6 @@
 # metaMDBG（1.4）：minimizer-space de Bruijn 图宏基因组组装器（源码分析）
 
-> 2026-08-13 整理，纯源码分析（`metaMDBG-metaMDBG-1.4/`，版本 `1.4`）。metaMDBG 是
+> 2026-08-13 整理、2026-08-17 对照源码逐项复核修订，纯源码分析（`metaMDBG-metaMDBG-1.4/`，版本 `1.4`）。metaMDBG 是
 > 面向**长而准的宏基因组 reads**（PacBio HiFi、Nanopore R10.4+）的组装器，论文
 > [High-quality metagenome assembly from long accurate reads with metaMDBG]
 > (Nature Biotechnology 2023)，作者 Gaëtan Benoit、Rayan Chikhi、Christopher
@@ -35,6 +35,45 @@
 - **checkpoint 断点续跑**：每步写 `tmp/checkpoints/<step>.checkpoint` 文件，
   重跑同一命令自动跳过已完成步骤（README 明示，`AssemblyPipeline.hpp` 里
   `createCheckpoint`/`isCheckpoint` 实现）。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：reads → FracMinHash 式 minimizer 采样（密度 0.5%）→ 以
+**k′-min-mer（连续 k 个 minimizer）** 为节点建 minimizer-space de Bruijn 图 →
+**multi-k 迭代**（k 从 4 到 ≈N50×密度×2，每轮 +1）：跨轮用更大 k 的 solid
+k′-min-mer 验证上一轮 unitig 连接（跨接验证，§4.1.1），同轮内渐进丰度过滤
+（1.1× 起步、~10% 步长逐级删低覆盖 unitig，§6.3）→ 最终轮 minimap2+POA
+重建碱基序列并抛光。
+
+```
+reads（HiFi / ONT R10）
+  → readSelection：FracMinHash minimizer 采样（hash < density×maxHash）
+      （HiFi 同聚体压缩；ONT 先 minimap2 read 纠错）
+  ── multi-k 迭代（firstK=4 … lastK≈N50×0.005×2，每轮 k+1）──
+  ① createGraph(k)：计数 solid k′-min-mer（reads + 上轮 unitig 序列）
+      + computeNextUnitigGraph：加载上轮 unitig 图
+          solveEdges               跨接 doublet（前 1 + 后 k−1）查表选边/压实
+          removeUnsupportedUnitigs 内部 k′-min-mer 无支撑 → 整条删
+          solveSmallUnitigs        单 k′-min-mer 小节点 → triplet 两两重连
+  ② generateContigs(k)：ProgressiveAbundanceFilter
+        simplify（superbubble/tip）⇄ removeAbundanceNoQueue（1.1×起、
+        ~10% 步长、删后 recompact）→ 每个新 cutoff 存图快照
+        generateContigs3：从最高 cutoff 倒序消费快照 → contigs.nodepath
+  ③ toMinspace：nodepath → minimizer 序列 → unitig_data.txt 反馈下一轮
+  ── 最终轮（isFinalPass）──
+  derepSmall（包含去重）→ removeOverlaps（首尾重叠截断）
+  → removeRepeats（reads 桥接证据断开未桥接重复）
+  → toBasespace：minimap2 reads→contig + POA 抛光 → contigs.fasta.gz
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| minimizer 采样 | FracMinHash 式阈值采样（非窗口最小），首尾各丢 1 个 k-mer，重复 minimizer 剔除 | §5 |
+| k′-min-mer 计数 | 外部分区（nbBases/20Gb，clamp [cores,5000]）+ singleton rescue | §6.1 |
+| 跨接验证 | doublet/triplet 用当前 k 的 solid 表选边——multi-k 迭代核心 | §4.1.1 |
+| 渐进丰度过滤 | 1.1× 起步 ~10% 步长逐级删低覆盖 unitig + recompact；cutoff 快照倒序输出 | §6.3 |
+| unitig 丰度 | 组成 k′-min-mer 丰度向量取中位数（merge 保持有序不变量） | §6.2 |
+| 碱基重建 | 内嵌 minimap2 分片映射 + spoa POA 抛光；覆盖度裁两端 75 bp | §7.2 |
 
 ## 2. 仓库结构
 
@@ -158,7 +197,7 @@ removeUnsupportedUnitigs(unitigGraph); // 2. 删内部 k′-min-mer 无支撑的
 solveSmallUnitigs(unitigGraph);     // 3. 处理长度恰为单个 k′-min-mer 的小 unitig
 ```
 
-1. **`solveEdges`**（`CreateMdbg.cpp:3874`）：对每条相邻 unitig 边
+1. **`solveEdges`**（`CreateMdbg.cpp:3903`）：对每条相邻 unitig 边
    `pred → succ`，用 `getDoublet2` 构造**跨接 k′-min-mer（doublet）**：
    前驱末尾 1 个 minimizer + 后继开头 k−1 个 minimizer（长度恰为**当前** k）。
    查当前轮计数表 `_mdbgNodesLight`（丰度 ≤ 1 的不进表，见下）：
@@ -166,7 +205,7 @@ solveSmallUnitigs(unitigGraph);     // 3. 处理长度恰为单个 k′-min-mer 
      （`CreateMdbg.cpp:4063`）把 doublet 压实成新 unitig 节点，替换原直接边
      （`pred → edgeNode → succ`）；
    - doublet 不存在 → `removeSuccessor` 删除该边。
-   无论支持与否原边都会被移除（`CreateMdbg.cpp:4000-4001`），区别只在于
+   无论支持与否原边都会被移除（`CreateMdbg.cpp:3997-3998`），区别只在于
    支持时经由新 edge node 重建连接、不支持时直接断开。
 2. **`removeUnsupportedUnitigs`**（`CreateMdbg.cpp:4138`）：unitig 内部所有
    当前 k 的 k′-min-mer 必须在 `_mdbgNodesLight` 中存在，否则整条 unitig 删除

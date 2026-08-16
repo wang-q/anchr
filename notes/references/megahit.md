@@ -608,6 +608,15 @@ G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
   配套修正 `coverage()` dominant-offset 的峰比门槛 0.7→0.6（120 bp indel
   会把 histogram 分成 66%/34% 两峰，主峰 ratio 0.664 被旧门槛跳过导致
   跨主 K 近重复去重失效、Dup 1.147；identity ≥99% 兜底）。
+* **通用化（2026-08-17，去 G37 特调）**：模板 multik 分支不再硬编码
+  KS/验证集——`anchr asm multik --print-ks` 从 reads N50 输出自适应主 K
+  序列（`auto_ks_for_reads`，150 bp → 50/70/90/110，450 bp →
+  51..251），第一主 K 先跑引导其余，验证轮用固定间隔规则（每 3 个取 1
+  个）。顺带修复模板 `\${}` 转义 bug（Tera 不处理 `${}`，`\$` 残留让
+  bash 把变量当字面量——57 处全局修复）。G37 7 组端到端（auto 版）：
+  N50 133.1K、**GF 99.899%（最高）**、Dup 1.005、0 mis——参数完全由
+  reads 自适应，无数据集特定值；N50 低于手写 31..192 版（318K）但 GF
+  更高，且换 reads 长度自动调整。
 6. **本地组装（§4.5）**：MEGAHIT 用 reads 回帖 + IDBA-UD 内核做 contig 端点延伸，
    与 anchr `fq extend`（tadpole 沿图延伸）目标相近；其 `min_mapping_len=75`、
    `LocalRange = min(2*mean, mean+3*sd)` 封顶 650 等参数可对照。

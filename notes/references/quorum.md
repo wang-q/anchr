@@ -1,6 +1,6 @@
 # quorum-1.1.2：基于 k-mer 计数的 read 纠错（源码分析）
 
-> 2026-08-13 整理，纯源码分析（`quorum-1.1.2/`）。quorum 是 Guillaume Marçais
+> 2026-08-13 整理、2026-08-17 对照源码逐项复核修订，纯源码分析（`quorum-1.1.2/`）。quorum 是 Guillaume Marçais
 > 的 read 纠错工具，依赖 Jellyfish 2.0 的 k-mer 哈希计数；项目较老（源码
 > Copyright 2012，NEWS 仅 "Initial release 0.1.0"，无后续版本记录），但
 > **算法基础扎实**，是 pgr 未来做 read 纠错的主要参考。
@@ -14,6 +14,43 @@
 - **输入输出**：输入 FASTQ；默认输出 `quorum_corrected.fa`（FASTA），
   `--paired-files` 时输出 `_1.fa`/`_2.fa`。FASTA 头带纠错日志：
   `>1204 86:sub:T-C 91:3_trunc 62:5_trunc`（坐标 0-based）。
+
+### 1.1 核心算法与流程总览（先读这节）
+
+**一句话**：`quorum_create_database` 用 Jellyfish 哈希做**带质量位的
+canonical k-mer 计数**（高质量 3 起步、低质量不污染高质量计数）→
+`quorum_error_correct_reads` 逐 read 找高质量 anchor、向两端 `extend`：
+每步查「第 0 位替换为 A/C/G/T」的 4 个延续计数，按 count==0 / ==1 /
+多候选 + Poisson 碰撞检验决定截断/替换/保留，滑动窗口内错误数超限即
+回退截断。
+
+```
+FASTQ ── quorum.in（Perl 入口：质量编码检测、-k 24、-s 200M、-b 7）──
+  ① quorum_create_database
+      双滚动 mer（fwd/rev）→ canonical（m<rm ? m : rm）→ hash_with_quality.add
+      编码 (count<<1)|quality：高质量 → 3 起步；低质量不污染高质量计数
+      原子 CAS 无锁并发；哈希满 barrier 同步翻倍扩容 → .jf
+  ② quorum_error_correct_reads
+      find_starting_mer：连续 good(2) 个高质量计数 ≥ anchor-count(3)
+        的 k-mer 作 anchor（污染命中即丢；找不到 → 丢弃/单碱基 N）
+      extend（forward/backward 模板对称）：
+        get_best_alternatives：4 个替代计数（仅最高质量等级）
+        count==0 → 截断；==1 且 ≠ 原碱基 → 替换；>1 → Poisson 碰撞
+          检验 / 候选延续性仲裁（选最接近 prev_count，平局用下一碱基）
+      err_log：滑窗(-w 10)内错误 ≥ -e 3 → 回退截断（防过度纠错）
+  ③ 输出 FASTA（header 带 pos:sub:X-Y / pos:N_trunc 日志）
+
+双端：merge_mate_pairs 交错 | EC（强制 --no-discard）| split_mate_pairs 拆回
+```
+
+| 核心块 | 机制 | 详见 |
+|---|---|---|
+| 质量加权计数 | `(count<<1)\|quality` 编码；高质量 3 起步，低质量证据不膨胀计数 | §3.1 |
+| 查询原语 | `get_best_alternatives`：4 替代计数 + 最高质量等级 + ucode | §3.2 |
+| anchor + extend | 连续高质量 k-mer 起锚，双向模板化逐碱基扩展 | §4.1/§4.2 |
+| Poisson 检验 | 多候选时 `p = Σcounts × ε/3`，碰撞概率小则保留原碱基 | §4.2/§4.4 |
+| 窗口限错 | err_log 滑窗错误数超限回退截断到窗口起点 | §4.3 |
+| 方向抽象 | fwd/bwd 的 mer/ptr/counter 三层适配器统一 extend 代码 | §4.5 |
 
 ## 2. 架构：入口脚本 + 四个工具
 
