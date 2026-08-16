@@ -27,7 +27,7 @@
   环状旋转等价）——multik 在 1 Mb 规模保持 100% 完整无 N；
 * **扩展性**：内存 ≈ 0.8 GB / 1 Mb（计数表 + 图 + reads 缓冲）；真实细菌
   基因组（~5 Mb）预计 ~45 s / ~4 GB，可接受；宏基因组（Gb 级）需外部
-  分桶（`design/asm-assemble.md` §13，todo §2）；
+  分桶（`design/asm-unitig.md` §13，todo §2）；
 * **对比**：`asm olc`（并行多 k + 启发式）Lambda 20k 最长 19 kb vs
   multik 46.5 kb（短读）/ 100%（长读）——迭代路线在连通性与完整性上
   全面占优（无冗余 + 计数证据选边）。

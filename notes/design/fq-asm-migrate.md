@@ -148,7 +148,8 @@ docs），依赖 pgr crate 的基础模块：
   project-understanding 索引、todo、CHANGELOG；
 - 参考笔记随迁：references 9 个（bcalm/canu/celera/cutadapt/fairy/
   metaMDBG/quorum/sickle/skesa）+ design 6 个（fq-trim/merge-replace、
-  asm-assemble/asm-map/fq-range/asm-olc）从 pgr 移除；
+  asm-assemble/asm-map/fq-range/asm-olc；asm-assemble 2026-08-17 拆为
+  asm-contig/asm-unitig）从 pgr 移除；
 - todo 条目移交：pgr `notes/todo.md` 中 anchr 侧待办已移交 anchr todo
   （anchr 模板替换、fq norm 精确 vs 近似定稿、asm olc 参数验证、OLC
   宏基因组/长读验证），pgr 保留指针条目；fq/asm 已完成记录与"明确不做"
@@ -306,7 +307,8 @@ libs 内嵌 `#[cfg(test)]`（qual.rs 的 detect 测试留 pgr，其余随 libs �
 | :--- | :--- |
 | `fq-trim-replace.md` | `fq` trim 系列移植（BBTools 对照） |
 | `fq-merge-replace.md` | `fq` merge/ec 系列移植（BBTools 对照） |
-| `asm-assemble.md` | `asm` contig/unitig/olc |
+| `asm-contig.md` | `asm contig`（2026-08-17 自 asm-assemble.md 拆出） |
+| `asm-unitig.md` | `asm unitig`（2026-08-17 自 asm-assemble.md 拆出） |
 | `asm-map.md` | `asm map` |
 | `fq-range.md` | `fq range`（FASTQ `.loc` 索引） |
 | `asm-olc.md` | `asm ovlp/layout/cns/olc` |

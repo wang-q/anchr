@@ -396,7 +396,7 @@ DCC 数）。输出经 `Character_Buffer` 缓冲后写 `Output_Sink`。
 - **anchr 现状**：`anchr asm unitig`（`src/cmd/asm/unitig.rs` +
   `src/libs/asm/assemble.rs::assemble_unitigs`）是 **BCALM 2 的移植**（`ograph.cpp`
   `graph3` 语义），不是 cuttlefish 的移植；cuttlefish 与 bcalm 是同一目标
-  （cdBG 构建）的两条不同技术路线，见 `notes/design/asm-assemble.md` §10。
+  （cdBG 构建）的两条不同技术路线，见 `notes/design/asm-unitig.md` §10。
 - **可借鉴点**：
   1. **边中心（edge-centric）建图**：以 `(k+1)-mer` 为边、`k-mer` 为顶点枚举，
      顶点可从边直接取前后缀（`Kmer<k>::from_prefix/from_suffix`，`ODD_K` 保证

@@ -1,6 +1,6 @@
 //! `anchr fq qc` — FastQC-compatible reads quality-control statistics.
 //!
-//! M1 (design: notes/design/qc.md): statistical modules with
+//! M1 (design: notes/design/fq-qc.md): statistical modules with
 //! `fastqc_data.txt` / `summary.txt` output; per-file subdirectories named
 //! `{input}_fastqc/` (fastqc layout).
 

@@ -72,7 +72,7 @@ solid k-mer 生成 unitig/contig，参数按各自常规用法（存在不对称
   与 BBHash MPHF 是主要来源。per-chunk 去重 + 树状合并
   消除了含重复的全局 key 中间体后相对旧实现（1.24/2.9/5.3 GB）大幅
   改善，chunk 尺寸 4096 → 16384 再降 ~25%（根因与后续方向见
-  [asm-assemble.md](../design/asm-assemble.md)
+  [asm-unitig.md](../design/asm-unitig.md)
   §9）；
 - **contig vs unitig**：三种 anchr 模式共享同一 k-mer 表（RSS 几乎
   相同），种子化贪心遍历比严格压缩合并得更多——full 上 contig 97 条、
@@ -90,7 +90,7 @@ solid k-mer 生成 unitig/contig，参数按各自常规用法（存在不对称
   环状 unitig 的表示与 bcalm 的 k-mer 过滤/压缩不完全一致；canonical
   k-mer 集合核对几乎相等（578 297 vs 578 298，仅缺 1 个）。
   bcalm 保留全部 unitig 的语义分析（顶点分解、无损压实，含旧
-  `contained` 的历史实测）见 [asm-assemble.md](../design/asm-assemble.md)
+  `contained` 的历史实测）见 [asm-unitig.md](../design/asm-unitig.md)
   §10；
 - **确定性与功能**：anchr 的 walk 单线程、扫描顺序无关，输出确定性；
   计数阶段并行但结果与并行度无关。原生支持 gz 输入、FASTQ/FASTA、

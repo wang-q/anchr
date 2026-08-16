@@ -2,7 +2,7 @@
 
 > 仅保留 actionable 待办；历史结论、已完成项与细节见各 design/benchmark/
 > audit 文档（索引见 `project-understanding.md`；2026-08-15 会话交接见
-> `design/asm-olc-modern-flow.md`；明确不做清单见
+> `design/asm-olc.md` §15；明确不做清单见
 > `project-understanding.md` §6.4）。
 
 ## 待实现
@@ -117,8 +117,8 @@
 - pgr rev 更新流程 + `.cargo/config.toml` patch 发布差异
   （`project-understanding.md` §8.1）；
 - pgr supermer 质量门控：落地后 FASTQ 可去掉 direct 回退
-  （`asm-assemble.md` §12.1）；
-- pgr 并行读 gz（`asm-assemble.md` §12.3，风险>收益暂缓）；
+  （`asm-unitig.md` §12.1）；
+- pgr 并行读 gz（`asm-unitig.md` §12.3，风险>收益暂缓）；
 
 ## 待验证 / 等数据到位
 

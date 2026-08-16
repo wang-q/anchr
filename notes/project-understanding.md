@@ -209,7 +209,7 @@ dazzler 流水线（overlap/orient/merge 及外部 LAshow/daligner）也已废�
 - 不搬 pgr 专属基准：`benches/` 33 个 .rs 与 `notes/benchmarks/` 12 篇
   均服务 pgr 剩余命令/基础层，留在 pgr；
 - 不做并行 walk（`--parallel-walk` 已撤：多阶段线程池叠加会卡死系统，
-  教训见 `design/asm-assemble.md` §12.2）。
+  教训见 `design/asm-unitig.md` §12.2）。
 
 ## 7. 与周边项目的关系
 
@@ -258,13 +258,14 @@ dazzler 流水线（overlap/orient/merge 及外部 LAshow/daligner）也已废�
 
 - **组装流程链**：`fq`（trim/ec/merge/norm）→ `asm unitig/contig` →
   `asm ovlp/layout/cns/olc` → `asm map` → `template` 编排；
-  文档：`docs/fq.md`、`docs/asm.md`、`notes/design/asm-assemble.md`、
-  `notes/design/asm-olc.md`、`notes/design/asm-map.md`；
+  文档：`docs/fq.md`、`docs/asm.md`、`notes/design/asm-contig.md`、
+  `notes/design/asm-unitig.md`、`notes/design/asm-olc.md`、
+  `notes/design/asm-map.md`；
 - **BBTools 替换链**：`fq clump/split/sample/clean/filter/merge/ec-*/norm`
   对照 39.38 golden；文档：`notes/design/fq-trim-replace.md`、
   `notes/design/fq-merge-replace.md`、`notes/references/bbtools.md`；
 - **Overlap 工具**：`contained`/`dazzname` 已删除（2026-08-15，见
-  `notes/design/asm-olc-modern-flow.md`）；`covered` 命令已废弃（pgr
+  `notes/design/asm-olc.md` §15）；`covered` 命令已废弃（pgr
   runlist 替代）；基准 `benches/covered_benchmark.rs`。
 
 ## 10. 设计笔记索引（notes/design/）
@@ -274,14 +275,14 @@ dazzler 流水线（overlap/orient/merge 及外部 LAshow/daligner）也已废�
 | `fq-asm-migrate.md` | 迁移方案档案（阶段 1-4 + 批次 + 核对清单） |
 | `fq-trim-replace.md` | trim 流水线 BBTools 替换（8 步 + 入口映射） |
 | `fq-merge-replace.md` | merge/ec 系列 BBTools 替换 |
-| `asm-assemble.md` | contig/unitig/olc 组装设计 |
+| `asm-contig.md` | `asm contig`：tadpole contigMode 迁移（2026-08-17 自 asm-assemble.md §1-7 拆出） |
+| `asm-unitig.md` | `asm unitig`：cdBG unitig 压实与计数基础设施（2026-08-17 自 asm-assemble.md §8-13 拆出） |
 | `asm-map.md` | perfect-mode map 移植 |
 | `fq-range.md` | FASTQ `.loc` 索引（range 命令） |
-| `asm-olc.md` | OLC 三段设计 |
+| `asm-olc.md` | OLC 三段设计 + §14 改造 + §15 现代流程总结（fq→multik→anchor→olc--unitigs→quast，2026-08-15 会话收官与用户裁定；自 asm-olc-modern-flow.md 并入） |
 | `asm-multik.md` | multi-k 迭代组装（unitig 图跨轮验证，借鉴 metaMDBG；无 N 染色体核心方向；§9 防 misassembly（bridge_filter/split_by_bridge）、§10 metaMDBG 对比，2026-08-15 并入） |
-| `asm-olc-modern-flow.md` | 现代组装流程总结（2026-08-15 会话收官：fq→multik→anchor→olc--unitigs→quast；完整总结与用户裁定） |
 | `fq-validation.md` | fq 前处理验证计划（2026-08-15：与老流程 reads 准备阶段逐一对账 + P0-P5 行动计划） |
-| `qc.md` | 自有 QC 方案设计（FastQC/Falco 双参考，M1-M4 里程碑） |
+| `fq-qc.md` | 自有 QC 方案设计（FastQC/Falco 双参考，M1-M4 里程碑；`fq qc` 命令） |
 
 ## 11. 外部工具参考索引（notes/references/）
 
@@ -311,5 +312,5 @@ dazzler 流水线（overlap/orient/merge 及外部 LAshow/daligner）也已废�
   基因组 → 单条 100%，9.4 s / 816 MB）；
 - `notes/benchmarks/README.md`：benchmarks 目录索引；
 - `notes/todo.md`：待办清单（仅 actionable 项，历史结论与细节见各
-  design/benchmark 文档，会话交接见 `design/asm-olc-modern-flow.md`）；
+  design/benchmark 文档，会话交接见 `design/asm-olc.md` §15）；
 - 本文档为项目理解与索引入口；`AGENTS.md` 为行为准则。

@@ -33,7 +33,8 @@
 
 BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../design/fq-trim-replace.md) §4.2、
 [fq-merge-replace.md](../design/fq-merge-replace.md)、
-[asm-assemble.md](../design/asm-assemble.md)）：
+[asm-contig.md](../design/asm-contig.md)、
+[asm-unitig.md](../design/asm-unitig.md)）：
 
 | BBTools 工具 | 入口类 | 源码位置 | anchr 目标 |
 | :--- | :--- | :--- | :--- |
@@ -58,7 +59,7 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../desig
    --dupesubs 0` 整对去重，N 通配精确匹配，保留期望错误更少的一对。
 3. **tadpole 内存模型**：多字 `Kmer`（`Vec<u64>` 共 2k 位，镜像 BBTools long
    array），k 无上限；逐字节一致需复刻其 `-Xmx` 相关内存语义，已文档化偏差
-   （[asm-assemble.md](../design/asm-assemble.md)）。
+   （[asm-contig.md](../design/asm-contig.md)）。
 4. **bbmap perfectmode**：种子-验证、完美匹配（无错配无缺口）、`ambiguous=all`
    语义在 `current/align2/AbstractMapThread.java:1371` 确认（`maxMismatches=
    (PERFECTMODE||SEMIPERFECTMODE)?0:...`，另见 :810 门控"imperfect 不可完美映射"）
@@ -153,7 +154,7 @@ BBTools 入口 → anchr/pgr 目标（映射出处 [fq-trim-replace.md](../desig
 | `mode` | contig | contig/extend/correct 等 |
 
 > 内存模型：多字 `Kmer`（`Vec<u64>` 共 2k 位）镜像 BBTools long array，k 无上限——
-> 逐字节一致需复刻其 `-Xmx` 内存语义（详见 `asm-assemble.md`）。
+> 逐字节一致需复刻其 `-Xmx` 内存语义（详见 `asm-contig.md`）。
 
 **延伸/分支（junction）判定**（`assemble/Tadpole.java`）：
 - 参数硬编码默认：`minExtension=2`、`minCoverage=1`、`minCountSeed=3`、`minCountExtend=2`、

@@ -501,7 +501,7 @@ N50 24,445（v7 26,562，-8%：宁断勿嵌合的正确性代价）、Genome fra
 
 * `references/metaMDBG.md` §4.1.1（跨接验证机制，2026-08-14 重读补充）
 * `design/asm-olc.md`（现有并行多 k OLC；v1 素材与对照）
-* `design/asm-assemble.md` §8（`asm unitig` 语义与 L: 边）
+* `design/asm-unitig.md` §8（`asm unitig` 语义与 L: 边）
 * `pgr: libs/kmer/supermer.rs`（FASTA 默认计数路径）
 
 <!-- 以下内容并入自 `asm-multik-misassembly.md`（2026-08-15 文档合并） -->
