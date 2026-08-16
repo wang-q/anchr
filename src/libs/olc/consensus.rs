@@ -591,7 +591,10 @@ pub(crate) fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
         // (e.g. a 120 bp insertion leaves 76% at one offset); the banded
         // identity below tolerates the indel, so the peak-ratio bar is only
         // a candidate filter — the >=99% identity check does the judging.
-        if hits >= 100 && ratio >= 0.7 {
+        // A large internal indel can split the histogram into two near-equal
+        // peaks (e.g. 66%/34% for a 120 bp insertion); the peak-ratio bar is
+        // only a candidate filter, the >=99% identity check does the judging.
+        if hits >= 100 && ratio >= 0.6 {
             let hay_len = haystack.len() as isize;
             let nd_len = needle.len() as isize;
             let start = off.max(0) as usize;

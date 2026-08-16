@@ -558,6 +558,16 @@ G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
   192），其余主 K 并行 + `--guide-contigs unitigs_K31.fasta`。MG1655 验证
   因大 reads 计算成本过高暂缓（K192 引导 ~20 min/组 + 下游 olc 更慢），
   G37 端到端已支撑落地。
+* **性能优化：验证轮稀疏化（2026-08-17）**：模板 multik 的 K_LIST 原来是
+  "当前主 K + 所有更大 k"（11 个 k → 10 个验证轮，66 次全量计数/组——
+  MG1655 单组 20+ min）。对照 SKESA（`steps=11` 但增量延伸）与 megahit
+  （8 个稀疏 k）后实验：验证轮从 11 个减到 3 个（`VERIFY_KS="71 121 192"`），
+  **单主 unitigs 完全一致**（G37 K31：751/12,310 相同）、时间 2m42s→
+  **1m14s（2.2×）**；端到端（G37 7 组，稀疏验证 + K192 引导）质量保持
+  （N50 317.5K、GF 99.563%、Dup 1.001、0 mis，vs 全量 318.1K/99.642/1.002）。
+  配套修正 `coverage()` dominant-offset 的峰比门槛 0.7→0.6（120 bp indel
+  会把 histogram 分成 66%/34% 两峰，主峰 ratio 0.664 被旧门槛跳过导致
+  跨主 K 近重复去重失效、Dup 1.147；identity ≥99% 兜底）。
 6. **本地组装（§4.5）**：MEGAHIT 用 reads 回帖 + IDBA-UD 内核做 contig 端点延伸，
    与 anchr `fq extend`（tadpole 沿图延伸）目标相近；其 `min_mapping_len=75`、
    `LocalRange = min(2*mean, mean+3*sd)` 封顶 650 等参数可对照。

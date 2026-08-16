@@ -31,6 +31,10 @@ parallel --no-run-if-empty --linebuffer -k -j 1 "
    branch keeps the old cap. #}
 KS="31 41 51 61 71 81 101 121 128 160 192"
 KS_BCALM="31 41 51 61 71 81 101 121"
+{# Sparse validation set: intermediate k rounds re-count the reads with
+   little added signal (G37: 11->3 validation rounds, identical unitigs,
+   ~2.2x faster). Each master validates against the sparse set only. #}
+VERIFY_KS="71 121 192"
 {% if unitigger == "bcalm" %}    # external bcalm unitigs per k, merged across k with the modern OLC step
     for K in ${KS_BCALM}; do
         bcalm \
@@ -80,17 +84,22 @@ KS_BCALM="31 41 51 61 71 81 101 121"
     # raw unitigs do produce chimeric short fragments).
     anchr asm multik \
         ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
-        -k "31,41,51,61,71,81,101,121,128,160,192" \
+        -k "31,71,121,192" \
         -p {{ parallel2 }} \
         -o unitigs_K31.fasta
 
     for K in 41 51 61 71 81 101 121 128 160 192; do
         K_LIST=\"\"
-        for J in ${KS}; do
-            if [ \${J} -ge \${K} ]; then
+        for J in ${VERIFY_KS}; do
+            if [ \${J} -gt \${K} ]; then
                 K_LIST=\"\${K_LIST}\${K_LIST:+,}\${J}\"
             fi
         done
+        if [ -z \"\${K_LIST}\" ]; then
+            K_LIST=\"\${K}\"
+        else
+            K_LIST=\"\${K},\${K_LIST}\"
+        fi
         (
             anchr asm multik \
                 ../../6_down_sampling/MRX{1}P{2}/pe.cor.fa.gz \
