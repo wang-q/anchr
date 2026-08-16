@@ -38,18 +38,18 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         cat 2_illumina/merge/env.json |
             jq '.SUM_OUT | tonumber | . / {{ opt.genome }} / {} | floor | . - 1'
     )
-    MAX_SERIAL=\$(( \${MAX_SERIAL} < {{ opt.splitp }} ? \${MAX_SERIAL} : {{ opt.splitp }} ))
+    MAX_SERIAL=\$(( ${MAX_SERIAL} < {{ opt.splitp }} ? ${MAX_SERIAL} : {{ opt.splitp }} ))
 
-    for i in \$( seq 0 1 \${MAX_SERIAL} ); do
-        P=\$( printf '%03d' \${i})
-        printf \"  * Part: %s\n\" \${P}
+    for i in \$( seq 0 1 ${MAX_SERIAL} ); do
+        P=\$( printf '%03d' ${i})
+        printf \"  * Part: %s\n\" ${P}
 
-        mkdir -p \"6_down_sampling/MRX{}P\${P}\"
+        mkdir -p \"6_down_sampling/MRX{}P${P}\"
 
-        mv  \"6_down_sampling/MRX{}/\${P}.fa\" \
-            \"6_down_sampling/MRX{}P\${P}/pe.cor.fa\"
-        pigz -p {{ opt.parallel }} \"6_down_sampling/MRX{}P\${P}/pe.cor.fa\"
-        cp 2_illumina/merge/env.json \"6_down_sampling/MRX{}P\${P}\"
+        mv  \"6_down_sampling/MRX{}/${P}.fa\" \
+            \"6_down_sampling/MRX{}P${P}/pe.cor.fa\"
+        pigz -p {{ opt.parallel }} \"6_down_sampling/MRX{}P${P}/pe.cor.fa\"
+        cp 2_illumina/merge/env.json \"6_down_sampling/MRX{}P${P}\"
     done
 
     " ::: {{ opt.cov }}

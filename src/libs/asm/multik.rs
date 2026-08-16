@@ -88,6 +88,15 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
     Ok(chains)
 }
 
+/// Auto-derived master-k sequence from the input reads' read-length N50.
+/// Public for the CLI `--print-ks` helper: the template uses it to drive
+/// per-master parallel runs with a sequence that adapts to the reads
+/// (short 150 bp reads get 50/70/90/110; merged ~450 bp reads get
+/// 51/71/91/.../251), instead of hard-coding k values.
+pub fn auto_ks_for_reads(infiles: &[String]) -> Result<Vec<usize>> {
+    Ok(auto_ks(read_n50(&read_records(infiles)?)))
+}
+
 /// Runs the single-skeleton iteration: pass 0 builds maximal unitigs at
 /// `k0`, every k in `later_ks` validates the graph (bridge k-mers, internal
 /// solidity, reads bridges), and validated chains are compacted into long

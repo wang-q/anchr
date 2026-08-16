@@ -112,6 +112,16 @@ Examples:
                 ),
         )
         .arg(
+            Arg::new("print_ks")
+                .long("print-ks")
+                .action(ArgAction::SetTrue)
+                .help(
+                    "Print the auto-derived master-k sequence (from the read-length N50) \
+                     and exit; lets templates drive per-master runs with an adaptive k \
+                     list instead of hard-coded values",
+                ),
+        )
+        .arg(
             Arg::new("list_files")
                 .long("list-files")
                 .action(ArgAction::SetTrue)
@@ -121,6 +131,23 @@ Examples:
 
 /// Execute the multik command.
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
+    if args.get_flag("print_ks") {
+        let infiles: Vec<String> = args
+            .get_many::<String>("infiles")
+            .unwrap()
+            .flat_map(|f| pgr::libs::par::resolve_paths(f, false).unwrap_or_default())
+            .collect();
+        let ks = crate::libs::asm::multik::auto_ks_for_reads(&infiles)
+            .with_context(|| "failed to derive the k sequence from the reads")?;
+        println!(
+            "{}",
+            ks.iter()
+                .map(|k| k.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+        return Ok(());
+    }
     let is_list = args.get_flag("list_files");
     let mut infiles: Vec<String> = Vec::new();
     for f in args.get_many::<String>("infiles").unwrap() {

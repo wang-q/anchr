@@ -36,18 +36,18 @@ parallel --no-run-if-empty --linebuffer -k -j 2 "
         cat 2_illumina/Q{1}L{2}/env.json |
             jq '.SUM_OUT | tonumber | . / {{ opt.genome }} / {3} | floor | . - 1'
     )
-    MAX_SERIAL=\$(( \${MAX_SERIAL} < {{ opt.splitp }} ? \${MAX_SERIAL} : {{ opt.splitp }} ))
+    MAX_SERIAL=\$(( ${MAX_SERIAL} < {{ opt.splitp }} ? ${MAX_SERIAL} : {{ opt.splitp }} ))
 
-    for i in \$( seq 0 1 \${MAX_SERIAL} ); do
-        P=\$( printf '%03d' \${i})
-        printf \"  * Part: %s\n\" \${P}
+    for i in \$( seq 0 1 ${MAX_SERIAL} ); do
+        P=\$( printf '%03d' ${i})
+        printf \"  * Part: %s\n\" ${P}
 
-        mkdir -p \"4_down_sampling/Q{1}L{2}X{3}P\${P}\"
+        mkdir -p \"4_down_sampling/Q{1}L{2}X{3}P${P}\"
 
-        mv  \"4_down_sampling/Q{1}L{2}X{3}/\${P}.fa\" \
-            \"4_down_sampling/Q{1}L{2}X{3}P\${P}/pe.cor.fa\"
-        pigz -p {{ opt.parallel }} \"4_down_sampling/Q{1}L{2}X{3}P\${P}/pe.cor.fa\"
-        cp 2_illumina/Q{1}L{2}/env.json \"4_down_sampling/Q{1}L{2}X{3}P\${P}\"
+        mv  \"4_down_sampling/Q{1}L{2}X{3}/${P}.fa\" \
+            \"4_down_sampling/Q{1}L{2}X{3}P${P}/pe.cor.fa\"
+        pigz -p {{ opt.parallel }} \"4_down_sampling/Q{1}L{2}X{3}P${P}/pe.cor.fa\"
+        cp 2_illumina/Q{1}L{2}/env.json \"4_down_sampling/Q{1}L{2}X{3}P${P}\"
     done
 
     " ::: 0 {{ opt.qual }} ::: 0 {{ opt.len }} ::: {{ opt.cov }}
