@@ -262,6 +262,50 @@ impl RefineTable {
         })
     }
 
+    /// Direct canonical counting over borrowed slices: byte-identical to
+    /// [`RefineTable::build_supermer_slices`] but skips the super-mer
+    /// stage. On unique sequence (unitigs, coverage ~1) super-mers never
+    /// collapse — every window becomes an 80-byte stage-1 record that
+    /// stage 2 must expand again — while the direct path sorts one
+    /// `ceil(k/4)`-byte key per window and groups. High-coverage inputs
+    /// (reads) still prefer the super-mer path.
+    pub(crate) fn build_direct_slices(seqs: &[&[u8]], k: usize) -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            k > 0 && k <= pgr::libs::kmer::key::Kmer::MAX_K,
+            "k must be in 1..={}, got {k}",
+            pgr::libs::kmer::key::Kmer::MAX_K
+        );
+        const CHUNK: usize = 512;
+        let key_bytes = k.div_ceil(4);
+        let per_chunk: Vec<Vec<u8>> = seqs
+            .par_chunks(CHUNK)
+            .map(|chunk| {
+                let cap = chunk
+                    .iter()
+                    .map(|s| s.len().saturating_sub(k - 1) * key_bytes)
+                    .sum();
+                let mut raw = Vec::with_capacity(cap);
+                for seq in chunk {
+                    pgr::libs::kmer::canonical_keys(seq, k, |_, km| {
+                        raw.extend_from_slice(km.to_bytes());
+                    });
+                }
+                raw
+            })
+            .collect();
+        let n: usize = per_chunk.iter().map(Vec::len).sum();
+        let mut keys: Vec<u8> = Vec::with_capacity(n);
+        for mut v in per_chunk {
+            keys.append(&mut v);
+        }
+        let table = pgr::libs::kmer::count::count_keys(keys, k);
+        Ok(Self {
+            table,
+            prefix_index: OnceLock::new(),
+            sorted: OnceLock::new(),
+        })
+    }
+
     /// Streaming direct counter: reads `infiles` record-by-record, fans out
     /// to `threads` workers that emit packed keys in bounded chunks and
     /// merge per-worker count tables. Unlike `build_threaded` this never
@@ -360,24 +404,39 @@ impl RefineTable {
         })
     }
 
-    /// Sorted-start offsets per 1- or 2-byte key prefix (bucket `p` spans
-    /// `[offs[p], offs[p+1])`), built lazily in one O(n) scan.
+    /// Sorted-start offsets per 1-, 2- or 3-byte key prefix (bucket `p`
+    /// spans `[offs[p], offs[p+1])`), built lazily in one O(n) scan. Big
+    /// tables (reads) use 3-byte prefixes: 16M buckets hold well under one
+    /// row each on average, so a lookup is one index read plus at most a
+    /// couple of key compares instead of a ~8-probe binary search over a
+    /// 64K-bucket range.
     fn prefix_index(&self) -> &[u32] {
         self.prefix_index.get_or_init(|| {
             let kb = self.table.key_bytes();
             let keys = &self.table.keys;
             let n = keys.len() / kb;
-            let entries = if kb >= 2 { 65537 } else { 257 };
+            let width = if kb == 1 {
+                1
+            } else if kb >= 3 && n > (1 << 20) {
+                3
+            } else {
+                2
+            };
+            let entries = 256usize.pow(width as u32) + 1;
             let mut offs = vec![0u32; entries];
             let mut i = 0usize;
             for (p, slot) in offs.iter_mut().take(entries - 1).enumerate() {
                 let lo = i;
                 while i < n {
-                    let b0 = keys[i * kb];
-                    let pref = if kb >= 2 {
-                        ((b0 as usize) << 8) | keys[i * kb + 1] as usize
-                    } else {
-                        b0 as usize
+                    let s = i * kb;
+                    let pref = match width {
+                        1 => keys[s] as usize,
+                        2 => ((keys[s] as usize) << 8) | keys[s + 1] as usize,
+                        _ => {
+                            ((keys[s] as usize) << 16)
+                                | ((keys[s + 1] as usize) << 8)
+                                | keys[s + 2] as usize
+                        }
                     };
                     if pref > p {
                         break;
@@ -389,6 +448,31 @@ impl RefineTable {
             offs[entries - 1] = n as u32;
             offs
         })
+    }
+
+    /// Row of canonical packed key `q` (already `kb` bytes), None when
+    /// absent: prefix bucket + at most a couple of in-bucket compares.
+    fn locate(&self, q: &[u8]) -> Option<usize> {
+        let kb = self.table.key_bytes();
+        let offs = self.prefix_index();
+        let p = match offs.len() {
+            257 => q[0] as usize,
+            65537 => ((q[0] as usize) << 8) | q[1] as usize,
+            _ => ((q[0] as usize) << 16) | ((q[1] as usize) << 8) | q[2] as usize,
+        };
+        let keys = &self.table.keys;
+        let mut lo = offs[p] as usize;
+        let mut hi = offs[p + 1] as usize;
+        while lo < hi {
+            let mid = (lo + hi) >> 1;
+            let mid_b = &keys[mid * kb..(mid + 1) * kb];
+            match mid_b.cmp(q) {
+                std::cmp::Ordering::Less => lo = mid + 1,
+                std::cmp::Ordering::Greater => hi = mid,
+                std::cmp::Ordering::Equal => return Some(mid),
+            }
+        }
+        None
     }
 
     /// Count of the canonical form of `kmer` (0 when absent).
@@ -417,26 +501,8 @@ impl RefineTable {
             qbuf[..kb].copy_from_slice(canon.0.to_bytes());
         }
         let q = &qbuf[..kb];
-        // Bucket by the 1-2 byte key prefix, then binary search inside it.
-        let offs = self.prefix_index();
-        let p = if kb >= 2 {
-            ((q[0] as usize) << 8) | q[1] as usize
-        } else {
-            q[0] as usize
-        };
-        let keys = &self.table.keys;
-        let mut lo = offs[p] as usize;
-        let mut hi = offs[p + 1] as usize;
-        while lo < hi {
-            let mid = (lo + hi) >> 1;
-            let mid_b = &keys[mid * kb..(mid + 1) * kb];
-            match mid_b.cmp(q) {
-                std::cmp::Ordering::Less => lo = mid + 1,
-                std::cmp::Ordering::Greater => hi = mid,
-                std::cmp::Ordering::Equal => return self.table.counts[mid],
-            }
-        }
-        0
+        // Prefix bucket + in-bucket binary search (see `prefix_index`).
+        self.locate(q).map(|r| self.table.counts[r]).unwrap_or(0)
     }
 
     /// Count of an already-canonicalized k-mer (0 when absent): skips the
@@ -445,25 +511,7 @@ impl RefineTable {
     pub(crate) fn get_count_canonical(&self, kmer: &Kmer) -> u32 {
         let kb = self.table.key_bytes();
         let q = &kmer.0.to_bytes()[..kb];
-        let offs = self.prefix_index();
-        let p = if kb >= 2 {
-            ((q[0] as usize) << 8) | q[1] as usize
-        } else {
-            q[0] as usize
-        };
-        let keys = &self.table.keys;
-        let mut lo = offs[p] as usize;
-        let mut hi = offs[p + 1] as usize;
-        while lo < hi {
-            let mid = (lo + hi) >> 1;
-            let mid_b = &keys[mid * kb..(mid + 1) * kb];
-            match mid_b.cmp(q) {
-                std::cmp::Ordering::Less => lo = mid + 1,
-                std::cmp::Ordering::Greater => hi = mid,
-                std::cmp::Ordering::Equal => return self.table.counts[mid],
-            }
-        }
-        0
+        self.locate(q).map(|r| self.table.counts[r]).unwrap_or(0)
     }
 
     /// Row and count of an oriented k-mer's canonical form (None when
@@ -491,25 +539,7 @@ impl RefineTable {
             qbuf[..kb].copy_from_slice(canon.0.to_bytes());
         }
         let q = &qbuf[..kb];
-        let offs = self.prefix_index();
-        let p = if kb >= 2 {
-            ((q[0] as usize) << 8) | q[1] as usize
-        } else {
-            q[0] as usize
-        };
-        let keys = &self.table.keys;
-        let mut lo = offs[p] as usize;
-        let mut hi = offs[p + 1] as usize;
-        while lo < hi {
-            let mid = (lo + hi) >> 1;
-            let mid_b = &keys[mid * kb..(mid + 1) * kb];
-            match mid_b.cmp(q) {
-                std::cmp::Ordering::Less => lo = mid + 1,
-                std::cmp::Ordering::Greater => hi = mid,
-                std::cmp::Ordering::Equal => return Some((mid, self.table.counts[mid])),
-            }
-        }
-        None
+        self.locate(q).map(|r| (r, self.table.counts[r]))
     }
 
     /// Per-row entry rank for rows with `count >= threshold` (`u32::MAX`

@@ -268,7 +268,9 @@ impl Master {
     /// (plus a guide, when the invocation is guided).
     fn cut(&mut self, base: &RefineTable, threshold: u32) -> Result<()> {
         let seqs: Vec<&[u8]> = self.unitigs.iter().map(|u| u.bases.as_slice()).collect();
-        let unitig_table = RefineTable::build_supermer_slices(&seqs, self.k0)?;
+        // Direct counting: unitig sequence is unique, so super-mer collapse
+        // never engages (byte-identical table, half the sort volume).
+        let unitig_table = RefineTable::build_direct_slices(&seqs, self.k0)?;
         let view = SumView(base, &unitig_table);
         remove_unsupported(
             &mut self.unitigs,
@@ -299,7 +301,8 @@ impl Master {
         self.branch.append(&mut self.carried_branch);
         let t0 = std::time::Instant::now();
         let seqs: Vec<&[u8]> = self.unitigs.iter().map(|u| u.bases.as_slice()).collect();
-        let unitig_table = RefineTable::build_supermer_slices(&seqs, k)?;
+        // Direct counting (unique sequence; see `Master::cut`).
+        let unitig_table = RefineTable::build_direct_slices(&seqs, k)?;
         let view = SumView(base, &unitig_table);
         let t_count = t0.elapsed().as_secs_f64();
         let timing = std::env::var_os("ANCHR_MULTIK_TIMING").is_some();
@@ -459,14 +462,34 @@ fn assemble_one(
     opts: &MultikOptions,
 ) -> Result<Vec<MultikUnitig>> {
     let read_seqs: Vec<&[u8]> = reads.iter().map(|(s, _)| s.as_slice()).collect();
+    let timing = std::env::var_os("ANCHR_MULTIK_TIMING").is_some();
     // FASTA input: count straight from the cached reads buffer (FastK-style
     // super-mer counting, no quality gating — byte-identical to the direct
     // path); FASTQ falls back to `assemble_unitigs_core`'s quality-gated
     // counting, which re-reads the infiles.
     let fasta_input = reads.iter().all(|(_, q)| q.is_empty());
+    // The pass-0 table is kept when no rounds follow: `cut` validates
+    // against the same k0 table, so the single-k path counts once instead
+    // of twice.
+    let mut k0_table: Option<RefineTable> = None;
     let mut master = if fasta_input {
+        let t = std::time::Instant::now();
         let table = RefineTable::build_supermer_slices(&read_seqs, k0)?;
-        Master::pass0(&table, k0, opts)
+        if timing {
+            eprintln!(
+                "reads table k={k0} build: {:.3}s",
+                t.elapsed().as_secs_f64()
+            );
+        }
+        let t = std::time::Instant::now();
+        let m = Master::pass0(&table, k0, opts);
+        if timing {
+            eprintln!("master k0={k0} pass0: {:.3}s", t.elapsed().as_secs_f64());
+        }
+        if later_ks.is_empty() {
+            k0_table = Some(table);
+        }
+        m
     } else {
         let (unitigs, _) = assemble_unitigs_core(infiles, &pass0_opts(k0, opts))?;
         Master::from_unitigs(unitigs, k0)
@@ -478,18 +501,45 @@ fn assemble_one(
     // (R+2 identical full counts per run before).
     let probe_half = 30;
     let probe_len = probe_half * 2;
+    let t = std::time::Instant::now();
     let probe_table = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
+    if timing {
+        eprintln!(
+            "probe table k={probe_len} build: {:.3}s",
+            t.elapsed().as_secs_f64()
+        );
+    }
 
     let threshold = opts.min_count_extend as u32;
     if later_ks.is_empty() {
-        let table = RefineTable::build_supermer_slices(&read_seqs, k0)?;
+        let t = std::time::Instant::now();
+        let rebuilt;
+        let table = match k0_table.take() {
+            Some(t) => t,
+            // FASTQ path counted inside pass 0; rebuild for `cut`.
+            None => {
+                rebuilt = RefineTable::build_supermer_slices(&read_seqs, k0)?;
+                rebuilt
+            }
+        };
         master.cut(&table, threshold)?;
+        if timing {
+            eprintln!("master k0={k0} cut: {:.3}s", t.elapsed().as_secs_f64());
+        }
     }
     for &k in later_ks {
+        let t = std::time::Instant::now();
         let table = RefineTable::build_supermer_slices(&read_seqs, k)?;
+        if timing {
+            eprintln!("reads table k={k} build: {:.3}s", t.elapsed().as_secs_f64());
+        }
         master.round(k, &table, &probe_table, probe_half, opts)?;
     }
+    let t = std::time::Instant::now();
     master.finalize(&probe_table, probe_half, opts)?;
+    if timing {
+        eprintln!("master k0={k0} finalize: {:.3}s", t.elapsed().as_secs_f64());
+    }
     Ok(master.out)
 }
 
@@ -583,66 +633,192 @@ fn assemble_all_masters(
         }
         out.append(&mut guide_out);
     } else {
-        let probe = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
-        // Pipelined table building: a builder lane counts the next k while
-        // the main lane runs pass 0 + the validation rounds (whose per-batch
-        // parallelism is the number of earlier masters, often below the
-        // thread count). The bounded channel keeps at most two k tables
-        // alive at once, so peak memory stays at ~two tables + probe.
-        let (tx, rx) = std::sync::mpsc::sync_channel::<anyhow::Result<RefineTable>>(1);
-        std::thread::scope(|scope| -> anyhow::Result<()> {
-            let ks_lane = ks;
-            let reads_lane = &read_seqs;
-            let builder = scope.spawn(move || {
-                for &k in ks_lane {
-                    if tx
-                        .send(RefineTable::build_supermer_slices(reads_lane, k))
-                        .is_err()
-                    {
-                        break; // consumer dropped the channel (error path)
+        // Chain-per-master scheduling: the k-major loop serialized every
+        // master's round(k) behind the slowest one (a per-k barrier), yet
+        // the only true dependency is WITHIN a master (its rounds are
+        // sequential) — masters are independent. Each master runs as its
+        // own chain thread receiving the per-k reads tables (Arc, sent in
+        // ladder order by the builder lane) and processes pass0 + its
+        // rounds at its own pace. The builder pushes each table to its
+        // consumer chains through capacity-1 channels IN CHAIN ORDER, so a
+        // slow chain throttles the builder before it can run ahead: peak
+        // memory stays at ~two tables + probe. The probe table is built on
+        // demand (OnceLock) while the chains are still in pass 0.
+        let probe_cell: std::sync::OnceLock<
+            anyhow::Result<RefineTable, std::sync::Arc<anyhow::Error>>,
+        > = std::sync::OnceLock::new();
+        let masters: Vec<Master> = std::thread::scope(|scope| -> anyhow::Result<Vec<Master>> {
+            type TableLane = std::sync::mpsc::SyncSender<std::sync::Arc<RefineTable>>;
+            type ChainLane = std::sync::mpsc::Receiver<std::sync::Arc<RefineTable>>;
+            let (txs, rxs): (Vec<TableLane>, Vec<ChainLane>) = ks
+                .iter()
+                .map(|_| std::sync::mpsc::sync_channel::<std::sync::Arc<RefineTable>>(1))
+                .unzip();
+            let read_seqs_ref = &read_seqs;
+            let probe_cell_ref = &probe_cell;
+            let builder = scope.spawn(move || -> anyhow::Result<()> {
+                // Build reads tables on the worker pool with a bounded
+                // lookahead window (building + buffered tables beyond `next`)
+                // and forward them to the chains in ladder order: counting
+                // overlaps the chains' round work without letting the
+                // builder run unboundedly ahead (peak memory stays at
+                // ~window tables + the live chain tables + probe).
+                let (done_tx, done_rx): (
+                    std::sync::mpsc::Sender<(usize, anyhow::Result<RefineTable>)>,
+                    _,
+                ) = std::sync::mpsc::channel();
+                // `Receiver` is not `Sync`; the scope closure only recvs
+                // from the calling thread, so a plain Mutex suffices.
+                let done_rx = std::sync::Mutex::new(done_rx);
+                let mut buffered: Vec<Option<std::sync::Arc<RefineTable>>> = vec![None; ks.len()];
+                let mut next = 0usize;
+                let mut spawned = 0usize;
+                const BUILD_WINDOW: usize = 3;
+                rayon::scope(|s| -> anyhow::Result<()> {
+                    while next < ks.len() {
+                        while spawned < ks.len() && spawned < next + BUILD_WINDOW {
+                            let done_tx = done_tx.clone();
+                            let (i, k) = (spawned, ks[spawned]);
+                            let timing = std::env::var_os("ANCHR_MULTIK_TIMING").is_some();
+                            s.spawn(move |_| {
+                                let t = std::time::Instant::now();
+                                let res = RefineTable::build_supermer_slices(read_seqs_ref, k);
+                                if timing {
+                                    eprintln!(
+                                        "reads table k={k} build: {:.3}s",
+                                        t.elapsed().as_secs_f64()
+                                    );
+                                }
+                                let _ = done_tx.send((i, res));
+                            });
+                            spawned += 1;
+                        }
+                        let (i, res) = done_rx
+                            .lock()
+                            .unwrap()
+                            .recv()
+                            .map_err(|_| anyhow::anyhow!("multik reads table build failed"))?;
+                        // Propagate the first build error seen (the failing
+                        // build may complete out of ladder order).
+                        buffered[i] = Some(std::sync::Arc::new(res?));
+                        // Table k serves chains ks[0..=i] (pass0 at k0 == k,
+                        // rounds for k0 < k). A failed send means the chain
+                        // already exited (error): stop delivering; the
+                        // remaining chains see recv errors and unwind.
+                        while next < buffered.len() {
+                            let Some(t) = buffered[next].take() else {
+                                break;
+                            };
+                            for tx in &txs[..=next] {
+                                if tx.send(t.clone()).is_err() {
+                                    return Ok(());
+                                }
+                            }
+                            next += 1;
+                        }
                     }
-                }
+                    Ok(())
+                })
             });
-            let mut masters: Vec<Master> = Vec::new();
-            for &k in ks {
-                let table = rx
-                    .recv()
-                    .map_err(|_| anyhow::anyhow!("multik table builder exited unexpectedly"))??;
-                let t_p0 = std::time::Instant::now();
-                // pass 0 of the new master is independent of the earlier
-                // masters' rounds at k (different states, same read-only
-                // table), so both run concurrently on the worker pool
-                // instead of serializing pass-0 behind the rounds.
-                let (new_master, rounds_res) = rayon::join(
-                    || Master::pass0(&table, k, opts),
-                    || {
-                        masters
-                            .par_iter_mut()
-                            .try_for_each(|m| m.round(k, &table, &probe, probe_half, opts))
-                    },
-                );
-                rounds_res?;
-                masters.push(new_master);
-                if k == last_k {
-                    masters.last_mut().unwrap().cut(&table, threshold)?;
-                }
-                if std::env::var_os("ANCHR_MULTIK_TIMING").is_some() {
-                    eprintln!("pass0+rounds k={k}: {:.3}s", t_p0.elapsed().as_secs_f64());
-                }
-            }
-            // Finalize independent masters concurrently; outputs are appended
-            // in ladder order to keep the byte stream deterministic.
-            masters
-                .par_iter_mut()
-                .try_for_each(|m| m.finalize(&probe, probe_half, opts))?;
-            for m in &mut masters {
-                out.append(&mut m.out);
-            }
+            let handles: Vec<_> = rxs
+                .into_iter()
+                .enumerate()
+                .map(|(i, rx)| {
+                    scope.spawn(move || -> anyhow::Result<Master> {
+                        let k0 = ks[i];
+                        let timing = std::env::var_os("ANCHR_MULTIK_TIMING").is_some();
+                        let t_chain = std::time::Instant::now();
+                        // Probe table on first need (shared OnceLock; the
+                        // build joins the ambient worker pool).
+                        let probe = || -> anyhow::Result<&RefineTable> {
+                            let t = std::time::Instant::now();
+                            let cell = probe_cell_ref.get_or_init(|| {
+                                let r =
+                                    RefineTable::build_supermer_slices(read_seqs_ref, probe_len)
+                                        .map_err(std::sync::Arc::new);
+                                if timing {
+                                    eprintln!(
+                                        "probe table k={probe_len} build: {:.3}s",
+                                        t.elapsed().as_secs_f64()
+                                    );
+                                }
+                                r
+                            });
+                            cell.as_ref()
+                                .map_err(|e| anyhow::anyhow!("probe table: {e}"))
+                        };
+                        let mut master: Option<Master> = None;
+                        // Only the top-of-ladder master needs the final
+                        // table (for `cut`); other chains drop each table
+                        // as soon as the round releases it.
+                        let mut last_table: Option<std::sync::Arc<RefineTable>> = None;
+                        for &k in &ks[i..] {
+                            let table = rx.recv().map_err(|_| {
+                                anyhow::anyhow!("multik table builder exited unexpectedly")
+                            })?;
+                            if k == k0 {
+                                let t = std::time::Instant::now();
+                                master = Some(Master::pass0(&table, k, opts));
+                                if timing {
+                                    eprintln!(
+                                        "master k0={k0} pass0: {:.3}s",
+                                        t.elapsed().as_secs_f64()
+                                    );
+                                }
+                            } else {
+                                master.as_mut().unwrap().round(
+                                    k,
+                                    &table,
+                                    probe()?,
+                                    probe_half,
+                                    opts,
+                                )?;
+                            }
+                            if k0 == last_k {
+                                last_table = Some(table);
+                            }
+                        }
+                        let mut master = master.unwrap();
+                        // The top-of-ladder master has no validating k: cut
+                        // chimeric junctions with its own table instead.
+                        if k0 == last_k {
+                            let t = std::time::Instant::now();
+                            master.cut(last_table.as_deref().unwrap(), threshold)?;
+                            if timing {
+                                eprintln!("master k0={k0} cut: {:.3}s", t.elapsed().as_secs_f64());
+                            }
+                        }
+                        let t = std::time::Instant::now();
+                        master.finalize(probe()?, probe_half, opts)?;
+                        if timing {
+                            eprintln!(
+                                "master k0={k0} finalize: {:.3}s chain: {:.3}s",
+                                t.elapsed().as_secs_f64(),
+                                t_chain.elapsed().as_secs_f64()
+                            );
+                        }
+                        Ok(master)
+                    })
+                })
+                .collect();
             builder
                 .join()
-                .map_err(|_| anyhow::anyhow!("multik table builder panicked"))?;
-            Ok(())
+                .map_err(|_| anyhow::anyhow!("multik table builder panicked"))??;
+            // Outputs are appended in ladder order to keep the byte stream
+            // deterministic (each master's own result does not depend on
+            // scheduling).
+            let mut masters = Vec::with_capacity(handles.len());
+            for h in handles {
+                masters.push(
+                    h.join()
+                        .map_err(|_| anyhow::anyhow!("multik master chain panicked"))??,
+                );
+            }
+            Ok(masters)
         })?;
+        for mut m in masters {
+            out.append(&mut m.out);
+        }
     }
     Ok(out)
 }

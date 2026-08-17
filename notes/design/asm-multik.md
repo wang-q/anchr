@@ -928,3 +928,38 @@ HashMap 查找）、pass0 与 rounds 串行衔接。三项改动：
 峰值内存不变（~11.7 GB/进程 MG1655）。计时开关：`ANCHR_MULTIK_TIMING`
 （round 分解为 count/link/unsup/bridge/compact/prog）、
 `ANCHR_DFA_TIMING`、`ANCHR_SM_TIMING`。
+
+### 2026-08-17 深夜：chain-per-master 修复 + 内存受控 + 单 k 复用（22.8 s，输出字节级一致）
+
+chain-per-master 调度（每 master 一条 chain 线程，按梯次序从 builder
+收表）当晚引入两缺陷，本节修复：
+
+1. **builder 越界 panic**：表全部按序到齐时内层投递循环
+   `while let Some(t) = buffered[next].take()` 在 next==len 处越界
+   （先索引后判断）。改为 `while next < len { let Some(t)=… else break }`。
+   该 panic 使所有组 multik 失败，是当时门禁链缺 QUAST 的根因；
+2. **有界前瞻窗口**（`BUILD_WINDOW=3`）：原先 10 张 reads 表同时在
+   rayon 池上构建，峰值 15.9 GB；改为"构建中+已建待投递 ≤ 窗口值"
+   才 spawn 下一张（构建仍与 chains 的 round 重叠），峰值 12.8 GB。
+   实现要点：done 通道回收用 `Mutex<Receiver>`（`Receiver` 非 `Sync`，
+   但只在 scope 闭包线程内 recv，无争用）；
+3. **last_table 仅 top master 保留**（`cut` 是唯一消费者），其余
+   chain 的表引用随 round 结束立即释放；
+4. **单 k 路径复用 pass0 表**：`later_ks` 为空时 `cut` 不再重建 k0
+   表（k=160 单 k 16.3→11.6 s）；FASTQ 回退路径仍重建（计数在
+   pass0 内部带质量门控）；
+5. 计时开关扩展到 pass0/cut/finalize/probe/每表构建。
+
+实测结论（MG1655 单组、release）：
+
+* **22.8 s @ -p 8**（105.8 s 起步），峰值 12.8 GB；G37 单组 3–4.7 s、
+  2.1–2.6 GB；
+* **-p 不是越大越好**：all-masters 下 p16/p24 输出字节一致但更慢
+  （25.9/24.7 s）——10 chain 并发时 `remove_unsupported` 的随机访问
+  在 p16 劣化 3×（内存带宽饱和）。单组 p8 最优，32 核靠多组并发；
+* 聚合分解：rounds 63 s（count ~半）+ reads 表构建 ~31 s + 10×pass0
+  22 s + 10×finalize 13 s ≈ 130 s 池工作量，8 线程利用率 ~76%；
+  剩余可挤空间为链间投递的 lockstep（容量 1 通道以 chain 0 为串行
+  化点），收益 <2 s，不值得增加复杂度；
+* 质量门禁与 G37 `--unitigs` 口径新发现见 `results/model_org.md`
+  2026-08-17 深夜节（G37 P002 单组既有嵌合，与本节改动无关）。

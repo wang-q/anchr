@@ -899,3 +899,50 @@ earlier-masters rounds(k) rayon::join 并发），multik 输出与优化前
   5 组链 2 并发下每组 59–65 s；峰值内存不变（~11.7 GB/进程）；
 * 分解：DFA walk 7.3→1.9 s（k=160 隔离）、classify 1.5→1.1 s（删
   HashMap 构建）、46 轮 `remove_unsupported` CPU 104.9 s 转入并行。
+
+### mg1655/g37: chain-per-master 调度修复与内存受控（2026-08-17 深夜追加）
+
+上节 chain-per-master 重构引入两个缺陷，本节修复并完成门禁：
+
+1. **builder 越界 panic**：全部表按序到齐时 `buffered[next]` 越界
+   （next==len），所有组 multik 直接失败——即此前"门禁链缺 QUAST 报告"
+   的根因（multik 失败 → 下游全部静默跳过）；
+2. **并发建表无界**：10 张 reads 表同时构建，单进程峰值 15.9 GB。
+   改为 `BUILD_WINDOW=3` 的有界前瞻（构建+待投递 ≤3 张表，仍与
+   chains 的 round 工作重叠），峰值降到 **12.8 GB**（MG1655）/
+   2.1–2.6 GB（G37）；
+3. 非顶部 chain 不再保留 last_table（仅 top master 的 `cut` 需要）；
+4. 单 k 路径（`--kmer K` 无后续验证轮）`cut` 复用 pass0 表，k=160
+   单 k 调用 16.3→11.6 s；
+5. 计时开关 `ANCHR_MULTIK_TIMING` 覆盖 pass0/cut/finalize/probe/
+   builder（此前只有 round）。
+
+门禁（修复后全链复跑，跨组 olc `--unitigs` 正式口径）：
+
+| Dataset | Assembly | # contigs | N50 | # mis | GF% | 对照 |
+| ------- | -------- | --------: | ---: | ----: | --: | ---- |
+| MG1655  | 5 组 anchor 合并 | 90 | 118731 | **0** | 99.072 | 与 08-17 基线逐指标相同 |
+| G37     | 7 组 anchor 合并（--unitigs） | — | 134724 | **1** | 98.774 | 见下方归因 |
+| G37     | 7 组快速口径（无 --unitigs） | 58 | 55170 | **0** | 97.979 | 与 08-17 晚门禁逐指标相同 |
+
+* MG1655 multik 输出与修复前字节级一致；G37 P000/P002 multik 输出与
+  昨晚提交版（452ec01）二进制字节级一致——本节全部改动质量中性；
+* `-p` 扫描：输出在 p8/p16/p24 下字节级一致（确定性）；但 all-masters
+  单组 p16/p24 反而更慢（25.9/24.7 s vs p8 22.8 s）——10 chain 并发下
+  `remove_unsupported` 随机访问在 p16 劣化 3×（内存带宽瓶颈），
+  **单组 p8 即最优**，32 核靠多组并发利用；
+* 计时：MG1655 单组 multik 22.8 s（-p 8；原 105.8 s），聚合分解
+  rounds 63 s + 表构建 ~31 s + pass0 22 s + finalize 13 s ≈ 130 s 池
+  工作量（8 线程饱和，利用率 ~76%）。
+
+#### g37 `--unitigs` 口径 1 mis 归因（既有问题，非本节引入）
+
+* 嵌合位于 **MRX40P002 单组** `olc --unitigs` 输出 contig_2
+  （134,487 bp；relocation 52938↔134693，跨 ~82 kb 重复区），经
+  anchor 进入 7 组合并被保留；其余 6 组 anchor 均 0 mis；
+* P002 multik 输出与昨晚二进制字节一致 → 嵌合自 08-17 单次调用链
+  （auto 31..192）即存在。此前未暴露：快速口径（无 `--unitigs` 的
+  S0 重组装）会切碎重组 anchors 掩盖单组嵌合；08-16 per-master 模板
+  链（K≤160）记录为 0 mis，是否同样产生该嵌合未验证；
+* 遗留：单组嵌合的 master-k 归因与修复（如 anchor 层跨组投票对该
+  位点的处理）留待专项实验，按实验纪律需 A/B 验证。
