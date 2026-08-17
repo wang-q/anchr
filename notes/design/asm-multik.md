@@ -898,3 +898,33 @@ master 被残余错误打碎（一个错误杀死所有覆盖它的窗口，k≈
    cut 语义保留（assemble_one 与 --all-masters 一致）。
 4. 单组 anchor 层完全等价：08-16 链 N50 112,781（95 条）vs 新链
    112,781（96 条）。
+
+### 2026-08-17 晚：性能优化（105.8 s → 48.9 s，输出字节级一致）
+
+MG1655 单组（auto 31..160、-p 8）计时分解定位：46 轮合计
+`remove_unsupported` CPU 104.9 s（轮间已并行但轮内串行）、10 次
+pass0 的 DFA walk 串行 ~63 s（每步 3 次 O(k) canonical 重建 + 4 次
+HashMap 查找）、pass0 与 rounds 串行衔接。三项改动：
+
+1. **walk 滚动窗口 + succ 索引**（`dfa.rs`/`assemble.rs`）：窗口持
+   fw/rc 双链 lockstep 推进（两次 packed shift/步，canonical 退化为
+   字节比较）；classify 的 count_in/count_out 探针本就二分命中表行，
+   顺手记录"唯一后继/前驱的 entries 下标"（`solid_row_ranks` 把表行
+   映射为 entries 序号），walk 步进变为纯数组读。同时**删除整个
+   HashMap index**（4.6 M 顶点 × 64 B key ≈ 400 MB/表 + 4.6 M 次
+   insert），种子定位改 entries 二分（每 unitig 一次）。种子循环里
+   `idx(seed)` 的 4.6 M 次冗余查找一并去除（下标即枚举序）。
+   k=160 隔离计时：walk 7.34→1.95 s，classify 1.50→1.11 s。
+   `asm unitig/contig` 命令同样受益。
+2. **`remove_unsupported` 按 unitig 并行**（`par_iter`）：k0=31 的
+   2200+ unitigs 不再在轮内串行扫描；外层 rounds 已并行时内层任务
+   在同一线程池内联执行，无超订阅。
+3. **pass0(k) 与 rounds(k) 并发**（`rayon::join`，guided/非 guided
+   两条 lane 同样处理）：pass0 建新 master 与 earlier masters 的
+   rounds 状态不相交、共享只读表，原先却是串行衔接。
+
+验证：单组输出与优化前 `cmp` 逐字节一致（多次）；G37/MG1655 全链
+门禁 0 mis、逐指标持平（`results/model_org.md` 2026-08-17 晚两节）。
+峰值内存不变（~11.7 GB/进程 MG1655）。计时开关：`ANCHR_MULTIK_TIMING`
+（round 分解为 count/link/unsup/bridge/compact/prog）、
+`ANCHR_DFA_TIMING`、`ANCHR_SM_TIMING`。

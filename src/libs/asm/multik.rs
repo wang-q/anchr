@@ -140,13 +140,24 @@ fn pass0_opts(k0: usize, opts: &MultikOptions) -> AssembleOptions {
 /// plus the master's own unitig-only table, whose summed counts equal the
 /// joint count over both inputs (so per-master rounds reuse the shared
 /// reads table instead of recounting the reads at every k).
-trait CountView {
+trait CountView: Sync {
     fn count(&self, kmer: &TdKmer) -> u32;
+
+    /// Whether `kmer` — already canonicalized by the caller (e.g. via
+    /// [`RollCanon`]) — reaches `threshold`. Views over rolling windows
+    /// override this to skip the redundant per-window canonicalization.
+    fn is_solid(&self, kmer: &TdKmer, threshold: u32) -> bool {
+        self.count(kmer) >= threshold
+    }
 }
 
 impl CountView for RefineTable {
     fn count(&self, kmer: &TdKmer) -> u32 {
         self.get_count(kmer)
+    }
+
+    fn is_solid(&self, kmer: &TdKmer, threshold: u32) -> bool {
+        self.get_count_canonical(kmer) >= threshold
     }
 }
 
@@ -157,6 +168,49 @@ impl CountView for SumView<'_> {
         self.0
             .get_count(kmer)
             .saturating_add(self.1.get_count(kmer))
+    }
+
+    fn is_solid(&self, kmer: &TdKmer, threshold: u32) -> bool {
+        // Short-circuit: solid reads alone settle most windows, so the
+        // master's own unitig table is only consulted for the rare rest.
+        let a = self.0.get_count_canonical(kmer);
+        a >= threshold || a.saturating_add(self.1.get_count_canonical(kmer)) >= threshold
+    }
+}
+
+/// Rolling window holding the forward k-mer and its reverse complement in
+/// lockstep: advancing costs two packed shifts and the canonical form is a
+/// byte compare, instead of rebuilding the rc base-by-base (O(k)) at every
+/// window position.
+struct RollCanon {
+    fw: TdKmer,
+    rc: TdKmer,
+}
+
+impl RollCanon {
+    /// Window over the first `k` bases of `bases` (`bases.len() >= k`).
+    fn new(k: usize, bases: &[u8]) -> Self {
+        let mut fw = TdKmer::new(k);
+        for &b in &bases[..k] {
+            fw.push_right(base_code(b));
+        }
+        Self { rc: fw.rc(), fw }
+    }
+
+    /// Advance one base (2-bit `code` of the incoming base): the window's
+    /// rc prepends the complemented base and drops its 3' end.
+    fn push_code(&mut self, code: u8) {
+        self.fw.push_right(code);
+        self.rc.push_left(3 - code);
+    }
+
+    /// The canonical (lexicographically smaller) strand.
+    fn canon(&self) -> &TdKmer {
+        if self.fw.cmp_bases(&self.rc) != std::cmp::Ordering::Greater {
+            &self.fw
+        } else {
+            &self.rc
+        }
     }
 }
 
@@ -248,10 +302,12 @@ impl Master {
         let unitig_table = RefineTable::build_supermer_slices(&seqs, k)?;
         let view = SumView(base, &unitig_table);
         let t_count = t0.elapsed().as_secs_f64();
+        let timing = std::env::var_os("ANCHR_MULTIK_TIMING").is_some();
         let threshold = opts.min_count_extend as u32;
         let k0 = self.k0;
         // 1. Cross-round link validation (solveEdges): the bridge k-mer
         // covering the junction must be solid at the current k.
+        let t1 = std::time::Instant::now();
         for (i, ls) in self.links.iter_mut().enumerate() {
             ls.retain(|l| {
                 let u = &self.unitigs[i];
@@ -266,6 +322,7 @@ impl Master {
                 bridge_kmer(u, v, l, k, k0).is_some_and(|km| view.count(&km) >= threshold)
             });
         }
+        let t2 = std::time::Instant::now();
         // 2. Chimeric-unitig cleanup (removeUnsupportedUnitigs): every
         // internal current-k k-mer of a long-enough unitig must be solid.
         remove_unsupported(
@@ -276,30 +333,37 @@ impl Master {
             k,
             threshold,
         );
+        let t3 = std::time::Instant::now();
         // 2.5 Reads-bridge validation: every surviving link must have reads
         // fully covering a probe spanning the junction. Chimeric links (two
         // distant regions joined by a shared k-mer) have no bridging reads
         // and are dropped BEFORE recompaction, so the per-round merge cannot
         // fix them into the main path (prevents relocation misassemblies).
         bridge_filter(&self.unitigs, &mut self.links, probe, k0, probe_half, 2);
+        let t4 = std::time::Instant::now();
         // 3. Recompact unique chains so the main path grows between rounds
         // (metaMDBG recompacts after every abundance-removal round). No
         // abundance pruning here — that is deferred to the final filter, so
         // single-genome coverage fluctuation never drops real content.
         recompact_graph(&mut self.unitigs, &mut self.links, &mut self.branch, k0);
+        let t5 = std::time::Instant::now();
         // 4. Prune low-abundance branching/isolated unitigs and carry them
         // into the next round (the final round's carry becomes output).
         let (dropped, dropped_branch) =
             progressive_filter(&mut self.unitigs, &mut self.links, &mut self.branch, k0);
         self.carried = dropped;
         self.carried_branch = dropped_branch;
-        if std::env::var_os("ANCHR_MULTIK_TIMING").is_some() {
+        if timing {
             let n = self.unitigs.len();
             let bp: usize = self.unitigs.iter().map(|u| u.bases.len()).sum();
             let edges: usize = self.links.iter().map(|l| l.len()).sum();
             eprintln!(
-                "master k0={k0} round k={k}: {n} unitigs, {bp} bp, {edges} edges, count {t_count:.3}s graph {:.3}s total {:.3}s",
-                t_round.elapsed().as_secs_f64() - t_count,
+                "master k0={k0} round k={k}: {n} unitigs, {bp} bp, {edges} edges, count {t_count:.3}s link {:.3}s unsup {:.3}s bridge {:.3}s compact {:.3}s prog {:.3}s total {:.3}s",
+                t2.duration_since(t1).as_secs_f64(),
+                t3.duration_since(t2).as_secs_f64(),
+                t4.duration_since(t3).as_secs_f64(),
+                t5.duration_since(t4).as_secs_f64(),
+                t5.elapsed().as_secs_f64(),
                 t_round.elapsed().as_secs_f64()
             );
         }
@@ -493,45 +557,92 @@ fn assemble_all_masters(
         let mut masters: Vec<Master> = Vec::new();
         for &k in ks.iter().skip(1) {
             let table = RefineTable::build_supermer_slices(&seqs_with_guide, k)?;
-            masters.push(Master::pass0(&table, k, opts));
+            // Same pass-0/rounds overlap as the unguided lane (independent
+            // states, shared read-only table).
+            let (new_master, rounds_res) = rayon::join(
+                || Master::pass0(&table, k, opts),
+                || {
+                    masters
+                        .par_iter_mut()
+                        .try_for_each(|m| m.round(k, &table, &probe2, probe_half, opts))
+                },
+            );
+            rounds_res?;
+            masters.push(new_master);
             if k == last_k {
                 masters.last_mut().unwrap().cut(&table, threshold)?;
             }
-            // Independent per-master rounds run concurrently on the worker
-            // pool (each master's graph walk is serial, so lanes interleave
-            // with the counting tasks); results are unchanged.
-            let earlier = masters.len() - 1;
-            masters
-                .par_iter_mut()
-                .take(earlier)
-                .try_for_each(|m| m.round(k, &table, &probe2, probe_half, opts))?;
         }
+        // Finalize independent masters concurrently; outputs are appended
+        // in ladder order to keep the byte stream deterministic.
+        masters
+            .par_iter_mut()
+            .try_for_each(|m| m.finalize(&probe2, probe_half, opts))?;
         for m in &mut masters {
-            m.finalize(&probe2, probe_half, opts)?;
             out.append(&mut m.out);
         }
         out.append(&mut guide_out);
     } else {
         let probe = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
-        let mut masters: Vec<Master> = Vec::new();
-        for &k in ks {
-            let table = RefineTable::build_supermer_slices(&read_seqs, k)?;
-            masters.push(Master::pass0(&table, k, opts));
-            if k == last_k {
-                masters.last_mut().unwrap().cut(&table, threshold)?;
+        // Pipelined table building: a builder lane counts the next k while
+        // the main lane runs pass 0 + the validation rounds (whose per-batch
+        // parallelism is the number of earlier masters, often below the
+        // thread count). The bounded channel keeps at most two k tables
+        // alive at once, so peak memory stays at ~two tables + probe.
+        let (tx, rx) = std::sync::mpsc::sync_channel::<anyhow::Result<RefineTable>>(1);
+        std::thread::scope(|scope| -> anyhow::Result<()> {
+            let ks_lane = ks;
+            let reads_lane = &read_seqs;
+            let builder = scope.spawn(move || {
+                for &k in ks_lane {
+                    if tx
+                        .send(RefineTable::build_supermer_slices(reads_lane, k))
+                        .is_err()
+                    {
+                        break; // consumer dropped the channel (error path)
+                    }
+                }
+            });
+            let mut masters: Vec<Master> = Vec::new();
+            for &k in ks {
+                let table = rx
+                    .recv()
+                    .map_err(|_| anyhow::anyhow!("multik table builder exited unexpectedly"))??;
+                let t_p0 = std::time::Instant::now();
+                // pass 0 of the new master is independent of the earlier
+                // masters' rounds at k (different states, same read-only
+                // table), so both run concurrently on the worker pool
+                // instead of serializing pass-0 behind the rounds.
+                let (new_master, rounds_res) = rayon::join(
+                    || Master::pass0(&table, k, opts),
+                    || {
+                        masters
+                            .par_iter_mut()
+                            .try_for_each(|m| m.round(k, &table, &probe, probe_half, opts))
+                    },
+                );
+                rounds_res?;
+                masters.push(new_master);
+                if k == last_k {
+                    masters.last_mut().unwrap().cut(&table, threshold)?;
+                }
+                if std::env::var_os("ANCHR_MULTIK_TIMING").is_some() {
+                    eprintln!("pass0+rounds k={k}: {:.3}s", t_p0.elapsed().as_secs_f64());
+                }
             }
-            // Independent per-master rounds run concurrently on the worker
-            // pool; results are unchanged (each master's state is private).
-            let earlier = masters.len() - 1;
+            // Finalize independent masters concurrently; outputs are appended
+            // in ladder order to keep the byte stream deterministic.
             masters
                 .par_iter_mut()
-                .take(earlier)
-                .try_for_each(|m| m.round(k, &table, &probe, probe_half, opts))?;
-        }
-        for m in &mut masters {
-            m.finalize(&probe, probe_half, opts)?;
-            out.append(&mut m.out);
-        }
+                .try_for_each(|m| m.finalize(&probe, probe_half, opts))?;
+            for m in &mut masters {
+                out.append(&mut m.out);
+            }
+            builder
+                .join()
+                .map_err(|_| anyhow::anyhow!("multik table builder panicked"))?;
+            Ok(())
+        })?;
     }
     Ok(out)
 }
@@ -755,18 +866,15 @@ fn split_by_bridge(
         // Mark windows without read support (rolling window: one push_right
         // and one lookup per position instead of an O(probe_len) encode).
         let mut cut: Vec<usize> = Vec::new();
-        let mut km = TdKmer::new(probe_len);
-        for &b in &u.bases[..probe_len] {
-            km.push_right(base_code(b));
-        }
-        let mut ok = table.get_count(&km) >= threshold;
+        let mut km = RollCanon::new(probe_len, &u.bases);
+        let mut ok = table.get_count_canonical(km.canon()) >= threshold;
         let mut prev_cut = !ok;
         if !ok {
             cut.push(0);
         }
         for i in 1..=n - probe_len {
-            km.push_right(base_code(u.bases[i + probe_len - 1]));
-            ok = table.get_count(&km) >= threshold;
+            km.push_code(base_code(u.bases[i + probe_len - 1]));
+            ok = table.get_count_canonical(km.canon()) >= threshold;
             // Start a cut at the beginning of an unsupported run.
             if !ok && !prev_cut {
                 cut.push(i);
@@ -1115,8 +1223,12 @@ fn remove_unsupported(
     k: usize,
     threshold: u32,
 ) {
+    // Per-unitig work is independent (and the k0 master's 2000+ unitigs
+    // otherwise serialize inside its round), so the keep scan joins the
+    // ambient pool; when the pool is busy with other masters' rounds the
+    // tasks simply run inline.
     let keep: Vec<bool> = unitigs
-        .iter()
+        .par_iter()
         .map(|u| {
             if u.bases.len() < k {
                 return true;
@@ -1133,15 +1245,12 @@ fn remove_unsupported(
             // unitigs wholesale (MG1655 5-group chain N50 124K -> 79.6K,
             // 0 mis either way — pure over-pruning). Chimeric joins are
             // caught by the reads-bridge validation instead.
-            let mut km = TdKmer::new(k);
-            for &b in &u.bases[..k] {
-                km.push_right(base_code(b));
-            }
+            let mut km = RollCanon::new(k, &u.bases);
             for j in 0..n_kmers {
                 if j > 0 {
-                    km.push_right(base_code(u.bases[j + k - 1]));
+                    km.push_code(base_code(u.bases[j + k - 1]));
                 }
-                if table.count(&km) < threshold {
+                if !table.is_solid(km.canon(), threshold) {
                     missing += 1;
                     if missing > max_missing {
                         break;
@@ -1641,6 +1750,39 @@ mod tests {
         let out = assemble_multik(std::slice::from_ref(&f), &opts).unwrap();
         let _ = std::fs::remove_file(&f);
         out
+    }
+
+    #[test]
+    fn rollcanon_matches_canonical() {
+        // Rolling dual-strand window must agree with the per-window
+        // `TdKmer::canonical` rebuild at every position (deterministic
+        // pseudo-random sequence, several k values incl. non-multiples of 4).
+        let mut x: u64 = 0x243F6A8885A308D3;
+        let seq: Vec<u8> = (0..600)
+            .map(|_| {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                b"ACGT"[x as usize % 4]
+            })
+            .collect();
+        for k in [31usize, 41, 61, 81, 101, 128, 160] {
+            let mut rc = RollCanon::new(k, &seq);
+            for j in 0..=seq.len() - k {
+                if j > 0 {
+                    rc.push_code(base_code(seq[j + k - 1]));
+                }
+                let mut km = TdKmer::new(k);
+                for &b in &seq[j..j + k] {
+                    km.push_right(base_code(b));
+                }
+                assert_eq!(
+                    rc.canon().cmp_bases(&km.canonical()),
+                    std::cmp::Ordering::Equal,
+                    "k={k} j={j}"
+                );
+            }
+        }
     }
 
     #[test]

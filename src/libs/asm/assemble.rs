@@ -707,8 +707,10 @@ fn build_unitigs_dfa(
     let entries = states.entries();
     let mut visited = vec![0u8; entries.len()];
     let mut unitigs = Vec::new();
-    for (seed, seed_count) in entries.iter() {
-        let si = states.idx(seed).expect("seed in classification states");
+    for (si, (seed, seed_count)) in entries.iter().enumerate() {
+        // `si` is the seed's own index in the parallel states/counts arrays
+        // (entries are unique and the index maps key -> enumeration order),
+        // so no HashMap lookup is needed here.
         if visited[si] == 1 {
             continue;
         }
@@ -717,49 +719,63 @@ fn build_unitigs_dfa(
             .map(|i| number_to_base(seed.base_at(k - 1 - i)))
             .collect();
         visited[si] = 1;
-        // Extend right while the path stays non-branching.
+        // Extend right while the path stays non-branching. The window keeps
+        // the forward k-mer and its reverse complement in lockstep (two
+        // packed shifts per step); classification prelinked each vertex's
+        // unique continuation, so a step is plain array reads plus a byte
+        // compare for the strand.
         let mut circular = false;
-        let mut kmer = rightmost_kmer(&bb, k);
+        let mut fw = rightmost_kmer(&bb, k);
+        let mut rcm = fw.rc();
+        let mut idx = states
+            .canon_idx_pair(&fw, &rcm)
+            .expect("seed in classification states");
         let mut right_counts: Vec<u32> = Vec::new();
         right_counts.push(*seed_count);
-        while let Some(b) = states.out_base(&kmer) {
-            let mut next = kmer;
-            next.push_right(b);
-            let canon = next.canonical();
-            if states.in_count(&next) != 1 {
+        while let Some((b, ci)) =
+            states.step(fw.cmp_bases(&rcm) != std::cmp::Ordering::Greater, idx)
+        {
+            fw.push_right(b);
+            rcm.push_left(3 - b);
+            if states.in_count_at(fw.cmp_bases(&rcm) != std::cmp::Ordering::Greater, ci) != 1 {
                 break;
             }
-            let ci = states.idx(&canon).expect("canon in classification states");
             if visited[ci] == 1 {
                 circular = true;
                 break;
             }
             bb.push(number_to_base(b));
-            right_counts.push(states.count_canonical(&canon));
+            right_counts.push(states.count_at(ci));
             visited[ci] = 1;
-            kmer = next;
+            idx = ci;
         }
         // Extend left by reverse-complementing and extending right.
         let mut rc: Vec<u8> = rev_comp(&bb).collect();
         let mut left_counts: Vec<u32> = Vec::with_capacity(rc.len() - k + 1);
         left_counts.push(*seed_count); // first RC k-mer = rc(seed)
-        let mut rkmer = rightmost_kmer(&rc, k);
-        while let Some(b) = states.out_base(&rkmer) {
-            let mut next = rkmer;
-            next.push_right(b);
-            let canon = next.canonical();
-            if states.in_count(&next) != 1 {
+                                       // Same rolling fw/rc pair as the right extension (the walked strand
+                                       // is the reverse complement here).
+        let mut fw = rightmost_kmer(&rc, k);
+        let mut rcm = fw.rc();
+        let mut idx = states
+            .canon_idx_pair(&fw, &rcm)
+            .expect("seed in classification states");
+        while let Some((b, ci)) =
+            states.step(fw.cmp_bases(&rcm) != std::cmp::Ordering::Greater, idx)
+        {
+            fw.push_right(b);
+            rcm.push_left(3 - b);
+            if states.in_count_at(fw.cmp_bases(&rcm) != std::cmp::Ordering::Greater, ci) != 1 {
                 break;
             }
-            let ci = states.idx(&canon).expect("canon in classification states");
             if visited[ci] == 1 {
                 circular = true;
                 break;
             }
             rc.push(number_to_base(b));
-            left_counts.push(states.count_canonical(&canon));
+            left_counts.push(states.count_at(ci));
             visited[ci] = 1;
-            rkmer = next;
+            idx = ci;
         }
         bb = rev_comp(&rc).collect();
         // Canonical orientation, like the contig mode.

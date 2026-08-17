@@ -439,6 +439,94 @@ impl RefineTable {
         0
     }
 
+    /// Count of an already-canonicalized k-mer (0 when absent): skips the
+    /// forward/rc canonicalization that `get_count` performs, for callers
+    /// that roll a window and track both strands in lockstep.
+    pub(crate) fn get_count_canonical(&self, kmer: &Kmer) -> u32 {
+        let kb = self.table.key_bytes();
+        let q = &kmer.0.to_bytes()[..kb];
+        let offs = self.prefix_index();
+        let p = if kb >= 2 {
+            ((q[0] as usize) << 8) | q[1] as usize
+        } else {
+            q[0] as usize
+        };
+        let keys = &self.table.keys;
+        let mut lo = offs[p] as usize;
+        let mut hi = offs[p + 1] as usize;
+        while lo < hi {
+            let mid = (lo + hi) >> 1;
+            let mid_b = &keys[mid * kb..(mid + 1) * kb];
+            match mid_b.cmp(q) {
+                std::cmp::Ordering::Less => lo = mid + 1,
+                std::cmp::Ordering::Greater => hi = mid,
+                std::cmp::Ordering::Equal => return self.table.counts[mid],
+            }
+        }
+        0
+    }
+
+    /// Row and count of an oriented k-mer's canonical form (None when
+    /// absent from the table): like [`Self::get_count`] but also reports
+    /// the packed-table row, so classification can link neighbouring
+    /// vertices without a second lookup.
+    pub(crate) fn find_row(&self, kmer: &Kmer) -> Option<(usize, u32)> {
+        let kb = self.table.key_bytes();
+        let mut qbuf = [0u8; key::Kmer::MAX_K / 4];
+        if self.table.k.is_multiple_of(4) {
+            let fw = kmer.0.to_bytes();
+            let mut rc = [0u8; key::Kmer::MAX_K / 4];
+            for i in 0..kb {
+                rc[kb - 1 - i] = REVCOMP_BYTE[fw[i] as usize];
+            }
+            let half = kb.div_ceil(2);
+            let canon: &[u8] = if fw[..half] <= rc[..half] {
+                fw
+            } else {
+                &rc[..kb]
+            };
+            qbuf[..kb].copy_from_slice(canon);
+        } else {
+            let canon = kmer.canonical();
+            qbuf[..kb].copy_from_slice(canon.0.to_bytes());
+        }
+        let q = &qbuf[..kb];
+        let offs = self.prefix_index();
+        let p = if kb >= 2 {
+            ((q[0] as usize) << 8) | q[1] as usize
+        } else {
+            q[0] as usize
+        };
+        let keys = &self.table.keys;
+        let mut lo = offs[p] as usize;
+        let mut hi = offs[p + 1] as usize;
+        while lo < hi {
+            let mid = (lo + hi) >> 1;
+            let mid_b = &keys[mid * kb..(mid + 1) * kb];
+            match mid_b.cmp(q) {
+                std::cmp::Ordering::Less => lo = mid + 1,
+                std::cmp::Ordering::Greater => hi = mid,
+                std::cmp::Ordering::Equal => return Some((mid, self.table.counts[mid])),
+            }
+        }
+        None
+    }
+
+    /// Per-row entry rank for rows with `count >= threshold` (`u32::MAX`
+    /// elsewhere), in packed-table order: `solid_entries` preserves that
+    /// order, so the rank maps a found row onto the parallel entries index.
+    pub(crate) fn solid_row_ranks(&self, threshold: u32) -> Vec<u32> {
+        let mut ranks = vec![u32::MAX; self.table.counts.len()];
+        let mut rank = 0u32;
+        for (row, &c) in self.table.counts.iter().enumerate() {
+            if c >= threshold {
+                ranks[row] = rank;
+                rank += 1;
+            }
+        }
+        ranks
+    }
+
     /// Deterministic (canonical k-mer) sorted snapshot of (key, count),
     /// computed once and cached for the multi-pass assemble scans.
     pub(crate) fn sorted_entries(&self) -> &[(Kmer, u32)] {

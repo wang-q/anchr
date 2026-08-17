@@ -442,6 +442,22 @@ multik 分支，bcalm/unitig 分支保持 1000）、`asm extend --min-len 1000`
 * 本流程为快速门禁复现（手写 anchor 合并脚本），contigs 数多于模板
   7_merge 链属预期；单组验证 N50 121K（auto 31..192）。
 
+### g37: multik 性能优化门禁（2026-08-17 晚追加）
+
+walk 滚动窗口 + succ 索引（删除 400 MB HashMap index）、
+`remove_unsupported` 按 unitig 并行、pass0 与 rounds 并发（详见
+`notes/design/asm-multik.md` §性能）。multik 输出与优化前字节级一致，
+全链复跑：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  mm/100k | indel/100k |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | -------: | ---------: |
+| 性能优化后（auto 31..192） | 58 | 179800 | 581098 | 55170 | 0 | 97.979 | 107.51 | 28.59 |
+| 08-17 门禁记录（同口径） | 58 | 179800 | 580756 | 55170 | 0 | 97.943 | 108.81 | 28.78 |
+
+* **0 mis 保持**，逐指标与 08-17 门禁一致（GF +0.036 源于其间合入的
+  `remove_unsupported` run>=2 过剪修复，非本次性能改动）；
+* 单组 multik 4.2–6.5 s（-p 8、2 组并发），峰值 ~2.0 GB/进程。
+
 ### mg1655: multik vs bcalm 对照（2026-08-15）
 
 同一批 `6_down_sampling` reads（MRX40P000/P001/P002 + MRX80P000/P001，
@@ -865,3 +881,21 @@ fix_chain.sh）：跨组 anchors 合并用了 `asm olc --list-files`（无
 * 复现：`/tmp/mg1655_fix/`（fix 后 multik）+ `olc --unitigs --list-files
   anchors.list` + extend + quast（quast_fix_u）；变体对照在
   `/tmp/mg1655_vstep`、`/tmp/mg1655_vguide`、`/tmp/mg1655_nocut`。
+
+### mg1655: multik 性能优化门禁（2026-08-17 晚追加）
+
+`--all-masters` 单次调用的三个性能改动（walk 滚动 fw/rc 窗口 + 分类期
+预联唯一后继下标、`remove_unsupported` 按 unitig 并行、pass0(k) 与
+earlier-masters rounds(k) rayon::join 并发），multik 输出与优化前
+**字节级一致**，全链复跑（跨组 olc 带 `--unitigs`，同上节口径）：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  mm/100k | indel/100k |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | -------: | ---------: |
+| 性能优化后（auto 31..160） | 90 | 268842 | 4624071 | 118731 | 0 | 99.072 | 2.06 | 0.06 |
+| 上节基线（优化前同口径） | 90 | 268842 | 4624071 | 118731 | 0 | 99.072 | 2.06 | 0.06 |
+
+* 逐指标完全相同（multik 字节级一致 → 下游全同），**0 mis 保持**；
+* 单组计时（release、-p 8、单进程）：105.8 s → **48.9 s**（2.2×）；
+  5 组链 2 并发下每组 59–65 s；峰值内存不变（~11.7 GB/进程）；
+* 分解：DFA walk 7.3→1.9 s（k=160 隔离）、classify 1.5→1.1 s（删
+  HashMap 构建）、46 轮 `remove_unsupported` CPU 104.9 s 转入并行。
