@@ -6,7 +6,7 @@
 use super::master::{CountView, RollCanon};
 use super::MultikUnitig;
 use crate::libs::asm::assemble::{compute_links, Link, Unitig};
-use crate::libs::asm::table::base_code;
+use crate::libs::asm::table::{base_code, RefineTable};
 use anyhow::Result;
 use pgr::libs::nt::rev_comp;
 use rayon::prelude::*;
@@ -411,6 +411,8 @@ pub(crate) fn progressive_filter(
     links: &mut Vec<Vec<Link>>,
     branch: &mut Vec<bool>,
     k_build: usize,
+    probe: Option<&RefineTable>,
+    probe_half: usize,
 ) -> (Vec<Unitig>, Vec<bool>) {
     if unitigs.is_empty() {
         return (Vec::new(), Vec::new());
@@ -481,7 +483,7 @@ pub(crate) fn progressive_filter(
         // Recompact after removal so the main path grows (metaMDBG
         // recompacts every round); chimeric junctions possibly fused here
         // are cut back by `split_by_bridge` right after this filter.
-        recompact_graph(unitigs, links, branch, k_build);
+        recompact_graph(unitigs, links, branch, k_build, probe, probe_half);
         t += (t * 0.1).min(10.0);
     }
     (dropped, dropped_branch)
@@ -536,21 +538,138 @@ fn oriented_segment(
     Some((li, lrev, ri, rrev))
 }
 
+/// Per-unitig probe-window statistics over the reads-only probe table:
+/// `median` (the unitig's "normal" coverage) plus `left_max`/`right_max`
+/// (the max count over the first/last `SPAN` bases). A junction whose
+/// junction-adjacent end max far exceeds the unitig's own median is a
+/// repeat bridge — the shared windows carry reads from both genomic
+/// copies, so recompacting that chain would fuse two distant loci into a
+/// relocation chimera (DH5alpha's two relocation misassemblies join loci
+/// through ~1 kb conserved repeats; the elevated windows sit a few hundred
+/// bases from the breakpoint, so the single junction probe misses them).
+/// Windows roll one base at a time; a unitig shorter than one probe window
+/// has no stats (0: never a base).
+struct ProbeStats {
+    median: u32,
+    left_max: u32,
+    right_max: u32,
+}
+
+fn probe_stats(unitigs: &[Unitig], table: &RefineTable, probe_half: usize) -> Vec<ProbeStats> {
+    const SPAN: usize = 2000;
+    let probe_len = probe_half * 2;
+    unitigs
+        .iter()
+        .map(|u| {
+            let n = u.bases.len();
+            if n < probe_len {
+                return ProbeStats {
+                    median: 0,
+                    left_max: 0,
+                    right_max: 0,
+                };
+            }
+            let mut counts: Vec<u32> = Vec::with_capacity(n - probe_len + 1);
+            let mut left_max = 0u32;
+            let mut right_max = 0u32;
+            let right_cut = n.saturating_sub(SPAN);
+            let mut km = RollCanon::new(probe_len, &u.bases);
+            for p in 0..=n - probe_len {
+                if p > 0 {
+                    km.push_code(base_code(u.bases[p + probe_len - 1]));
+                }
+                let c = table.get_count_canonical(km.canon());
+                if p < SPAN {
+                    left_max = left_max.max(c);
+                }
+                if p + probe_len > right_cut {
+                    right_max = right_max.max(c);
+                }
+                counts.push(c);
+            }
+            counts.sort_unstable();
+            ProbeStats {
+                median: counts[counts.len() / 2],
+                left_max,
+                right_max,
+            }
+        })
+        .collect()
+}
+
+/// Whether the `i → l.to` junction spans a repeat bridge: the max probe
+/// count over the junction-adjacent end of either unitig exceeds
+/// `REPEAT_RATIO` times that unitig's own median coverage. Such chains are
+/// not compacted (recompaction would fuse two distant loci into a
+/// relocation chimera — the shared windows carry reads from both copies).
+fn is_repeat_bridge(i: usize, l: &Link, unitigs: &[Unitig], stats: &[ProbeStats]) -> bool {
+    // A repeat region has reads on both copies; a low-coverage or short
+    // unitig's coverage is too noisy to be a base. 1.5: a 2-copy repeat
+    // raises the junction end to ~2x the unique median, but real ratios
+    // land at 1.5-1.7x (coverage noise, read sharing), so 1.8 misses them.
+    const REPEAT_RATIO: f32 = 1.5;
+    let si = &stats[i];
+    let sj = &stats[l.to];
+    // Junction-adjacent ends: `i` leaves its right (left) end when
+    // `from_rc` is false (true); the link enters `to`'s left (right) end
+    // when `to_rc` is false (true).
+    let (im, mi) = if l.from_rc {
+        (si.left_max, si.median)
+    } else {
+        (si.right_max, si.median)
+    };
+    let (jm, mj) = if l.to_rc {
+        (sj.right_max, sj.median)
+    } else {
+        (sj.left_max, sj.median)
+    };
+    let hi = im as f32 >= 2.0 && mi as f32 >= 2.0 && im as f32 > REPEAT_RATIO * mi as f32;
+    let hj = jm as f32 >= 2.0 && mj as f32 >= 2.0 && jm as f32 > REPEAT_RATIO * mj as f32;
+    let blocked = hi || hj;
+    // Debug: report every long-unitig junction checked, with the coverage
+    // ratio that decided it (to trace why a relocation bridge survived).
+    if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some()
+        && (unitigs[i].bases.len() > 40_000 || unitigs[l.to].bases.len() > 40_000)
+    {
+        eprintln!(
+            "repeat-check {}->{} len={}x{} hi={} ({}x{}) hj={} ({}x{}) blocked={blocked}",
+            i,
+            l.to,
+            unitigs[i].bases.len(),
+            unitigs[l.to].bases.len(),
+            hi,
+            im,
+            mi,
+            hj,
+            jm,
+            mj
+        );
+    }
+    blocked
+}
+
 /// In-graph recompaction: merge unique chains into longer unitigs and
 /// relink the chain endpoints (metaMDBG `UnitigGraph2::recompact`). The
 /// merged unitig keeps the chain head's begin (from_rc=true) links and the
 /// chain tail's end (from_rc=false) links; external edges pointing into
 /// the chain are redirected to the merged unitig.
+/// chain. `probe` (reads-only) gates the chain ends: a junction whose
+/// shared-overlap probe count far exceeds both unitigs' own median (a
+/// repeat bridge) is not compacted, so recompaction cannot fuse two distant
+/// loci into a relocation chimera.
 pub(crate) fn recompact_graph(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
     branch: &mut Vec<bool>,
     k_build: usize,
+    probe: Option<&RefineTable>,
+    probe_half: usize,
 ) {
     let n = unitigs.len();
     if n <= 1 {
         return;
     }
+    let stats = probe.map(|t| probe_stats(unitigs, t, probe_half));
     let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
     let mut right_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
     let mut left_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
@@ -595,6 +714,22 @@ pub(crate) fn recompact_graph(
                 || left_of[rn].is_some()
             {
                 continue;
+            }
+            // A repeat bridge joins two distant loci; blocking the link here
+            // keeps them as separate unitigs instead of fusing a chimera.
+            if let (Some(_), Some(s)) = (probe, stats.as_deref()) {
+                if is_repeat_bridge(i, l, unitigs, s) {
+                    if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() {
+                        eprintln!(
+                            "repeat-bridge blocked {}->{} len={}x{}",
+                            i,
+                            l.to,
+                            unitigs[i].bases.len(),
+                            unitigs[l.to].bases.len()
+                        );
+                    }
+                    continue;
+                }
             }
             right_of[ln] = Some((ri, rrev));
             left_of[rn] = Some((li, lrev));
@@ -694,14 +829,20 @@ pub(crate) fn recompact_graph(
 /// stay separate. Each link is first resolved into an oriented chain
 /// segment (`left → right`, with a per-unitig strand flag) by matching the
 /// actual extremity (k_build-1)-mers; the walk then follows unique
-/// chain-oriented ends (2n nodes: id * 2 + rev).
+/// chain-oriented ends (2n nodes: id * 2 + rev). `probe` (reads-only) gates
+/// the chain ends: a junction whose shared-overlap probe count far exceeds
+/// both unitigs' own median (a repeat bridge) is not compacted, so a final
+/// chain cannot fuse two distant loci into a relocation chimera.
 pub(crate) fn merge_chains(
     unitigs: &[Unitig],
     links: &[Vec<Link>],
     branch: &[bool],
     k_build: usize,
+    probe: Option<&RefineTable>,
+    probe_half: usize,
 ) -> Result<Vec<MultikUnitig>> {
     let n = unitigs.len();
+    let stats = probe.map(|t| probe_stats(unitigs, t, probe_half));
     let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
     let mut right_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
     let mut left_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
@@ -744,6 +885,22 @@ pub(crate) fn merge_chains(
                 || left_of[rn].is_some()
             {
                 continue;
+            }
+            // A repeat bridge joins two distant loci; blocking the link here
+            // keeps them as separate unitigs instead of fusing a chimera.
+            if let (Some(_), Some(s)) = (probe, stats.as_deref()) {
+                if is_repeat_bridge(i, l, unitigs, s) {
+                    if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() {
+                        eprintln!(
+                            "repeat-bridge blocked {}->{} len={}x{}",
+                            i,
+                            l.to,
+                            unitigs[i].bases.len(),
+                            unitigs[l.to].bases.len()
+                        );
+                    }
+                    continue;
+                }
             }
             right_of[ln] = Some((ri, rrev));
             left_of[rn] = Some((li, lrev));

@@ -88,7 +88,7 @@ pub(crate) fn bridge_kmer(
 /// of the shared `(k_build-1)`-mer overlap (u tail + v continuation, or the
 /// reverse for a left-end link). Direction is resolved by actual extremity
 /// matching (same as [`bridge_kmer`]).
-fn probe_kmer(
+pub(crate) fn probe_kmer(
     u: &Unitig,
     v: &Unitig,
     link: &Link,
@@ -215,6 +215,34 @@ pub(crate) fn split_by_bridge(
             out.push(u.clone());
             out_branch.push(is_branch);
             continue;
+        }
+        // Debug: report long unitigs cut by the bridge split (and the cut
+        // positions) so chimeric-junction cuts can be traced on real data.
+        if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() && n > 50_000 {
+            eprintln!(
+                "split_by_bridge cut len={n} cuts={} cut_pos={:?}",
+                cut.len(),
+                &cut[..cut.len().min(12)]
+            );
+        }
+        // Debug: dump the probe-table support profile of long unitigs that
+        // were NOT cut (to find why a chimeric junction survives the split).
+        if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() && n > 90_000 && cut.is_empty() {
+            let mut zero = 0usize;
+            let mut first_zero = usize::MAX;
+            let mut km = RollCanon::new(probe_len, &u.bases);
+            for j in 0..=n - probe_len {
+                if j > 0 {
+                    km.push_code(base_code(u.bases[j + probe_len - 1]));
+                }
+                if table.get_count_canonical(km.canon()) < threshold {
+                    zero += 1;
+                    first_zero = first_zero.min(j);
+                }
+            }
+            eprintln!(
+                "split_by_bridge UNCUT len={n} probe={probe_len} zero_windows={zero} first_zero={first_zero}"
+            );
         }
         // Split at the cut positions.
         let mut pieces: Vec<usize> = Vec::new();

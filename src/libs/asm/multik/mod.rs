@@ -333,7 +333,7 @@ mod tests {
         assert_eq!(variants[0].bases, alt_bases);
         assert!(!unitigs[dom].bases.is_empty());
         // The surviving graph is one unique chain source -> dom -> right.
-        let chains = merge_chains(&unitigs, &links, &branch, 31).unwrap();
+        let chains = merge_chains(&unitigs, &links, &branch, 31, None, 0).unwrap();
         let expected = 60 + 30 + 40 + 30 + 60; // s + m1[30..] + r[30..]
         assert_eq!(chains[0].bases.len(), expected);
     }
@@ -467,7 +467,7 @@ mod tests {
             Vec::new(),
         ];
         let mut branch = vec![false; unitigs.len()];
-        let (dropped, _) = progressive_filter(&mut unitigs, &mut links, &mut branch, 21);
+        let (dropped, _) = progressive_filter(&mut unitigs, &mut links, &mut branch, 21, None, 0);
         assert_eq!(unitigs.len(), 2, "unique chain must survive the filter");
         assert!(dropped.is_empty());
     }
@@ -480,7 +480,7 @@ mod tests {
         let mut unitigs = vec![a, iso];
         let mut links = vec![Vec::new(), Vec::new()];
         let mut branch = vec![false; unitigs.len()];
-        let (dropped, _) = progressive_filter(&mut unitigs, &mut links, &mut branch, 21);
+        let (dropped, _) = progressive_filter(&mut unitigs, &mut links, &mut branch, 21, None, 0);
         assert_eq!(
             unitigs.len(),
             1,
@@ -515,7 +515,7 @@ mod tests {
             Vec::new(),
         ];
         let mut branch = vec![false; unitigs.len()];
-        recompact_graph(&mut unitigs, &mut links, &mut branch, 21);
+        recompact_graph(&mut unitigs, &mut links, &mut branch, 21, None, 0);
         // A(100) + B[20..](80) + C[20..](80) = 260.
         assert_eq!(unitigs.len(), 1);
         assert_eq!(unitigs[0].bases.len(), 260);
@@ -546,7 +546,7 @@ mod tests {
             }],
         ];
         let branch = vec![false; unitigs.len()];
-        let out = merge_chains(&unitigs, &links, &branch, 21).unwrap();
+        let out = merge_chains(&unitigs, &links, &branch, 21, None, 0).unwrap();
         assert_eq!(out.len(), 3, "v must not merge with either predecessor");
         let total: usize = out.iter().map(|u| u.bases.len()).sum();
         assert_eq!(total, 300, "no unitig is fused at the junction");
@@ -578,7 +578,7 @@ mod tests {
             }],
         ];
         let mut branch = vec![false; unitigs.len()];
-        recompact_graph(&mut unitigs, &mut links, &mut branch, 21);
+        recompact_graph(&mut unitigs, &mut links, &mut branch, 21, None, 0);
         // v keeps both incoming links (it was not absorbed), so the merged
         // graph still has three segments and v's begin retains two edges.
         assert_eq!(unitigs.len(), 3);

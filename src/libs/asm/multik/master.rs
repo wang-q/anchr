@@ -65,6 +65,29 @@ pub(crate) struct RollCanon {
     rc: TdKmer,
 }
 
+/// Debug trace: dumps the current unitig graph (FASTA + link lines) to
+/// `$ANCHR_MULTIK_TRACE_DIR/<tag>.fa` so an external tool can follow a
+/// junction across the rounds. No-op when the env var is unset.
+fn trace_graph(tag: &str, unitigs: &[Unitig], links: &[Vec<Link>]) {
+    use std::io::Write;
+    let Some(dir) = std::env::var_os("ANCHR_MULTIK_TRACE_DIR") else {
+        return;
+    };
+    let path = std::path::Path::new(&dir).join(format!("{tag}.fa"));
+    let mut f = std::fs::File::create(&path).unwrap();
+    for (i, u) in unitigs.iter().enumerate() {
+        writeln!(f, ">u{i} len={} cov={:.1}", u.bases.len(), u.coverage).unwrap();
+        for chunk in u.bases.chunks(100) {
+            writeln!(f, "{}", String::from_utf8_lossy(chunk)).unwrap();
+        }
+        let ls: Vec<String> = links[i]
+            .iter()
+            .map(|l| format!("{}{}", l.to, if l.from_rc { "-" } else { "+" }))
+            .collect();
+        writeln!(f, "#L {}", ls.join(" ")).unwrap();
+    }
+}
+
 impl RollCanon {
     /// Window over the first `k` bases of `bases` (`bases.len() >= k`).
     pub(crate) fn new(k: usize, bases: &[u8]) -> Self {
@@ -118,6 +141,7 @@ impl Master {
     /// inside `assemble_unitigs_core` with quality gating).
     pub(crate) fn from_unitigs(unitigs: Vec<Unitig>, k0: usize) -> Self {
         let links = compute_links(&unitigs, k0);
+        trace_graph(&format!("pass0_k{k0}"), &unitigs, &links);
         // Repeat fragments (a repeated element's shared k-mers fan into four
         // or more flanking unitigs at the master k) connect to four or more
         // partners. Snapshot that branch status at pass 0: a chain through
@@ -226,14 +250,51 @@ impl Master {
         // (metaMDBG recompacts after every abundance-removal round). No
         // abundance pruning here — that is deferred to the final filter, so
         // single-genome coverage fluctuation never drops real content.
-        recompact_graph(&mut self.unitigs, &mut self.links, &mut self.branch, k0);
+        recompact_graph(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            k0,
+            Some(probe),
+            probe_half,
+        );
         let t5 = std::time::Instant::now();
         // 4. Prune low-abundance branching/isolated unitigs and carry them
         // into the next round (the final round's carry becomes output).
-        let (dropped, dropped_branch) =
-            progressive_filter(&mut self.unitigs, &mut self.links, &mut self.branch, k0);
+        let (dropped, dropped_branch) = progressive_filter(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            k0,
+            Some(probe),
+            probe_half,
+        );
         self.carried = dropped;
         self.carried_branch = dropped_branch;
+        trace_graph(
+            &format!("r{k0}_k{k}_after_prog"),
+            &self.unitigs,
+            &self.links,
+        );
+        // 4.5 Split unitigs at internal positions that have no reads support
+        // (recompact_graph can fuse chimeric unitigs — the abundance filter's
+        // recompaction also does this — so split them here before the next
+        // round uses the unitigs as the skeleton).  probe is reads-only, so
+        // unitig self-counts never mask a junction window.
+        split_by_bridge(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            probe,
+            k0,
+            probe_half,
+            threshold,
+        );
+        trace_graph(
+            &format!("r{k0}_k{k}_after_split"),
+            &self.unitigs,
+            &self.links,
+        );
         if timing {
             let n = self.unitigs.len();
             let bp: usize = self.unitigs.iter().map(|u| u.bases.len()).sum();
@@ -264,8 +325,9 @@ impl Master {
         // Split unitigs at internal positions that have no reads support
         // (the abundance filter's recompaction can fuse chimeric links into
         // a single unitig — the source of G37 relocations). Every probe
-        // window of a unitig must occur in the reads; an unsupported window
-        // is a chimeric junction and the unitig is cut there.
+        // window of a unitig must occur in the reads at least
+        // `min_count_extend` times; an unsupported window is a chimeric
+        // junction and the unitig is cut there.
         split_by_bridge(
             &mut self.unitigs,
             &mut self.links,
@@ -273,7 +335,7 @@ impl Master {
             probe,
             k0,
             probe_half,
-            1,
+            opts.min_count_extend as u32,
         );
         // Re-verify the links recomputed by the split: the new extremities
         // may join distant regions, so every surviving link needs bridging
@@ -307,9 +369,17 @@ impl Master {
             20.0,
         );
         weak_link_remover(&mut self.unitigs, &mut self.links, 0.05);
+        trace_graph(&format!("f{k0}_premerge"), &self.unitigs, &self.links);
 
         // Final compaction: merge validated chains into long unitigs.
-        let mut chains = merge_chains(&self.unitigs, &self.links, &self.branch, k0)?;
+        let mut chains = merge_chains(
+            &self.unitigs,
+            &self.links,
+            &self.branch,
+            k0,
+            Some(probe),
+            probe_half,
+        )?;
         chains.extend(
             std::mem::take(&mut self.carried)
                 .into_iter()

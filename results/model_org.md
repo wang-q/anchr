@@ -12,6 +12,21 @@
     * [mg1655: download](#mg1655-download)
     * [mg1655: template](#mg1655-template)
     * [mg1655: run](#mg1655-run)
+  * [*E. coli* str. K-12 substr. DH5alpha](#e-coli-str-k-12-substr-dh5alpha)
+    * [dh5alpha: reference](#dh5alpha-reference)
+    * [dh5alpha: download](#dh5alpha-download)
+    * [dh5alpha: template](#dh5alpha-template)
+    * [dh5alpha: run](#dh5alpha-run)
+  * [*Bacillus cereus* ATCC 10987](#bacillus-cereus-atcc-10987)
+    * [bcer: reference](#bcer-reference)
+    * [bcer: download](#bcer-download)
+    * [bcer: template](#bcer-template)
+    * [bcer: run](#bcer-run)
+  * [*Rhodobacter sphaeroides* 2.4.1](#rhodobacter-sphaeroides-241)
+    * [rsph: reference](#rsph-reference)
+    * [rsph: download](#rsph-download)
+    * [rsph: template](#rsph-template)
+    * [rsph: run](#rsph-run)
 <!-- TOC -->
 
 ## *Mycoplasma genitalium* G37
@@ -1001,3 +1016,992 @@ drop_cross_chimeras`，4 个单测覆盖删/留/同文件/断裂链场景。
   基准调优的自由量——但上述场景仍是开放风险；
 * 后续验证要求：上真实宏基因组前，先做 cv 开/关 A/B（对比 N50/GF/
   contig 数；N50 显著下降即误删信号），确认无误删再固化模板默认。
+
+## *E. coli* str. K-12 substr. DH5alpha
+
+### dh5alpha: reference
+
+* Reference genome
+
+```shell
+mkdir -p ~/data/anchr/dh5alpha/1_genome
+cd ~/data/anchr/dh5alpha/1_genome
+
+cp ~/data/anchr/ref/dh5alpha/genome.fa .
+cp ~/data/anchr/ref/dh5alpha/paralogs.fa .
+
+```
+
+### dh5alpha: download
+
+```shell
+cd ~/data/anchr/dh5alpha
+
+mkdir -p ena
+cd ena
+
+cat << EOF > source.csv
+SRP251726,dh5alpha,HiSeq 2500 PE125
+EOF
+
+anchr ena meta source.csv > ena_info.json
+anchr ena manifest ena_info.json
+
+tva to md ena_info.tsv --fmt
+
+aria2c -x 9 -s 3 -c -i ena_info.ftp.txt
+
+md5sum --check ena_info.md5.txt
+
+```
+
+| name     | srx        | platform        | layout | ilength | srr         | spot    | base  |
+|:---------|:-----------|:----------------|:-------|:--------|:------------|:--------|:------|
+| dh5alpha | SRX7856678 | ILLUMINA        | PAIRED |         | SRR11245239 | 5881654 | 1.37G |
+| dh5alpha | SRX7856679 | OXFORD_NANOPORE | SINGLE |         | SRR11245238 | 346489  | 3.35G |
+
+* Illumina
+
+```shell
+cd ~/data/anchr/dh5alpha
+
+mkdir -p 2_illumina
+cd 2_illumina
+
+ln -s ../ena/SRR11245239_1.fastq.gz R1.fq.gz
+ln -s ../ena/SRR11245239_2.fastq.gz R2.fq.gz
+
+```
+
+### dh5alpha: template
+
+```shell
+WORKING_DIR=${HOME}/data/anchr
+BASE_NAME=dh5alpha
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+rm 0_script/*
+anchr template \
+    --genome 4583637 \
+    --parallel 24 \
+    \
+    --repetitive \
+    \
+    --fastqc \
+    --insertsize \
+    --fastk \
+    \
+    --trim "--dedupe --cutoff 30 --cutk 31" \
+    --qual "25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --merge \
+    \
+    --cov "40 80" \
+    --unitigger "multik unitig bcalm" \
+    --statp 2 \
+    --uscale 2 \
+    --lscale 3 \
+    --redo
+
+```
+
+### dh5alpha: run
+
+```shell
+WORKING_DIR=${HOME}/data/anchr
+BASE_NAME=dh5alpha
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+bash 0_script/1_repetitive.sh
+
+bash 0_script/0_master.sh
+
+# bash 0_script/0_cleanup.sh
+
+```
+
+| Group             |  Mean | Median |  STDev | Pairs%/Orientation |
+|-------------------|------:|-------:|-------:|-------------------:|
+| R.genome.bbtools  | 470.7 |    346 | 2460.3 |             99.98% |
+| R.tadpole.bbtools | 389.0 |    340 |  206.1 |             94.97% |
+| R.genome.picard   | 394.8 |    346 |  208.3 |                 FR |
+| R.tadpole.picard  | 389.0 |    340 |  205.8 |                 FR |
+
+Table: statInsertSize
+
+| K    | property              |          min |          max |
+|------|-----------------------|-------------:|-------------:|
+| R.21 | Homozygous (a)        |              |         100% |
+|      | Genome Haploid Length |              | 4,422,294 bp |
+|      | Genome Repeat Length  |   120,434 bp |   120,514 bp |
+|      | Genome Unique Length  | 4,300,398 bp | 4,303,243 bp |
+|      | Model Fit             |     97.6629% |     98.0363% |
+|      | Read Error Rate       |              |    0.209622% |
+|      | Kmer Cov              |              |        267.1 |
+| R.51 | Homozygous (a)        |              |         100% |
+|      | Genome Haploid Length |              | 4,441,231 bp |
+|      | Genome Repeat Length  |    94,823 bp |    94,884 bp |
+|      | Genome Unique Length  | 4,344,991 bp | 4,347,764 bp |
+|      | Model Fit             |     97.9127% |      98.422% |
+|      | Read Error Rate       |              |    0.131634% |
+|      | Kmer Cov              |              |        185.6 |
+| R.81 | Homozygous (a)        |              |         100% |
+|      | Genome Haploid Length |              | 4,466,733 bp |
+|      | Genome Repeat Length  |    87,251 bp |    87,306 bp |
+|      | Genome Unique Length  | 4,378,088 bp | 4,380,823 bp |
+|      | Model Fit             |     97.4061% |      98.803% |
+|      | Read Error Rate       |              |    0.109848% |
+|      | Kmer Cov              |              |        108.3 |
+
+Table: statFastK
+
+| chr       | chrLength |   size | coverage |
+| --------- | --------: | -----: | -------: |
+| NZ_CP017100 | 4583637 | 110586 |   0.0241 |
+| all       |   4583637 | 110586 |   0.0241 |
+
+Table: statRepetitive
+
+| Name       |     N50 |     Sum |        # |
+|------------|--------:|--------:|---------:|
+| genome     | 4583637 |   4.58M |        1 |
+| paralogs   |    1737 | 188.16K |      111 |
+| repetitive |    1175 | 110.59K |      190 |
+| Illumina.R |     125 |   1.47G | 11763308 |
+| trim.R     |     125 |   1.37G | 10962178 |
+| Q0L0       |     125 |   1.37G | 10962178 |
+| Q25L60     |     125 |   1.25G | 10280852 |
+| Q30L60     |     125 |   1.13G |  9405463 |
+
+Table: statReads
+
+| Name     | N50 |     Sum |        # |
+|----------|----:|--------:|---------:|
+| clumpify | 125 |   1.37G | 10970448 |
+| highpass | 125 |   1.37G | 10966054 |
+| trim     | 125 |   1.37G | 10962178 |
+| filter   | 125 |   1.37G | 10962178 |
+| R1       | 125 | 682.99M |  5481089 |
+| R2       | 125 | 683.63M |  5481089 |
+| Rs       |   0 |       0 |        0 |
+
+Table: statTrimReads
+
+```text
+#R.trim
+#Matched	5620	0.05125%
+#Name	Reads	ReadsPct
+```
+
+```text
+#R.filter
+#Matched	0	0.00000%
+#Name	Reads	ReadsPct
+```
+
+| Name          | N50 |     Sum |        # |
+|---------------|----:|--------:|---------:|
+| clumped       | 125 |   1.37G | 10959360 |
+| ecco          | 125 |   1.37G | 10959360 |
+| eccc          | 125 |   1.37G | 10959360 |
+| ecct          | 125 |   1.37G | 10952518 |
+| extended      | 165 |    1.8G | 10952518 |
+| merged.raw    | 343 |    1.1G |  3510900 |
+| unmerged.raw  | 165 | 646.07M |  3930718 |
+| unmerged.trim | 165 | 646.07M |  3930718 |
+| M1            | 343 |   1.06G |  3403638 |
+| U1            | 165 | 322.94M |  1965359 |
+| U2            | 165 | 323.12M |  1965359 |
+| Us            |   0 |       0 |        0 |
+| M.cor         | 250 |   1.71G | 10737994 |
+
+Table: statMergeReads
+
+| Group              |  Mean | Median | STDev | Pairs% |
+|--------------------|------:|-------:|------:|-------:|
+| M.ihist.merge1.txt | 172.9 |    173 |  27.8 | 21.04% |
+| M.ihist.merge.txt  | 312.5 |    310 |  87.7 | 64.11% |
+
+Table: statMergeInsert
+
+| Name     | CovIn | CovOut | Discard% | Kmer | RealG |  EstG | Est/Real | RunTime |
+|----------|------:|-------:|---------:|-----:|------:|------:|---------:|--------:|
+| Q0L0.R   | 298.2 |  262.0 |   12.13% | "87" | 4.58M |  4.6M |     1.00 | 0:02:07 |
+| Q25L60.R | 273.7 |  253.4 |    7.43% | "87" | 4.58M | 4.53M |     0.99 | 0:01:57 |
+| Q30L60.R | 246.5 |  232.2 |    5.80% | "87" | 4.58M | 4.52M |     0.99 | 0:01:44 |
+
+Table: statQuorum
+
+| Name          | CovCor | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
+|---------------|-------:|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
+| Q0L0X40P000   |   40.0 |  0.983 |     57903 | 4.45M | 141 |    37.71K |     40 |   5 |   8.3 |   110 |
+| Q0L0X40P001   |   40.0 |  0.982 |     54887 | 4.46M | 146 |    28.86K |     40 |   6 |   7.3 |   116 |
+| Q0L0X40P002   |   40.0 |  0.984 |     56551 | 4.46M | 140 |    38.42K |     40 |   5 |   8.3 |   110 |
+| Q0L0X80P000   |   80.0 |   0.97 |     37978 | 4.45M | 197 |    21.17K |     80 |   9 |  17.7 |   214 |
+| Q0L0X80P001   |   80.0 |  0.971 |     35821 | 4.45M | 211 |    26.49K |     80 |   9 |  17.7 |   214 |
+| Q0L0X80P002   |   80.0 |  0.972 |     39975 | 4.45M | 200 |    21.03K |     80 |   9 |  17.7 |   214 |
+| Q25L60X40P000 |   40.0 |  0.984 |     63101 | 4.46M | 132 |    28.01K |     40 |   6 |   7.3 |   116 |
+| Q25L60X40P001 |   40.0 |  0.984 |     60855 | 4.46M | 128 |    25.15K |     40 |   6 |   7.3 |   116 |
+| Q25L60X40P002 |   40.0 |  0.983 |     63658 | 4.45M | 129 |    37.22K |     40 |   5 |   8.3 |   110 |
+| Q25L60X80P000 |   80.0 |  0.973 |     54848 | 4.46M | 157 |    16.31K |     80 |   9 |  17.7 |   214 |
+| Q25L60X80P001 |   80.0 |  0.972 |     51779 | 4.46M | 157 |    19.03K |     80 |   9 |  17.7 |   214 |
+| Q25L60X80P002 |   80.0 |  0.973 |     46203 | 4.44M | 158 |    18.13K |     80 |   9 |  17.7 |   214 |
+| Q30L60X40P000 |   40.0 |  0.984 |     63579 | 4.46M | 131 |    26.39K |     40 |   6 |   7.3 |   116 |
+| Q30L60X40P001 |   40.0 |  0.985 |     63667 | 4.46M | 131 |    34.87K |     40 |   6 |   7.3 |   116 |
+| Q30L60X40P002 |   40.0 |  0.984 |     60836 | 4.46M | 132 |    26.21K |     40 |   6 |   7.3 |   116 |
+| Q30L60X80P000 |   80.0 |  0.976 |     54900 | 4.46M | 154 |    22.07K |     80 |   9 |  17.7 |   214 |
+| Q30L60X80P001 |   80.0 |  0.975 |     54879 | 4.45M | 156 |    17.76K |     80 |   9 |  17.7 |   214 |
+
+Table: statUnitigsBcalm.md
+
+| Name      | CovCor | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
+|-----------|-------:|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
+| MRX40P000 |   40.0 |  0.972 |     73699 | 4.45M | 115 |    23.97K |     40 |   5 |   8.3 |   110 |
+| MRX40P001 |   40.0 |  0.972 |     63662 | 4.45M | 119 |     17.4K |     40 |   5 |   8.3 |   110 |
+| MRX40P002 |   40.0 |   0.97 |     73648 | 4.45M | 116 |    17.53K |     40 |   5 |   8.3 |   110 |
+| MRX80P000 |   80.0 |  0.969 |     67221 | 4.45M | 118 |    16.65K |     80 |   8 |  18.7 |   208 |
+| MRX80P001 |   80.0 |  0.968 |     73681 | 4.46M | 115 |    13.48K |     80 |   8 |  18.7 |   208 |
+| MRX80P002 |   80.0 |  0.968 |     73658 | 4.45M | 115 |    18.68K |     80 |   8 |  18.7 |   208 |
+
+Table: statMRUnitigsBcalm.md
+
+| Name          | CovCor | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
+|---------------|-------:|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
+| Q0L0X40P000   |   40.0 |  0.983 |     63651 | 4.45M | 121 |    32.58K |     40 |   5 |   8.3 |   110 |
+| Q0L0X40P001   |   40.0 |  0.981 |     64143 | 4.46M | 118 |    18.77K |     40 |   6 |   7.3 |   116 |
+| Q0L0X40P002   |   40.0 |  0.981 |     64135 | 4.46M | 118 |    20.76K |     40 |   6 |   7.3 |   116 |
+| Q0L0X80P000   |   80.0 |  0.973 |     73667 | 4.45M | 113 |    14.92K |     80 |   9 |  17.7 |   214 |
+| Q0L0X80P001   |   80.0 |  0.973 |     67322 | 4.46M | 115 |    16.59K |     80 |   9 |  17.7 |   214 |
+| Q0L0X80P002   |   80.0 |  0.974 |     67333 | 4.46M | 112 |    15.33K |     80 |   9 |  17.7 |   214 |
+| Q25L60X40P000 |   40.0 |  0.982 |     63609 | 4.46M | 121 |    23.16K |     40 |   5 |   8.3 |   110 |
+| Q25L60X40P001 |   40.0 |  0.983 |     64147 | 4.46M | 118 |    19.77K |     40 |   6 |   7.3 |   116 |
+| Q25L60X40P002 |   40.0 |  0.982 |     64144 | 4.46M | 117 |    20.57K |     40 |   6 |   7.3 |   116 |
+| Q25L60X80P000 |   80.0 |  0.974 |     67333 | 4.46M | 112 |    11.92K |     80 |   9 |  17.7 |   214 |
+| Q25L60X80P001 |   80.0 |  0.973 |     63670 | 4.46M | 116 |    16.48K |     80 |   9 |  17.7 |   214 |
+| Q25L60X80P002 |   80.0 |  0.974 |     67335 | 4.46M | 112 |    15.45K |     80 |   9 |  17.7 |   214 |
+| Q30L60X40P000 |   40.0 |  0.985 |     63579 | 4.46M | 121 |    22.51K |     40 |   6 |   7.3 |   116 |
+| Q30L60X40P001 |   40.0 |  0.984 |     64139 | 4.46M | 117 |     25.3K |     40 |   6 |   7.3 |   116 |
+| Q30L60X40P002 |   40.0 |  0.983 |     67343 | 4.46M | 119 |    19.78K |     40 |   6 |   7.3 |   116 |
+| Q30L60X80P000 |   80.0 |  0.977 |     64133 | 4.45M | 113 |    15.08K |     80 |   9 |  17.7 |   214 |
+| Q30L60X80P001 |   80.0 |  0.974 |     67327 | 4.45M | 113 |    14.97K |     80 |   9 |  17.7 |   214 |
+
+Table: statUnitigsBifrost.md
+
+| Name      | CovCor | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
+|-----------|-------:|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
+| MRX40P000 |   40.0 |   0.97 |     73691 | 4.45M | 116 |    17.84K |     40 |   5 |   8.3 |   110 |
+| MRX40P001 |   40.0 |  0.971 |     63653 | 4.46M | 120 |    17.86K |     40 |   5 |   8.3 |   110 |
+| MRX40P002 |   40.0 |  0.969 |     73648 | 4.46M | 116 |    16.94K |     40 |   5 |   8.3 |   110 |
+| MRX80P000 |   80.0 |  0.968 |     73694 | 4.45M | 117 |    16.15K |     80 |   8 |  18.7 |   208 |
+| MRX80P001 |   80.0 |  0.968 |     73669 | 4.46M | 113 |    13.42K |     80 |   8 |  18.7 |   208 |
+| MRX80P002 |   80.0 |  0.968 |     66255 | 4.45M | 117 |    17.03K |     80 |   8 |  18.7 |   208 |
+
+Table: statMRUnitigsBifrost.md
+
+| Name          | CovCor | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
+|---------------|-------:|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
+| Q0L0X40P000   |   40.0 |  0.972 |     28270 | 4.45M | 266 |    27.86K |     40 |   6 |   7.3 |   116 |
+| Q0L0X40P001   |   40.0 |  0.972 |     29053 | 4.46M | 283 |    23.31K |     40 |   6 |   7.3 |   116 |
+| Q0L0X40P002   |   40.0 |  0.973 |     28264 | 4.46M | 267 |     26.8K |     40 |   6 |   7.3 |   116 |
+| Q0L0X80P000   |   80.0 |  0.958 |     13252 | 4.41M | 533 |    46.59K |     79 |   9 |  17.3 |   212 |
+| Q0L0X80P001   |   80.0 |   0.96 |     12411 | 4.42M | 552 |    44.08K |     79 |   9 |  17.3 |   212 |
+| Q0L0X80P002   |   80.0 |  0.962 |     13206 | 4.43M | 520 |    41.43K |     80 |   9 |  17.7 |   214 |
+| Q25L60X40P000 |   40.0 |  0.977 |     42440 | 4.46M | 186 |    19.29K |     40 |   6 |   7.3 |   116 |
+| Q25L60X40P001 |   40.0 |  0.978 |     42093 | 4.46M | 187 |    21.82K |     40 |   6 |   7.3 |   116 |
+| Q25L60X40P002 |   40.0 |  0.977 |     40745 | 4.46M | 198 |     26.4K |     40 |   6 |   7.3 |   116 |
+| Q25L60X80P000 |   80.0 |  0.971 |     25042 | 4.45M | 305 |    23.03K |     80 |   9 |  17.7 |   214 |
+| Q25L60X80P001 |   80.0 |   0.97 |     24364 | 4.45M | 317 |    32.85K |     79 |   9 |  17.3 |   212 |
+| Q25L60X80P002 |   80.0 |   0.97 |     24816 | 4.45M | 313 |    26.94K |     80 |   9 |  17.7 |   214 |
+| Q30L60X40P000 |   40.0 |  0.977 |     49612 | 4.46M | 176 |    19.24K |     40 |   6 |   7.3 |   116 |
+| Q30L60X40P001 |   40.0 |  0.979 |     46331 | 4.46M | 164 |    26.95K |     40 |   6 |   7.3 |   116 |
+| Q30L60X40P002 |   40.0 |  0.979 |     44717 | 4.46M | 175 |    20.63K |     40 |   6 |   7.3 |   116 |
+| Q30L60X80P000 |   80.0 |  0.973 |     30313 | 4.45M | 271 |    24.42K |     80 |   9 |  17.7 |   214 |
+| Q30L60X80P001 |   80.0 |  0.973 |     28301 | 4.45M | 281 |    24.25K |     80 |   9 |  17.7 |   214 |
+
+Table: statUnitigsSuperreads.md
+
+| Name      | CovCor | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
+|-----------|-------:|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
+| MRX40P000 |   40.0 |  0.976 |     73680 | 4.45M | 116 |    25.76K |     40 |   5 |   8.3 |   110 |
+| MRX40P001 |   40.0 |  0.975 |     63584 | 4.45M | 125 |    20.31K |     40 |   5 |   8.3 |   110 |
+| MRX40P002 |   40.0 |  0.976 |     73659 | 4.46M | 119 |    20.13K |     40 |   5 |   8.3 |   110 |
+| MRX80P000 |   80.0 |  0.975 |     67221 | 4.45M | 122 |    23.32K |     80 |   8 |  18.7 |   208 |
+| MRX80P001 |   80.0 |  0.976 |     67271 | 4.46M | 116 |    18.38K |     80 |   8 |  18.7 |   208 |
+| MRX80P002 |   80.0 |  0.975 |     64139 | 4.45M | 121 |    21.57K |     80 |   8 |  18.7 |   208 |
+
+Table: statMRUnitigsSuperreads.md
+
+| Name                          | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
+|-------------------------------|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
+| 7_merge_anchors               |  0.986 |     78598 | 4.46M | 110 |         0 |    263 |  22 |  65.7 |   658 |
+| 7_merge_mr_unitigs_bcalm      |   0.99 |     73710 | 4.45M | 105 |         0 |    262 |  22 |  65.3 |   656 |
+| 7_merge_mr_unitigs_bifrost    |  0.991 |     73706 | 4.45M | 104 |         0 |    263 |  22 |  65.7 |   658 |
+| 7_merge_mr_unitigs_superreads |   0.99 |     73704 | 4.45M | 105 |         0 |    263 |  22 |  65.7 |   658 |
+| 7_merge_unitigs_bcalm         |   0.99 |     73693 | 4.45M | 106 |         0 |    263 |  22 |  65.7 |   658 |
+| 7_merge_unitigs_bifrost       |  0.989 |     78591 | 4.46M | 110 |         0 |    263 |  22 |  65.7 |   658 |
+| 7_merge_unitigs_superreads    |   0.99 |     73706 | 4.45M | 103 |         0 |    263 |  22 |  65.7 |   658 |
+
+Table: statMergeAnchors.md
+
+| Name         | Mapped | N50Anchor |   Sum |   # | SumOthers | median | MAD | lower | upper |
+|--------------|-------:|----------:|------:|----:|----------:|-------:|----:|------:|------:|
+| 8_spades     |  0.984 |    112448 | 4.47M |  76 |    18.41K |    263 |  22 |  65.7 |   658 |
+| 8_mr_spades  |  0.989 |    132590 | 4.49M |  69 |    21.23K |    376 |  28 |  97.3 |   920 |
+| 8_megahit    |  0.985 |     67322 | 4.46M | 117 |    25.03K |    263 |  22 |  65.7 |   658 |
+| 8_mr_megahit |  0.992 |    132754 |  4.5M |  73 |    21.88K |    376 |  28 |  97.3 |   920 |
+
+Table: statOtherAnchors.md
+
+| Name                     |     N50 |     Sum |   # |
+|--------------------------|--------:|--------:|----:|
+| Genome                   | 4583637 |   4.58M |   1 |
+| Paralogs                 |    1737 | 188.16K | 111 |
+| repetitive               |    1175 | 110.59K | 190 |
+| 7_merge_anchors.anchors  |   78598 |   4.46M | 110 |
+| glue_anchors             |   85585 |   4.46M | 105 |
+| fill_anchors             |  102321 |   4.46M |  92 |
+| spades.contig            |  114710 |   4.52M | 171 |
+| spades.scaffold          |  143522 |   4.52M | 163 |
+| spades.non-contained     |  132337 |   4.49M |  78 |
+| mr_spades.contig         |  178373 |   4.52M |  87 |
+| mr_spades.scaffold       |  203812 |   4.52M |  84 |
+| mr_spades.non-contained  |  178373 |   4.51M |  59 |
+| megahit.contig           |   85613 |   4.51M | 175 |
+| megahit.non-contained    |   85613 |   4.49M | 115 |
+| mr_megahit.contig        |  133730 |   4.56M | 154 |
+| mr_megahit.non-contained |  133730 |   4.52M |  70 |
+
+Table: statFinal
+
+| NAME                |   C |   S | D | F | M | Total |
+|:--------------------|----:|----:|--:|--:|--:|------:|
+| Genome              | 124 | 124 | 0 | 0 | 0 |   124 |
+| merge_superreads    | 124 | 124 | 0 | 0 | 0 |   124 |
+| merge_bcalm         | 124 | 124 | 0 | 0 | 0 |   124 |
+| merge_tadpole       | 124 | 124 | 0 | 0 | 0 |   124 |
+| merge_mr_superreads | 124 | 124 | 0 | 0 | 0 |   124 |
+| merge_mr_bcalm      | 124 | 124 | 0 | 0 | 0 |   124 |
+| merge_mr_tadpole    | 124 | 124 | 0 | 0 | 0 |   124 |
+| merge_anchors       | 124 | 124 | 0 | 0 | 0 |   124 |
+| glue_anchors        | 124 | 124 | 0 | 0 | 0 |   124 |
+| fill_anchors        | 124 | 124 | 0 | 0 | 0 |   124 |
+| spades              | 124 | 124 | 0 | 0 | 0 |   124 |
+| mr_spades           | 124 | 124 | 0 | 0 | 0 |   124 |
+| megahit             | 124 | 124 | 0 | 0 | 0 |   124 |
+| mr_megahit          | 124 | 124 | 0 | 0 | 0 |   124 |
+
+Table: statBusco run_bacteria_odb10
+
+| NAME                |   C |   S | D | F | M | Total |
+|:--------------------|----:|----:|--:|--:|--:|------:|
+| Genome              | 440 | 438 | 2 | 0 | 0 |   440 |
+| merge_superreads    | 440 | 438 | 2 | 0 | 0 |   440 |
+| merge_bcalm         | 440 | 438 | 2 | 0 | 0 |   440 |
+| merge_tadpole       | 440 | 438 | 2 | 0 | 0 |   440 |
+| merge_mr_superreads | 440 | 438 | 2 | 0 | 0 |   440 |
+| merge_mr_bcalm      | 440 | 438 | 2 | 0 | 0 |   440 |
+| merge_mr_tadpole    | 440 | 438 | 2 | 0 | 0 |   440 |
+| merge_anchors       | 440 | 438 | 2 | 0 | 0 |   440 |
+| glue_anchors        | 440 | 438 | 2 | 0 | 0 |   440 |
+| fill_anchors        | 440 | 438 | 2 | 0 | 0 |   440 |
+| spades              | 440 | 438 | 2 | 0 | 0 |   440 |
+| mr_spades           | 440 | 438 | 2 | 0 | 0 |   440 |
+| megahit             | 440 | 438 | 2 | 0 | 0 |   440 |
+| mr_megahit          | 440 | 438 | 2 | 0 | 0 |   440 |
+
+Table: statBusco run_enterobacterales_odb10
+
+### dh5alpha: multik 单次调用（--all-masters）全流程门禁（2026-08-18 追加）
+
+承接 `g37/mg1655: olc --cross-validate 跨组嵌合投票`（见上）后的第三条基准
+数据集验证。`asm multik --all-masters`（auto 阶梯按 reads N50 生成，
+本数据 N50 250 → 31..160）单次调用，13 组 MR anchor 合并口径，
+跨组 `olc --unitigs --cross-validate`：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup | N/100k | mm/100k | indel/100k |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: | -----: | ------: | ---------: |
+| 13 组 anchor + cross-validate | 105 | 259450 | 4619600 | 112966 | 2 | 98.848 | 1.019 | 0.00 | 2.71 | 0.24 |
+| spades（旧运行） | 78 | 132337 | 4490000 | 112448 | — | — | — | — | — | — |
+| mr_spades（旧运行） | 59 | 178373 | 4510000 | 132590 | — | — | — | — | — | — |
+| mr_megahit（旧运行） | 70 | 133730 | 4520000 | 132754 | — | — | — | — | — | — |
+
+要点（单组计时与资源）：
+* 13 组 MR（MRX40P000-008 + MRX80P000-003）每组合计 multik 20–33 s
+  （-p 8、2 组并发）、olc ~75–95 s、extend ~2 s、anchor ~2–3 s；
+  峰值内存 8.4–14.9 GB/进程（40× 组 ~8.6–10.5 GB、80× 组
+  ~10.8–14.9 GB），2 组并发峰值 ~30 GB（< 机器 88 GB 的 1/2）；
+* 跨组 `olc --unitigs --cross-validate` 96.4 s / 820 MB，extend 1.4 s；
+  QUAST 用 `quast.py -m 500 -r genome.fa --min-contig 200`。
+
+#### 2 mis 归因（跨组保守重复区 relocation，cross-validate 无法消除）
+
+QUAST 报 2 条 relocation（contig_3 203,757 bp 与 contig_18 96,201 bp）：
+
+| contig | length | junction (contig pos) | reloc 区间 (ref) | inconsistency | 组内存在 |
+| ------ | -----: | --------------------: | ---------------- | ------------: | -------- |
+| contig_3  | 203757 | 54973/54974 | 54973↔203757 | 1338 | 6/13 组 |
+| contig_18 |  96201 |  9203/9204 | 1..9203 ↔ 9204..96201 | 48378 | 13/13 组 |
+
+* **contig_18（13/13 组一致）**：junction 120 bp 序列在参考基因组
+  NZ_CP017100 中有两处完全一致的同源拷贝（pos 1,206,312 与 1,254,690，
+  相距 48,378 bp）——跨重复区 relocation。**所有 13 组 anchor 都保守地
+  连出该 junction**，`--cross-validate` 的"两端各 ≥2 组覆盖且中部无人
+  横跨"判定不成立（中部被其他组同样保守地横跨），故无法消除。这是
+  基准自身的重复区结构决定，与 G37 MRX40P002 单组低丰度菌株连接
+  （junction 仅在 1 组）不同；
+* **contig_3（6/13 组存在）**：junction 120 bp 在参考中无同源拷贝
+  （非重复区），但 6 组（≥2 组门槛）anchor 一致连出 → cross-validate
+  判定为"跨组保守连接"而保留。疑为 reads 覆盖在该位点的一致性结构
+  （真实菌株连接或参考 NZ_CP017100 与该菌株序列差异），机制与
+  contig_18 不同、待专项归因；
+* 单组 multik 输出与 08-17 版本字节级一致（`MRX40P000` 重跑 diff 为空），
+  本记录可复现：`/tmp/dh5alpha_gate/`（run.sh 复刻 model_org.md 标准
+ 门禁链）。
+
+## *Bacillus cereus* ATCC 10987
+
+> GAGE-B MiSeq 数据集（100× 子集），reads 与参考**同株**（见 reference
+> 节实测）。老流程基线（2025-06）来自 `results/gage_b.md`；现代流程门禁待跑。
+
+### bcer: reference
+
+* Reference genome
+
+```shell
+mkdir -p ~/data/anchr/Bcer_100x/1_genome
+cd ~/data/anchr/Bcer_100x/1_genome
+
+cp ~/data/anchr/ref/Bcer/genome.fa .
+cp ~/data/anchr/ref/Bcer/paralogs.fa .
+cp ~/data/anchr/ref/Bcer/repetitive.fa .
+
+```
+
+* 参考构成：NC_003909（染色体 5,224,283 bp）+ NC_005707（质粒 pBc10987，
+  208,369 bp）= 5,432,652 bp / 2 复制子；GC ~38%（低 GC）。
+* **reads 与参考同株**：GAGE-B 数据集即 ATCC 10987。本地实测（50k 原始
+  R1，2026-08-18）：reads 的 solid 31-mer 99.66% 出现在参考中、85.7%
+  整条 perfect 回贴——菌株差异≈0，QUAST 判据可直接使用（对比 Mabs/Vcho
+  的跨株情况，见下）。
+
+### bcer: download
+
+* Illumina（GAGE-B 100× 子集）
+
+```shell
+cd ~/data/anchr/Bcer_100x
+
+mkdir -p 2_illumina
+cd 2_illumina
+
+aria2c -x 4 -s 2 -c https://ccb.jhu.edu/gage_b/datasets/B_cereus_MiSeq.tar.gz
+
+# NOT gzipped tar
+tar xvf B_cereus_MiSeq.tar.gz raw/frag_1__cov100x.fastq
+tar xvf B_cereus_MiSeq.tar.gz raw/frag_2__cov100x.fastq
+
+cat raw/frag_1__cov100x.fastq |
+    pigz -p 8 -c \
+    > R1.fq.gz
+cat raw/frag_2__cov100x.fastq |
+    pigz -p 8 -c \
+    > R2.fq.gz
+
+rm -fr raw
+
+```
+
+* 本地已就位：`~/data/anchr/Bcer_100x/2_illumina/` 有 R1.fq.gz + R2.fq.gz
+  （2024-12 下载）；`1_genome/` 尚空，按 reference 节 cp 即可。
+
+### bcer: template
+
+* 现代流程模板（与 g37/dh5alpha 同口径；待跑）
+
+```shell
+WORKING_DIR=${HOME}/data/anchr
+BASE_NAME=Bcer_100x
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+rm 0_script/*
+anchr template \
+    --genome 5432652 \
+    --parallel 24 \
+    \
+    --repetitive \
+    \
+    --fastqc \
+    --insertsize \
+    --fastk \
+    \
+    --trim "--dedupe --cutoff 30 --cutk 31" \
+    --qual "25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --merge \
+    \
+    --cov "40 80" \
+    --unitigger "multik unitig bcalm" \
+    --statp 2 \
+    --uscale 2 \
+    --lscale 3
+
+```
+
+* 老流程模板（2025-06 GAGE-B 运行，基线数据见下节）：`--genome 5432652
+  --fastqc --insertsize --kat --trim "--dedupe --tile --cutoff 5 --cutk 31"
+  --qual "20 25 30" --len "60" --filter "adapter artifact" --quorum --merge
+  --ecphase "1 2 3" --cov "40 50 60 all" --unitigger "superreads bcalm
+  tadpole" --statp 2 --readl 250 --uscale 2 --lscale 3 --redo --extend`
+  （完整命令见 `results/gage_b.md`）。
+
+### bcer: run
+
+```shell
+WORKING_DIR=${HOME}/data/anchr
+BASE_NAME=Bcer_100x
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+bash 0_script/1_repetitive.sh
+
+bash 0_script/0_master.sh
+
+# bash 0_script/0_cleanup.sh
+
+```
+
+现代流程门禁**待跑**（本地数据已齐，可直接执行）；老流程 2025-06 运行见
+`results/gage_b.md`。
+
+### bcer: 老流程基线（2025-06 GAGE-B）
+
+reads：2,080,000 对 × 250 bp（~100×，481.02 Mb）；接头污染极低
+（#R.trim 匹配 0.06267%）。老流程 quorum（Q0L0）丢弃 12.98%。
+
+Table: statReads（老流程）
+
+| Name        |     N50 |     Sum |       # |
+|:------------|--------:|--------:|--------:|
+| Genome      | 5224283 | 5432652 |       2 |
+| Paralogs    |    2295 |  220468 |     101 |
+| repetitive |    2461 |  113050 |     173 |
+| Illumina.R  |     251 | 481.02M | 2080000 |
+| trim.R      |     250 | 404.36M | 1807384 |
+| Q20L60      |     250 | 396.79M | 1758525 |
+| Q25L60      |     250 | 379.57M | 1706208 |
+| Q30L60      |     250 | 344.25M | 1611233 |
+
+Table: statTrimReads（老流程）
+
+| Name           | N50 |     Sum |       # |
+|:---------------|----:|--------:|--------:|
+| clumpify       | 251 | 480.99M | 2079856 |
+| filteredbytile | 251 | 463.51M | 2005704 |
+| highpass       | 251 | 459.84M | 1989878 |
+| trim           | 250 | 404.41M | 1807576 |
+| filter         | 250 | 404.36M | 1807384 |
+| R1             | 250 | 209.26M |  903692 |
+| R2             | 247 |  195.1M |  903692 |
+| Rs             |   0 |       0 |       0 |
+
+```text
+#R.trim
+#Matched	1247	0.06267%
+#Name	Reads	ReadsPct
+```
+
+```text
+#R.filter
+#Matched	99	0.00548%
+#Name	Reads	ReadsPct
+```
+
+Table: statMergeReads（老流程）
+
+| Name          | N50 |     Sum |       # |
+|:--------------|----:|--------:|--------:|
+| clumped       | 250 | 404.36M | 1807382 |
+| ecco          | 250 | 404.36M | 1807382 |
+| eccc          | 250 | 404.36M | 1807382 |
+| ecct          | 250 | 400.39M | 1786476 |
+| extended      | 290 | 470.96M | 1786476 |
+| merged.raw    | 586 | 316.57M |  584078 |
+| unmerged.raw  | 285 | 149.75M |  618320 |
+| unmerged.trim | 285 | 149.74M |  618292 |
+| M1            | 586 | 316.54M |  584024 |
+| U1            | 290 |  79.96M |  309146 |
+| U2            | 270 |  69.78M |  309146 |
+| Us            |   0 |       0 |       0 |
+| M.cor         | 518 | 466.86M | 1786340 |
+
+| Group              |  Mean | Median | STDev | PercentOfPairs |
+|:-------------------|------:|-------:|------:|---------------:|
+| M.ihist.merge1.txt | 362.0 |    388 |  97.6 |         19.50% |
+| M.ihist.merge.txt  | 542.0 |    564 | 120.0 |         65.39% |
+
+Table: statQuorum（老流程）
+
+| Name     | CovIn | CovOut | Discard% |  Kmer | RealG |  EstG | Est/Real |   RunTime |
+|:---------|------:|-------:|---------:|------:|------:|------:|---------:|----------:|
+| Q0L0.R   |  74.4 |   64.8 |   12.98% | "127" | 5.43M | 5.35M |     0.98 | 0:01'00'' |
+| Q20L60.R |  73.0 |   64.7 |   11.48% | "127" | 5.43M | 5.35M |     0.98 | 0:00'52'' |
+| Q25L60.R |  69.9 |   63.8 |    8.71% | "127" | 5.43M | 5.34M |     0.98 | 0:00'50'' |
+| Q30L60.R |  63.4 |   59.7 |    5.75% | "127" | 5.43M | 5.34M |     0.98 | 0:00'49'' |
+
+Table: statMRUnitigsSuperreads（老流程）
+
+| Name       | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:-----------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|-----:|------:|------:|--------------------:|----------:|----------:|
+| MRX40P000  |   40.0 |  97.62% |     37925 | 5.31M | 240 |        81 | 22.62K | 519 |   39.0 |  7.0 |   6.0 | 120.0 | "31,41,51,61,71,81" |   0:01:07 |   0:00:34 |
+| MRX40P001  |   40.0 |  97.54% |     40827 | 5.31M | 237 |        64 | 18.73K | 454 |   39.0 |  8.0 |   5.0 | 126.0 | "31,41,51,61,71,81" |   0:01:07 |   0:00:32 |
+| MRX50P000  |   50.0 |  97.58% |     37545 | 5.31M | 249 |        90 | 22.64K | 547 |   49.0 |  9.0 |   7.3 | 152.0 | "31,41,51,61,71,81" |   0:01:19 |   0:00:36 |
+| MRX60P000  |   60.0 |  97.53% |     37952 | 5.31M | 250 |        92 | 20.41K | 527 |   59.0 | 11.0 |   8.7 | 184.0 | "31,41,51,61,71,81" |   0:01:30 |   0:00:37 |
+| MRXallP000 |   85.9 |  97.46% |     36340 | 5.33M | 253 |        90 |  18.9K | 537 |   84.0 | 15.0 |  13.0 | 258.0 | "31,41,51,61,71,81" |   0:02:00 |   0:00:35 |
+
+Table: statMRUnitigsBcalm（老流程）
+
+| Name       | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:-----------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|-----:|------:|------:|--------------------:|----------:|----------:|
+| MRX40P000  |   40.0 |  97.81% |     39857 | 5.34M | 232 |        87 | 18.83K | 442 |   39.0 |  8.0 |   5.0 | 126.0 | "31,41,51,61,71,81" |   0:01:30 |   0:00:32 |
+| MRX40P001  |   40.0 |  97.77% |     42781 | 5.31M | 229 |        86 | 18.97K | 412 |   39.0 |  8.0 |   5.0 | 126.0 | "31,41,51,61,71,81" |   0:01:36 |   0:00:31 |
+| MRX50P000  |   50.0 |  97.44% |     39857 | 5.34M | 236 |        80 | 16.34K | 466 |   49.0 |  9.0 |   7.3 | 152.0 | "31,41,51,61,71,81" |   0:01:39 |   0:00:33 |
+| MRX60P000  |   60.0 |  97.42% |     41648 | 5.38M | 238 |        98 | 17.86K | 463 |   59.0 | 11.0 |   8.7 | 184.0 | "31,41,51,61,71,81" |   0:01:40 |   0:00:35 |
+| MRXallP000 |   85.9 |  97.38% |     39857 | 5.31M | 246 |        97 | 16.29K | 489 |   85.0 | 15.0 |  13.3 | 260.0 | "31,41,51,61,71,81" |   0:01:54 |   0:00:35 |
+
+Table: statMRUnitigsTadpole（老流程）
+
+| Name       | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:-----------|-------:|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|-----:|------:|------:|--------------------:|----------:|----------:|
+| MRX40P000  |   40.0 |  97.83% |     44440 | 5.32M | 217 |       107 |  18.4K | 404 |   39.0 |  8.0 |   5.0 | 126.0 | "31,41,51,61,71,81" |   0:00:42 |   0:00:32 |
+| MRX40P001  |   40.0 |  97.77% |     44376 | 5.36M | 219 |        83 | 16.18K | 378 |   39.0 |  8.0 |   5.0 | 126.0 | "31,41,51,61,71,81" |   0:00:46 |   0:00:33 |
+| MRX50P000  |   50.0 |  97.76% |     42799 | 5.34M | 224 |       131 | 19.98K | 444 |   49.0 |  9.0 |   7.3 | 152.0 | "31,41,51,61,71,81" |   0:00:47 |   0:00:32 |
+| MRX60P000  |   60.0 |  97.77% |     42132 | 5.34M | 228 |       131 | 19.13K | 443 |   59.0 | 11.0 |   8.7 | 184.0 | "31,41,51,61,71,81" |   0:00:51 |   0:00:34 |
+| MRXallP000 |   85.9 |  97.70% |     41648 | 5.32M | 239 |       120 | 18.37K | 484 |   85.0 | 15.0 |  13.3 | 260.0 | "31,41,51,61,71,81" |   0:00:58 |   0:00:35 |
+
+Table: statMergeAnchors（老流程）
+
+| Name                          | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |  # | median |  MAD | lower | upper | RunTimeAN |
+|:------------------------------|--------:|----------:|------:|----:|----------:|--------:|---:|-------:|-----:|------:|------:|----------:|
+| 7_merge_anchors               |  97.76% |     36737 |  5.3M | 254 |     41729 | 291.14K | 43 |   64.0 | 12.0 |   9.3 | 200.0 |   0:00:42 |
+| 7_merge_mr_unitigs_bcalm      |  98.15% |     37087 | 5.21M | 252 |     41793 |  70.11K |  9 |   64.0 | 13.0 |   8.3 | 206.0 |   0:00:49 |
+| 7_merge_mr_unitigs_superreads |  97.83% |     34002 | 5.15M | 259 |      1091 |    6.8K |  7 |   64.0 | 13.0 |   8.3 | 206.0 |   0:00:43 |
+| 7_merge_mr_unitigs_tadpole    |  98.14% |     42769 | 5.21M | 232 |     41634 |  53.78K | 12 |   63.0 | 13.0 |   8.0 | 204.0 |   0:00:43 |
+| 7_merge_unitigs_bcalm         |  98.04% |     32860 | 5.31M | 273 |     36517 |  63.09K | 19 |   64.0 | 13.0 |   8.3 | 206.0 |   0:00:49 |
+| 7_merge_unitigs_superreads    |  98.10% |     32344 | 5.31M | 273 |     41729 |  64.41K | 24 |   64.0 | 13.0 |   8.3 | 206.0 |   0:00:46 |
+| 7_merge_unitigs_tadpole       |  98.02% |     32710 | 5.31M | 277 |     62295 |  81.41K | 21 |   64.0 | 12.0 |   9.3 | 200.0 |   0:00:45 |
+
+Table: statOtherAnchors（老流程）
+
+| Name         | Mapped% | N50Anchor |   Sum |   # | N50Others |    Sum |   # | median |  MAD | lower | upper | RunTimeAN |
+|:-------------|--------:|----------:|------:|----:|----------:|-------:|----:|-------:|-----:|------:|------:|----------:|
+| 8_spades     |  98.96% |     49586 | 2.14M |  80 |       899 |  9.35K | 106 |   64.0 | 13.0 |   8.3 | 206.0 |   0:00:33 |
+| 8_mr_spades  |  98.81% |     78041 | 5.35M | 130 |       217 | 10.11K | 212 |   85.0 | 15.0 |  13.3 | 260.0 |   0:00:36 |
+| 8_megahit    |  98.69% |     37648 | 4.85M | 218 |       125 | 21.73K | 356 |   64.0 | 13.0 |   8.3 | 206.0 |   0:00:40 |
+| 8_mr_megahit |  98.85% |     65403 | 5.36M | 153 |       451 | 13.53K | 265 |   85.0 | 15.0 |  13.3 | 260.0 |   0:00:36 |
+
+Table: statFinal（老流程）
+
+| Name                     |     N50 |     Sum |   # |
+|:-------------------------|--------:|--------:|----:|
+| Genome                   | 5224283 | 5432652 |   2 |
+| Paralogs                 |    2295 |  220468 | 101 |
+| repetitive              |    2461 |  113050 | 173 |
+| 7_merge_anchors.anchors  |   36737 | 5304696 | 254 |
+| 7_merge_anchors.others   |   41729 |  291138 |  43 |
+| glue_anchors             |   36737 | 5304175 | 253 |
+| fill_anchors             |   61075 | 5317582 | 159 |
+| spades.contig            |  207470 | 5366804 | 153 |
+| spades.scaffold          |  285416 | 5367163 | 139 |
+| spades.non-contained     |  207470 | 5349666 |  58 |
+| mr_spades.contig         |  100015 | 5367895 | 128 |
+| mr_spades.scaffold       |  284294 | 5374592 |  66 |
+| mr_spades.non-contained  |  100015 | 5361433 | 105 |
+| megahit.contig           |   59732 | 5360219 | 204 |
+| megahit.non-contained    |   59732 | 5341409 | 158 |
+| mr_megahit.contig        |   75019 | 5388594 | 186 |
+| mr_megahit.non-contained |   75019 | 5369027 | 141 |
+
+### bcer: 现代流程门禁（待跑）
+
+* 数据已就位（本地 R1/R2 + ref），按 template/run 节命令执行即可；
+* 关注点：低 GC（~38%）5.43 Mb 基因组（首个革兰氏阳性条目）下
+  `multik --all-masters` + 跨组 `olc --unitigs --cross-validate` 的表现；
+  老流程基线 fill N50 61,075 / 159 条（Sum 5,317,582 ≈ 参考 97.9%）；
+* 复现记录建议放 `/tmp/bcer_gate/`（参照 dh5alpha_gate 的门禁链格式）。
+
+## *Rhodobacter sphaeroides* 2.4.1
+
+> GAGE-B MiSeq 数据集（100× 子集）。参考即 2.4.1（名义同株，无本地
+> reads 实测）；结构复杂（2 染色体 + 5 质粒 = 7 复制子、重复 12.8%、
+> GC ~68%）正是纳入理由——对"无 N 染色体"目标的多复制子压力测试。
+> 老流程基线（2025-06）来自 `results/gage_b.md`；现代流程门禁待跑。
+
+### rsph: reference
+
+* Reference genome
+
+```shell
+mkdir -p ~/data/anchr/Rsph_100x/1_genome
+cd ~/data/anchr/Rsph_100x/1_genome
+
+cp ~/data/anchr/ref/Rsph/genome.fa .
+cp ~/data/anchr/ref/Rsph/paralogs.fa .
+cp ~/data/anchr/ref/Rsph/repetitive.fa .
+
+```
+
+* 参考构成：NC_007493（染色体 1，3,188,524 bp）+ NC_007494（染色体 2，
+  1,314,453 bp）+ 5 个质粒（NC_009007/NC_007488/NC_007489/NC_007490/
+  NC_009008）= 4,602,977 bp / 7 复制子；GC ~68%（极高 GC），重复含量
+  12.8%（GAGE-B 四菌株中最高）。
+
+### rsph: download
+
+* Illumina（GAGE-B 100× 子集）
+
+```shell
+cd ~/data/anchr/Rsph_100x
+
+mkdir -p 2_illumina
+cd 2_illumina
+
+aria2c -x 4 -s 2 -c http://ccb.jhu.edu/gage_b/datasets/R_sphaeroides_MiSeq.tar.gz
+
+# NOT gzipped tar
+tar xvf R_sphaeroides_MiSeq.tar.gz raw/insert_540_1__cov100x.fastq
+tar xvf R_sphaeroides_MiSeq.tar.gz raw/insert_540_2__cov100x.fastq
+
+cat raw/insert_540_1__cov100x.fastq |
+    pigz -p 8 -c \
+    > R1.fq.gz
+cat raw/insert_540_2__cov100x.fastq |
+    pigz -p 8 -c \
+    > R2.fq.gz
+
+rm -fr raw
+
+```
+
+* 本地暂无 reads（`~/data/anchr/Rsph_100x/` 为空），需先下载。
+
+### rsph: template
+
+* 现代流程模板（与 g37/dh5alpha 同口径；待跑）
+
+```shell
+WORKING_DIR=${HOME}/data/anchr
+BASE_NAME=Rsph_100x
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+rm 0_script/*
+anchr template \
+    --genome 4602977 \
+    --parallel 24 \
+    \
+    --repetitive \
+    \
+    --fastqc \
+    --insertsize \
+    --fastk \
+    \
+    --trim "--dedupe --cutoff 30 --cutk 31" \
+    --qual "25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --merge \
+    \
+    --cov "40 80" \
+    --unitigger "multik unitig bcalm" \
+    --statp 2 \
+    --uscale 2 \
+    --lscale 3
+
+```
+
+* 老流程模板（2025-06 GAGE-B 运行，基线数据见下节）：`--genome 4602977
+  --fastqc --insertsize --kat --trim "--dedupe" --qual "20 25 30" --len
+  "60" --filter "adapter artifact" --quorum --merge --ecphase "1 3" --cov
+  "30 all" --unitigger "superreads bcalm tadpole" --statp 2 --readl 250
+  --uscale 2 --lscale 3 --redo --extend`（完整命令见
+  `results/gage_b.md`）。
+
+### rsph: run
+
+```shell
+WORKING_DIR=${HOME}/data/anchr
+BASE_NAME=Rsph_100x
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+bash 0_script/1_repetitive.sh
+
+bash 0_script/0_master.sh
+
+# bash 0_script/0_cleanup.sh
+
+```
+
+现代流程门禁**待跑**（需先按 download 节取数）；老流程 2025-06 运行见
+`results/gage_b.md`（QUAST 用 `--no-check`，多复制子参考）。
+
+### rsph: 老流程基线（2025-06 GAGE-B）
+
+reads：1,800,000 对 × 250 bp（~100×，451.8 Mb）；接头匹配 6.39%
+（Reverse_adapter 4.58% 为主）。老流程 quorum（Q0L0）丢弃 11.10%。
+
+Table: statReads（老流程）
+
+| Name        |     N50 |     Sum |       # |
+|:------------|--------:|--------:|--------:|
+| Genome      | 3188524 | 4602977 |       7 |
+| Paralogs    |    2337 |  146789 |      66 |
+| repetitive |     572 |   57281 |     165 |
+| Illumina.R  |     251 |  451.8M | 1800000 |
+| trim.R      |     148 |  200.1M | 1452706 |
+| Q20L60      |     148 | 193.66M | 1401466 |
+| Q25L60      |     139 | 169.12M | 1304628 |
+| Q30L60      |     119 | 125.02M | 1123194 |
+
+Table: statTrimReads（老流程）
+
+| Name     | N50 |     Sum |       # |
+|:---------|----:|--------:|--------:|
+| clumpify | 251 | 447.53M | 1782994 |
+| trim     | 148 |  200.1M | 1452706 |
+| filter   | 148 |  200.1M | 1452706 |
+| R1       | 164 | 100.23M |  655190 |
+| R2       | 133 |  81.52M |  655190 |
+| Rs       | 141 |  18.34M |  142326 |
+
+```text
+#R.trim
+#Matched	113970	6.39206%
+#Name	Reads	ReadsPct
+Reverse_adapter	81598	4.57646%
+pcr_dimer	14481	0.81217%
+PCR_Primers	8081	0.45323%
+TruSeq_Universal_Adapter	5665	0.31772%
+```
+
+```text
+#R.filter
+#Matched	0	0.00000%
+#Name	Reads	ReadsPct
+```
+
+Table: statMergeReads（老流程）
+
+| Name          | N50 |     Sum |       # |
+|:--------------|----:|--------:|--------:|
+| clumped       | 148 | 200.09M | 1452579 |
+| ecco          | 148 | 199.84M | 1452578 |
+| ecct          | 148 | 198.72M | 1444000 |
+| extended      | 186 | 255.79M | 1444000 |
+| merged.raw    | 455 | 197.38M |  475527 |
+| unmerged.raw  | 172 |  80.09M |  492946 |
+| unmerged.trim | 172 |  80.07M |  492605 |
+| M1            | 455 |  197.2M |  475127 |
+| U1            | 172 |  19.67M |  121605 |
+| U2            | 151 |  17.53M |  121605 |
+| Us            | 182 |  42.86M |  249395 |
+| M.cor         | 443 | 277.99M | 1692254 |
+
+| Group              |  Mean | Median | STDev | PercentOfPairs |
+|:-------------------|------:|-------:|------:|---------------:|
+| M.ihist.merge1.txt | 184.3 |    179 |  66.0 |         10.54% |
+| M.ihist.merge.txt  | 415.1 |    452 |  89.0 |         65.86% |
+
+Table: statQuorum（老流程）
+
+| Name     | CovIn | CovOut | Discard% | Kmer | RealG |  EstG | Est/Real |   RunTime |
+|:---------|------:|-------:|---------:|-----:|------:|------:|---------:|----------:|
+| Q0L0.R   |  43.5 |   38.7 |   11.10% | "39" |  4.6M | 4.55M |     0.99 | 0:00'37'' |
+| Q20L60.R |  42.1 |   37.9 |    9.98% | "39" |  4.6M | 4.55M |     0.99 | 0:00'32'' |
+| Q25L60.R |  36.8 |   34.9 |    5.03% | "35" |  4.6M | 4.54M |     0.99 | 0:00'29'' |
+| Q30L60.R |  27.2 |   26.6 |    2.20% | "31" |  4.6M | 4.52M |     0.98 | 0:00'26'' |
+
+Table: statMRUnitigsSuperreads（老流程）
+
+| Name       | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:-----------|-------:|--------:|----------:|------:|----:|----------:|--------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| MRX30P000  |   30.0 |  97.39% |     20508 | 4.35M | 364 |      4332 |  140.5K | 739 |   27.0 | 5.0 |   5.0 |  84.0 | "31,41,51,61,71,81" |   0:00:46 |   0:00:28 |
+| MRX30P001  |   30.0 |  97.40% |     21605 | 4.34M | 357 |      3817 | 154.53K | 743 |   27.0 | 5.0 |   5.0 |  84.0 | "31,41,51,61,71,81" |   0:00:46 |   0:00:28 |
+| MRXallP000 |   60.4 |  97.36% |     22279 | 4.34M | 345 |      5800 | 167.85K | 749 |   55.0 | 9.0 |   9.3 | 164.0 | "31,41,51,61,71,81" |   0:01:14 |   0:00:29 |
+
+Table: statMRUnitigsBcalm（老流程）
+
+| Name       | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:-----------|-------:|--------:|----------:|------:|----:|----------:|--------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| MRX30P000  |   30.0 |  97.41% |     18774 | 4.35M | 404 |      5004 | 173.16K | 899 |   27.0 | 5.0 |   5.0 |  84.0 | "31,41,51,61,71,81" |   0:01:12 |   0:00:30 |
+| MRX30P001  |   30.0 |  97.35% |     19071 | 4.34M | 389 |      6101 | 196.85K | 857 |   27.0 | 5.0 |   5.0 |  84.0 | "31,41,51,61,71,81" |   0:01:17 |   0:00:28 |
+| MRXallP000 |   60.4 |  97.44% |     20747 | 4.33M | 353 |      6101 |  199.4K | 792 |   55.0 | 8.0 |  10.3 | 158.0 | "31,41,51,61,71,81" |   0:01:27 |   0:00:30 |
+
+Table: statMRUnitigsTadpole（老流程）
+
+| Name       | CovCor | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |   # | median | MAD | lower | upper |                Kmer | RunTimeUT | RunTimeAN |
+|:-----------|-------:|--------:|----------:|------:|----:|----------:|--------:|----:|-------:|----:|------:|------:|--------------------:|----------:|----------:|
+| MRX30P000  |   30.0 |  97.50% |     19948 | 4.34M | 379 |      5224 | 161.26K | 801 |   27.0 | 5.0 |   5.0 |  84.0 | "31,41,51,61,71,81" |   0:00:36 |   0:00:28 |
+| MRX30P001  |   30.0 |  97.55% |     19862 | 4.34M | 372 |      5475 | 173.65K | 799 |   27.0 | 5.0 |   5.0 |  84.0 | "31,41,51,61,71,81" |   0:00:35 |   0:00:29 |
+| MRXallP000 |   60.4 |  97.54% |     21368 | 4.33M | 344 |      6100 | 177.53K | 759 |   55.0 | 8.0 |  10.3 | 158.0 | "31,41,51,61,71,81" |   0:00:43 |   0:00:29 |
+
+Table: statMergeAnchors（老流程）
+
+| Name                          | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |   # | median |  MAD | lower | upper | RunTimeAN |
+|:------------------------------|--------:|----------:|------:|----:|----------:|--------:|----:|-------:|-----:|------:|------:|----------:|
+| 7_merge_anchors               |  91.17% |     36740 | 4.41M | 246 |      4689 | 360.25K | 133 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:33 |
+| 7_merge_mr_unitigs_bcalm      |  92.62% |     21353 | 4.33M | 349 |      5224 | 203.81K |  65 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:35 |
+| 7_merge_mr_unitigs_superreads |  92.48% |     22986 | 4.39M | 328 |      5487 | 188.38K |  62 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:34 |
+| 7_merge_mr_unitigs_tadpole    |  92.68% |     22194 | 4.33M | 335 |      5819 | 199.44K |  57 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:35 |
+| 7_merge_unitigs_bcalm         |  90.95% |     17117 | 4.33M | 424 |      5224 | 311.57K | 102 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:30 |
+| 7_merge_unitigs_superreads    |  91.58% |     30174 | 4.35M | 271 |      4689 | 308.94K | 114 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:31 |
+| 7_merge_unitigs_tadpole       |  91.26% |     22998 | 4.34M | 319 |      5018 | 335.15K | 115 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:30 |
+
+Table: statOtherAnchors（老流程）
+
+| Name         | Mapped% | N50Anchor |   Sum |   # | N50Others |     Sum |   # | median |  MAD | lower | upper | RunTimeAN |
+|:-------------|--------:|----------:|------:|----:|----------:|--------:|----:|-------:|-----:|------:|------:|----------:|
+| 8_spades     |  99.20% |     45176 | 1.94M |  83 |      7794 |  86.43K | 125 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:29 |
+| 8_mr_spades  |  99.13% |     30528 | 3.93M | 216 |     16123 |  151.9K | 304 |   55.0 |  8.0 |  10.3 | 158.0 |   0:00:31 |
+| 8_megahit    |  98.54% |     37964 |  4.1M | 230 |      5525 | 153.99K | 387 |   35.0 |  7.0 |   5.0 | 112.0 |   0:00:28 |
+| 8_mr_megahit |  99.34% |     26589 | 4.38M | 287 |     16123 | 164.89K | 523 |   55.0 |  8.0 |  10.3 | 158.0 |   0:00:31 |
+
+Table: statFinal（老流程）
+
+| Name                     |     N50 |     Sum |    # |
+|:-------------------------|--------:|--------:|-----:|
+| Genome                   | 3188524 | 4602977 |    7 |
+| Paralogs                 |    2337 |  146789 |   66 |
+| repetitive              |     572 |   57281 |  165 |
+| 7_merge_anchors.anchors  |   36740 | 4407623 |  246 |
+| 7_merge_anchors.others   |    4689 |  360250 |  133 |
+| glue_anchors             |   37591 | 4404044 |  240 |
+| fill_anchors             |   48535 | 4406444 |  183 |
+| spades.contig            |  150729 | 4576779 |  136 |
+| spades.scaffold          |  172916 | 4577123 |  131 |
+| spades.non-contained     |  150729 | 4562257 |   71 |
+| mr_spades.contig         |   55603 | 4566224 |  170 |
+| mr_spades.scaffold       |   89512 | 4567395 |  121 |
+| mr_spades.non-contained  |   55603 | 4555133 |  149 |
+| megahit.contig           |   52830 | 4572904 |  245 |
+| megahit.non-contained    |   52830 | 4541309 |  182 |
+| mr_megahit.contig        |   31157 | 4576803 |  282 |
+| mr_megahit.non-contained |   31157 | 4563775 |  255 |
+
+### rsph: 现代流程门禁（待跑）
+
+* 需先下载 reads（ccb.jhu.edu），再按 template/run 节命令执行；
+* 关注点：7 复制子（2 染色体 + 5 质粒）下 GF/dup 统计会被质粒放大，
+  QUAST 用 `--no-check`（老流程即如此），mis 判定看染色体级骨架；
+  `--cross-validate` 跨组投票对高重复（12.8%）菌株是核心验证；
+* 老流程基线 fill N50 48,535 / 183 条（Sum 4,406,444 ≈ 参考 95.7%），
+  anchors Mapped% 仅 91.17%（GAGE-B 四菌株最低，重复/质粒干扰）；
+* 复现记录建议放 `/tmp/rsph_gate/`（参照 dh5alpha_gate 的门禁链格式）。

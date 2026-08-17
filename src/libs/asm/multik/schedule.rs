@@ -73,7 +73,7 @@ pub(crate) fn assemble_one(
     // bridge_filter and the final split/bridge validation: its inputs never
     // change between rounds, so it is built once instead of once per call
     // (R+2 identical full counts per run before).
-    let probe_half = 30;
+    let probe_half = 65;
     let probe_len = probe_half * 2;
     let t = std::time::Instant::now();
     let probe_table = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
@@ -140,7 +140,7 @@ pub(crate) fn assemble_all_masters(
     opts: &MultikOptions,
 ) -> Result<Vec<MultikUnitig>> {
     let read_seqs: Vec<&[u8]> = reads.iter().map(|(s, _)| s.as_slice()).collect();
-    let probe_half = 30;
+    let probe_half = 65;
     let probe_len = probe_half * 2;
     let threshold = opts.min_count_extend as u32;
     let last_k = *ks.last().unwrap();
