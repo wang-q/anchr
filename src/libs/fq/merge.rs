@@ -1,7 +1,8 @@
 //! Paired-read overlap merging and overlap-based error correction
 //! (BBMerge-compatible).
 
-use crate::libs::asm::refine::{extend_read_right, RefineOptions, RefineTable};
+use crate::libs::asm::refine::{extend_read_right, RefineOptions};
+use crate::libs::asm::table::RefineTable;
 use crate::libs::fq::overlap;
 use anyhow::Result;
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};

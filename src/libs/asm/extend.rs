@@ -8,7 +8,7 @@
 //! gaps at contig ends (megahit `local_assemble` goal) without
 //! reassembling the reads.
 
-use super::refine::{base_code, Kmer, RefineTable};
+use super::table::{base_code, Kmer, RefineTable};
 use anyhow::{ensure, Result};
 use rayon::prelude::*;
 

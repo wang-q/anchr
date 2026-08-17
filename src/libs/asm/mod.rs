@@ -5,3 +5,4 @@ pub mod dfa;
 pub mod extend;
 pub mod multik;
 pub mod refine;
+pub mod table;

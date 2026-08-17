@@ -7,7 +7,7 @@
 //! the count table and parallelizes by partitioning the sorted vertex list
 //! (no CAS / locks needed), unlike cuttlefish's edge-scan update path.
 
-use super::refine::{Kmer, RefineTable};
+use super::table::{Kmer, RefineTable};
 use rayon::prelude::*;
 
 /// Per-vertex state: solidity-adjacent in/out degrees (0/1/2+ encoded as

@@ -3,7 +3,7 @@
 //! count-table build and the full assembly (bubbles on and off).
 
 use anchr::libs::asm::assemble::{assemble, assemble_unitigs, AssembleOptions};
-use anchr::libs::asm::refine::RefineTable;
+use anchr::libs::asm::table::RefineTable;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use pgr::libs::fmt::seq::{SeqReader, SeqRecord};
 use std::sync::OnceLock;
