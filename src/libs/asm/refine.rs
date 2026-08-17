@@ -262,7 +262,6 @@ impl RefineTable {
         })
     }
 
-
     /// Streaming direct counter: reads `infiles` record-by-record, fans out
     /// to `threads` workers that emit packed keys in bounded chunks and
     /// merge per-worker count tables. Unlike `build_threaded` this never

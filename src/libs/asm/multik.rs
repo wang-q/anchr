@@ -154,7 +154,9 @@ struct SumView<'a>(&'a RefineTable, &'a RefineTable);
 
 impl CountView for SumView<'_> {
     fn count(&self, kmer: &TdKmer) -> u32 {
-        self.0.get_count(kmer).saturating_add(self.1.get_count(kmer))
+        self.0
+            .get_count(kmer)
+            .saturating_add(self.1.get_count(kmer))
     }
 }
 
@@ -266,7 +268,14 @@ impl Master {
         }
         // 2. Chimeric-unitig cleanup (removeUnsupportedUnitigs): every
         // internal current-k k-mer of a long-enough unitig must be solid.
-        remove_unsupported(&mut self.unitigs, &mut self.links, &mut self.branch, &view, k, threshold);
+        remove_unsupported(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            &view,
+            k,
+            threshold,
+        );
         // 2.5 Reads-bridge validation: every surviving link must have reads
         // fully covering a probe spanning the junction. Chimeric links (two
         // distant regions joined by a shared k-mer) have no bridging reads
@@ -300,7 +309,12 @@ impl Master {
     /// Final steps after the last validation round: split unitigs at
     /// reads-unsupported windows, re-verify links, merge bubbles, clean
     /// tips/weak links, and compact validated chains into the output.
-    fn finalize(&mut self, probe: &RefineTable, probe_half: usize, opts: &MultikOptions) -> Result<()> {
+    fn finalize(
+        &mut self,
+        probe: &RefineTable,
+        probe_half: usize,
+        opts: &MultikOptions,
+    ) -> Result<()> {
         let k0 = self.k0;
         // Split unitigs at internal positions that have no reads support
         // (the abundance filter's recompaction can fuse chimeric links into
@@ -340,15 +354,25 @@ impl Master {
         // see megahit tip_remover / weak_link_remover). Doing this per round
         // was too aggressive on the k0=21 fragments (G37 longest 52.8k ->
         // 32.6k); after compaction the tips are real and few.
-        tip_remover(&mut self.unitigs, &mut self.links, &mut self.branch, k0 * 2, 20.0);
+        tip_remover(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            k0 * 2,
+            20.0,
+        );
         weak_link_remover(&mut self.unitigs, &mut self.links, 0.05);
 
         // Final compaction: merge validated chains into long unitigs.
         let mut chains = merge_chains(&self.unitigs, &self.links, &self.branch, k0)?;
-        chains.extend(std::mem::take(&mut self.carried).into_iter().map(|u| MultikUnitig {
-            bases: u.bases,
-            coverage: u.coverage,
-        }));
+        chains.extend(
+            std::mem::take(&mut self.carried)
+                .into_iter()
+                .map(|u| MultikUnitig {
+                    bases: u.bases,
+                    coverage: u.coverage,
+                }),
+        );
         chains.extend(variants.into_iter().map(|u| MultikUnitig {
             bases: u.bases,
             coverage: u.coverage,
@@ -455,7 +479,7 @@ fn assemble_all_masters(
         let reps = opts.min_count_seed.max(1);
         let guide_seqs: Vec<&[u8]> = guide_out
             .iter()
-            .flat_map(|u| std::iter::repeat(u.bases.as_slice()).take(reps))
+            .flat_map(|u| std::iter::repeat_n(u.bases.as_slice(), reps))
             .collect();
 
         // Phase 2: every later master counts reads + guide in one direct
@@ -1104,11 +1128,11 @@ fn remove_unsupported(
             // whose internal k-mers are largely unsupported are dropped.
             let max_missing = (n_kmers / 50).max(1);
             let mut missing = 0usize;
-            // A chimeric junction has a run of consecutive unsupported
-            // windows (the joined k-mers do not exist in the reads), while
-            // plain coverage fluctuation is isolated single windows; any
-            // run of >= 2 marks the unitig as chimeric.
-            let mut run = 0usize;
+            // No consecutive-run cutting here: a run of >= 2 unsupported
+            // windows also occurs at real low-coverage dips and pruned long
+            // unitigs wholesale (MG1655 5-group chain N50 124K -> 79.6K,
+            // 0 mis either way — pure over-pruning). Chimeric joins are
+            // caught by the reads-bridge validation instead.
             let mut km = TdKmer::new(k);
             for &b in &u.bases[..k] {
                 km.push_right(base_code(b));
@@ -1117,18 +1141,11 @@ fn remove_unsupported(
                 if j > 0 {
                     km.push_right(base_code(u.bases[j + k - 1]));
                 }
-                let ok = table.count(&km) >= threshold;
-                if !ok {
+                if table.count(&km) < threshold {
                     missing += 1;
-                    run += 1;
-                    if run >= 2 {
-                        return false;
-                    }
                     if missing > max_missing {
                         break;
                     }
-                } else {
-                    run = 0;
                 }
             }
             missing <= max_missing
@@ -1670,12 +1687,22 @@ mod tests {
 
     #[test]
     fn auto_ks_matches_read_length() {
-        // Short reads (150 bp): k0 ~1/3 of the read length.
-        assert_eq!(auto_ks(150), vec![50, 70, 90, 110]);
-        // Short reads (108 bp): k0 = clamp(108/3, 31, 51) = 36.
-        assert_eq!(auto_ks(108), vec![36, 56, 76]);
-        // Long reads (>= 10 kb): step 30 from k0=51 up to MAX_K (256).
-        assert_eq!(auto_ks(15000), vec![51, 81, 111, 141, 171, 201, 231]);
+        // Unmerged 150 bp reads: ladder floor at 81.
+        assert_eq!(auto_ks(150), vec![31, 41, 51, 61, 71, 81]);
+        // MG1655 merged reads (N50 339): k_max = clamp(169, 81, 192) = 169.
+        assert_eq!(
+            auto_ks(339),
+            vec![31, 41, 51, 61, 71, 81, 101, 121, 128, 160]
+        );
+        // G37 merged reads (N50 408) and long reads: capped at 192.
+        assert_eq!(
+            auto_ks(408),
+            vec![31, 41, 51, 61, 71, 81, 101, 121, 128, 160, 192]
+        );
+        assert_eq!(
+            auto_ks(15000),
+            vec![31, 41, 51, 61, 71, 81, 101, 121, 128, 160, 192]
+        );
         // Zero/empty input yields no ks.
         assert!(auto_ks(0).is_empty());
     }

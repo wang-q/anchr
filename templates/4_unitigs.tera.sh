@@ -71,13 +71,14 @@ KS="31 41 51 61 71 81 91"
     mv unitigs.ext.fasta unitigs.fasta
 {% else %}    # single-invocation multi-master multik: every k in KS builds its own
     # skeleton validated by the larger ks (k-major order, the reads count
-    # at each k is built once and shared by every master), the first
-    # master's unitigs guiding the rest. Replaces the per-master loop
-    # that re-counted the reads once per (master, round).
+    # at each k is built once and shared by every master). Replaces the
+    # per-master loop that re-counted the reads once per (master, round).
+    # No guide: 5-group anchor voting makes it quality-neutral (MG1655
+    # 0 mis with and without) while running ~2x faster.
     anchr asm multik \
         ../../4_down_sampling/Q${Q}L${L}X${X}P${P}/pe.cor.fa.gz \
         -k $(echo ${KS} | tr ' ' ',') \
-        --all-masters --use-guide \
+        --all-masters \
         -p {{ opt.parallel }} \
         -o unitigs_all.fasta
 

@@ -862,11 +862,39 @@ master 被残余错误打碎（一个错误杀死所有覆盖它的窗口，k≈
 `clamp(N50/2, 81, 192)`（MG1655→31..160，G37→31..192，150bp→31..81），
 数据集调优用显式 `--kmer`。
 
-### 验证结论（release、-p 4）
+### 验证结论（终版，2026-08-17；release）
 
-- G37 MRX40P000（N50 408）：auto 31..192 → 0 mis、N50 121K（旧 31..81
-  为 31K）、GF 98.54%（+0.75），单组 36.5 s（内存 869 MB）；rounds 并行
-  后 28.3 s，输出逐字节一致。
-- MG1655 MRX40P000（N50 339）：新旧在 31..128 下质量完全一致（均 2 mis
-  单组、GF 99.40）；guide 与否无差异；0 mis 依赖 5 组 anchor 合并投票
-  （见 benchmarks）。单组 5:04（同 k 旧串行 7:23）。
+- **MG1655 5 组 anchor 合并：三变体全部 0 mis**（guide 31..192 / 无
+  guide 31..192 / auto 默认 31..160，当时 N50 读数 ~79.6K、GF 98.85–98.88，
+  注：N50 读数受 /tmp 实验脚本跨组缺 `--unitigs` 的测量错误影响，见下）。
+  guide 逐指标几乎相同 → 模板定型为 `--all-masters` 无 guide。
+- **G37 7 组全流程：0 mis**（auto 31..192，guide 与无 guide 输出完全
+  一致；N50 55.2K 与旧 multik 链持平、GF +0.95）。单组 auto N50 121K。
+- 单组对照无回归：MG1655 新旧同 k（31..128）质量完全一致（均 2 mis、
+  GF 99.40、N50 112,514）——重构质量中性；单组 0 mis 不可达，0 mis 一直是
+  多组 anchor 投票的产物。
+- 计时/内存（单组、-p 8）：MG1655 auto 无 guide 140–172 s / 峰值
+  6.6 GB（40×）、10.8 GB（80×）；guide ~360 s（233 s，run>=2 移除后）。
+  G37 单组 36.5 s→28.3 s（rounds 并行，输出逐字节一致）、869 MB。
+- 数字详情见 `results/model_org.md` 2026-08-17 两节。
+
+### 2026-08-17 下午：run>=2 过度剪除修复 + N50 归因终局
+
+1. **run>=2 过度剪除**（commit 9f5fca7 引入的连续不支撑窗口检查）：
+   真实覆盖凹陷出现连续 ≥2 个不 solid 窗口，把 MG1655 5 组链的长
+   unitig 整条删掉（N50 124K→79.6K）。移除该检查，回到"容忍
+   `n_kmers/50` 个孤立缺失窗口"语义；嵌合交给 reads-bridge 验证。
+   修复后 N50 96.4K、0 mis。
+2. **N50 96.4K vs 基线 124.0K 归因**（曾误判为验证密度）：
+   真因是 /tmp 实验脚本跨组 anchors 合并漏了 `--unitigs`——anchors
+   被当 reads 重新走 S0 组装切碎。补上后（multik 输出不变）：
+   **90 contigs / N50 118,731 / GF 99.072%（+0.55 pp）/ 0 mis**，
+   达到并部分超越 08-16 基线。正式模板 `7_merge_anchors.tera.sh`
+   一直带 `--unitigs`，流程无此 bug。
+3. **三项 A/B 全部中性**（5 组 anchor 投票抹平 multik 层差异）：
+   验证密度（every k vs every-third，仅一处 166 kb 重复区序列不同、
+   QUAST 逐指标相同）、`--use-guide`、last-k cut（单轮 master 的
+   remove_unsupported）。实验用 `--validate-step` 临时开关已移除，
+   cut 语义保留（assemble_one 与 --all-masters 一致）。
+4. 单组 anchor 层完全等价：08-16 链 N50 112,781（95 条）vs 新链
+   112,781（96 条）。

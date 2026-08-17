@@ -73,20 +73,19 @@ KS_BCALM="31 41 51 61 71 81 101 121"
         -o unitigs.ext.fasta
     mv unitigs.ext.fasta unitigs.fasta
 {% else %}    # single-invocation multi-master multik: --kmer auto (default) derives
-    # the master-k list from the read-length N50 (no hard-coded k values),
-    # every k builds its own skeleton validated by the larger ks (k-major
-    # order, the reads count at each k is built once and shared by every
-    # master), and the first master's unitigs guide the rest (megahit
-    # seq2sdbg --contig guidance), so high-k masters do not fragment on
-    # reads with thin high-k support. Replaces the per-master loop with
-    # its guide files and repeated reads counting.
+    # the master-k ladder from the read-length N50 (no hard-coded k
+    # values), every k builds its own skeleton validated by the larger ks
+    # (k-major order, the reads count at each k is built once and shared
+    # by every master). Replaces the per-master loop with its guide files
+    # and repeated reads counting. No guide: 5-group anchor voting makes
+    # it quality-neutral (MG1655 0 mis with and without) at ~2x speed.
     # Keep short (200..1000 bp) reads-supported fragments: on merged reads
     # they cover low-complexity gap regions without chimeras (G37: GF
     # 98.869->99.083%, 0 mis; bcalm/unitig branches keep 1000 because their
     # raw unitigs do produce chimeric short fragments).
     anchr asm multik \
         ../../6_down_sampling/MRX${X}P${P}/pe.cor.fa.gz \
-        --all-masters --use-guide \
+        --all-masters \
         -p {{ opt.parallel }} \
         -o unitigs_all.fasta
 
