@@ -50,7 +50,7 @@ FASTA/FASTQ 读入（`libs/fmt/`）与 FA 读取一样永远留在 pgr；Phred �
 | 文件 | 说明 |
 | :--- | :--- |
 | `libs/fq/`（除 qual.rs/pairs.rs/trim.rs 的 detect_quality_base） | trim/trim_adapter/merge/norm/sample/split/clump/overlap 业务（bbnet 已移除，2026-08-16） |
-| `libs/asm/`（assemble.rs/tadpole.rs/mod.rs） | tadpole 组装、unitig 逻辑 |
+| `libs/asm/`（assemble/、table.rs、refine.rs、multik/） | tadpole 组装、unitig 逻辑 |
 | `libs/olc/`（consensus.rs/layout.rs/overlap.rs/mod.rs） | OLC 三阶段 |
 | `cmd_pgr/fq/`（16 文件） | 命令壳 |
 | `cmd_pgr/asm/`（9 文件） | 命令壳 |

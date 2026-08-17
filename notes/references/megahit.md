@@ -632,8 +632,8 @@ G37 最长 contig +20%、misassemblies 保持 0（`notes/design/asm-multik.md`
 ### 8.1 若要复刻类似效果，anchr 需要什么（差距清单）
 
 把上面对照转成**落地清单**。前提：遵循 AGENTS.md——复杂逻辑进 `libs/`、`cmd/`
-薄壳、**尽量不加新依赖**。anchr 现状：`asm contig/unitig` 走 `libs/asm/assemble.rs`
-（tadpole contigMode，`TadpoleTable = HashMap<Kmer,u32>` 全内存），`asm olc` 走
+薄壳、**尽量不加新依赖**。anchr 现状：`asm contig/unitig` 走 `libs/asm/assemble/`
+（tadpole contigMode，`RefineTable` 全内存），`asm olc` 走
 `libs/olc/`（多 k unitig → overlap → layout → cns），`asm map` 是 `libs/map.rs`
 完美回帖；pgr `KmerTable` 提供 packed bytes + radix sort + rayon 精确计数。
 **anchr 的 `Kmer::MAX_K` 跟随 pgr（2026-08-16 起 256，对标 MEGAHIT 的 255）**

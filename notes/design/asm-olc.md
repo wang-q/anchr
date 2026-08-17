@@ -57,7 +57,7 @@ reads ──(多 k 各生成 unitigs)──> 伪 reads ──(overlap)──> PA
 
 ### S0 伪 reads 生成（复用，不新写）
 
-每个 k 跑 `anchr asm unitig`（`libs/asm/assemble.rs::assemble_unitigs`，
+每个 k 跑 `anchr asm unitig`（`libs/asm/assemble/unitig.rs::assemble_unitigs`，
 bcalm graph3 压缩语义，默认 k=31 / solid ≥3）。产出物：unitig FASTA。
 
 **命名**：`asm unitig` 的输出名恒为 `unitig_<id>`，多 k 合并必然撞名。
@@ -171,7 +171,7 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
 
 | 环节 | 复用 | 用途 |
 |---|---|---|
-| S0 | `libs/asm/assemble.rs::assemble_unitigs`（anchr 业务） | unitig 生成（命令层 `asm unitig` 已包装） |
+| S0 | `libs/asm/assemble/unitig.rs::assemble_unitigs`（anchr 业务） | unitig 生成（命令层 `asm unitig` 已包装） |
 | S1 | `libs/map.rs`（MapIndex 形态 + `canonical_keys` + radix，anchr 业务） | canonical k-mer 种子索引 |
 | S1 | `pgr::libs::kmer/key.rs::Kmer` | 边界 k-mer 编解码 / rc / canonical |
 | S1 | `pgr::libs::nt::rev_comp` | 方向验证 |
@@ -180,7 +180,7 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
 | S2 | `pgr::libs::ds/dsu.rs`（仅若需要连通分量） | 布局分组（v0 可不用） |
 | S3 | `pgr::libs::fmt/seq.rs::SeqReader` | unitig FASTA 读取 |
 | 全部 | `pgr::libs::io.rs` reader/writer、`cmd/args.rs` 标准参数 | I/O 与 CLI 一致性 |
-| 驱动 | `libs/asm/assemble.rs` + 上述各 libs | 内存组合，无中间文件 |
+| 驱动 | `libs/asm/assemble/` + 上述各 libs | 内存组合，无中间文件 |
 
 **不引入新依赖**（AGENTS.md 硬性要求）；k-mer 表示统一用 FastK 字节键
 （`pgr::libs::kmer` 的唯一表示），与 `pgr kmer`/`pgi`/`anchr asm map` 同套。
@@ -227,7 +227,7 @@ overlap（第 0 步恒 0）。同 contig 内区间连续（`q_end[i] == q_start[
   `cns` 同理；命名逻辑抽到 `cmd/asm/common.rs` 三命令共用；
 * 驱动器的 unitig 命名 `k<k>:unitig_<id>`（不是 `<stem>:`），阶段管道用
   文件 stem；两者互不冲突（驱动器 `--keep-dir` 产物可直接喂阶段命令）；
-* `asm unitig` 新增内存版 `assemble_unitigs_buf`（`assemble.rs` 最小重构：
+* `asm unitig` 新增内存版 `assemble_unitigs_buf`（`assemble/unitig.rs` 最小重构：
   核心逻辑抽出 `assemble_unitigs_core`，写盘版行为不变）。
 
 ## 10. 不做 / 待决

@@ -6,7 +6,7 @@
 > 机制细节见 `references/metaMDBG.md` §4.1.1（2026-08-14 重读补充）；
 > 本文把它映射到 anchr 的碱基 k-mer 空间，形成可落地设计。
 >
-> **状态：v4 已实现（2026-08-14）**：`anchr asm multik`（`libs/asm/multik.rs`
+> **状态：v4 已实现（2026-08-14）**：`anchr asm multik`（`libs/asm/multik/`
 > + `cmd/asm/multik.rs`），4 单测 + 6 集成测试，361 全量测试绿。
 > * v1（跨接验证 + 嵌合清理 + 压实）：Lambda 20k k=21,51,81 → 64 contigs /
 >   最长 7924 / N50 3790 / 总长 46670；
@@ -89,8 +89,8 @@ metaMDBG 的迭代路线正好逐一补上：**选边用当前更大 k 的 solid
 |---|---|---|
 | k′-min-mer（minimizer 序列） | 碱基 k-mer（FastK 字节键，`Kmer::MAX_K=128`） | ✅ pgr |
 | 每轮 k′ +1（≈ +200 bp 跨度） | 用户给定递增 k 序列（如 21→51→81） | ✅ 参数化 |
-| reads + unitig 序列计数 | 多文件计数：reads + 上一轮 unitig FASTA | ✅ `TadpoleTable::build_supermer` 多序列输入 |
-| unitig 图（`unitigGraph_prev`） | `asm unitig` 输出 + `compute_links` 的 L: 边 | ✅ `libs/asm/assemble.rs` |
+| reads + unitig 序列计数 | 多文件计数：reads + 上一轮 unitig FASTA | ✅ `RefineTable::build_supermer` 多序列输入 |
+| unitig 图（`unitigGraph_prev`） | `asm unitig` 输出 + `compute_links` 的 L: 边 | ✅ `libs/asm/assemble/unitig.rs` |
 | solveEdges（doublet 查 solid） | 每条 L: 边构造跨接 k-mer（u 末尾 k−1 碱基 + v 延续碱基，见 §4.2），查当前 k 计数 ≥ 2 | ➕ 新逻辑 |
 | removeUnsupportedUnitigs | unitig 内部所有当前 k 的 k-mer 必须 solid，缺失 → 删整条 | ➕ 新逻辑 |
 | solveSmallUnitigs（triplet） | 短 unitig（len < k）：前向 triplet（pred 末尾 k−len + small）与后向 triplet（small + succ 开头 k−len）验证 | ➕ 新逻辑 |
@@ -445,20 +445,18 @@ N50 24,445（v7 26,562，-8%：宁断勿嵌合的正确性代价）、Genome fra
 
 | 组件 | 复用 | 用途 |
 |---|---|---|
-| pass 0 | `libs/asm/assemble.rs::assemble_unitigs_core` + `compute_links` | 初始 unitig 图 |
-| 计数 | `TadpoleTable::build_supermer` / `build_streamed` | 当前 k solid 表 |
-| 查表 | `TadpoleTable::get_count`（排序键二分） | 跨接/内部/triplet 验证 |
+| pass 0 | `libs/asm/assemble/unitig.rs::assemble_unitigs_core` + `compute_links` | 初始 unitig 图 |
+| 计数 | `RefineTable::build_supermer` / `build_streamed` | 当前 k solid 表 |
+| 查表 | `RefineTable::get_count`（排序键二分） | 跨接/内部/triplet 验证 |
 | k-mer 编解码 | `pgr::libs::kmer::key::Kmer`（FastK 字节键） | 跨接 k-mer 构造 |
 | 方向 | `compute_links` 的 `Link{to, from_rc, to_rc}` | 边方向语义 |
 | 合并 | `libs/olc/consensus.rs` 的精确缝合思路（或直接序列拼接） | 压实 |
 | CLI | `cmd/args.rs` 标准参数 | 与 `asm unitig`/`olc` 一致 |
 
-新增逻辑放 `libs/asm/multik.rs`（anchr 业务库），`cmd/asm/multik.rs` 薄壳；
+新增逻辑放 `libs/asm/multik/`（anchr 业务库），`cmd/asm/multik.rs` 薄壳；
 与 `asm-olc.md` 的分层原则一致（算法在 libs，CLI 在 cmd）。
 
-## 6. 验证计划
-
-### 单元测试（libs/asm/multik.rs）
+### 单元测试（libs/asm/multik/）
 
 * 跨接验证：构造两 unitig 共享 (k1−1)-mer 端点，reads 含/不含跨接 k-mer →
   边保留/断开；
@@ -611,7 +609,7 @@ misassembly 自然减少。
 
 **实现**（`multik.rs`）：
 * `bridge_filter`：对每条 unitig 间边构造连接探针（u 尾 30bp + v 延续 30bp
-  = 60-mer），查 reads 表（`TadpoleTable::build_supermer`），count ≥ 2
+  = 60-mer），查 reads 表（`RefineTable::build_supermer`），count ≥ 2
   保留、否则断开——metaMDBG `computeBridgingReads` 语义；每轮 recompact
   前 + split 后各跑一次；
 * `split_by_bridge`：对每个 unitig 内部滑动 60-mer 窗口，无任何 reads
@@ -703,7 +701,7 @@ bcalm 等价（自研可替代外部依赖）。详见
 ## 10. metaMDBG 与 multik 实现对比
 
 > 基于完整源码阅读：metaMDBG 1.4（`metaMDBG-metaMDBG-1.4/`，C++）与
-> anchr multik（`src/libs/asm/multik.rs`，Rust）。两者是同一条
+> anchr multik（`src/libs/asm/multik/`，Rust）。两者是同一条
 > "multi-k 迭代 + 图验证"路线的两种实现；本文对比实现层差异。
 
 ### 1. 定位
@@ -906,7 +904,7 @@ MG1655 单组（auto 31..160、-p 8）计时分解定位：46 轮合计
 pass0 的 DFA walk 串行 ~63 s（每步 3 次 O(k) canonical 重建 + 4 次
 HashMap 查找）、pass0 与 rounds 串行衔接。三项改动：
 
-1. **walk 滚动窗口 + succ 索引**（`dfa.rs`/`assemble.rs`）：窗口持
+1. **walk 滚动窗口 + succ 索引**（`dfa.rs`/`assemble/`）：窗口持
    fw/rc 双链 lockstep 推进（两次 packed shift/步，canonical 退化为
    字节比较）；classify 的 count_in/count_out 探针本就二分命中表行，
    顺手记录"唯一后继/前驱的 entries 下标"（`solid_row_ranks` 把表行

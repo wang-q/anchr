@@ -116,14 +116,18 @@ match app.get_matches().subcommand() {
 
 ### 4.1 `libs/asm/` — k-mer 图组装与 read 精修
 
-- `refine.rs`：read 级 k-mer 图精修——质量门控计数表、局部重装纠错、
-  保守延伸、junk/low-depth 过滤（最初移植自 BBTools `tadpole.sh`，后续
-  已发展出 long-k 路径/打包表/流式计数，仅保留 CLI 兼容对照）；
-- `assemble.rs`：`assemble`（contig）/`assemble_unitigs`（unitig）入口，
-  种子深度阈值、分支处理。
-- `multik.rs`：multi-k 迭代组装（unitig 图跨轮验证：桥接 k-mer 选边 +
+- `table.rs`：canonical k-mer 计数表（`RefineTable`，FastK 2-bit 打包、前缀
+  索引、solid 阈值），原 `refine.rs` 中的计数逻辑独立成模块；
+- `refine.rs`：read 级 k-mer 图精修——局部重装纠错、保守延伸、junk/low-depth
+  过滤（最初移植自 BBTools `tadpole.sh`，后续已发展出 long-k 路径/打包表/
+  流式计数，仅保留 CLI 兼容对照）；
+- `assemble/`：tadpole 式 contig 组装 + BCALM 式 unitig 组装（目录拆分）：
+  - `contig.rs`：`assemble`（contig）入口、种子深度阈值、贪婪延伸；
+  - `bubble.rs`：BubblePopper（contig 图并行路径合并）；
+  - `unitig.rs`：`assemble_unitigs`（unitig）入口、DFA/succ 索引走步、`compute_links`。
+- `multik/`：multi-k 迭代组装（unitig 图跨轮验证：桥接 k-mer 选边 +
   嵌合清理 + 渐进丰度过滤/主路径保护 + recompact；设计
-  `design/asm-multik.md`）。
+  `design/asm-multik.md`），拆为 `schedule.rs`/`master.rs`/`bridge.rs`/`graph.rs`。
 
 ### 4.2 `libs/olc/` — OLC 三阶段
 

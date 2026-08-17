@@ -4,7 +4,7 @@
 > 审计记录（而非 pgr 侧）。
 
 对 `anchr asm` 全部 7 个子命令（contig/unitig/ovlp/layout/cns/olc/map）及相关库
-文件（`libs/asm/assemble.rs`、`libs/asm/refine.rs`、`libs/olc/overlap.rs`、
+文件（`libs/asm/assemble/`、`libs/asm/table.rs`、`libs/asm/refine.rs`、`libs/olc/overlap.rs`、
 `libs/olc/layout.rs`、`libs/olc/consensus.rs`、`libs/map.rs`，以及
 `cmd/asm/common.rs`）和全部测试/文档进行审核。以下仅保留有借鉴意义的结论；
 逐轮验证过程已精简（第一轮发现并修复 5 类问题，第二、三轮复核未再发现新问题，
@@ -15,8 +15,8 @@
 
 | 子命令 | 命令文件 | 主要库 |
 | ------ | -------- | ------ |
-| contig | `src/cmd/asm/contig.rs` | `libs/asm/assemble.rs`, `libs/asm/refine.rs` |
-| unitig | `src/cmd/asm/unitig.rs` | `libs/asm/assemble.rs`, `libs/asm/refine.rs` |
+| contig | `src/cmd/asm/contig.rs` | `libs/asm/assemble/contig.rs`, `libs/asm/assemble/bubble.rs`, `libs/asm/table.rs`, `libs/asm/refine.rs` |
+| unitig | `src/cmd/asm/unitig.rs` | `libs/asm/assemble/unitig.rs`, `libs/asm/table.rs`, `libs/asm/refine.rs` |
 | ovlp   | `src/cmd/asm/ovlp.rs`   | `libs/olc/overlap.rs` |
 | layout | `src/cmd/asm/layout.rs` | `libs/olc/layout.rs` |
 | cns    | `src/cmd/asm/cns.rs`    | `libs/olc/consensus.rs` |
@@ -202,7 +202,7 @@ asm 家族对照 BBTools tadpole（contig）、BCALM2/GATB `ograph.cpp graph3`
   FASTA `--links` 分支仍把 `links[i]` 原样写入 `L:+:<to>:<ori>` 头部条目，未过滤
   被丢弃的 unitig id，导致头部引用不存在的 `unitig_<id>`——与 GFA 属同一类
   悬空引用缺陷，只因 `command_asm_unitig_links_header` 测试用 `--min-contig-len 1`
-  （不触发丢弃）而未被覆盖。修复：在 `libs/asm/assemble.rs` 的 FASTA `--links`
+  （不触发丢弃）而未被覆盖。修复：在 `libs/asm/assemble/unitig.rs` 的 FASTA `--links`
   分支用与 GFA 相同的 `kept` 过滤 `links[i]` 后再写入头部。回归
   `command_asm_unitig_links_no_dangling`（bubble 数据 + 默认 `--min-contig-len`，
   校验每个 `L:` 引用的 id 都存在于输出头部；已证实在修复前失败）。
