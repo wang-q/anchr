@@ -644,3 +644,33 @@ reads（每覆盖度子集）
 3. 560bp 碎片 mis 的覆盖度门槛（`--min-contig-len 1000` 可滤，可选）；
 4. SAM 内存化（宏基因组时再做）；
 5. multik 性能优化（计数复用 / remove_unsupported 查表化 / 轮数裁剪）。
+
+### 15.5 `--cross-validate` 跨组嵌合投票（2026-08-18）
+
+背景（G37 MRX40P002 归因，详见 `results/model_org.md` 2026-08-17/18
+两节）：单组内 k≥101 的图会连上某些"低丰度菌株 A-B 相邻"结构
+（junction 桥接 reads 9 条，真实存在），quast 按主参考报 relocation；
+而跨组 `olc --unitigs` 的 `filter_contained` 会把被嵌合 contig
+前缀整条包含的其他组正确 contigs 删掉，嵌合反而存活到最后。
+
+机制（`libs/olc/overlap.rs::drop_cross_chimeras`，CLI
+`olc --unitigs --cross-validate`，默认关；跨组模板
+`7_merge_anchors.tera.sh` 已开）：
+
+* contig 两端（flank = min_overlap）各自被 ≥2 个其他**文件**的
+  contigs 覆盖（按文件 stem 计票），且中部 junction 窗口
+  （span = min_overlap/2）无任何其他文件 contig 横跨 → 删除该
+  contig；序列由其他组的分开 contigs 完整提供，GF 不降（G37 实测
+  反升 98.774→98.797）；
+* 横跨判定先**按来源 contig 合并对齐区间**：精确重叠链在每个错配
+  处断裂，组0 的 236 kb 等价 contig 表现为两段
+  [0,48851)+[48757,236423)，单段检查会误判（MG1655 首版实测误删，
+  N50 118731→113444，合并后恢复）；
+* 必须在 `filter_contained` **之前**跑（否则正确 contigs 已被
+  前缀包含删除）；
+* 单文件输入时无跨文件 covers，自然无操作。
+
+语义边界：这是跨样本多数投票（其余组分开 ↔ 本组连上），只能压制
+"单组私有的连接"；各组一致的真连接（有横跨者）保留。精确重叠的
+固有盲区（两条等价 contig 端部错位、对齐不含任何端点时检测不到）
+由 min_groups≥2 门槛兜底，实测 MG1655/G37 双门禁 0 mis。

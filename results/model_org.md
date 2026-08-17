@@ -946,3 +946,39 @@ earlier-masters rounds(k) rayon::join 并发），multik 输出与优化前
   链（K≤160）记录为 0 mis，是否同样产生该嵌合未验证；
 * 遗留：单组嵌合的 master-k 归因与修复（如 anchor 层跨组投票对该
   位点的处理）留待专项实验，按实验纪律需 A/B 验证。
+
+### g37/mg1655: `olc --cross-validate` 跨组嵌合投票（2026-08-18 追加）
+
+承接上节归因。深挖结论修正了初步判断：
+
+* 归因到 master：逐链复现（`--kmer K..160` 子阶梯）显示连接在
+  **k≥101 的全部链**存在（m101/m121/m128/m160），非 m160 独有；
+  m128 链 quast 0 mis 只是 junction 恰在 contig 开头 146 bp，未达
+  extensive misassembly 报告标准；
+* junction 桥接 reads 计数 **9**（正常位置 16–21）→ 不是低支持噪声，
+  而是**真实存在的低丰度菌株 A-B 相邻结构**（菌株结构变异）。
+  单组内 count 阈值不可切、也不应切；唯一正确压制层是跨组一致性；
+* 跨组 `olc --unitigs` 保留嵌合的机制：`filter_contained` 把
+  "被嵌合 contig 前缀整条包含"的**其他组正确 contigs** 删掉，
+  嵌合反而存活。
+
+修复：`olc --unitigs --cross-validate`（默认关；模板
+`7_merge_anchors.tera.sh` 已开启）。判定：一条 contig 的两端各自被
+≥2 个其他文件的 contigs 覆盖（flank=min_overlap），且中部 junction
+窗口（span=min_overlap/2）无任何其他文件 contig 横跨 → 删除该
+contig（序列由其他组的分开 contigs 完整提供）。横跨判定先按来源
+contig 合并对齐区间（精确重叠链在错配处断裂成多段，见 MG1655
+236 kb contig 误删修复）。实现 `libs/olc/overlap.rs
+drop_cross_chimeras`，4 个单测覆盖删/留/同文件/断裂链场景。
+
+| Dataset | Assembly | # contigs | N50 | # mis | GF% | 对照 |
+| ------- | -------- | --------: | ---: | ----: | --: | ---- |
+| G37     | 7 组 + cross-validate | 14 | 121664 | **0** | 98.797 | 无 cv：1 mis/134724/98.774；GF 反升 |
+| MG1655  | 5 组 + cross-validate | — | 118731 | **0** | 99.072 | 与基线逐指标相同（236 kb 正确 contig 保留） |
+
+* 首版（区间不合并）曾误删 MG1655 anchor.2:anchor_1（236 kb）：
+  组0 等价 contig 的精确重叠链在错配处断为 [0,48851)+[48757,236423)
+  两段，单段横跨检查失败；按来源合并后恢复，N50 回到 118,731；
+* cargo test 421 通过（含 4 个新增 cross 单测）；clippy/fmt 干净；
+  模板 `7_merge_anchors.tera.sh` 接入 `--cross-validate`
+  （单文件流程 covers 为空、自然无操作）。

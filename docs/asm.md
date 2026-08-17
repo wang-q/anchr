@@ -495,6 +495,11 @@ anchr asm olc [OPTIONS] <infiles>...
     directly re-runnable through those commands as-is).
 *   `--list-files`: Treat `<infiles>` as list files, one sequence file path
     per line (blank lines and `#` comments are ignored).
+*   `--cross-validate`: With `--unitigs` over multiple files (one sample
+    per file): drop contigs whose two ends are each covered by at least 2
+    other files' contigs while no other file's contig spans the middle
+    junction — single-sample chimeric joins whose sequence the other
+    files carry separated (requires `--unitigs`).
 
 ### Examples
 

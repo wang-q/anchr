@@ -1,7 +1,9 @@
 use crate::libs::asm::assemble::{assemble_unitigs_buf, AssembleOptions};
 use crate::libs::olc::consensus::consensus_with_ratio;
 use crate::libs::olc::layout::build_layouts;
-use crate::libs::olc::overlap::{filter_contained, find_overlaps, OverlapOptions, Unitig};
+use crate::libs::olc::overlap::{
+    drop_cross_chimeras, filter_contained, find_overlaps, CrossOptions, OverlapOptions, Unitig,
+};
 use anyhow::Context;
 use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use std::io::Write;
@@ -106,6 +108,13 @@ Examples:
                 .help("Inputs are already-assembled unitigs/contigs (skip the S0 unitig assembly; one FASTA per file, tagged by file stem)"),
         )
         .arg(
+            Arg::new("cross_validate")
+                .long("cross-validate")
+                .action(ArgAction::SetTrue)
+                .requires("unitigs")
+                .help("With multiple input files: drop contigs whose two ends are each covered by >= 2 other files while no other file spans the middle junction (single-file chimeric joins)"),
+        )
+        .arg(
             Arg::new("keep_dir")
                 .long("keep-dir")
                 .num_args(1)
@@ -178,6 +187,24 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             min_overlap,
         },
     )?;
+
+    // S1.25: cross-sample validation. Must run before `filter_contained`:
+    // a single-file chimeric join prefix-contains the other files' correct
+    // contigs, so the plain containment filter would drop the correct
+    // versions and keep the chimera.
+    let (unitigs, overlaps) = if args.get_flag("cross_validate") {
+        drop_cross_chimeras(
+            &unitigs,
+            &overlaps,
+            &CrossOptions {
+                flank: min_overlap,
+                span: min_overlap / 2,
+                min_groups: 2,
+            },
+        )
+    } else {
+        (unitigs, overlaps)
+    };
 
     // S1.5: drop unitigs fully contained in longer unitigs (multi-k
     // redundancy); layouts are unchanged, the graph shrinks.

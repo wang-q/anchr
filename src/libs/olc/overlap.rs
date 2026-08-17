@@ -359,6 +359,151 @@ fn mark_contained(contained: &mut [bool], c: usize, d: usize, clen: usize, dlen:
     }
 }
 
+/// Input-file tag of a unitig (the `stem:` prefix added by the CLI reader).
+fn file_tag(name: &str) -> &str {
+    name.split(':').next().unwrap_or(name)
+}
+
+/// Options for [`drop_cross_chimeras`].
+pub struct CrossOptions {
+    /// Slack for calling a cover "at the start/end" of a contig.
+    pub flank: usize,
+    /// Half-width of the junction window a spanning contig must cover.
+    pub span: usize,
+    /// Distinct other files required per end (cross-sample vote).
+    pub min_groups: usize,
+}
+
+/// Drops single-file chimeric joins from a multi-file (cross-sample) mix.
+///
+/// A contig is dropped when both of its ends are independently explained by
+/// other files' contigs (`flank` slack, `min_groups` distinct files per end)
+/// while no other-file contig spans the middle junction window (`span`
+/// half-width): the join is private to one file and the separated contigs
+/// from the other files carry the same sequence without it. Overlaps of
+/// dropped contigs are removed and the surviving ids remapped.
+pub fn drop_cross_chimeras(
+    unitigs: &[Unitig],
+    overlaps: &[Overlap],
+    opts: &CrossOptions,
+) -> (Vec<Unitig>, Vec<Overlap>) {
+    let n = unitigs.len();
+    // Other-file alignment intervals projected onto each contig.
+    let mut covers: Vec<Vec<(usize, usize, usize)>> = vec![Vec::new(); n];
+    for ov in overlaps {
+        let q_tag = file_tag(&unitigs[ov.qid].name);
+        let t_tag = file_tag(&unitigs[ov.tid].name);
+        if q_tag != t_tag {
+            covers[ov.tid].push((ov.t_start, ov.t_end, ov.qid));
+            covers[ov.qid].push((ov.q_start, ov.q_end, ov.tid));
+        }
+    }
+    let mut drop = vec![false; n];
+    for (i, u) in unitigs.iter().enumerate() {
+        let len = u.seq.len();
+        if len < 2 * opts.flank {
+            continue;
+        }
+        let tag = file_tag(&u.name);
+        // Merge per-source intervals first: an exact overlap chain from one
+        // contig breaks at every mismatch, so a true spanning contig shows
+        // up as several abutting pieces, not one interval.
+        let mut by_src: std::collections::HashMap<usize, Vec<(usize, usize)>> =
+            std::collections::HashMap::new();
+        for &(ys, ye, other) in &covers[i] {
+            if file_tag(&unitigs[other].name) != tag {
+                by_src.entry(other).or_default().push((ys, ye));
+            }
+        }
+        let mut cs: Vec<(usize, usize, usize)> = Vec::new();
+        for (other, mut ivs) in by_src {
+            ivs.sort_unstable();
+            let mut merged: Vec<(usize, usize)> = Vec::new();
+            for (ys, ye) in ivs {
+                match merged.last_mut() {
+                    Some(last) if ys <= last.1 + opts.span => last.1 = last.1.max(ye),
+                    _ => merged.push((ys, ye)),
+                }
+            }
+            for (ys, ye) in merged {
+                if ye - ys >= opts.span * 2 {
+                    cs.push((ys, ye, other));
+                }
+            }
+        }
+        if cs.is_empty() {
+            continue;
+        }
+        let head_tags: std::collections::HashSet<&str> = cs
+            .iter()
+            .filter(|(ys, _, _)| *ys <= opts.flank)
+            .map(|(_, _, other)| file_tag(&unitigs[*other].name))
+            .collect();
+        let tail_tags: std::collections::HashSet<&str> = cs
+            .iter()
+            .filter(|(_, ye, _)| *ye >= len - opts.flank)
+            .map(|(_, _, other)| file_tag(&unitigs[*other].name))
+            .collect();
+        if head_tags.len() < opts.min_groups || tail_tags.len() < opts.min_groups {
+            continue;
+        }
+        // Deepest head cover start-side and earliest tail cover end-side:
+        // the junction sits between them.
+        let hmax = cs
+            .iter()
+            .filter(|(ys, _, _)| *ys <= opts.flank)
+            .map(|(_, ye, _)| *ye)
+            .max()
+            .unwrap();
+        let tmin = cs
+            .iter()
+            .filter(|(_, ye, _)| *ye >= len - opts.flank)
+            .map(|(ys, _, _)| *ys)
+            .min()
+            .unwrap();
+        if hmax >= len - opts.flank || tmin <= opts.flank {
+            continue;
+        }
+        let p = (hmax + tmin) / 2;
+        let spanned = cs
+            .iter()
+            .any(|(ys, ye, _)| *ys <= p.saturating_sub(opts.span) && *ye >= p + opts.span);
+        if !spanned {
+            drop[i] = true;
+        }
+    }
+    let mut new_id = vec![usize::MAX; n];
+    let mut filtered = Vec::with_capacity(n);
+    for (i, u) in unitigs.iter().enumerate() {
+        if !drop[i] {
+            new_id[i] = filtered.len();
+            filtered.push(Unitig {
+                name: u.name.clone(),
+                seq: u.seq.clone(),
+            });
+        }
+    }
+    let filtered_overlaps = overlaps
+        .iter()
+        .filter_map(|ov| {
+            let qid = new_id[ov.qid];
+            let tid = new_id[ov.tid];
+            (qid != usize::MAX && tid != usize::MAX).then_some(Overlap {
+                qid,
+                tid,
+                strand: ov.strand,
+                q_start: ov.q_start,
+                q_end: ov.q_end,
+                t_start: ov.t_start,
+                t_end: ov.t_end,
+                length: ov.length,
+                otype: ov.otype,
+            })
+        })
+        .collect();
+    (filtered, filtered_overlaps)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,6 +528,99 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    fn cross_opts() -> CrossOptions {
+        CrossOptions {
+            flank: 15,
+            span: 10,
+            min_groups: 1,
+        }
+    }
+
+    /// A chimera joined from two other files' contigs is dropped: both its
+    /// ends are covered by other files and nothing spans the junction.
+    #[test]
+    fn cross_chimera_dropped() {
+        let pre = "TTTTTTTTTT";
+        let a = "ACGTACGTACACGTACGTACACGTACGTACACGTACGTACACGTACGTACACGTACGTAC";
+        let b = "TTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCC";
+        let post = "AAAAAAAAAA";
+        // g1 joins a+b (chimeric in g1 only); g2/g3 keep them apart.
+        let us = unitigs(
+            &["g1:chimera", "g2:contig_a", "g3:contig_b"],
+            &[
+                &format!("{pre}{a}{b}{post}"),
+                &format!("{pre}{a}CCCCCCCCCC"),
+                &format!("GGGGGGGGGG{b}{post}"),
+            ],
+        );
+        let ovs = find(&us, 10, 20);
+        let (fu, fo) = drop_cross_chimeras(&us, &ovs, &cross_opts());
+        assert_eq!(fu.len(), 2, "chimera dropped, separated contigs kept");
+        assert!(fu.iter().all(|u| u.name != "g1:chimera"));
+        assert!(fo.iter().all(|ov| ov.qid < 2 && ov.tid < 2));
+    }
+
+    /// A cross-file contig spanning the junction keeps the joined contig.
+    #[test]
+    fn cross_span_keeps_join() {
+        let pre = "TTTTTTTTTT";
+        let a = "ACGTACGTACACGTACGTACACGTACGTACACGTACGTACACGTACGTACACGTACGTAC";
+        let b = "TTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCC";
+        let post = "AAAAAAAAAA";
+        let us = unitigs(
+            &["g1:joined", "g2:spanner"],
+            &[&format!("{pre}{a}{b}{post}"), &format!("{a}{b}")],
+        );
+        let ovs = find(&us, 10, 20);
+        let (fu, _) = drop_cross_chimeras(&us, &ovs, &cross_opts());
+        assert_eq!(fu.len(), 2, "the spanning contig confirms the join");
+    }
+
+    /// Same-file overlaps never trigger a cross-file drop.
+    #[test]
+    fn same_file_never_dropped() {
+        let a = "ACGTACGTACACGTACGTACACGTACGTACACGTACGTAC";
+        let b = "TTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGG";
+        let us = unitigs(
+            &["g1:joined", "g1:left", "g1:right"],
+            &[
+                &format!("{a}{b}"),
+                &format!("TTTTTTTTTT{a}CCCCCCCCCC"),
+                &format!("GGGGGGGGGG{b}AAAAAAAAAA"),
+            ],
+        );
+        let ovs = find(&us, 10, 20);
+        let (fu, _) = drop_cross_chimeras(&us, &ovs, &cross_opts());
+        assert_eq!(fu.len(), 3, "no cross-file evidence, nothing dropped");
+    }
+
+    /// A spanning contig whose exact-overlap chain breaks at a small
+    /// insertion still confirms the join (per-source interval merging).
+    #[test]
+    fn cross_broken_chain_spans() {
+        let pre = "TTTTTTTTTT";
+        let a = "ACGTACGTACACGTACGTACACGTACGTACACGTACGTACACGTACGTACACGTACGTAC";
+        let b = "TTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCCTTTGGGGCCC";
+        let post = "AAAAAAAAAA";
+        let x = "GGTTGGTT";
+        let us = unitigs(
+            &["g1:joined", "g2:with_insert", "g3:left", "g3:right"],
+            &[
+                &format!("{pre}{a}{b}{post}"),
+                &format!("{pre}{a}{x}{b}{post}"),
+                &format!("{pre}{a}CCCCCCCCCC"),
+                &format!("GGGGGGGGGG{b}{post}"),
+            ],
+        );
+        let ovs = find(&us, 10, 20);
+        let (fu, _) = drop_cross_chimeras(&us, &ovs, &cross_opts());
+        assert_eq!(
+            fu.len(),
+            4,
+            "the insertion-broken spanner keeps the join alive"
+        );
     }
 
     /// Two unitigs sharing a 10 bp suffix/prefix overlap.
