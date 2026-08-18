@@ -129,3 +129,19 @@ misassemblies**（最初为 contig_3 / contig_18，之后演变为 contig_4 / co
   既有表格一致，禁止变更导致纵向对比失效）。
 - multik 低覆盖缝 / extend 保守检查的相关参数若继续调整，需按实验纪律在 G37 与 MG1655
   上过质量门禁（misassemblies 不得高于基线 0）。
+
+## 9. 普世化结论：cv 默认关（2026-08-18）
+
+§3.5 的 extend 跨 contig 所有权护栏 + multik 低覆盖缝拆分（c9da0ce）在 DH5alpha 上
+归零错装，但这两类改动对 G37/MG1655 **无条件生效**，使单组 anchor 由基线 96 条增至
+~118 条（宁断勿错的覆盖代价）。A/B 验证（`/tmp/gate/`，结果已记入
+`results/model_org.md` 各数据集门禁节）：
+
+* multik 核心改动**必要且普世**：回退 multik 后 G37 N50 由 121.4K 降至 99.8K——低覆盖
+  缝拆分 + 31-mer 重复桥并非 DH5alpha 特设，而是通用的嵌合解析，保留；
+* `--cross-validate`（跨组 OLC 投票）在现行 anchor 上是**回归信号**：cv 把无 cv 口径下
+  参考连续（0 mis）的真 contig 拆成两段，G37 N50 121.4K→81.7K（-33%）、MG1655
+  110.5K→95.7K（-13%）、DH5alpha 99.5K→82.9K（-17%），三数据集同向；
+* **普世修复 = 模板默认关闭 cv**（`templates/7_merge_anchors.tera.sh`）：extend 跨 contig
+  护栏已在 anchor 层解决嵌合，cv 只对"多样本同群落"数据集按需开启。此改动不针对任何
+  数据集，三数据集 N50 均恢复且 mis 保持 0。

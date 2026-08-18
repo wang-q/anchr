@@ -192,6 +192,7 @@ impl Master {
     /// carry. `probe` is the shared reads-only probe table; `repeat` is the
     /// shared reads-only short-k table that gates repeat bridges during
     /// recompaction.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn round(
         &mut self,
         k: usize,

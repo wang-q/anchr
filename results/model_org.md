@@ -95,7 +95,7 @@ cd ${WORKING_DIR}/${BASE_NAME}
 rm 0_script/*
 anchr template \
     --genome 580076 \
-    --parallel 8 \
+    --parallel 16 \
     \
     --repetitive \
     \
@@ -111,7 +111,7 @@ anchr template \
     --merge \
     \
     --cov "40 80" \
-    --unitigger "multik unitig bcalm" \
+    --unitigger "multik unitig" \
     --statp 2 \
     --uscale 2 \
     --lscale 3
@@ -473,6 +473,42 @@ walk 滚动窗口 + succ 索引（删除 400 MB HashMap index）、
   `remove_unsupported` run>=2 过剪修复，非本次性能改动）；
 * 单组 multik 4.2–6.5 s（-p 8、2 组并发），峰值 ~2.0 GB/进程。
 
+### g37: 现行代码全链门禁复现与 cv 回归（2026-08-18 追加）
+
+模板参数更新（`--unitigger "multik unitig"`、`--parallel 16`）后，用
+现行代码（含 extend 跨 contig 所有权护栏）复跑 7 组 MR 门禁链：
+multik --all-masters（auto 31..192）→ olc --unitigs → extend → anchor →
+跨组 merge（cv 开/关 A/B）。脚本 `/tmp/gate/gate_run.sh g37 ...`，结果
+在 `/tmp/gate/g37/`：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: |
+| 7 组 merge + cross-validate（现行） | 16 | 186939 | 582281 |  81715 | 0 | 98.598 | 1.001 |
+| 7 组 merge（无 cv） | 15 | 186939 | 582281 | 121382 | 0 | 98.598 | 1.001 |
+| 08-16 新链基线（无 cv） | 13 | 236494 | 583630 | 121532 | 0 | 98.849 | 1.000 |
+| 08-18 上节 cv 记录 | 14 | — | — | 121664 | 0 | 98.797 | — |
+
+要点：
+* **mis 保持 0**（质量门禁通过）；无 cv N50 121.4K 与 08-16 新链 121.5K
+  持平，但 Largest 187K vs 236K、contigs 15 vs 13——**c9da0ce（DH5alpha
+  relocation 修复，git HEAD）合入后**单组延伸更保守（宁断勿错），236.5K
+  跨复制起点 contig 不再接出；
+* **cv 在现行 anchor 上是回归信号**：cv 把一条无 cv 口径下参考连续
+  （0 mis）的 121,382 bp 真 contig 拆成 92,957 + 28,394 两段 → N50
+  81.7K（-33%），与上节 121,664/14 记录不符。归因：上节记录基于
+  c9da0ce **前**的 anchor；c9da0ce 合入后单组 anchor 变化，cv 在新
+  anchor 上把该连接误判为嵌合（两端各 ≥2 组覆盖、中部无横跨，属
+  "验证边界"列的长重复/无横跨误删场景）；
+* **根因**：c9da0ce 不只是 extend 护栏，还改动了 **multik 核心**
+  （`multik/graph.rs` 新增内部低覆盖缝拆分 `internal_repeat_bridge_split`
+  + 31-mer 短 k 重复表，`schedule.rs`/`master.rs` 配套），这些改动对
+  G37/MG1655 **无条件生效**，直接改变 multik 输出 → 单组 unitigs/anchor
+  变化（~118 条/组 vs 基线 96 条）。audit §3.5 的回归门禁只测了 extend.rs
+  （"复用各 pre-extend unitig"），**未覆盖 multik 核心改动**，故漏检；
+* 复现：单组 multik 与既有 anchor 链字节级一致（`MRX40P000` 重跑 diff
+  为空），全链在 `/tmp/gate/g37/`（6_unitigs_multik/、
+  7_merge_mr_unitigs_multik/、9_quast_gate/、cv_test/）。
+
 ### mg1655: multik vs bcalm 对照（2026-08-15）
 
 同一批 `6_down_sampling` reads（MRX40P000/P001/P002 + MRX80P000/P001，
@@ -586,7 +622,7 @@ cd ${WORKING_DIR}/${BASE_NAME}
 rm 0_script/*
 anchr template \
     --genome 4641652 \
-    --parallel 8 \
+    --parallel 16 \
     \
     --repetitive \
     \
@@ -604,6 +640,7 @@ anchr template \
     --bwa "Q25L60" \
     \
     --cov "40 80" \
+    --unitigger "multik unitig" \
     --statp 2 \
     --uscale 2 \
     --lscale 3
@@ -1016,6 +1053,31 @@ drop_cross_chimeras`，4 个单测覆盖删/留/同文件/断裂链场景。
   基准调优的自由量——但上述场景仍是开放风险；
 * 后续验证要求：上真实宏基因组前，先做 cv 开/关 A/B（对比 N50/GF/
   contig 数；N50 显著下降即误删信号），确认无误删再固化模板默认。
+
+### mg1655: 现行代码门禁复现与 cv 回归（2026-08-18 追加）
+
+extend 跨 contig 所有权护栏合入、模板参数更新（`--parallel 16`、
+`--unitigger "multik unitig"`）后复跑 5 组 MR 门禁链，跨组 merge 做
+cv 开/关 A/B（`/tmp/gate/gate_run.sh mg1655 ...`，结果在 `/tmp/gate/mg1655/`）：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: |
+| 5 组 merge + cross-validate（现行） | 114 | 268272 | 4570176 |  95706 | 0 | 98.325 | 1.001 |
+| 5 组 merge（无 cv） | 107 | 268272 | 4632159 | 110467 | 0 | 98.346 | 1.015 |
+| 08-17 门禁基线（无 cv） |  90 | 268842 | 4624071 | 118731 | 0 | 99.072 | 1.005 |
+
+要点：
+* **mis 保持 0**（质量门禁通过），cv 开/关均 0 mis；
+* 无 cv N50 110.5K vs 08-17 基线 118.7K（-7%）、GF -0.73 pp：差异来自
+  **c9da0ce（DH5alpha relocation 修复）** 合入后单组 anchor 更碎
+  （~118 条/组 vs 基线 96 条）——multik 核心改动（内部低覆盖缝拆分 +
+  31-mer 重复桥）+ extend 护栏，与 DH5alpha 门禁记录的护栏代价同向；
+  单组 multik 输出与基线字节级一致（见 G37 节根因）；
+* **cv 仍是回归信号**：cv 把无 cv 的 110.5K N50 进一步降到 95.7K
+  （-13%），与 G37 一样在现行 anchor 上拆分真连接——08-18 上节"cv
+  中性"记录基于 c9da0ce 前的 anchor，合入后不再成立；
+* 复现：全链在 `/tmp/gate/mg1655/`（6_unitigs_multik/、
+  7_merge_mr_unitigs_multik/、9_quast_gate/、cv_test/）。
 
 ## *E. coli* str. K-12 substr. DH5alpha
 
@@ -1466,6 +1528,30 @@ QUAST 报 2 条 relocation（contig_3 203,757 bp 与 contig_18 96,201 bp）：
 * 单组 multik 输出与 08-17 版本字节级一致（`MRX40P000` 重跑 diff 为空），
   本记录可复现：`/tmp/dh5alpha_gate/`（run.sh 复刻 model_org.md 标准
  门禁链）。
+
+### dh5alpha: 现行代码门禁复现（2026-08-18 追加）
+
+`--parallel 16`、`--unitigger "multik unitig"` 参数更新后复跑 13 组 MR
+门禁链（multik --all-masters auto 31..160 → olc → extend → anchor → 跨组
+merge，cv 开/关 A/B），`/tmp/gate/gate_run.sh dh5alpha ...`，结果在
+`/tmp/gate/dh5alpha/`：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: |
+| 13 组 merge + cross-validate（现行） | 123 | 258601 | 4502677 |  82876 | 0 | 97.915 | 1.003 |
+| 13 组 merge（无 cv） | 117 | 258601 | 4505173 |  99473 | 0 | 97.942 | 1.004 |
+| 08-18 上节门禁（cv + 护栏） | 122 | 259019 | 4581642 |  82991 | 0 | 98.342 | 1.016 |
+
+要点：
+* **mis 保持 0**（质量门禁通过）；N50 82.9K 与上节门禁（82.9K）一致、
+  Largest 258.6K vs 259.0K（0.2% 差）——现行代码复现 DH5alpha 门禁；
+* GF 97.915 vs 98.342（-0.43 pp）、Total -79K：本节 13 组全部重跑（上节
+  仅重跑 MRX80P001、其余复用 gate5 anchor），少量 contig 级差异，非错装；
+* cv 开/关：N50 82.9K vs 99.5K（-17%）——与 G37/MG1655 同向的 cv 代价，
+  DH5alpha 门禁本就以 cv 口径记录，属预期（重复区 relocation 被护栏消除后
+  的 cv 剩余代价）；
+* 复现：全链在 `/tmp/gate/dh5alpha/`（6_unitigs_multik/、
+  7_merge_mr_unitigs_multik/、9_quast_gate/、cv_test/）。
 
 ## *Bacillus cereus* ATCC 10987
 

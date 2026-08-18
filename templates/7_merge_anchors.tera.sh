@@ -32,7 +32,11 @@ find . -path "*${DIR_PREFIX}*" \
     sort -r \
     > ${DIR_MERGE}/anchors.list
 
-anchr asm olc --unitigs --cross-validate --list-files ${DIR_MERGE}/anchors.list \
+# Cross-group `--cross-validate` is opt-in (default off): the extend
+# cross-contig guardrail already resolves chimeras at the anchor level, and
+# cv false-splits reference-contiguous contigs on current anchors (see
+# model_org.md). Enable it only for multi-sample same-community datasets.
+anchr asm olc --unitigs --list-files ${DIR_MERGE}/anchors.list \
     --min-overlap 1000 --min-contig-len ${MIN_CL} \
     -o ${DIR_MERGE}/anchor.merge.fasta
 
