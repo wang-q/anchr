@@ -554,26 +554,36 @@ fn oriented_segment(
 }
 
 /// Per-unitig short-k window statistics over the reads-only repeat table:
-/// `median` (the unitig's "normal" coverage) plus `left_max`/`right_max`
-/// (the max count over the first/last `SPAN` bases). A junction whose
-/// junction-adjacent end max far exceeds the unitig's own median is a
-/// repeat bridge — the shared windows carry reads from both genomic
-/// copies, so recompacting that chain would fuse two distant loci into a
-/// relocation chimera (DH5alpha's two relocation misassemblies join loci
-/// through ~1 kb repeats whose tandem copies carry SNP variations: at the
-/// 130-mer probe the shared windows are broken into distinct alleles and
-/// show no elevation, while a short k (31) sees the ~2x coverage). The
+/// `median` (the unitig's "normal" coverage) plus `left_hi`/`right_hi`
+/// (the 95th-percentile count over the first/last `SPAN` bases). A
+/// junction whose junction-adjacent end elevation far exceeds the unitig's
+/// own median is a repeat bridge — the shared windows carry reads from both
+/// genomic copies, so recompacting that chain would fuse two distant loci
+/// into a relocation chimera (DH5alpha's two relocation misassemblies join
+/// loci through ~1 kb repeats whose tandem copies carry SNP variations: at
+/// the 130-mer probe the shared windows are broken into distinct alleles
+/// and show no elevation, while a short k (31) sees the ~2x coverage). The
 /// elevated windows sit a few hundred bases from the breakpoint, so the
-/// single junction probe misses them too. Windows roll one base at a time;
-/// a unitig shorter than one window has no stats (0: never a base).
+/// single junction probe misses them too. A high quantile is used rather
+/// than the max because the max over SPAN windows is noise-dominated at low
+/// coverage (≈ μ+3.9√μ, crossing 1.5× the median below ~60×): a real
+/// repeat bridge keeps many windows elevated, so the 95th percentile still
+/// sees the ~2× level. Windows roll one base at a time; a unitig shorter
+/// than one window has no stats (0: never a base).
 struct ProbeStats {
     median: u32,
-    left_max: u32,
-    right_max: u32,
+    left_hi: u32,
+    right_hi: u32,
 }
 
 fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Vec<ProbeStats> {
     const SPAN: usize = 2000;
+    const Q: f64 = 0.95;
+    let hi = |v: &mut Vec<u32>| {
+        v.sort_unstable();
+        let i = ((v.len() - 1) as f64 * Q) as usize;
+        v[i]
+    };
     unitigs
         .iter()
         .map(|u| {
@@ -581,13 +591,13 @@ fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Ve
             if n < window_len {
                 return ProbeStats {
                     median: 0,
-                    left_max: 0,
-                    right_max: 0,
+                    left_hi: 0,
+                    right_hi: 0,
                 };
             }
             let mut counts: Vec<u32> = Vec::with_capacity(n - window_len + 1);
-            let mut left_max = 0u32;
-            let mut right_max = 0u32;
+            let mut left: Vec<u32> = Vec::new();
+            let mut right: Vec<u32> = Vec::new();
             let right_cut = n.saturating_sub(SPAN);
             let mut km = RollCanon::new(window_len, &u.bases);
             for p in 0..=n - window_len {
@@ -596,18 +606,18 @@ fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Ve
                 }
                 let c = table.get_count_canonical(km.canon());
                 if p < SPAN {
-                    left_max = left_max.max(c);
+                    left.push(c);
                 }
                 if p + window_len > right_cut {
-                    right_max = right_max.max(c);
+                    right.push(c);
                 }
                 counts.push(c);
             }
             counts.sort_unstable();
             ProbeStats {
                 median: counts[counts.len() / 2],
-                left_max,
-                right_max,
+                left_hi: hi(&mut left),
+                right_hi: hi(&mut right),
             }
         })
         .collect()
@@ -752,11 +762,12 @@ pub(crate) fn internal_repeat_bridge_split(
     *links = compute_links(unitigs, k_build);
 }
 
-/// Whether the `i → l.to` junction spans a repeat bridge: the max short-k
-/// window count over the junction-adjacent end of either unitig exceeds
-/// `REPEAT_RATIO` times that unitig's own median coverage. Such chains are
-/// not compacted (recompaction would fuse two distant loci into a
-/// relocation chimera — the shared windows carry reads from both copies).
+/// Whether the `i → l.to` junction spans a repeat bridge: the 95th-
+/// percentile short-k window count over the junction-adjacent end of
+/// either unitig exceeds `REPEAT_RATIO` times that unitig's own median
+/// coverage. Such chains are not compacted (recompaction would fuse two
+/// distant loci into a relocation chimera — the shared windows carry reads
+/// from both copies).
 fn is_repeat_bridge(i: usize, l: &Link, unitigs: &[Unitig], stats: &[ProbeStats]) -> bool {
     // A repeat region has reads on both copies; a low-coverage or short
     // unitig's coverage is too noisy to be a base. 1.5: a 2-copy repeat
@@ -769,22 +780,24 @@ fn is_repeat_bridge(i: usize, l: &Link, unitigs: &[Unitig], stats: &[ProbeStats]
     // `from_rc` is false (true); the link enters `to`'s left (right) end
     // when `to_rc` is false (true).
     let (im, mi) = if l.from_rc {
-        (si.left_max, si.median)
+        (si.left_hi, si.median)
     } else {
-        (si.right_max, si.median)
+        (si.right_hi, si.median)
     };
     let (jm, mj) = if l.to_rc {
-        (sj.right_max, sj.median)
+        (sj.right_hi, sj.median)
     } else {
-        (sj.left_max, sj.median)
+        (sj.left_hi, sj.median)
     };
     let hi = im as f32 >= 2.0 && mi as f32 >= 2.0 && im as f32 > REPEAT_RATIO * mi as f32;
     let hj = jm as f32 >= 2.0 && mj as f32 >= 2.0 && jm as f32 > REPEAT_RATIO * mj as f32;
     let blocked = hi || hj;
-    // Debug: report every long-unitig junction checked, with the coverage
-    // ratio that decided it (to trace why a relocation bridge survived).
+    // Debug: report every junction between long-enough unitigs checked,
+    // with the coverage ratio that decided it (to trace why a relocation
+    // bridge survived).
     if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some()
-        && (unitigs[i].bases.len() > 40_000 || unitigs[l.to].bases.len() > 40_000)
+        && unitigs[i].bases.len() >= 500
+        && unitigs[l.to].bases.len() >= 500
     {
         eprintln!(
             "repeat-check {}->{} len={}x{} hi={} ({}x{}) hj={} ({}x{}) blocked={blocked}",
