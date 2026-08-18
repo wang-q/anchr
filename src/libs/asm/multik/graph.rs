@@ -411,8 +411,8 @@ pub(crate) fn progressive_filter(
     links: &mut Vec<Vec<Link>>,
     branch: &mut Vec<bool>,
     k_build: usize,
-    probe: Option<&RefineTable>,
-    probe_half: usize,
+    repeat: Option<&RefineTable>,
+    repeat_k: usize,
 ) -> (Vec<Unitig>, Vec<bool>) {
     if unitigs.is_empty() {
         return (Vec::new(), Vec::new());
@@ -483,7 +483,22 @@ pub(crate) fn progressive_filter(
         // Recompact after removal so the main path grows (metaMDBG
         // recompacts every round); chimeric junctions possibly fused here
         // are cut back by `split_by_bridge` right after this filter.
-        recompact_graph(unitigs, links, branch, k_build, probe, probe_half);
+        recompact_graph(unitigs, links, branch, k_build, repeat, repeat_k);
+        if std::env::var_os("ANCHR_MULTIK_TRACE_DIR").is_some() {
+            let dir = std::env::var("ANCHR_MULTIK_TRACE_DIR").unwrap();
+            use std::io::Write;
+            let path = std::path::Path::new(&dir).join(format!("prog_t{:.1}.fa", t));
+            if let Ok(mut f) = std::fs::File::create(&path) {
+                for (i, u) in unitigs.iter().enumerate() {
+                    writeln!(f, ">u{i} len={} cov={:.1}", u.bases.len(), u.coverage).unwrap();
+                    let ls: Vec<String> = links[i]
+                        .iter()
+                        .map(|l| format!("{}{}", l.to, if l.from_rc { "-" } else { "+" }))
+                        .collect();
+                    writeln!(f, "#L {}", ls.join(" ")).unwrap();
+                }
+            }
+        }
         t += (t * 0.1).min(10.0);
     }
     (dropped, dropped_branch)
@@ -538,51 +553,52 @@ fn oriented_segment(
     Some((li, lrev, ri, rrev))
 }
 
-/// Per-unitig probe-window statistics over the reads-only probe table:
+/// Per-unitig short-k window statistics over the reads-only repeat table:
 /// `median` (the unitig's "normal" coverage) plus `left_max`/`right_max`
 /// (the max count over the first/last `SPAN` bases). A junction whose
 /// junction-adjacent end max far exceeds the unitig's own median is a
 /// repeat bridge — the shared windows carry reads from both genomic
 /// copies, so recompacting that chain would fuse two distant loci into a
 /// relocation chimera (DH5alpha's two relocation misassemblies join loci
-/// through ~1 kb conserved repeats; the elevated windows sit a few hundred
-/// bases from the breakpoint, so the single junction probe misses them).
-/// Windows roll one base at a time; a unitig shorter than one probe window
-/// has no stats (0: never a base).
+/// through ~1 kb repeats whose tandem copies carry SNP variations: at the
+/// 130-mer probe the shared windows are broken into distinct alleles and
+/// show no elevation, while a short k (31) sees the ~2x coverage). The
+/// elevated windows sit a few hundred bases from the breakpoint, so the
+/// single junction probe misses them too. Windows roll one base at a time;
+/// a unitig shorter than one window has no stats (0: never a base).
 struct ProbeStats {
     median: u32,
     left_max: u32,
     right_max: u32,
 }
 
-fn probe_stats(unitigs: &[Unitig], table: &RefineTable, probe_half: usize) -> Vec<ProbeStats> {
+fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Vec<ProbeStats> {
     const SPAN: usize = 2000;
-    let probe_len = probe_half * 2;
     unitigs
         .iter()
         .map(|u| {
             let n = u.bases.len();
-            if n < probe_len {
+            if n < window_len {
                 return ProbeStats {
                     median: 0,
                     left_max: 0,
                     right_max: 0,
                 };
             }
-            let mut counts: Vec<u32> = Vec::with_capacity(n - probe_len + 1);
+            let mut counts: Vec<u32> = Vec::with_capacity(n - window_len + 1);
             let mut left_max = 0u32;
             let mut right_max = 0u32;
             let right_cut = n.saturating_sub(SPAN);
-            let mut km = RollCanon::new(probe_len, &u.bases);
-            for p in 0..=n - probe_len {
+            let mut km = RollCanon::new(window_len, &u.bases);
+            for p in 0..=n - window_len {
                 if p > 0 {
-                    km.push_code(base_code(u.bases[p + probe_len - 1]));
+                    km.push_code(base_code(u.bases[p + window_len - 1]));
                 }
                 let c = table.get_count_canonical(km.canon());
                 if p < SPAN {
                     left_max = left_max.max(c);
                 }
-                if p + probe_len > right_cut {
+                if p + window_len > right_cut {
                     right_max = right_max.max(c);
                 }
                 counts.push(c);
@@ -597,8 +613,147 @@ fn probe_stats(unitigs: &[Unitig], table: &RefineTable, probe_half: usize) -> Ve
         .collect()
 }
 
-/// Whether the `i → l.to` junction spans a repeat bridge: the max probe
-/// count over the junction-adjacent end of either unitig exceeds
+/// Splits unitigs at internal low-coverage seams in the short-k repeat
+/// table: a narrow run of windows whose count falls far below the unitig's
+/// own median is a chimeric junction — the sequence on both sides is real
+/// (each locus has reads support) but the crossing windows that join two
+/// distant loci are absent from the reads. Real repeats show elevated (not
+/// depleted) coverage and wide low regions are genuine genomic features
+/// (e.g. coverage gaps), so only narrow internal runs are cut. End regions
+/// are left alone (a unitig naturally ends at a coverage drop). Links are
+/// recomputed from the new extremities; the fresh ends re-enter the chain
+/// merge, whose [`is_repeat_bridge`] keeps repeat ends from re-fusing.
+pub(crate) fn internal_repeat_bridge_split(
+    unitigs: &mut Vec<Unitig>,
+    links: &mut Vec<Vec<Link>>,
+    branch: &mut Vec<bool>,
+    table: &RefineTable,
+    repeat_k: usize,
+    k_build: usize,
+) {
+    if unitigs.is_empty() {
+        return;
+    }
+    // A DH5alpha relocation junction is a ~30-60 bp run of near-zero 31-mer
+    // windows inside the unitig (the two loci share no crossing k-mer);
+    // real content has even coverage on both sides of the seam. Isolated
+    // 1-2 window dips are coverage noise and wide low regions are real
+    // features, so only narrow internal runs (MIN_RUN..=MAX_RUN) are cut.
+    const SPAN: usize = 2000;
+    const MIN_RUN: usize = 5;
+    const MAX_RUN: usize = 200;
+    const GAP: usize = 3;
+    const LOW_RATIO: f64 = 0.3;
+    const MIN_MEDIAN: u32 = 8;
+    let mut out: Vec<Unitig> = Vec::new();
+    let mut out_branch: Vec<bool> = Vec::new();
+    for (u, &is_branch) in unitigs.iter().zip(branch.iter()) {
+        let n = u.bases.len();
+        // Need an internal region on both sides of any seam, plus a window.
+        if n < 2 * SPAN + repeat_k {
+            out.push(u.clone());
+            out_branch.push(is_branch);
+            continue;
+        }
+        let mut counts: Vec<u32> = Vec::with_capacity(n - repeat_k + 1);
+        let mut km = RollCanon::new(repeat_k, &u.bases);
+        for p in 0..=n - repeat_k {
+            if p > 0 {
+                km.push_code(base_code(u.bases[p + repeat_k - 1]));
+            }
+            counts.push(table.get_count_canonical(km.canon()));
+        }
+        let mut sorted = counts.clone();
+        sorted.sort_unstable();
+        let median = sorted[sorted.len() / 2];
+        if median < MIN_MEDIAN {
+            out.push(u.clone());
+            out_branch.push(is_branch);
+            continue;
+        }
+        // Collect runs of depleted windows across the whole unitig (end runs
+        // participate in the width logic); a window at base `p` covers
+        // [p, p+repeat_k).
+        let low = (LOW_RATIO * median as f64) as u32;
+        let mut runs: Vec<(usize, usize)> = Vec::new(); // (start, end) inclusive
+        let mut i = 0usize;
+        while i < counts.len() {
+            if counts[i] < low {
+                let start = i;
+                let mut end = i;
+                while i < counts.len() && counts[i] < low {
+                    end = i;
+                    i += 1;
+                }
+                // Merge with the previous run if within GAP.
+                if let Some((_, prev_end)) = runs.last_mut() {
+                    if start - *prev_end - 1 <= GAP {
+                        *prev_end = end;
+                        continue;
+                    }
+                }
+                runs.push((start, end));
+            } else {
+                i += 1;
+            }
+        }
+        // Cut only at narrow, internal runs: a real low-coverage region is
+        // wide (> MAX_RUN) and an assembly end sits within SPAN of the end.
+        let mut cut: Vec<usize> = Vec::new();
+        for &(start, end) in &runs {
+            if end - start + 1 < MIN_RUN || end - start + 1 > MAX_RUN {
+                continue;
+            }
+            if start < SPAN || end > n - SPAN {
+                continue;
+            }
+            cut.push((start + end) / 2);
+        }
+        if cut.is_empty() {
+            out.push(u.clone());
+            out_branch.push(is_branch);
+            continue;
+        }
+        if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() && n > 50_000 {
+            eprintln!(
+                "internal_repeat_bridge_split cut len={n} median={median} cuts={} cut_pos={:?}",
+                cut.len(),
+                &cut[..cut.len().min(12)]
+            );
+        }
+        // Split at the cut positions (same as split_by_bridge).
+        let mut pieces: Vec<usize> = Vec::new();
+        let mut s = 0usize;
+        for &c in &cut {
+            if c <= s {
+                continue;
+            }
+            pieces.push(c - s);
+            s = c;
+        }
+        pieces.push(n - s);
+        let mut pos = 0usize;
+        for len in pieces {
+            if len < k_build {
+                // Too short to host a (k_build-1)-mer end: drop the fragment.
+                pos += len;
+                continue;
+            }
+            let mut nu = u.clone();
+            nu.bases = u.bases[pos..pos + len].to_vec();
+            nu.id = 0;
+            out.push(nu);
+            out_branch.push(is_branch);
+            pos += len;
+        }
+    }
+    *unitigs = out;
+    *branch = out_branch;
+    *links = compute_links(unitigs, k_build);
+}
+
+/// Whether the `i → l.to` junction spans a repeat bridge: the max short-k
+/// window count over the junction-adjacent end of either unitig exceeds
 /// `REPEAT_RATIO` times that unitig's own median coverage. Such chains are
 /// not compacted (recompaction would fuse two distant loci into a
 /// relocation chimera — the shared windows carry reads from both copies).
@@ -653,23 +808,23 @@ fn is_repeat_bridge(i: usize, l: &Link, unitigs: &[Unitig], stats: &[ProbeStats]
 /// merged unitig keeps the chain head's begin (from_rc=true) links and the
 /// chain tail's end (from_rc=false) links; external edges pointing into
 /// the chain are redirected to the merged unitig.
-/// chain. `probe` (reads-only) gates the chain ends: a junction whose
-/// shared-overlap probe count far exceeds both unitigs' own median (a
-/// repeat bridge) is not compacted, so recompaction cannot fuse two distant
-/// loci into a relocation chimera.
+/// chain. `repeat` (reads-only short-k table) gates the chain ends: a
+/// junction whose shared-overlap window count far exceeds both unitigs'
+/// own median (a repeat bridge) is not compacted, so recompaction cannot
+/// fuse two distant loci into a relocation chimera.
 pub(crate) fn recompact_graph(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
     branch: &mut Vec<bool>,
     k_build: usize,
-    probe: Option<&RefineTable>,
-    probe_half: usize,
+    repeat: Option<&RefineTable>,
+    repeat_k: usize,
 ) {
     let n = unitigs.len();
     if n <= 1 {
         return;
     }
-    let stats = probe.map(|t| probe_stats(unitigs, t, probe_half));
+    let stats = repeat.map(|t| probe_stats(unitigs, t, repeat_k));
     let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
     let mut right_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
     let mut left_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
@@ -717,7 +872,7 @@ pub(crate) fn recompact_graph(
             }
             // A repeat bridge joins two distant loci; blocking the link here
             // keeps them as separate unitigs instead of fusing a chimera.
-            if let (Some(_), Some(s)) = (probe, stats.as_deref()) {
+            if let (Some(_), Some(s)) = (repeat, stats.as_deref()) {
                 if is_repeat_bridge(i, l, unitigs, s) {
                     if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() {
                         eprintln!(
@@ -829,20 +984,21 @@ pub(crate) fn recompact_graph(
 /// stay separate. Each link is first resolved into an oriented chain
 /// segment (`left → right`, with a per-unitig strand flag) by matching the
 /// actual extremity (k_build-1)-mers; the walk then follows unique
-/// chain-oriented ends (2n nodes: id * 2 + rev). `probe` (reads-only) gates
-/// the chain ends: a junction whose shared-overlap probe count far exceeds
-/// both unitigs' own median (a repeat bridge) is not compacted, so a final
-/// chain cannot fuse two distant loci into a relocation chimera.
+/// chain-oriented ends (2n nodes: id * 2 + rev). `repeat` (reads-only
+/// short-k table) gates the chain ends: a junction whose shared-overlap
+/// window count far exceeds both unitigs' own median (a repeat bridge) is
+/// not compacted, so a final chain cannot fuse two distant loci into a
+/// relocation chimera.
 pub(crate) fn merge_chains(
     unitigs: &[Unitig],
     links: &[Vec<Link>],
     branch: &[bool],
     k_build: usize,
-    probe: Option<&RefineTable>,
-    probe_half: usize,
+    repeat: Option<&RefineTable>,
+    repeat_k: usize,
 ) -> Result<Vec<MultikUnitig>> {
     let n = unitigs.len();
-    let stats = probe.map(|t| probe_stats(unitigs, t, probe_half));
+    let stats = repeat.map(|t| probe_stats(unitigs, t, repeat_k));
     let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
     let mut right_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
     let mut left_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
@@ -888,7 +1044,7 @@ pub(crate) fn merge_chains(
             }
             // A repeat bridge joins two distant loci; blocking the link here
             // keeps them as separate unitigs instead of fusing a chimera.
-            if let (Some(_), Some(s)) = (probe, stats.as_deref()) {
+            if let (Some(_), Some(s)) = (repeat, stats.as_deref()) {
                 if is_repeat_bridge(i, l, unitigs, s) {
                     if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() {
                         eprintln!(

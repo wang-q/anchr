@@ -3,8 +3,8 @@
 
 use super::bridge::{bridge_filter, bridge_kmer, split_by_bridge};
 use super::graph::{
-    bubble_merge, merge_chains, progressive_filter, recompact_graph, remove_unsupported,
-    tip_remover, weak_link_remover,
+    bubble_merge, internal_repeat_bridge_split, merge_chains, progressive_filter, recompact_graph,
+    remove_unsupported, tip_remover, weak_link_remover,
 };
 use super::schedule::pass0_opts;
 use super::{MultikOptions, MultikUnitig};
@@ -189,13 +189,17 @@ impl Master {
     /// validate every link's bridge k-mer and every unitig's internal
     /// k-mers against `base` + this master's unitigs, filter links by
     /// reads bridges, recompact, and prune low-abundance unitigs into the
-    /// carry. `probe` is the shared reads-only probe table.
+    /// carry. `probe` is the shared reads-only probe table; `repeat` is the
+    /// shared reads-only short-k table that gates repeat bridges during
+    /// recompaction.
     pub(crate) fn round(
         &mut self,
         k: usize,
         base: &RefineTable,
         probe: &RefineTable,
         probe_half: usize,
+        repeat: &RefineTable,
+        repeat_k: usize,
         opts: &MultikOptions,
     ) -> Result<()> {
         let t_round = std::time::Instant::now();
@@ -246,6 +250,11 @@ impl Master {
         // fix them into the main path (prevents relocation misassemblies).
         bridge_filter(&self.unitigs, &mut self.links, probe, k0, probe_half, 2);
         let t4 = std::time::Instant::now();
+        trace_graph(
+            &format!("r{k0}_k{k}_after_bridge"),
+            &self.unitigs,
+            &self.links,
+        );
         // 3. Recompact unique chains so the main path grows between rounds
         // (metaMDBG recompacts after every abundance-removal round). No
         // abundance pruning here — that is deferred to the final filter, so
@@ -255,10 +264,15 @@ impl Master {
             &mut self.links,
             &mut self.branch,
             k0,
-            Some(probe),
-            probe_half,
+            Some(repeat),
+            repeat_k,
         );
         let t5 = std::time::Instant::now();
+        trace_graph(
+            &format!("r{k0}_k{k}_after_compact"),
+            &self.unitigs,
+            &self.links,
+        );
         // 4. Prune low-abundance branching/isolated unitigs and carry them
         // into the next round (the final round's carry becomes output).
         let (dropped, dropped_branch) = progressive_filter(
@@ -266,8 +280,8 @@ impl Master {
             &mut self.links,
             &mut self.branch,
             k0,
-            Some(probe),
-            probe_half,
+            Some(repeat),
+            repeat_k,
         );
         self.carried = dropped;
         self.carried_branch = dropped_branch;
@@ -319,6 +333,8 @@ impl Master {
         &mut self,
         probe: &RefineTable,
         probe_half: usize,
+        repeat: &RefineTable,
+        repeat_k: usize,
         opts: &MultikOptions,
     ) -> Result<()> {
         let k0 = self.k0;
@@ -336,6 +352,20 @@ impl Master {
             k0,
             probe_half,
             opts.min_count_extend as u32,
+        );
+        // Split unitigs at internal narrow high-coverage spikes in the
+        // short-k repeat table: a repeat bridge inside a unitig (reads from
+        // both copies share a few windows) fused two distant loci, and the
+        // 130-mer split above misses it because the junction windows have
+        // reads support. End repeats are already gated by is_repeat_bridge
+        // during the final compaction, so only internal spikes are cut here.
+        internal_repeat_bridge_split(
+            &mut self.unitigs,
+            &mut self.links,
+            &mut self.branch,
+            repeat,
+            repeat_k,
+            k0,
         );
         // Re-verify the links recomputed by the split: the new extremities
         // may join distant regions, so every surviving link needs bridging
@@ -377,8 +407,8 @@ impl Master {
             &self.links,
             &self.branch,
             k0,
-            Some(probe),
-            probe_half,
+            Some(repeat),
+            repeat_k,
         )?;
         chains.extend(
             std::mem::take(&mut self.carried)

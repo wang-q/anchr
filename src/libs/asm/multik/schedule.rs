@@ -10,6 +10,13 @@ use crate::libs::asm::table::RefineTable;
 use anyhow::Result;
 use rayon::prelude::*;
 
+/// Short-k window for repeat-bridge detection: DH5alpha's relocation
+/// chimeras join loci through ~1 kb repeats whose tandem copies carry SNP
+/// variations, so the 130-mer probe sees the copies as distinct alleles
+/// (no ~2x coverage) while a 31-mer window still spans the shared core and
+/// shows the double coverage. Matches the ladder floor.
+const REPEAT_K: usize = 31;
+
 /// Pass-0 assemble options (BCALM graph3 semantics, same fast paths as the
 /// `asm unitig` command: super-mer counting, adaptive minimizer length, and
 /// the DFA-state walk engine).
@@ -83,6 +90,17 @@ pub(crate) fn assemble_one(
             t.elapsed().as_secs_f64()
         );
     }
+    // Reads-only short-k table for repeat-bridge gating during recompaction
+    // (see [`REPEAT_K`]); only the reads themselves, built once like the
+    // probe.
+    let t = std::time::Instant::now();
+    let repeat_table = RefineTable::build_supermer_slices(&read_seqs, REPEAT_K)?;
+    if timing {
+        eprintln!(
+            "repeat table k={REPEAT_K} build: {:.3}s",
+            t.elapsed().as_secs_f64()
+        );
+    }
 
     let threshold = opts.min_count_extend as u32;
     if later_ks.is_empty() {
@@ -107,10 +125,18 @@ pub(crate) fn assemble_one(
         if timing {
             eprintln!("reads table k={k} build: {:.3}s", t.elapsed().as_secs_f64());
         }
-        master.round(k, &table, &probe_table, probe_half, opts)?;
+        master.round(
+            k,
+            &table,
+            &probe_table,
+            probe_half,
+            &repeat_table,
+            REPEAT_K,
+            opts,
+        )?;
     }
     let t = std::time::Instant::now();
-    master.finalize(&probe_table, probe_half, opts)?;
+    master.finalize(&probe_table, probe_half, &repeat_table, REPEAT_K, opts)?;
     if timing {
         eprintln!("master k0={k0} finalize: {:.3}s", t.elapsed().as_secs_f64());
     }
@@ -151,15 +177,16 @@ pub(crate) fn assemble_all_masters(
         // reads table is built for the round and dropped right after —
         // no cache, so memory stays at ~one table regardless of |ks|.
         let probe = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
+        let repeat = RefineTable::build_supermer_slices(&read_seqs, REPEAT_K)?;
         let mut guide_master = {
             let t = RefineTable::build_supermer_slices(&read_seqs, ks[0])?;
             Master::pass0(&t, ks[0], opts)
         };
         for &k in ks.iter().skip(1) {
             let t = RefineTable::build_supermer_slices(&read_seqs, k)?;
-            guide_master.round(k, &t, &probe, probe_half, opts)?;
+            guide_master.round(k, &t, &probe, probe_half, &repeat, REPEAT_K, opts)?;
         }
-        guide_master.finalize(&probe, probe_half, opts)?;
+        guide_master.finalize(&probe, probe_half, &repeat, REPEAT_K, opts)?;
 
         // Guide pseudo-reads: each contig repeated to the solid threshold
         // (the same records `--guide-contigs` writes as a FASTA infile).
@@ -178,6 +205,7 @@ pub(crate) fn assemble_all_masters(
         let mut seqs_with_guide: Vec<&[u8]> = read_seqs.clone();
         seqs_with_guide.extend_from_slice(&guide_seqs);
         let probe2 = RefineTable::build_supermer_slices(&seqs_with_guide, probe_len)?;
+        let repeat2 = RefineTable::build_supermer_slices(&seqs_with_guide, REPEAT_K)?;
         let mut masters: Vec<Master> = Vec::new();
         for &k in ks.iter().skip(1) {
             let table = RefineTable::build_supermer_slices(&seqs_with_guide, k)?;
@@ -186,9 +214,9 @@ pub(crate) fn assemble_all_masters(
             let (new_master, rounds_res) = rayon::join(
                 || Master::pass0(&table, k, opts),
                 || {
-                    masters
-                        .par_iter_mut()
-                        .try_for_each(|m| m.round(k, &table, &probe2, probe_half, opts))
+                    masters.par_iter_mut().try_for_each(|m| {
+                        m.round(k, &table, &probe2, probe_half, &repeat2, REPEAT_K, opts)
+                    })
                 },
             );
             rounds_res?;
@@ -201,7 +229,7 @@ pub(crate) fn assemble_all_masters(
         // in ladder order to keep the byte stream deterministic.
         masters
             .par_iter_mut()
-            .try_for_each(|m| m.finalize(&probe2, probe_half, opts))?;
+            .try_for_each(|m| m.finalize(&probe2, probe_half, &repeat2, REPEAT_K, opts))?;
         for m in &mut masters {
             out.append(&mut m.out);
         }
@@ -221,6 +249,9 @@ pub(crate) fn assemble_all_masters(
         let probe_cell: std::sync::OnceLock<
             anyhow::Result<RefineTable, std::sync::Arc<anyhow::Error>>,
         > = std::sync::OnceLock::new();
+        let repeat_cell: std::sync::OnceLock<
+            anyhow::Result<RefineTable, std::sync::Arc<anyhow::Error>>,
+        > = std::sync::OnceLock::new();
         let masters: Vec<Master> = std::thread::scope(|scope| -> anyhow::Result<Vec<Master>> {
             type TableLane = std::sync::mpsc::SyncSender<std::sync::Arc<RefineTable>>;
             type ChainLane = std::sync::mpsc::Receiver<std::sync::Arc<RefineTable>>;
@@ -230,6 +261,7 @@ pub(crate) fn assemble_all_masters(
                 .unzip();
             let read_seqs_ref = &read_seqs;
             let probe_cell_ref = &probe_cell;
+            let repeat_cell_ref = &repeat_cell;
             let builder = scope.spawn(move || -> anyhow::Result<()> {
                 // Build reads tables on the worker pool with a bounded
                 // lookahead window (building + buffered tables beyond `next`)
@@ -321,6 +353,16 @@ pub(crate) fn assemble_all_masters(
                             cell.as_ref()
                                 .map_err(|e| anyhow::anyhow!("probe table: {e}"))
                         };
+                        // Short-k repeat table on first need (shared
+                        // OnceLock), same lazy pattern as the probe.
+                        let repeat = || -> anyhow::Result<&RefineTable> {
+                            let cell = repeat_cell_ref.get_or_init(|| {
+                                RefineTable::build_supermer_slices(read_seqs_ref, REPEAT_K)
+                                    .map_err(std::sync::Arc::new)
+                            });
+                            cell.as_ref()
+                                .map_err(|e| anyhow::anyhow!("repeat table: {e}"))
+                        };
                         let mut master: Option<Master> = None;
                         // Only the top-of-ladder master needs the final
                         // table (for `cut`); other chains drop each table
@@ -345,6 +387,8 @@ pub(crate) fn assemble_all_masters(
                                     &table,
                                     probe()?,
                                     probe_half,
+                                    repeat()?,
+                                    REPEAT_K,
                                     opts,
                                 )?;
                             }
@@ -363,7 +407,7 @@ pub(crate) fn assemble_all_masters(
                             }
                         }
                         let t = std::time::Instant::now();
-                        master.finalize(probe()?, probe_half, opts)?;
+                        master.finalize(probe()?, probe_half, repeat()?, REPEAT_K, opts)?;
                         if timing {
                             eprintln!(
                                 "master k0={k0} finalize: {:.3}s chain: {:.3}s",

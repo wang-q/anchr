@@ -1084,7 +1084,7 @@ cd ${WORKING_DIR}/${BASE_NAME}
 rm 0_script/*
 anchr template \
     --genome 4583637 \
-    --parallel 24 \
+    --parallel 16 \
     \
     --repetitive \
     \
@@ -1100,11 +1100,10 @@ anchr template \
     --merge \
     \
     --cov "40 80" \
-    --unitigger "multik unitig bcalm" \
+    --unitigger "multik unitig" \
     --statp 2 \
     --uscale 2 \
-    --lscale 3 \
-    --redo
+    --lscale 3
 
 ```
 
@@ -1424,7 +1423,8 @@ Table: statBusco run_enterobacterales_odb10
 
 | Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup | N/100k | mm/100k | indel/100k |
 | -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: | -----: | ------: | ---------: |
-| 13 组 anchor + cross-validate | 105 | 259450 | 4619600 | 112966 | 2 | 98.848 | 1.019 | 0.00 | 2.71 | 0.24 |
+| 13 组 anchor + cross-validate + extend 跨 contig 护栏（现行） | 122 | 259019 | 4581642 |  82991 | 0 | 98.342 | 1.016 | 0.00 | 1.27 | 0.20 |
+| 13 组 anchor + cross-validate（消除前，2 mis） | 105 | 259450 | 4619600 | 112966 | 2 | 98.848 | 1.019 | 0.00 | 2.71 | 0.24 |
 | spades（旧运行） | 78 | 132337 | 4490000 | 112448 | — | — | — | — | — | — |
 | mr_spades（旧运行） | 59 | 178373 | 4510000 | 132590 | — | — | — | — | — | — |
 | mr_megahit（旧运行） | 70 | 133730 | 4520000 | 132754 | — | — | — | — | — | — |
@@ -1437,7 +1437,12 @@ Table: statBusco run_enterobacterales_odb10
 * 跨组 `olc --unitigs --cross-validate` 96.4 s / 820 MB，extend 1.4 s；
   QUAST 用 `quast.py -m 500 -r genome.fa --min-contig 200`。
 
-#### 2 mis 归因（跨组保守重复区 relocation，cross-validate 无法消除）
+#### 2 mis 归因（跨组保守重复区 relocation，已消除）
+
+> 结论（2026-08-18）：**misassemblies 已归 0**。两条 contamination 根源于 `asm extend`
+> 延伸 walk；由 extend 低覆盖缝检查（contig_4）与 extend 跨 contig 所有权护栏
+> （contig_22）消除，详见 `notes/audit/audit-asm-relocation-chimeras.md` §3.4-3.5。
+> G37 / MG1655 回归门禁 mis 均保持 0（GF -0.2~0.4 pp、N50 -1%~-11%）。
 
 QUAST 报 2 条 relocation（contig_3 203,757 bp 与 contig_18 96,201 bp）：
 
