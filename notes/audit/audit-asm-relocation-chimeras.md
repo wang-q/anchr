@@ -11,8 +11,10 @@ misassemblies**（最初为 contig_3 / contig_18，之后演变为 contig_4 / co
 
 **目标**：消除这 2 条 relocation 嵌合，使 misassemblies 降为 0（与 G37 / MG1655 基线一致）。
 
-**现状（2026-08-18）**：**misassemblies 已归 0**。`contig_4` 由 extend 低覆盖缝检查
-消除；`contig_22` 由 extend 跨 contig 所有权护栏消除（见 §3.5）。
+**现状（2026-08-19）**：**misassemblies 已归 0**。`contig_4` 由 extend 低覆盖缝检查
+消除；`contig_22` 由 extend 跨 contig 所有权护栏消除（见 §3.5）；DH5alpha 残留的
+multik 层保守重复 relocation（unitig_76 / contig_18）由 `internal_repeat_bridge_split`
+**高覆盖 run 检测**消除（见 §10）。G37 / MG1655 MR 链 0 mis 无回归。
 
 ## 2. 关键文件与当前改动（工作区未提交）
 
@@ -145,3 +147,54 @@ misassemblies**（最初为 contig_3 / contig_18，之后演变为 contig_4 / co
 * **普世修复 = 模板默认关闭 cv**（`templates/7_merge_anchors.tera.sh`）：extend 跨 contig
   护栏已在 anchor 层解决嵌合，cv 只对"多样本同群落"数据集按需开启。此改动不针对任何
   数据集，三数据集 N50 均恢复且 mis 保持 0。
+
+## 10. multik 高覆盖保守重复 run 检测（2026-08-19，消除 unitig_76 / contig_18）
+
+### 10.1 根因：internal_repeat_bridge_split 只切低覆盖，漏高覆盖保守重复桥
+
+`internal_repeat_bridge_split`（§3.1 的 v2 低覆盖缝）只切割 `LOW_RATIO=0.3` 的窄低
+覆盖 run。但 DH5alpha contig_18 / unitig_76 是**另一类**嵌合：通过 ~1 kb 保守重复区
+连接参考上相距 **48,378 bp** 的两个位点（此处正是旧 audit §5 记录的 48378/1338
+relocation），接合处覆盖率是**该 unitig 中位数的 ~2×**（两个基因组拷贝都被 reads
+覆盖），低覆盖检测不触发 → 嵌合在多 k master 的 finalize 阶段保留，`olc`/extend 无法
+再解除。
+
+### 10.2 修复：新增高覆盖 run 切割（普世机制，非数据特调）
+
+在 `internal_repeat_bridge_split`（`src/libs/asm/multik/graph.rs`）原有低覆盖 run 切割
+之外，增补对**宽内部升高 run** 的切割：
+
+- 阈值：`HI_RATIO=1.5`、`MIN_HI_RUN=250`、`MAX_HI_RUN=3000`、`HI_GAP=3`（对照低覆盖
+  分支的 `LOW_RATIO=0.3` / `MIN_RUN=5` / `MAX_RUN=200` / `GAP=3`）。
+- 切点落在升高区内部，使每个切口**两端各保留 >5% 的 SPAN 窗口仍呈升高电平**，供
+  re-compaction 的 `is_repeat_bridge`（§3.2）看到重复端并被阻断，避免重熔嵌合。
+- 只放宽 run 宽度（窄升高视为噪声），端区不切，宽度用中位数界定——保持通用。
+
+### 10.3 门禁（三数据集 MR 链全 0 mis，已记入 results/model_org.md）
+
+修复后 binary 全链复跑（/tmp/dh5alpha_full、/tmp/g37_full、/tmp/mg1655_full；
+multik --all-masters auto 31..192 → olc --unitigs → extend → anchor → 跨组 merge，
+无 cv），QUAST `--min-contig 100`，merge_mr_multik：
+
+| Dataset  | # contigs | Largest |  Total |    N50 | # mis |   GF% |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: |
+| DH5alpha（修复前） | 113 | 258601 |  4557959 |  102446 | 1 | 97.943 |
+| DH5alpha（修复后） | 116 | 258601 |  4559551 |  102446 | 0 | 97.962 |
+| G37（修复后） | 17 | 187458 | 586244 | 121369 | 0 | 98.666 |
+| MG1655（修复后） | 102 | 268273 | 4584693 | 117787 | 0 | 98.360 |
+
+- DH5alpha mis 1→0（contig_18 消除），N50 102446 不变、GF +0.019 pp——高覆盖切割
+  未伤正常组装；
+- G37 / MG1655 **无回归**：G37 N50 121369 ≈ 无 cv 基线 121382；MG1655 与 statQuast
+  逐项一致（102 / 117787 / 98.360 / 0 mis）——两者无此类嵌合，切割不触发或等价；
+- 只改 `multik/graph.rs` `internal_repeat_bridge_split`，未动 `is_repeat_bridge` /
+  `schedule` / `master`。
+
+### 10.4 教训（勿重复）
+
+- **错装判定必须以 quast 为准**：曾用 `check_chimera`（L/R/CORE 探针命中）判"7 个
+  嵌合体"，实为探针取自重复区导致的误报——unitig_20/21/22/23/35/76/79 全部**单比对**
+  参考（minimap2）、覆盖剖面无固定高覆盖 run，quast 0 mis。
+- 覆盖剖面（`prof_multi` 31-mer）与 read-bridge（`verify_seam`）只作假设来源：DH5alpha
+  这类保守重复嵌合接合处覆盖正常且 reads 区间连续，覆盖/桥接启发式均无普世特征，
+  最终靠**高覆盖 run 切割 + is_repeat_bridge 阻断**组合解决。

@@ -623,16 +623,28 @@ fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Ve
         .collect()
 }
 
-/// Splits unitigs at internal low-coverage seams in the short-k repeat
-/// table: a narrow run of windows whose count falls far below the unitig's
-/// own median is a chimeric junction — the sequence on both sides is real
-/// (each locus has reads support) but the crossing windows that join two
-/// distant loci are absent from the reads. Real repeats show elevated (not
-/// depleted) coverage and wide low regions are genuine genomic features
-/// (e.g. coverage gaps), so only narrow internal runs are cut. End regions
-/// are left alone (a unitig naturally ends at a coverage drop). Links are
-/// recomputed from the new extremities; the fresh ends re-enter the chain
-/// merge, whose [`is_repeat_bridge`] keeps repeat ends from re-fusing.
+/// Splits unitigs at internal junctions in the short-k repeat table where
+/// the two fused loci are not continuously bridged by reads. Two chimeric
+/// signatures are cut:
+/// 1. a narrow run of windows whose count falls far below the unitig's own
+///    median — the sequence on both sides is real (each locus has reads
+///    support) but the crossing windows that join two distant loci are
+///    absent from the reads;
+/// 2. a wide internal run of windows whose count far exceeds the median —
+///    a conserved repeat (e.g. DH5alpha's ~1 kb relocation bridge) whose
+///    tandem copies carry SNP variations so the long-k probe sees them as
+///    distinct alleles while a short k still sees the ~2x coverage of both
+///    genomic copies. The cut lands inside the elevated run, so every
+///    surviving fragment ends on the repeated core; re-compaction then
+///    blocks the fresh ends via [`is_repeat_bridge`] instead of re-fusing
+///    the chimera.
+///
+/// Real repeats show elevated coverage and wide low regions are genuine
+/// genomic features (e.g. coverage gaps), so only narrow internal depleted
+/// runs and wide internal elevated runs are cut. End regions are left
+/// alone (a unitig naturally ends at a coverage drop). Links are recomputed
+/// from the new extremities; the fresh ends re-enter the chain merge,
+/// whose [`is_repeat_bridge`] keeps repeat ends from re-fusing.
 pub(crate) fn internal_repeat_bridge_split(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
@@ -644,17 +656,25 @@ pub(crate) fn internal_repeat_bridge_split(
     if unitigs.is_empty() {
         return;
     }
-    // A DH5alpha relocation junction is a ~30-60 bp run of near-zero 31-mer
-    // windows inside the unitig (the two loci share no crossing k-mer);
-    // real content has even coverage on both sides of the seam. Isolated
-    // 1-2 window dips are coverage noise and wide low regions are real
-    // features, so only narrow internal runs (MIN_RUN..=MAX_RUN) are cut.
+    // A DH5alpha relocation junction is either a ~30-60 bp run of
+    // near-zero 31-mer windows (the two loci share no crossing k-mer) or a
+    // ~1 kb conserved repeat with ~2x 31-mer coverage. Real content has
+    // even coverage on both sides of a seam. Isolated 1-2 window dips are
+    // coverage noise and wide low regions are real features, so only
+    // narrow internal depleted runs (MIN_RUN..=MAX_RUN) are cut. Elevated
+    // runs need a wide MIN_HI_RUN: the cut must leave >5% of SPAN windows
+    // elevated on each side for [`is_repeat_bridge`] to still see the
+    // repeat end and block re-fusing.
     const SPAN: usize = 2000;
     const MIN_RUN: usize = 5;
     const MAX_RUN: usize = 200;
     const GAP: usize = 3;
     const LOW_RATIO: f64 = 0.3;
     const MIN_MEDIAN: u32 = 8;
+    const HI_RATIO: f64 = 1.5;
+    const MIN_HI_RUN: usize = 250;
+    const MAX_HI_RUN: usize = 3000;
+    const HI_GAP: usize = 3;
     let mut out: Vec<Unitig> = Vec::new();
     let mut out_branch: Vec<bool> = Vec::new();
     for (u, &is_branch) in unitigs.iter().zip(branch.iter()) {
@@ -707,8 +727,36 @@ pub(crate) fn internal_repeat_bridge_split(
                 i += 1;
             }
         }
-        // Cut only at narrow, internal runs: a real low-coverage region is
-        // wide (> MAX_RUN) and an assembly end sits within SPAN of the end.
+        // Collect runs of elevated windows (conserved-repeat bridges): two
+        // loci fused through a shared ~1 kb repeat read at ~2x the unitig's
+        // own median.
+        let high = (HI_RATIO * median as f64) as u32;
+        let mut hi_runs: Vec<(usize, usize)> = Vec::new();
+        let mut i = 0usize;
+        while i < counts.len() {
+            if counts[i] > high {
+                let start = i;
+                let mut end = i;
+                while i < counts.len() && counts[i] > high {
+                    end = i;
+                    i += 1;
+                }
+                if let Some((_, prev_end)) = hi_runs.last_mut() {
+                    if start - *prev_end - 1 <= HI_GAP {
+                        *prev_end = end;
+                        continue;
+                    }
+                }
+                hi_runs.push((start, end));
+            } else {
+                i += 1;
+            }
+        }
+        // Cut only at narrow, internal depleted runs: a real low-coverage
+        // region is wide (> MAX_RUN) and an assembly end sits within SPAN
+        // of the end. Wide, internal elevated runs are cut inside the run,
+        // leaving >5% of each fresh end's SPAN windows elevated so
+        // `is_repeat_bridge` still blocks re-fusing.
         let mut cut: Vec<usize> = Vec::new();
         for &(start, end) in &runs {
             if end - start + 1 < MIN_RUN || end - start + 1 > MAX_RUN {
@@ -719,6 +767,17 @@ pub(crate) fn internal_repeat_bridge_split(
             }
             cut.push((start + end) / 2);
         }
+        for &(start, end) in &hi_runs {
+            if end - start + 1 < MIN_HI_RUN || end - start + 1 > MAX_HI_RUN {
+                continue;
+            }
+            if start < SPAN || end > n - SPAN {
+                continue;
+            }
+            cut.push((start + end) / 2);
+        }
+        cut.sort_unstable();
+        cut.dedup();
         if cut.is_empty() {
             out.push(u.clone());
             out_branch.push(is_branch);
