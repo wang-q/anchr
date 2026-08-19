@@ -554,36 +554,45 @@ fn oriented_segment(
 }
 
 /// Per-unitig short-k window statistics over the reads-only repeat table:
-/// `median` (the unitig's "normal" coverage) plus `left_hi`/`right_hi`
-/// (the 95th-percentile count over the first/last `SPAN` bases). A
-/// junction whose junction-adjacent end elevation far exceeds the unitig's
-/// own median is a repeat bridge — the shared windows carry reads from both
-/// genomic copies, so recompacting that chain would fuse two distant loci
-/// into a relocation chimera (DH5alpha's two relocation misassemblies join
-/// loci through ~1 kb repeats whose tandem copies carry SNP variations: at
-/// the 130-mer probe the shared windows are broken into distinct alleles
-/// and show no elevation, while a short k (31) sees the ~2x coverage). The
-/// elevated windows sit a few hundred bases from the breakpoint, so the
-/// single junction probe misses them too. A high quantile is used rather
-/// than the max because the max over SPAN windows is noise-dominated at low
-/// coverage (≈ μ+3.9√μ, crossing 1.5× the median below ~60×): a real
-/// repeat bridge keeps many windows elevated, so the 95th percentile still
-/// sees the ~2× level. Windows roll one base at a time; a unitig shorter
-/// than one window has no stats (0: never a base).
+/// `median` (the unitig's "normal" coverage), `left_hi`/`right_hi` (the
+/// 95th-percentile count over the first/last `SPAN` bases), and
+/// `left_tip_max`/`right_tip_max` (the max count over the first/last `TIP`
+/// windows). A junction whose junction-adjacent end elevation far exceeds
+/// the unitig's own median is a repeat bridge — the shared windows carry
+/// reads from both genomic copies, so recompacting that chain would fuse
+/// two distant loci into a relocation chimera (DH5alpha's two relocation
+/// misassemblies join loci through ~1 kb repeats whose tandem copies carry
+/// SNP variations: at the 130-mer probe the shared windows are broken into
+/// distinct alleles and show no elevation, while a short k (31) sees the
+/// ~2x coverage). The elevated windows sit a few hundred bases from the
+/// breakpoint, so the single junction probe misses them too. A high
+/// quantile is used rather than the max because the max over SPAN windows
+/// is noise-dominated at low coverage (≈ μ+3.9√μ, crossing 1.5× the median
+/// below ~60×): a real repeat bridge keeps many windows elevated, so the
+/// 95th percentile still sees the ~2× level. A very short repeat bridge —
+/// e.g. the ~30 bp conserved bridge in contig_24 that is exactly the
+/// `(k_build-1)`-mer overlap forming the link — elevates only the
+/// junction-adjacent tip windows, invisible to the SPAN quantile, so the
+/// tip max is kept as a second, local probe. Windows roll one base at a
+/// time; a unitig shorter than one window has no stats (0: never a base).
 struct ProbeStats {
     median: u32,
     left_hi: u32,
     right_hi: u32,
+    left_tip_max: u32,
+    right_tip_max: u32,
 }
 
 fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Vec<ProbeStats> {
     const SPAN: usize = 2000;
+    const TIP: usize = 30;
     const Q: f64 = 0.95;
     let hi = |v: &mut Vec<u32>| {
         v.sort_unstable();
         let i = ((v.len() - 1) as f64 * Q) as usize;
         v[i]
     };
+    let tip_max = |v: &[u32]| v.iter().copied().max().unwrap_or(0);
     unitigs
         .iter()
         .map(|u| {
@@ -593,12 +602,20 @@ fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Ve
                     median: 0,
                     left_hi: 0,
                     right_hi: 0,
+                    left_tip_max: 0,
+                    right_tip_max: 0,
                 };
             }
             let mut counts: Vec<u32> = Vec::with_capacity(n - window_len + 1);
             let mut left: Vec<u32> = Vec::new();
             let mut right: Vec<u32> = Vec::new();
+            let mut tip_left: Vec<u32> = Vec::new();
+            let mut tip_right: Vec<u32> = Vec::new();
             let right_cut = n.saturating_sub(SPAN);
+            // TEMP DEBUG: raw junction-end windows (before sorting) for the
+            // run-structure dump below.
+            let mut dbg_left: Vec<u32> = Vec::new();
+            let mut dbg_right: Vec<u32> = Vec::new();
             let mut km = RollCanon::new(window_len, &u.bases);
             for p in 0..=n - window_len {
                 if p > 0 {
@@ -608,16 +625,59 @@ fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Ve
                 if p < SPAN {
                     left.push(c);
                 }
+                if p < TIP {
+                    tip_left.push(c);
+                }
+                if p < 400 {
+                    dbg_left.push(c);
+                }
                 if p + window_len > right_cut {
                     right.push(c);
+                }
+                if p + window_len > n - TIP {
+                    tip_right.push(c);
+                }
+                if p + window_len > n - 400 {
+                    dbg_right.push(c);
                 }
                 counts.push(c);
             }
             counts.sort_unstable();
+            let median = counts[counts.len() / 2];
+            // TEMP DEBUG: dump the junction-end run structure so a
+            // mid-distance repeat bridge (coverage ~1.4x, below REPEAT_RATIO)
+            // can be separated from noise runs.
+            if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() && n >= 3000 {
+                let best_run = |w: &[u32], ratio: f32| -> usize {
+                    let thr = ((median as f32 * ratio).ceil() as u32).max(2);
+                    let mut best = 0usize;
+                    let mut cur = 0usize;
+                    for &c in w {
+                        if c >= thr {
+                            cur += 1;
+                            best = best.max(cur);
+                        } else {
+                            cur = 0;
+                        }
+                    }
+                    best
+                };
+                eprintln!(
+                    "probe-run len={n} med={median} L12={} L13={} L14={} R12={} R13={} R14={}",
+                    best_run(&dbg_left, 1.2),
+                    best_run(&dbg_left, 1.3),
+                    best_run(&dbg_left, 1.4),
+                    best_run(&dbg_right, 1.2),
+                    best_run(&dbg_right, 1.3),
+                    best_run(&dbg_right, 1.4),
+                );
+            }
             ProbeStats {
-                median: counts[counts.len() / 2],
+                median,
                 left_hi: hi(&mut left),
                 right_hi: hi(&mut right),
+                left_tip_max: tip_max(&tip_left),
+                right_tip_max: tip_max(&tip_right),
             }
         })
         .collect()
@@ -838,19 +898,40 @@ fn is_repeat_bridge(i: usize, l: &Link, unitigs: &[Unitig], stats: &[ProbeStats]
     // Junction-adjacent ends: `i` leaves its right (left) end when
     // `from_rc` is false (true); the link enters `to`'s left (right) end
     // when `to_rc` is false (true).
-    let (im, mi) = if l.from_rc {
-        (si.left_hi, si.median)
+    let (im, mi, it) = if l.from_rc {
+        (si.left_hi, si.median, si.left_tip_max)
     } else {
-        (si.right_hi, si.median)
+        (si.right_hi, si.median, si.right_tip_max)
     };
-    let (jm, mj) = if l.to_rc {
-        (sj.right_hi, sj.median)
+    let (jm, mj, jt) = if l.to_rc {
+        (sj.right_hi, sj.median, sj.right_tip_max)
     } else {
-        (sj.left_hi, sj.median)
+        (sj.left_hi, sj.median, sj.left_tip_max)
     };
     let hi = im as f32 >= 2.0 && mi as f32 >= 2.0 && im as f32 > REPEAT_RATIO * mi as f32;
     let hj = jm as f32 >= 2.0 && mj as f32 >= 2.0 && jm as f32 > REPEAT_RATIO * mj as f32;
-    let blocked = hi || hj;
+    // The SPAN quantile misses a very short repeat bridge (e.g. contig_24's
+    // ~30 bp bridge, exactly the (k_build-1)-mer overlap that forms the
+    // link), so the junction-adjacent tip max catches it: the shared
+    // overlap lifts only the last TIP windows to ~2x. Low-coverage unitigs
+    // are excluded (their tip max is noise-dominated).
+    let ti = mi as f32 >= 2.0 && it as f32 > REPEAT_RATIO * mi as f32;
+    let tj = mj as f32 >= 2.0 && jt as f32 > REPEAT_RATIO * mj as f32;
+    // A short-to-medium repeat bridge (30-200 bp, e.g. MG1655's ~137 bp
+    // relocation junction at ~1.4x) elevates the junction-adjacent tip
+    // windows of BOTH unitig ends below `REPEAT_RATIO`, so neither
+    // single-end check fires. Requiring the elevation on both ends at a
+    // lower ratio separates these real bridges from coverage noise, which
+    // rarely lifts both ends simultaneously. 1.25 (not 1.3): the Q25
+    // groups' copy of the same 137 bp bridge lands at 1.32/1.28, just
+    // under 1.3; 1.25 still stays above the noise floor (unblocked
+    // junctions cluster well below 1.2 on both ends).
+    const LOW_REPEAT_RATIO: f32 = 1.25;
+    let both_tips = mi as f32 >= 2.0
+        && mj as f32 >= 2.0
+        && it as f32 >= LOW_REPEAT_RATIO * mi as f32
+        && jt as f32 >= LOW_REPEAT_RATIO * mj as f32;
+    let blocked = hi || hj || ti || tj || both_tips;
     // Debug: report every junction between long-enough unitigs checked,
     // with the coverage ratio that decided it (to trace why a relocation
     // bridge survived).
@@ -859,7 +940,7 @@ fn is_repeat_bridge(i: usize, l: &Link, unitigs: &[Unitig], stats: &[ProbeStats]
         && unitigs[l.to].bases.len() >= 500
     {
         eprintln!(
-            "repeat-check {}->{} len={}x{} hi={} ({}x{}) hj={} ({}x{}) blocked={blocked}",
+            "repeat-check {}->{} len={}x{} hi={} ({}x{}) hj={} ({}x{}) ti={} ({}x{}) tj={} ({}x{}) blocked={blocked}",
             i,
             l.to,
             unitigs[i].bases.len(),
@@ -869,6 +950,12 @@ fn is_repeat_bridge(i: usize, l: &Link, unitigs: &[Unitig], stats: &[ProbeStats]
             mi,
             hj,
             jm,
+            mj,
+            ti,
+            it,
+            mi,
+            tj,
+            jt,
             mj
         );
     }

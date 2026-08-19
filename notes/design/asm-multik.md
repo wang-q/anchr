@@ -961,3 +961,501 @@ chain-per-master 调度（每 master 一条 chain 线程，按梯次序从 build
   化点），收益 <2 s，不值得增加复杂度；
 * 质量门禁与 G37 `--unitigs` 口径新发现见 `results/model_org.md`
   2026-08-17 深夜节（G37 P002 单组既有嵌合，与本节改动无关）。
+
+### 2026-08-19：两类短重复桥嵌合（MG1655 contig_137 / contig_38）
+
+MG1655 全链门禁（`/tmp/mg1655_full`）复现两处 relocation 嵌合，均由
+**短于一个 k-mer 窗口的保守重复桥**引起——junction 两侧的覆盖抬升低于
+`REPEAT_RATIO`，既有 `is_repeat_bridge`/60-mer 探针均漏检。两个修复：
+
+1. **100-mer 终局探针（`FINAL_PROBE_HALF=50`，`schedule.rs`）**：30 bp
+   共享重复（ref 857.7 kb 与 2589.6 kb 两拷贝，contig_137）使 60-mer
+   探针（repeat+单侧翼）仍能被真实位点 reads 支持而漏网；100-mer 探针
+   越过重复触达两侧唯一序列，嵌合 junction 无 reads 支持即被剪断。只用于
+   `finalize` 的终局 `bridge_filter`（bubble_merge 后重新验链）；逐轮
+   `split_by_bridge` 保持 60-mer，避免低覆盖（40x）组被 Poisson 噪声过切。
+2. **both_tips 检查（`graph.rs is_repeat_bridge`）**：97–137 bp 重复桥
+   （ref 921 kb 与 1097 kb 两拷贝，contig_38，Q0L0X40P005 u328→u389）
+   覆盖抬升仅 1.33–1.42×，低于 `REPEAT_RATIO=1.5` 且单端 tip 检查不触发；
+   但**两端** junction 邻接 tip 窗口同时抬升（≥1.3× 中位，实测 1.39/1.42×）。
+   覆盖噪声极少同时抬高两端，故要求 `mi,mj≥2` 且 `it≥1.3×mi` 且
+   `jt≥1.3×mj` 即可判别。分析脚本（/tmp/mg1655_fix_test/）显示该判据
+   仅多阻断 ~104 个 junction（1205 未阻断中），且几乎全为真重复桥。
+
+**验证**：Q0L0X40P005 用修复后二进制重跑 multik，PAF 比对确认无 unitig
+跨接 locusA(921022–925978)/locusB(1097522–1109457)——原 16755 bp 融合
+unitig_240 已断开，仅剩 3 个 106–122 bp 重复片段 unitig（整条即重复区，
+两拷贝各一短匹配，属正常）。MG1655 全链指标见
+`results/model_org.md` 2026-08-19 节。
+
+### 2026-08-20：Q25L60X80P001 unitig_411 轮内 progressive_filter 融合（未解决，会话交接）
+
+> 本节点记录 2026-08-20 凌晨的**未完成状态**，供新会话直接接续。当前
+> 工作树未提交的改动：`src/libs/asm/multik/{graph,master,schedule}.rs` +
+> 本文件（即 2026-08-19 两处修复，尚未 git commit）。
+
+**待办总览**（对应 todo：fullchain / gate / doc 均未完成）：
+
+1. **修 unitig_411 嵌合**（本节点关键遗留，机制见下）——未解决；
+2. **MG1655 全链重跑**——00:00 的重跑因 /tmp 磁盘配额失败，结论不可信；
+3. **G37 / DH5alpha 不回归验证**——未做；
+4. **更新 `results/model_org.md`**——未做。
+
+**unitig_411 嵌合的已查明事实**（分析脚本均在 `/tmp/q25p001/*.py`）：
+
+* **形态**：unitig_411 = 14990 bp = A 侧唯一尾 + ~137 bp 重复桥 + B 侧唯一头，
+  融合 locusA(921 kb)/locusB(1097 kb) 两拷贝（`trace_u411.py`：最终输出来自
+  k0=81 master 链 u69，与 unitig_411 逐字节一致）。
+* **融合点（关键）**：k0=81 master 的 k=91 轮中
+  `r81_k91_after_compact` 时 u278(A-only,4966)/u29(B-only,23839) 仍**分离**，
+  `after_prog` 已融合成 u14(28712,AB-fused) → **融合发生在
+  `progressive_filter` 内部 recompaction**（`graph.rs` 409–505 行，
+  486 行 recompact_graph；k0=41 轮同样在 r41_k51_after_compact 后融合，
+  对应 u293→u136）。
+* **为什么终局探针无效**：融合后 u14 是**单一 unitig、无 link 可查**，
+  `finalize` 里 100-mer 终局 `bridge_filter`（master.rs 434 行）只重验 link，
+  剪不到已融合的 unitig；`split_by_bridge`/`internal_repeat_bridge_split`
+  也都不触发（junction 窗口 60/100-mer 均有 reads 支持，且无覆盖尖峰）。
+  → **单纯把 `FINAL_PROBE_HALF` 调大（150/200-mer）不能解决本问题**。
+* **覆盖信号**：junction 两端 tip 覆盖为 0.71×/0.64× 中位（低于中位，
+  正常 unitig 末端 taper），`is_repeat_bridge` 的 hi/hj/ti/tj/both_tips
+  全部不触发。
+* **探针判别**（`analyze_junc2.py`，读长 150 bp，组内 80x）：
+  junction 处 60-mer supported=True、100-mer supported=True、
+  **150-mer supported=False**、200-mer supported=False → 150-mer 探针
+  能判嵌合，但必须用在**融合发生之前**（即轮内 recompact/prog 之前
+  验 link），不是 finalize。
+
+**候选修复方向**（未验证，需 A/B）：
+
+* A. 轮内 `progressive_filter` 的 recompact 前，用长探针（~150-mer）验一次
+  link（类似 finalize 的终局 bridge_filter，但提前到每轮 prog 前）。风险：
+  40x 组的真 junction 可能缺长探针支持而被过切，需先实测
+  Q25L60X80P001（80x，应可切）与 Q25L60X40P*（40x，防过切）两组对比。
+* B. 让 `progressive_filter`/`recompact_graph` 的融合被 reads-bridge 门控
+  （融合前判 chimeric link）。实现更侵入，先试 A。
+
+**MG1655 全链重跑现状（不可信，需重做）**：
+
+* 00:00 用修复后二进制跑了 `4_anchors.sh`，但 **/tmp 磁盘配额满**，
+  X80 组（Q0L0X80*/Q25L60X80*/Q30L60X80*）`anchr asm anchor` 全部失败
+  （`/tmp/mg1655_full/post_4_anchors.log` 显示 "Disk quota exceeded"），
+  X80 组无 anchor.fasta；`7_merge_anchors` 的 anchors.list 是陈旧混合的。
+* 即便如此 `9_quast`（00:00:16）显示 merge_anchors **0 mis**、N50 125881、
+  GF 98.531——但基于不完整/陈旧数据，**不能作为门禁结论**。
+* /tmp 现状：34G/45G（77%）；`du`：mg1655_full 16G、dh5alpha_full 15G、
+  mg1655_fix_test 1.6G、g37_full 995M、q25p001 592M。重跑前需先清盘。
+
+**下一步建议顺序**：
+
+1. 清理 /tmp（备份/删除分析残留）→ 释放空间；
+2. 实现/验证修复 A（轮内长探针验链），确认 Q25L60X80P001 不再出
+   unitig_411，且 40x 组不碎片化；
+3. MG1655 全链干净重跑（所有组含 X80）→ 7_merge → 9_quast 验证 0 mis；
+4. G37、DH5alpha 不回归验证（同样先看 /tmp 空间，dh5alpha_full 15G）；
+5. 更新 `results/model_org.md`（2026-08-19 两处修复 + 本次全链新指标）；
+6. git commit 未提交改动（graph/master/schedule.rs + 本文件）。
+
+---
+
+## 附：DH5alpha relocation 嵌合调查记录（并入自 `notes/audit/audit-asm-relocation-chimeras.md`，2026-08-20）
+
+> 维护约定（原 audit 文件）：本段是 DH5alpha 多组多 k 流程中 relocation 嵌合的完整
+> 调查快照。**任何后续尝试本问题的方案前，必须先读本段**，避免重复已完成/已排除的
+> 手段。命令级门禁数据以 `results/model_org.md` 为唯一权威；本段只记录调查过程与结论。
+
+### 1. 问题现象与目标
+
+**现象**：DH5alpha 13 组下采样链（模型门禁链）最终 `quast -m500` 报 **2 条 relocation
+misassemblies**（最初为 contig_3 / contig_18，之后演变为 contig_4 / contig_22）。
+
+**目标**：消除这 2 条 relocation 嵌合，使 misassemblies 降为 0（与 G37 / MG1655 基线一致）。
+
+**现状（2026-08-19）**：**misassemblies 已归 0**。`contig_4` 由 extend 低覆盖缝检查
+消除；`contig_22` 由 extend 跨 contig 所有权护栏消除（见 §3.5）；DH5alpha 残留的
+multik 层保守重复 relocation（unitig_76 / contig_18）由 `internal_repeat_bridge_split`
+**高覆盖 run 检测**消除（见 §10）。G37 / MG1655 MR 链 0 mis 无回归。
+
+### 2. 关键文件与当前改动（工作区未提交）
+
+| 文件 | 改动 | 作用 |
+|------|------|------|
+| `src/libs/asm/multik/graph.rs` | `internal_repeat_bridge_split`：从高覆盖尖峰(RATIO=4)改为**低覆盖缝**(LOW_RATIO=0.3, MIN_RUN=5, MAX_RUN=200, GAP=3, MIN_MEDIAN=8, SPAN=2000)；`is_repeat_bridge` 按 junction probe count / unitig 中位数覆盖率比(1.5x)阻断跨重复合并；`recompact_graph` 重复桥检测 | multik 内拆/阻断嵌合 |
+| `src/libs/asm/multik/master.rs` / `schedule.rs` | 31-mer 短 k 重复表（探测 SNP 型串联重复） | 捕获 k-长 k 表漏掉的重复桥 |
+| `src/libs/asm/extend.rs` | walk 覆盖率检查：`LOW_RATIO=0.3`, `MIN_LOW_RUN=5`, `contig_median_count()` | 连续≥5 步 k-mer 计数 < 0.3×中位数即回滚停止，阻断跨低覆盖缝延伸 |
+| `results/model_org.md` | DH5alpha 模板 `--unitigger` 去掉 `bcalm`、去掉非法 `--redo` | 模板修正 |
+
+### 3. 已尝试且最后被采纳的方案（有效）
+
+#### 3.1 multik 内部低覆盖缝切分（`internal_repeat_bridge_split`）
+- **v1 高覆盖尖峰**（4×median, FLANK 隔离检查）→ 过度切割，28 条 unitig 被切，
+  输出碎片化（最长 2.5 kb）→ 废弃。
+- **v2 低覆盖缝**（0.3×median）→ 每条仅切 4-5 处，保留 258 kb 大 unitig → 采纳。
+
+#### 3.2 重复桥阻断（`is_repeat_bridge` / `recompact_graph`）
+- junction probe count > 1.5× 该 unitig 中位数覆盖 → 视为重复桥，不合并。
+- 成功消除 MRX40P001 的 95 kb contig_18。
+
+#### 3.3 31-mer 短 k 重复表
+- 长 k 重复表漏掉 SNP 型串联重复；31-mer 表补上，阻断 MRX80P001 的 u4→u314 重复桥。
+
+#### 3.4 extend 低覆盖缝检查（采纳，消除 contig_4）
+- walk 连续 5 步计数 < 0.3×中位数即回滚，消除 `contig_4`。
+
+#### 3.5 extend 跨 contig 所有权护栏（2026-08-18 采纳，消除 contig_22 → 0 mis）
+- **根因**：contig_23 的 3' 端 walk 越过强覆盖保守重复区，接进远程 3922.2 kb 位点
+  （该序列已被同组 contig_19 装配占有）。接合处覆盖不低（74-104×），低覆盖检查
+  无效——这是真正的高覆盖保守重复区 relocation。
+- **实现**（`src/libs/asm/extend.rs`）：`cross_contig_kmers` 预建所有输入 contig 的
+  规范 k-mer 归属索引（`sole` = 仅属于单条 contig 的 k-mer → 其索引；`multi` = 出现
+  于 ≥2 条不同 contig 的 k-mer）。walk 每步检查新窗口：若 `multi` 含它、或其 `sole`
+  属主 ≠ 当前 contig（即 foreign），连续 ≥ `MIN_FOREIGN_RUN(5)` 步即回滚停止，去掉
+  进入他人领地的延伸（回滚到最后一个自属窗口）。
+- **验证**（`/tmp/dh5alpha_gate6`，仅重跑 MRX80P001 extend+anchor，其余 12 组复用
+  gate5 anchor）：**misassemblies 1 → 0**，N50 82.9 k 持平、contigs 119→122（无碎片化）、
+  Genome fraction 98.84 → 98.34（-0.5 pp，宁断勿错的覆盖代价，约 ~23 kb 唯一序列）。
+  local misassembly 2 者均为 1（既有，未新增）。
+- **回归门禁**（`/tmp/regress_extend.sh g37|mg1655`，仅改 extend.rs，其余步骤/数据不变，
+  复用各 pre-extend unitig，比较新旧二进制的 quast）：
+
+  | 数据集 | misassemblies | Genome fraction | N50 |
+  |--------|---------------|-----------------|-----|
+  | G37  基线 (gate) → 新 (gate2) | 0 → **0** | 97.979 → 97.743 (-0.24 pp) | 55170 → 48850 |
+  | MG1655 基线 (fix) → 新 (fix2) | 0 → **0** | 98.856 → 98.418 (-0.44 pp) | 96447 → 95499 |
+
+  两数据集 mis 均保持 **0**（不高于基线），未引入新错装；GF 代价 ~0.2-0.4 pp，
+  与 DH5alpha 的 -0.5 pp 同量级，属宁断勿错的覆盖代价，回归门禁通过。
+- **单测**：`stops_when_crossing_another_contig`（contig A 的 overhang 接进仅被 contig
+  B 占有的区域 → 截断）；现有 5 个单 contig 测试不受影响（sole/multi 为空）。
+
+### 4. 已排除的手段（不要重复）
+
+| 手段 | 结果 | 原因 |
+|------|------|------|
+| 调 multik `min_count_extend` | 无效 | 嵌合不源自 k-mer 阈值 |
+| 调 `probe_half` | 无效 | 同上 |
+| 重复区支持阈值 RATIO=1.5 + 130-mer probe | 失败 | 未消除嵌合 |
+| 高覆盖尖峰切分 v1 (RATIO=4, FLANK) | 碎片化严重 | 误切真实区域 |
+| `--cross-validate` 跨组 OLC `drop_cross_chimeras` | 无法消除 contig_22 | 嵌合嵌在**单个** anchor 内部，跨文件级校验无效 |
+
+### 5. 残差 contig_22 的根因（2026-08-18 定位）
+
+**起源链（MRX80P001）**，用 `/tmp/probe_real.fa`（4498.5 kb 位点 200bp probe）与
+`/tmp/probe_chi.fa`（3922.2 kb 位点 200bp probe）扫描各阶段：
+
+| 阶段 | 文件 | 结果 |
+|------|------|------|
+| multik | `MRX80P001/unitigs_all.fasta` | 仅 real，**干净**（unitig_125-130/216/217） |
+| per-group OLC | `MRX80P001/unitigs.fasta` contig_23 | 仅 real，干净 |
+| **per-group extend** | `MRX80P001/unitigs.ext.fasta` contig_23 | **同时含 real + chi + 嵌合在此形成** |
+| anchor | `MRX80P001/anchor.fasta` anchor_24_contig_23_173-64837 | 携带嵌合进后续 |
+| cross OLC+extend | `merge.fasta`→`merge.ext.fasta` | 在嵌合 anchor 上再 +1000 bp（两端各 500） |
+
+**结论**：嵌合由**单组 `asm extend`** 造成。contig_23 的 3' 端 k-mer walk 从真实位点
+延伸越过一个**强覆盖保守重复区**，接到远端 3922.2 kb 位点。
+
+**为什么低覆盖 seam 检查拦不住**：MRX80P001 是高覆盖样本（~80x），3922.2 kb 重复位点
+在它自己的 reads 中覆盖极高，接合处 k-mer 计数不低、有单一明确路径，**并非低覆盖 seam**。
+这与已消除的 contig_4 本质不同（contig_4 的接合位点在 MRX40P000 reads 中近零覆盖，故
+低覆盖检查生效）。这是真正的保守重复区强覆盖 relocation，单一覆盖率度量无法与正确延伸
+区分。
+
+**关联**：这正是 `results/model_org.md` 记载的 DH5alpha 跨组保守重复区 relocation 已知
+边界。G37/MG1655 基线为 0 不受影响。
+
+### 6. 后续方向（已实现跨 contig 所有权，见 §3.5）
+
+延伸 walk 进入已被其他 contig 占有的 k-mer 区判定为嵌合这一方向**已落地**（§3.5），
+跨 contig relocation 在 DH5alpha 上归零。以下为仍可考虑的保守化余量（勿在未 A/B 前
+直接改公式）：
+
+1. **重复上下文抑制**：extend 时检测 seed/延伸 k-mer 的多重性，在重复上下文中进一步
+   缩减延伸。当前跨 contig 所有权已等价覆盖大部分重复区场景，可作为更激进路线。
+2. **高覆盖样本保守化**：对高覆盖样本限制 `--max-extend` / 提升 `--min-support`。
+
+### 7. 手动分析脚本（/tmp，仅参考）
+
+- `/tmp/find_seq.py`：在 fasta 中精确检索序列子串，定位嵌合来源。
+- `/tmp/prof_terminal.py`：对 unitig 做 31-mer 覆盖剖面，找低覆盖缝。
+- `/tmp/map_tail.py`：将 unitig 3' 端按 24-mer seed 比对参考，定位嵌合接合。
+- `/tmp/scan_source.py`：确定嵌合 contig 的源组/unitig 归属。
+- 门禁链：`/tmp/dh5alpha_gate4/run.sh`、`/tmp/dh5alpha_gate5/run.sh`
+  （gate4=低覆盖缝 split 代码，gate5=含 extend 保守检查）、`/tmp/dh5alpha_gate6`
+  （含 extend 跨 contig 所有权；仅重跑 MRX80P001，其余组复用 gate5 anchor）。
+- quast 结果：gate5 `quast/report.tsv`（1 mis：contig_22）、gate6 `quast/report.tsv`
+  （**0 mis**）。
+
+### 8. 需更新的下游记录
+
+- 若最终接受 1 mis 或设法降 0，须把结论追加进 `results/model_org.md`（quast 参数保持
+  既有表格一致，禁止变更导致纵向对比失效）。
+- multik 低覆盖缝 / extend 保守检查的相关参数若继续调整，需按实验纪律在 G37 与 MG1655
+  上过质量门禁（misassemblies 不得高于基线 0）。
+
+### 9. 普世化结论：cv 默认关（2026-08-18）
+
+§3.5 的 extend 跨 contig 所有权护栏 + multik 低覆盖缝拆分（c9da0ce）在 DH5alpha 上
+归零错装，但这两类改动对 G37/MG1655 **无条件生效**，使单组 anchor 由基线 96 条增至
+~118 条（宁断勿错的覆盖代价）。A/B 验证（`/tmp/gate/`，结果已记入
+`results/model_org.md` 各数据集门禁节）：
+
+* multik 核心改动**必要且普世**：回退 multik 后 G37 N50 由 121.4K 降至 99.8K——低覆盖
+  缝拆分 + 31-mer 重复桥并非 DH5alpha 特设，而是通用的嵌合解析，保留；
+* `--cross-validate`（跨组 OLC 投票）在现行 anchor 上是**回归信号**：cv 把无 cv 口径下
+  参考连续（0 mis）的真 contig 拆成两段，G37 N50 121.4K→81.7K（-33%）、MG1655
+  110.5K→95.7K（-13%）、DH5alpha 99.5K→82.9K（-17%），三数据集同向；
+* **普世修复 = 模板默认关闭 cv**（`templates/7_merge_anchors.tera.sh`）：extend 跨 contig
+  护栏已在 anchor 层解决嵌合，cv 只对"多样本同群落"数据集按需开启。此改动不针对任何
+  数据集，三数据集 N50 均恢复且 mis 保持 0。
+
+### 10. multik 高覆盖保守重复 run 检测（2026-08-19，消除 unitig_76 / contig_18）
+
+#### 10.1 根因：internal_repeat_bridge_split 只切低覆盖，漏高覆盖保守重复桥
+
+`internal_repeat_bridge_split`（§3.1 的 v2 低覆盖缝）只切割 `LOW_RATIO=0.3` 的窄低
+覆盖 run。但 DH5alpha contig_18 / unitig_76 是**另一类**嵌合：通过 ~1 kb 保守重复区
+连接参考上相距 **48,378 bp** 的两个位点（此处正是旧 audit §5 记录的 48378/1338
+relocation），接合处覆盖率是**该 unitig 中位数的 ~2×**（两个基因组拷贝都被 reads
+覆盖），低覆盖检测不触发 → 嵌合在多 k master 的 finalize 阶段保留，`olc`/extend 无法
+再解除。
+
+#### 10.2 修复：新增高覆盖 run 切割（普世机制，非数据特调）
+
+在 `internal_repeat_bridge_split`（`src/libs/asm/multik/graph.rs`）原有低覆盖 run 切割
+之外，增补对**宽内部升高 run** 的切割：
+
+- 阈值：`HI_RATIO=1.5`、`MIN_HI_RUN=250`、`MAX_HI_RUN=3000`、`HI_GAP=3`（对照低覆盖
+  分支的 `LOW_RATIO=0.3` / `MIN_RUN=5` / `MAX_RUN=200` / `GAP=3`）。
+- 切点落在升高区内部，使每个切口**两端各保留 >5% 的 SPAN 窗口仍呈升高电平**，供
+  re-compaction 的 `is_repeat_bridge`（§3.2）看到重复端并被阻断，避免重熔嵌合。
+- 只放宽 run 宽度（窄升高视为噪声），端区不切，宽度用中位数界定——保持通用。
+
+#### 10.3 门禁（三数据集 MR 链全 0 mis，已记入 results/model_org.md）
+
+修复后 binary 全链复跑（/tmp/dh5alpha_full、/tmp/g37_full、/tmp/mg1655_full；
+multik --all-masters auto 31..192 → olc --unitigs → extend → anchor → 跨组 merge，
+无 cv），QUAST `--min-contig 100`，merge_mr_multik：
+
+| Dataset  | # contigs | Largest |  Total |    N50 | # mis |   GF% |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: |
+| DH5alpha（修复前） | 113 | 258601 |  4557959 |  102446 | 1 | 97.943 |
+| DH5alpha（修复后） | 116 | 258601 |  4559551 |  102446 | 0 | 97.962 |
+| G37（修复后） | 17 | 187458 | 586244 | 121369 | 0 | 98.666 |
+| MG1655（修复后） | 102 | 268273 | 4584693 | 117787 | 0 | 98.360 |
+
+- DH5alpha mis 1→0（contig_18 消除），N50 102446 不变、GF +0.019 pp——高覆盖切割
+  未伤正常组装；
+- G37 / MG1655 **无回归**：G37 N50 121369 ≈ 无 cv 基线 121382；MG1655 与 statQuast
+  逐项一致（102 / 117787 / 98.360 / 0 mis）——两者无此类嵌合，切割不触发或等价；
+- 只改 `multik/graph.rs` `internal_repeat_bridge_split`，未动 `is_repeat_bridge` /
+  `schedule` / `master`。
+
+#### 10.4 教训（勿重复）
+
+- **错装判定必须以 quast 为准**：曾用 `check_chimera`（L/R/CORE 探针命中）判"7 个
+  嵌合体"，实为探针取自重复区导致的误报——unitig_20/21/22/23/35/76/79 全部**单比对**
+  参考（minimap2）、覆盖剖面无固定高覆盖 run，quast 0 mis。
+- 覆盖剖面（`prof_multi` 31-mer）与 read-bridge（`verify_seam`）只作假设来源：DH5alpha
+  这类保守重复嵌合接合处覆盖正常且 reads 区间连续，覆盖/桥接启发式均无普世特征，
+  最终靠**高覆盖 run 切割 + is_repeat_bridge 阻断**组合解决。
+
+---
+
+## 附：自 results/model_org.md 移入的调试/归因记录（2026-08-20）
+
+> 以下章节原位于 `results/model_org.md`，属对比/归因/cv 回归等调试记录而非权威
+> 门禁数字表，按约定迁入本设计文档。命令级门禁数据仍以 `results/model_org.md`
+> 为唯一权威。
+
+### g37: unitig / bcalm / multik 三链对比（2026-08-16）
+
+同一批 G37 reads 上，唯一变量是 unitigger：`asm multik`（每主 K
+31..81 构建骨架、更大 k 验证、跨主 K 合并）vs `asm unitig`（自研 BCALM
+语义，每 k 独立 unitigs）vs 外部 bcalm（K = 31..81），下游
+anchor / OLC 合并参数完全相同。
+
+#### 最终合并（QUAST，merge 链）
+
+| 指标        | multik | unitig | bcalm |
+| :---------- | -----: | -----: | -----: |
+| # contigs   |  **15** |    19 |    19 |
+| N50         | **55,098** | 48,853 | 48,853 |
+| Largest     | **179,712** | 107,330 | 107,330 |
+| # misassemblies | 0 | 0 | 0 |
+| GF%         | **96.997** | 96.970 | 96.970 |
+| mm/100 kbp  |   76.44 |  77.37 |  77.37 |
+
+#### 结论
+
+* **multik 全面占优**：N50 比 unitig/bcalm 高 13%（55.1K vs 48.9K），
+  contigs 更少（15 vs 19），三链均 0 mis——与 MG1655 的结论一致
+  （N50 +42%，见 `notes/benchmarks/mg1655-unitig-bcalm-multik.md`）；
+* **unitig 与 bcalm 等价**：N50 / contigs / GF 完全一致（`asm unitig`
+  是 bcalm 的 Rust 复刻，自研可替代外部依赖）；
+* **merge 链（MR）同样如此**：multik 55.0K vs unitig/bcalm 48.8K；
+* **mm/100k 三链一致（76-77）**：来自 reads 与参考 NC_000908 的系统性
+  差异，与组装链无关；spades 系（222-300）明显更高。
+
+### g37: 新链（2026-08-16 追加：K128 + 气泡合并 + extend --min-len 1000 + min-contig-len 200）
+
+模板 multik 分支自 2026-08-16 起自动包含：主 K `31..121 128 160`（6_ MR
+链；4_ 链 `31..91`，bcalm 分支 `31..121`）、multik 气泡合并（默认
+`--merge-similar 0.95 --merge-len 20`）、olc `--min-contig-len 200`（仅
+multik 分支，bcalm/unitig 分支保持 1000）、`asm extend --min-len 1000`
+（短于 1000 bp 的 contig 不延伸，避免重复区嵌合）。详细机制与中间实验见
+`notes/benchmarks/g37-megahit-spades.md` §7/§8/§10。
+
+7 组 MR（MRX40P000-004 + MRX80P000-001）QUAST（新链 = 31..128+160 +
+气泡合并 + extend --min-len 1000 + min200）：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup | N/100k | mm/100k | indel/100k |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: | -----: | ------: | ---------: |
+| merge_mr_multik（旧，K31..81） | 17 | 114442 | 565518 |  55049 | 0 | 96.963 | 1.003 | 0.00 | 77.46 | 19.14 |
+| merge_mr_multik（新链） | 13 | 236494 | 583630 | 121532 | 0 | 98.849 | 1.000 | 0.00 | 226.03 | 66.37 |
+| mr_spades（旧运行） |  2 | 580506 | 580632 | 580506 | 0 | 100.000 | 1.001 | 0.00 | 300.77 | 91.64 |
+| mr_megahit（旧运行） | 44 | 319186 | 599025 | 319186 | 3 | 99.893 | 1.025 | 0.00 | 311.14 | 88.39 |
+
+要点：
+* 新链 N50 55.0K→**121.5K**（+121%）、GF 96.963→**98.849%**、**0 mis
+  保持**，并跨复制起点接出 236.5K 最大 contig；K160 长 unitig 层提升
+  N50，配合 indel 容忍的近重复合并（banded identity）Dup 1.000；
+* mm/100k 上升（77→226）是 QUAST 对参考的口径问题：新覆盖集中在低复杂
+  区，reads 与 NC_000908 在那里差异 ~5%，consensus 忠实反映 reads
+  （reads-vs-contigs 一致率 99.96%）；bwa 口径下真缺口仅 ~1.6K bp；
+* QUAST minimap 会漏对齐低复杂度区短 contig，报告的未覆盖 bp 偏大。
+
+### mg1655: multik vs bcalm 对照（2026-08-15）
+
+同一批 `6_down_sampling` reads（MRX40P000/P001/P002 + MRX80P000/P001，
+5 组），唯一变量是 unitigger：`asm multik` vs `asm unitig`（自研 BCALM
+语义）vs 外部 bcalm（每 k 31..81 独立 unitigs + `asm olc --unitigs` 跨 k
+合并），下游 anchor/OLC 合并参数完全相同。
+
+#### unitig / anchor 阶段（N50 / 条数 / Sum）
+
+| 组        | multik unitigs | unitig unitigs | bcalm unitigs |
+| --------- | -------------: | -------------: | ------------: |
+| MRX40P000 |  21238 / 1455  |  61235 / 131   |  56477 / 142  |
+| MRX40P001 |  19872 / 1455  |  61235 / 129   |  54908 / 147  |
+| MRX40P002 |  21238 / 1455  |  59716 / 130   |  57961 / 143  |
+| MRX80P000 |  19331 / 1525  |  53834 / 158   |  42412 / 194  |
+| MRX80P001 |  20068 / 1525  |  50795 / 163   |  42234 / 195  |
+
+multik 的 unitigs 比 bcalm/unitig 短约 2.5-3 倍、条数多约 9-11 倍；
+`asm unitig`（自研）与 bcalm 等价且略优；两链 anchor Sum ≈ 4.53M，比
+multik 的 4.47M 更接近基因组。
+
+#### 最终合并（`asm olc --unitigs`，5 组合并）与 QUAST
+
+| 指标      | unitig 链（自研） | bcalm 链（现代） | multik 链（现代，同输入） | legacy bcalm | legacy merge_anchors |
+| --------- | ----------------: | ---------------: | ------------------------: | ------------: | --------------------: |
+| # contigs |               102 |              108 |                       317 |           101 |                   103 |
+| N50       |           105,719 |           95,478 |                    23,403 |        78,596 |                95,484 |
+| Largest   |          246,019 |          202,937 |                    73,030 |       174,107 |               204,605 |
+| # mis     |                 1 |                1 |                         4 |             0 |                     0 |
+| GF%       |            97.77 |            97.77 |                     96.44 |         97.26 |                 97.67 |
+| Dup       |           1.000 |           1.001 |                      1.003 |         1.000 |                  1.000 |
+| mm/100k   |            0.27 |            0.04 |                      0.18 |          0.00 |                  0.40 |
+| indel/100k|            0.29 |            0.23 |                      0.02 |          0.02 |                  0.13 |
+
+结论：N50 差距基本全部来自 unitig 阶段——`asm unitig` 链（105.7K）与
+bcalm 链（95.5K）都追平并超过 legacy（95.5K），multik 只有 23.4K；mis
+从 multik 的 4 降到 unitig/bcalm 链的 1（legacy 0）；`asm unitig` 与外部
+bcalm 等价（自研可替代外部依赖）。
+
+#### multik k0 修复（2026-08-15 追加）
+
+multik 碎片化的根因是 pass 0 骨架冻结在 k0（21/31）：迭代轮只验证/合并
+k0 的图，从不重新组装（单跑 `asm unitig -k 81` 有 53.5K/705 条，multik
+迭代却输出 21K/1455 条）。`auto_ks` k0 从 `N50/10` 改为 `N50/3`
+（clamp 31..51）后，MG1655 5 组 k0=51 全链：unitig N50 46-60K（原
+19-21K）、merge N50 **65.8K**（原 23.4K，128 contigs）、GF 97.36%
+（原 96.44）、Dup 1.000；mis 仍 4（重复区/环状 quast 误报 + merge 阶段
+重复序列 exact-overlap 错连，机制分析见 `todo.md`，未修）。
+
+#### Dup 修复（2026-08-15 追加）
+
+原两链 Dup 1.07-1.08 偏高：anchor 阶段无近似重复 contig，重复由
+`asm olc --unitigs` 跨组合并产生（跨组 anchors 边界不一致，exact overlap
+检测连不上，残留同区域不同边界的 contig 对）。`asm olc` 现在在 consensus
+后增加近似 overlap 合并（`consensus::merge_overlapping_contigs`：31-mer
+定位主导 offset + 头部锚定 + 重叠区 ≥99% 一致才合并，嵌合 contig 的
+多块对齐被拒绝）：unitig 链 Dup **1.079 → 1.000**、bcalm 链 **1.068 →
+1.001**，GF 97.77% 不变，unitig 链 N50 105.7K → 110.2K（93 contigs），
+bcalm 链 N50 95.5K → 88.1K（102 contigs）。mis 仍为 1（contig_26
+relocation，嵌合修复属另一任务）。
+
+### mg1655: 新链处理与对比（2026-08-16 追加）
+
+同一批 5 组 MR reads（`6_down_sampling/MRX40P000/P001/P002` +
+`MRX80P000/P001`），当前 multik 链（K31..121+128+160 + 气泡合并 + extend
+`--min-len 1000` + `--min-contig-len 200`）QUAST：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup | N/100k | mm/100k | indel/100k |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: | -----: | ------: | ---------: |
+| 新 multik 链（5 组） | 90 | 268333 | 4584494 | 123988 | 0 | 98.523 | 1.002 | 0.00 | 0.22 | 0.09 |
+| 旧 multik 链（同 5 组，K31..81） | 107 | — | — | 95478 | 0 | 97.61 | ~1.00 | — | — | — |
+| merge_mr_multik（旧运行，全组） | 317 | 73037 | 4527602 | 23594 | 5 | 96.49 | 1.011 | 0.00 | 0.24 | 0.02 |
+| spades（旧运行） | 125 | 224028 | 4572988 | 125607 | 0 | 98.47 | 1.000 | 0.00 | 0.74 | 0.17 |
+| mr_spades（旧运行） | 152 | 284843 | 4588125 | 148607 | 0 | 98.64 | 1.002 | 0.00 | 0.92 | 0.17 |
+| megahit（旧运行） | 273 | 175838 | 4588105 | 43891 | 92 | 98.26 | 1.004 | 0.00 | 3.73 | 0.50 |
+| mr_megahit（旧运行） | 138 | 311797 | 4611104 | 126312 | 2 | 98.89 | 1.004 | 0.00 | 2.13 | 0.26 |
+
+要点（详细分析见 `notes/benchmarks/mg1655-process-compare.md`）：
+* 新链 N50 95.5K→**124.0K**（+30%）、GF 97.61→**98.523%**、**0 mis**；
+  同 5 组输入口径下已超过 megahit（82.8K / 1 mis）并与 spades 持平，
+  仅 mr_spades（148.6K，全量输入）更高；
+* **extend 必须 `--min-len 1000`**：extend 短碎片会把 1.2 Mb 处重复元件
+  拷贝接成嵌合体（238 bp 碎片被长成 1,238 bp relocation，3 mis）；加门槛
+  后 0 mis（G37 同步验证）；
+* 处理过程中顺带修复 `asm olc` consensus 的 O(n²×L) 性能瓶颈（种子索引
+  预筛，输出逐位一致），MG1655 单组 9 主池从数小时降到 3 分钟。
+
+### mg1655: 现行代码门禁复现与 cv 回归（2026-08-18 追加）
+
+extend 跨 contig 所有权护栏合入、模板参数更新（`--parallel 16`、
+`--unitigger "multik unitig"`）后复跑 5 组 MR 门禁链，跨组 merge 做
+cv 开/关 A/B（`/tmp/gate/gate_run.sh mg1655 ...`，结果在 `/tmp/gate/mg1655/`）：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: |
+| 5 组 merge + cross-validate（现行） | 114 | 268272 | 4570176 |  95706 | 0 | 98.325 | 1.001 |
+| 5 组 merge（无 cv） | 107 | 268272 | 4632159 | 110467 | 0 | 98.346 | 1.015 |
+| 08-17 门禁基线（无 cv） |  90 | 268842 | 4624071 | 118731 | 0 | 99.072 | 1.005 |
+
+要点：
+* **mis 保持 0**（质量门禁通过），cv 开/关均 0 mis；
+* 无 cv N50 110.5K vs 08-17 基线 118.7K（-7%）、GF -0.73 pp：差异来自
+  **c9da0ce（DH5alpha relocation 修复）** 合入后单组 anchor 更碎
+  （~118 条/组 vs 基线 96 条）——multik 核心改动（内部低覆盖缝拆分 +
+  31-mer 重复桥）+ extend 护栏，与 DH5alpha 门禁记录的护栏代价同向；
+  单组 multik 输出与基线字节级一致（见 G37 节根因）；
+* **cv 仍是回归信号**：cv 把无 cv 的 110.5K N50 进一步降到 95.7K
+  （-13%），与 G37 一样在现行 anchor 上拆分真连接——08-18 上节"cv
+  中性"记录基于 c9da0ce 前的 anchor，合入后不再成立；
+* 复现：全链在 `/tmp/gate/mg1655/`（6_unitigs_multik/、
+  7_merge_mr_unitigs_multik/、9_quast_gate/、cv_test/）。
+
+### dh5alpha: 现行代码门禁复现（2026-08-18 追加）
+
+`--parallel 16`、`--unitigger "multik unitig"` 参数更新后复跑 13 组 MR
+门禁链（multik --all-masters auto 31..160 → olc → extend → anchor → 跨组
+merge，cv 开/关 A/B），`/tmp/gate/gate_run.sh dh5alpha ...`，结果在
+`/tmp/gate/dh5alpha/`：
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: |
+| 13 组 merge + cross-validate（现行） | 123 | 258601 | 4502677 |  82876 | 0 | 97.915 | 1.003 |
+| 13 组 merge（无 cv） | 117 | 258601 | 4505173 |  99473 | 0 | 97.942 | 1.004 |
+| 08-18 上节门禁（cv + 护栏） | 122 | 259019 | 4581642 |  82991 | 0 | 98.342 | 1.016 |
+
+要点：
+* **mis 保持 0**（质量门禁通过）；N50 82.9K 与上节门禁（82.9K）一致、
+  Largest 258.6K vs 259.0K（0.2% 差）——现行代码复现 DH5alpha 门禁；
+* GF 97.915 vs 98.342（-0.43 pp）、Total -79K：本节 13 组全部重跑（上节
+  仅重跑 MRX80P001、其余复用 gate5 anchor），少量 contig 级差异，非错装；
+* cv 开/关：N50 82.9K vs 99.5K（-17%）——与 G37/MG1655 同向的 cv 代价，
+  DH5alpha 门禁本就以 cv 口径记录，属预期（重复区 relocation 被护栏消除后
+  的 cv 剩余代价）；
+* 复现：全链在 `/tmp/gate/dh5alpha/`（6_unitigs_multik/、
+  7_merge_mr_unitigs_multik/、9_quast_gate/、cv_test/）。

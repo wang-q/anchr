@@ -65,6 +65,24 @@ pub(crate) struct RollCanon {
     rc: TdKmer,
 }
 
+/// Debug trace: dumps the final merged chains (FASTA) to
+/// `$ANCHR_MULTIK_TRACE_DIR/<tag>.fa` so an external tool can follow a
+/// junction into the output unitigs. No-op when the env var is unset.
+fn trace_chains(tag: &str, chains: &[MultikUnitig]) {
+    use std::io::Write;
+    let Some(dir) = std::env::var_os("ANCHR_MULTIK_TRACE_DIR") else {
+        return;
+    };
+    let path = std::path::Path::new(&dir).join(format!("{tag}.fa"));
+    let mut f = std::fs::File::create(&path).unwrap();
+    for (i, u) in chains.iter().enumerate() {
+        writeln!(f, ">u{i} len={} cov={:.1}", u.bases.len(), u.coverage).unwrap();
+        for chunk in u.bases.chunks(100) {
+            writeln!(f, "{}", String::from_utf8_lossy(chunk)).unwrap();
+        }
+    }
+}
+
 /// Debug trace: dumps the current unitig graph (FASTA + link lines) to
 /// `$ANCHR_MULTIK_TRACE_DIR/<tag>.fa` so an external tool can follow a
 /// junction across the rounds. No-op when the env var is unset.
@@ -330,10 +348,13 @@ impl Master {
     /// Final steps after the last validation round: split unitigs at
     /// reads-unsupported windows, re-verify links, merge bubbles, clean
     /// tips/weak links, and compact validated chains into the output.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn finalize(
         &mut self,
         probe: &RefineTable,
         probe_half: usize,
+        final_probe: &RefineTable,
+        final_probe_half: usize,
         repeat: &RefineTable,
         repeat_k: usize,
         opts: &MultikOptions,
@@ -400,6 +421,24 @@ impl Master {
             20.0,
         );
         weak_link_remover(&mut self.unitigs, &mut self.links, 0.05);
+        // bubble_merge recomputes every link from raw (k_build-1)-mer
+        // overlaps after the reads-bridge validation above, so a link that
+        // joins two distant loci through a short shared repeat (a k-mer
+        // present in both copies, e.g. MG1655's 30-mer bridge) can slip in
+        // without bridging reads. Re-verify before the final compaction;
+        // is_repeat_bridge cannot catch such a junction because the shared
+        // stretch is shorter than one k-mer window, so the junction never
+        // shows elevated coverage above REPEAT_RATIO. The long probe (see
+        // [`FINAL_PROBE_HALF`]) reaches the unique sequence on both sides
+        // of the repeat, so the chimeric junction has no read support.
+        bridge_filter(
+            &self.unitigs,
+            &mut self.links,
+            final_probe,
+            k0,
+            final_probe_half,
+            2,
+        );
         trace_graph(&format!("f{k0}_premerge"), &self.unitigs, &self.links);
 
         // Final compaction: merge validated chains into long unitigs.
@@ -411,6 +450,7 @@ impl Master {
             Some(repeat),
             repeat_k,
         )?;
+        trace_chains(&format!("f{k0}_chains"), &chains);
         chains.extend(
             std::mem::take(&mut self.carried)
                 .into_iter()

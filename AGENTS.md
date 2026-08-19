@@ -110,10 +110,8 @@
 
 ### 质量红线（组装类改动）
 
-- 任何触碰 `src/libs/asm/` 的改动，合入前必须在基准数据集上过质量门禁：
-  G37 与 MG1655 全流程 quast 对比，**错装数（# misassemblies）不得高于
-  `results/model_org.md` 中记录的基线**（两者均为 0）；GF/N50 变化以带
-  日期小节追加到对应数据集下。
+- 任何触碰 `src/libs/asm/` 的改动，合入前必须在基准数据集 `results/model_org.md`  上过质量门禁：
+  G37, MG1655 与 dh5alpha 全流程 quast 对比，**错装数（# misassemblies）必需为 0；GF/N50 变化也不应该过大。
 - 禁止未经 A/B 验证就替换启发式公式/默认参数（如 auto 阶梯、阈值）。
   历史经验证的配置优先于"看起来更合理"的公式。
 

@@ -17,6 +17,19 @@ use rayon::prelude::*;
 /// shows the double coverage. Matches the ladder floor.
 const REPEAT_K: usize = 31;
 
+/// Longer reads-only probe (FINAL_PROBE_HALF*2-mer) for the final
+/// bridge_filter only. A short repeat bridge shorter than one short-k
+/// window (e.g. MG1655's 30 bp shared repeat) raises only the
+/// junction-adjacent windows to ~1.4-1.5x the unitig median — under
+/// `REPEAT_RATIO` — and the 60-mer junction probe (repeat + one flank) is
+/// still read-supported at the real locus, so both checks miss it. The
+/// 100-mer probe reaches the unique sequence on both sides of the repeat
+/// (probe_half 50 > 30), so the chimeric junction has no read support and
+/// the link is pruned. Only the final link re-verification uses it;
+/// `split_by_bridge` keeps the 60-mer so low-coverage (40x) groups are
+/// not over-cut by Poisson noise (see `notes/design/asm-multik.md` §7).
+const FINAL_PROBE_HALF: usize = 50;
+
 /// Pass-0 assemble options (BCALM graph3 semantics, same fast paths as the
 /// `asm unitig` command: super-mer counting, adaptive minimizer length, and
 /// the DFA-state walk engine).
@@ -94,6 +107,17 @@ pub(crate) fn assemble_one(
             t.elapsed().as_secs_f64()
         );
     }
+    // Longer reads-only table for the final link re-verification only (see
+    // [`FINAL_PROBE_HALF`]).
+    let t = std::time::Instant::now();
+    let final_probe_table = RefineTable::build_supermer_slices(&read_seqs, FINAL_PROBE_HALF * 2)?;
+    if timing {
+        eprintln!(
+            "final probe table k={} build: {:.3}s",
+            FINAL_PROBE_HALF * 2,
+            t.elapsed().as_secs_f64()
+        );
+    }
     // Reads-only short-k table for repeat-bridge gating during recompaction
     // (see [`REPEAT_K`]); only the reads themselves, built once like the
     // probe.
@@ -140,7 +164,15 @@ pub(crate) fn assemble_one(
         )?;
     }
     let t = std::time::Instant::now();
-    master.finalize(&probe_table, probe_half, &repeat_table, REPEAT_K, opts)?;
+    master.finalize(
+        &probe_table,
+        probe_half,
+        &final_probe_table,
+        FINAL_PROBE_HALF,
+        &repeat_table,
+        REPEAT_K,
+        opts,
+    )?;
     if timing {
         eprintln!("master k0={k0} finalize: {:.3}s", t.elapsed().as_secs_f64());
     }
@@ -182,6 +214,7 @@ pub(crate) fn assemble_all_masters(
         // no cache, so memory stays at ~one table regardless of |ks|.
         let probe = RefineTable::build_supermer_slices(&read_seqs, probe_len)?;
         let repeat = RefineTable::build_supermer_slices(&read_seqs, REPEAT_K)?;
+        let final_probe = RefineTable::build_supermer_slices(&read_seqs, FINAL_PROBE_HALF * 2)?;
         let mut guide_master = {
             let t = RefineTable::build_supermer_slices(&read_seqs, ks[0])?;
             Master::pass0(&t, ks[0], opts)
@@ -190,7 +223,15 @@ pub(crate) fn assemble_all_masters(
             let t = RefineTable::build_supermer_slices(&read_seqs, k)?;
             guide_master.round(k, &t, &probe, probe_half, &repeat, REPEAT_K, opts)?;
         }
-        guide_master.finalize(&probe, probe_half, &repeat, REPEAT_K, opts)?;
+        guide_master.finalize(
+            &probe,
+            probe_half,
+            &final_probe,
+            FINAL_PROBE_HALF,
+            &repeat,
+            REPEAT_K,
+            opts,
+        )?;
 
         // Guide pseudo-reads: each contig repeated to the solid threshold
         // (the same records `--guide-contigs` writes as a FASTA infile).
@@ -210,6 +251,7 @@ pub(crate) fn assemble_all_masters(
         seqs_with_guide.extend_from_slice(&guide_seqs);
         let probe2 = RefineTable::build_supermer_slices(&seqs_with_guide, probe_len)?;
         let repeat2 = RefineTable::build_supermer_slices(&seqs_with_guide, REPEAT_K)?;
+        let final_probe2 = RefineTable::build_supermer_slices(&seqs_with_guide, FINAL_PROBE_HALF * 2)?;
         let mut masters: Vec<Master> = Vec::new();
         for &k in ks.iter().skip(1) {
             let table = RefineTable::build_supermer_slices(&seqs_with_guide, k)?;
@@ -233,7 +275,17 @@ pub(crate) fn assemble_all_masters(
         // in ladder order to keep the byte stream deterministic.
         masters
             .par_iter_mut()
-            .try_for_each(|m| m.finalize(&probe2, probe_half, &repeat2, REPEAT_K, opts))?;
+            .try_for_each(|m| {
+                m.finalize(
+                    &probe2,
+                    probe_half,
+                    &final_probe2,
+                    FINAL_PROBE_HALF,
+                    &repeat2,
+                    REPEAT_K,
+                    opts,
+                )
+            })?;
         for m in &mut masters {
             out.append(&mut m.out);
         }
@@ -256,6 +308,9 @@ pub(crate) fn assemble_all_masters(
         let repeat_cell: std::sync::OnceLock<
             anyhow::Result<RefineTable, std::sync::Arc<anyhow::Error>>,
         > = std::sync::OnceLock::new();
+        let final_probe_cell: std::sync::OnceLock<
+            anyhow::Result<RefineTable, std::sync::Arc<anyhow::Error>>,
+        > = std::sync::OnceLock::new();
         let masters: Vec<Master> = std::thread::scope(|scope| -> anyhow::Result<Vec<Master>> {
             type TableLane = std::sync::mpsc::SyncSender<std::sync::Arc<RefineTable>>;
             type ChainLane = std::sync::mpsc::Receiver<std::sync::Arc<RefineTable>>;
@@ -266,6 +321,7 @@ pub(crate) fn assemble_all_masters(
             let read_seqs_ref = &read_seqs;
             let probe_cell_ref = &probe_cell;
             let repeat_cell_ref = &repeat_cell;
+            let final_probe_cell_ref = &final_probe_cell;
             let builder = scope.spawn(move || -> anyhow::Result<()> {
                 // Build reads tables on the worker pool with a bounded
                 // lookahead window (building + buffered tables beyond `next`)
@@ -367,6 +423,20 @@ pub(crate) fn assemble_all_masters(
                             cell.as_ref()
                                 .map_err(|e| anyhow::anyhow!("repeat table: {e}"))
                         };
+                        // Longer reads-only table for the final link
+                        // re-verification (shared OnceLock), built on first
+                        // finalize (see [`FINAL_PROBE_HALF`]).
+                        let final_probe = || -> anyhow::Result<&RefineTable> {
+                            let cell = final_probe_cell_ref.get_or_init(|| {
+                                RefineTable::build_supermer_slices(
+                                    read_seqs_ref,
+                                    FINAL_PROBE_HALF * 2,
+                                )
+                                .map_err(std::sync::Arc::new)
+                            });
+                            cell.as_ref()
+                                .map_err(|e| anyhow::anyhow!("final probe table: {e}"))
+                        };
                         let mut master: Option<Master> = None;
                         // Only the top-of-ladder master needs the final
                         // table (for `cut`); other chains drop each table
@@ -411,7 +481,15 @@ pub(crate) fn assemble_all_masters(
                             }
                         }
                         let t = std::time::Instant::now();
-                        master.finalize(probe()?, probe_half, repeat()?, REPEAT_K, opts)?;
+                        master.finalize(
+                            probe()?,
+                            probe_half,
+                            final_probe()?,
+                            FINAL_PROBE_HALF,
+                            repeat()?,
+                            REPEAT_K,
+                            opts,
+                        )?;
                         if timing {
                             eprintln!(
                                 "master k0={k0} finalize: {:.3}s chain: {:.3}s",
