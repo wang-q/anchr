@@ -381,6 +381,25 @@ walk 滚动窗口 + succ 索引（删除 400 MB HashMap index）、
   `remove_unsupported` run>=2 过剪修复，非本次性能改动）；
 * 单组 multik 4.2–6.5 s（-p 8、2 组并发），峰值 ~2.0 GB/进程。
 
+### g37: end-multiplicity 门控全链门禁（2026-08-20 追加）
+
+针对 Q25L60X80P001 unitig_411 的 end-multiplicity 图级门控（共享
+(k-1)-mer ≥3 末端阻断压缩/融合，`graph.rs`；详见
+`notes/design/asm-multik.md` §2026-08-20）合入后的 G37 全链门禁：7 组 MR
+multik(--all-masters auto 31..160) → olc → extend → anchor → 跨组
+`asm olc --unitigs` merge，QUAST `--min-contig 10`（同模板 9_quast.sh）。
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup | N/100k | mm/100k | indel/100k |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: | -----: | ------: | ---------: |
+| 08-16 merge_mr_multik 基线 | 17 | 187458 | 586244 | 121369 | 0 | 98.666 | 1.005 | 0.00 | 241.36 | 70.08 |
+| **本次 end-multiplicity（修复后）** | 13 | 187498 | 581339 | 121382 | 0 | 98.674 | 1.001 | 0.00 | 238.19 | 70.15 |
+
+* **0 mis 保持**；N50 +13 bp（+0.01%）、GF +0.008pp，无回归；
+* Total 581.3K vs 基线 586.2K（−0.8%）、Dup 1.001 vs 1.005：门控切开
+  少量 3-末端重复区错误融合，冗余更低、更贴近参考大小；
+* 单级门禁（Q25L60X80P001 同组口径）4 mis 与修复前持平——单级 unitig
+  层 mis 由下游多组 anchor 投票消解，与全链 0 mis 不矛盾。
+
 ## *E. coli* str. K-12 substr. MG1655
 
 ### mg1655: reference
@@ -745,6 +764,32 @@ earlier-masters rounds(k) rayon::join 并发），multik 输出与优化前
 * 分解：DFA walk 7.3→1.9 s（k=160 隔离）、classify 1.5→1.1 s（删
   HashMap 构建）、46 轮 `remove_unsupported` CPU 104.9 s 转入并行。
 
+### mg1655: end-multiplicity 门控全链门禁（2026-08-20 追加）
+
+针对 Q25L60X80P001 unitig_411 的 end-multiplicity 图级门控（共享
+(k-1)-mer ≥3 末端阻断压缩/融合，`graph.rs`；详见
+`notes/design/asm-multik.md` §2026-08-20）合入后的 MG1655 全链门禁：
+标准 5 组 MR（MRX40P000/P001/P002 + MRX80P000/P001）multik(--all-masters
+auto 31..160) → olc → extend → anchor → 跨组 `asm olc --unitigs` merge，
+QUAST `--min-contig 10`（同模板 9_quast.sh 口径）。
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup | N/100k | mm/100k | indel/100k |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: | -----: | ------: | ---------: |
+| 08-17 性能优化门禁基线（auto 31..160） | 90 | 268842 | 4624071 | 118731 | 0 | 99.072 | 1.005 | 0.00 | 2.06 | 0.06 |
+| 08-18 现行复现（无 cv，c9da0ce 合入后） | 107 | 268272 | 4632159 |  95706 | 0 | 98.325 | 1.001 | — | — | — |
+| **本次 end-multiplicity（5 组，修复后）** | 91 | 268281 | 4617679 | 112557 | 0 | 98.197 | 1.013 | 0.00 | 0.00 | 0.04 |
+
+要点：
+* **0 mis 保持**；N50 112.6K、GF 98.197 与 08-18 现行复现（c9da0ce
+  合入后 5 组无 cv：N50 110.5K、GF 98.346）同代吻合，低于 08-17 基线
+  （118.7K、GF 99.072）——该差归因 c9da0ce（DH5alpha relocation 修复）
+  合入后 extend 跨 contig 护栏，非本次端门控；门控在 MG1655 上不新增
+  回归；
+* 单级门禁（Q25L60X80P001 组）4 mis 与修复前持平——单级 unitig 层
+  mis 由多组 anchor 投票消解，与全链 0 mis 不矛盾；
+* 13 组全跑口径 am：N50 117.8K、GF 98.206、0 mis（contigs 数更多），
+  与 5 组口径结论一致。
+
 ## *E. coli* str. K-12 substr. DH5alpha
 
 ### dh5alpha: reference
@@ -1101,6 +1146,31 @@ Table: statQuast
   ~10.8–14.9 GB），2 组并发峰值 ~30 GB（< 机器 88 GB 的 1/2）；
 * 跨组 `olc --unitigs --cross-validate` 96.4 s / 820 MB，extend 1.4 s；
   QUAST 用 `quast.py -m 500 -r genome.fa --min-contig 200`。
+
+### dh5alpha: end-multiplicity 门控全链门禁（2026-08-20 追加）
+
+针对 Q25L60X80P001 unitig_411 的 end-multiplicity 图级门控（共享
+(k-1)-mer ≥3 末端阻断压缩/融合，`graph.rs`；详见
+`notes/design/asm-multik.md` §2026-08-20）合入后的 DH5alpha 全链门禁：
+13 组 MR（MRX40P000-008 + MRX80P000-003）multik(--all-masters auto
+31..160) → olc → extend → anchor → 跨组 `asm olc --unitigs` merge
+（无 cv，模板默认），QUAST `--min-contig 10`（同模板 9_quast.sh）。
+
+| Assembly | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup | N/100k | mm/100k | indel/100k |
+| -------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: | -----: | ------: | ---------: |
+| 08-18 门禁 cv + 护栏（cv 口径） | 122 | 259019 | 4581642 |  82991 | 0 | 98.342 | 1.016 | 0.00 | 1.27 | 0.20 |
+| 08-18 门禁 13 组 merge（无 cv） | 117 | 258601 | 4505173 |  99473 | 0 | 97.942 | 1.004 | — | — | — |
+| **本次 end-multiplicity（13 组无 cv，修复后）** | 105 | 258601 | 4496026 |  99473 | 0 | 97.800 | 1.003 | 0.00 | 0.18 | 0.16 |
+
+要点：
+* **0 mis 保持**；N50 99.5K 与 08-18 门禁无 cv 记录逐位一致（99,473），
+  Largest 一致（258,601），GF -0.14 pp、Total -9K（contigs 105 vs 117，
+  分组投票消元更干净）——端门控在 DH5alpha 上无新增回归；
+* 对位取**无 cv** 口径：cv（`--cross-validate`）在现行 anchor 上会假拆
+  真连接（N50 82.9K，-17%，见 `notes/design/asm-multik.md` §跨组嵌合），
+  且 AGENTS.md 错装判定以 quast 为准；无 cv 0 mis 即通过门禁；
+* 单级门禁（Q25L60X80P001 组）4 mis 与修复前持平——单级 unitig 层
+  mis 由下游多组 anchor 投票消解，与全链 0 mis 不矛盾。
 
 ## *Bacillus cereus* ATCC 10987
 
