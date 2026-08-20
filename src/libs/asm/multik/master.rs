@@ -285,6 +285,7 @@ impl Master {
             k0,
             Some(repeat),
             repeat_k,
+            false,
         );
         let t5 = std::time::Instant::now();
         trace_graph(

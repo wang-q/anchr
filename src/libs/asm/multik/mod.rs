@@ -515,7 +515,7 @@ mod tests {
             Vec::new(),
         ];
         let mut branch = vec![false; unitigs.len()];
-        recompact_graph(&mut unitigs, &mut links, &mut branch, 21, None, 0);
+        recompact_graph(&mut unitigs, &mut links, &mut branch, 21, None, 0, false);
         // A(100) + B[20..](80) + C[20..](80) = 260.
         assert_eq!(unitigs.len(), 1);
         assert_eq!(unitigs[0].bases.len(), 260);
@@ -578,7 +578,7 @@ mod tests {
             }],
         ];
         let mut branch = vec![false; unitigs.len()];
-        recompact_graph(&mut unitigs, &mut links, &mut branch, 21, None, 0);
+        recompact_graph(&mut unitigs, &mut links, &mut branch, 21, None, 0, false);
         // v keeps both incoming links (it was not absorbed), so the merged
         // graph still has three segments and v's begin retains two edges.
         assert_eq!(unitigs.len(), 3);

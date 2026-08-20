@@ -10,7 +10,7 @@ use crate::libs::asm::table::{base_code, RefineTable};
 use anyhow::Result;
 use pgr::libs::nt::rev_comp;
 use rayon::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Megahit-style tip removal: short unitigs (<= `max_tip_len`) that are
 /// tips (one end has no connection) with depth far below their neighbour
@@ -483,7 +483,7 @@ pub(crate) fn progressive_filter(
         // Recompact after removal so the main path grows (metaMDBG
         // recompacts every round); chimeric junctions possibly fused here
         // are cut back by `split_by_bridge` right after this filter.
-        recompact_graph(unitigs, links, branch, k_build, repeat, repeat_k);
+        recompact_graph(unitigs, links, branch, k_build, repeat, repeat_k, true);
         if std::env::var_os("ANCHR_MULTIK_TRACE_DIR").is_some() {
             let dir = std::env::var("ANCHR_MULTIK_TRACE_DIR").unwrap();
             use std::io::Write;
@@ -551,6 +551,65 @@ fn oriented_segment(
         }
     };
     Some((li, lrev, ri, rrev))
+}
+
+/// Number of unitig ends (`begin` and `end` of each unitig) carrying each
+/// canonical (k_build-1)-mer. A junction whose shared overlap k-mer is
+/// carried by >= 3 ends is a conserved/segmental-duplication repeat: the
+/// k0 skeleton cannot decide which locus is the true continuation, so
+/// recompacting across it would fuse two distant loci into a relocation
+/// chimera. Coverage- and read-length-independent, so it catches repeats
+/// whose short-k windows show no elevation (Q25's flat-coverage relocation
+/// bridge for unitig_411).
+fn end_multiplicity(unitigs: &[Unitig], k_build: usize) -> HashMap<Vec<u8>, u16> {
+    let km1 = k_build - 1;
+    let mut mult: HashMap<Vec<u8>, u16> = HashMap::new();
+    for u in unitigs {
+        let b = &u.bases;
+        if b.len() < km1 {
+            continue;
+        }
+        for raw in [b[..km1].to_vec(), b[b.len() - km1..].to_vec()] {
+            let rc = rev_comp(&raw).collect::<Vec<u8>>();
+            let canon = if raw <= rc { raw } else { rc };
+            *mult.entry(canon).or_insert(0) += 1;
+        }
+    }
+    mult
+}
+
+/// The canonical (k_build-1)-mer shared by the junction leaving oriented
+/// node `(li, lrev)` (its chain-oriented right end), i.e. the overlap that
+/// the chain-merging logic would compact across.
+fn junction_kmer(unitigs: &[Unitig], li: usize, lrev: bool, k_build: usize) -> Option<Vec<u8>> {
+    let km1 = k_build - 1;
+    let b = &unitigs[li].bases;
+    if b.len() < km1 {
+        return None;
+    }
+    let shared: Vec<u8> = if lrev {
+        rev_comp(&b[..km1]).collect()
+    } else {
+        b[b.len() - km1..].to_vec()
+    };
+    let rc = rev_comp(&shared).collect::<Vec<u8>>();
+    Some(if shared <= rc { shared } else { rc })
+}
+
+/// Whether the chain junction leaving oriented node `(li, lrev)` spans a
+/// repeat the k0 skeleton cannot resolve: the shared overlap (k_build-1)-mer
+/// is carried by >= 3 unitig ends. See [`end_multiplicity`].
+fn is_multiplicity_repeat(
+    end_mult: Option<&HashMap<Vec<u8>, u16>>,
+    unitigs: &[Unitig],
+    li: usize,
+    lrev: bool,
+    k_build: usize,
+) -> bool {
+    end_mult.is_some_and(|m| {
+        junction_kmer(unitigs, li, lrev, k_build)
+            .is_some_and(|k| m.get(&k).copied().unwrap_or(0) >= 3)
+    })
 }
 
 /// Per-unitig short-k window statistics over the reads-only repeat table:
@@ -634,10 +693,10 @@ fn probe_stats(unitigs: &[Unitig], table: &RefineTable, window_len: usize) -> Ve
                 if p + window_len > right_cut {
                     right.push(c);
                 }
-                if p + window_len > n - TIP {
+                if p + window_len > n.saturating_sub(TIP) {
                     tip_right.push(c);
                 }
-                if p + window_len > n - 400 {
+                if p + window_len > n.saturating_sub(400) {
                     dbg_right.push(c);
                 }
                 counts.push(c);
@@ -971,6 +1030,16 @@ fn is_repeat_bridge(i: usize, l: &Link, unitigs: &[Unitig], stats: &[ProbeStats]
 /// junction whose shared-overlap window count far exceeds both unitigs'
 /// own median (a repeat bridge) is not compacted, so recompaction cannot
 /// fuse two distant loci into a relocation chimera.
+///
+/// When `gate_multiplicity` is set, an extra graph-level gate applies:
+/// an overlap (k_build-1)-mer carried by >= 3 unitig ends is a
+/// conserved/segmental duplication whose shared k-mer the k0 skeleton
+/// cannot resolve, so the chain is not compacted across it. This catches
+/// relocation bridges that show no short-k coverage elevation (Q25's
+/// unitig_411 A/B junction) and that only form during the abundance
+/// filter's recompaction, so it is enabled there and at the final chain
+/// merge — not during the per-round recompaction, which would fragment
+/// every repeated k-mer junction and shrink N50.
 pub(crate) fn recompact_graph(
     unitigs: &mut Vec<Unitig>,
     links: &mut Vec<Vec<Link>>,
@@ -978,12 +1047,19 @@ pub(crate) fn recompact_graph(
     k_build: usize,
     repeat: Option<&RefineTable>,
     repeat_k: usize,
+    gate_multiplicity: bool,
 ) {
     let n = unitigs.len();
     if n <= 1 {
         return;
     }
     let stats = repeat.map(|t| probe_stats(unitigs, t, repeat_k));
+    // Graph-level repeat gate (see [`end_multiplicity`]).
+    let end_mult = if gate_multiplicity {
+        Some(end_multiplicity(unitigs, k_build))
+    } else {
+        None
+    };
     let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
     let mut right_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
     let mut left_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
@@ -1031,7 +1107,7 @@ pub(crate) fn recompact_graph(
             }
             // A repeat bridge joins two distant loci; blocking the link here
             // keeps them as separate unitigs instead of fusing a chimera.
-            if let (Some(_), Some(s)) = (repeat, stats.as_deref()) {
+            let blocked_coverage = if let (Some(_), Some(s)) = (repeat, stats.as_deref()) {
                 if is_repeat_bridge(i, l, unitigs, s) {
                     if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() {
                         eprintln!(
@@ -1042,8 +1118,29 @@ pub(crate) fn recompact_graph(
                             unitigs[l.to].bases.len()
                         );
                     }
-                    continue;
+                    true
+                } else {
+                    false
                 }
+            } else {
+                false
+            };
+            // The shared overlap k-mer being carried by a third unitig end
+            // is a conserved repeat the k0 skeleton cannot resolve; merging
+            // across it would fuse two loci (Q25's A/B relocation bridge).
+            let blocked_multiplicity =
+                is_multiplicity_repeat(end_mult.as_ref(), unitigs, li, lrev, k_build);
+            if blocked_coverage || blocked_multiplicity {
+                if blocked_multiplicity && std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() {
+                    eprintln!(
+                        "multiplicity-bridge blocked {}->{} len={}x{}",
+                        i,
+                        l.to,
+                        unitigs[i].bases.len(),
+                        unitigs[l.to].bases.len()
+                    );
+                }
+                continue;
             }
             right_of[ln] = Some((ri, rrev));
             left_of[rn] = Some((li, lrev));
@@ -1158,6 +1255,8 @@ pub(crate) fn merge_chains(
 ) -> Result<Vec<MultikUnitig>> {
     let n = unitigs.len();
     let stats = repeat.map(|t| probe_stats(unitigs, t, repeat_k));
+    // Graph-level repeat gate (see [`end_multiplicity`]).
+    let end_mult = Some(end_multiplicity(unitigs, k_build));
     let node_of = |id: usize, rev: bool| 2 * id + rev as usize;
     let mut right_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
     let mut left_of: Vec<Option<(usize, bool)>> = vec![None; 2 * n];
@@ -1203,7 +1302,7 @@ pub(crate) fn merge_chains(
             }
             // A repeat bridge joins two distant loci; blocking the link here
             // keeps them as separate unitigs instead of fusing a chimera.
-            if let (Some(_), Some(s)) = (repeat, stats.as_deref()) {
+            let blocked_coverage = if let (Some(_), Some(s)) = (repeat, stats.as_deref()) {
                 if is_repeat_bridge(i, l, unitigs, s) {
                     if std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() {
                         eprintln!(
@@ -1214,8 +1313,29 @@ pub(crate) fn merge_chains(
                             unitigs[l.to].bases.len()
                         );
                     }
-                    continue;
+                    true
+                } else {
+                    false
                 }
+            } else {
+                false
+            };
+            // The shared overlap k-mer being carried by a third unitig end
+            // is a conserved repeat the k0 skeleton cannot resolve; merging
+            // across it would fuse two loci (Q25's A/B relocation bridge).
+            let blocked_multiplicity =
+                is_multiplicity_repeat(end_mult.as_ref(), unitigs, li, lrev, k_build);
+            if blocked_coverage || blocked_multiplicity {
+                if blocked_multiplicity && std::env::var_os("ANCHR_MULTIK_DEBUG").is_some() {
+                    eprintln!(
+                        "multiplicity-bridge blocked {}->{} len={}x{}",
+                        i,
+                        l.to,
+                        unitigs[i].bases.len(),
+                        unitigs[l.to].bases.len()
+                    );
+                }
+                continue;
             }
             right_of[ln] = Some((ri, rrev));
             left_of[rn] = Some((li, lrev));

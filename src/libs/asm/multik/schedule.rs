@@ -251,7 +251,8 @@ pub(crate) fn assemble_all_masters(
         seqs_with_guide.extend_from_slice(&guide_seqs);
         let probe2 = RefineTable::build_supermer_slices(&seqs_with_guide, probe_len)?;
         let repeat2 = RefineTable::build_supermer_slices(&seqs_with_guide, REPEAT_K)?;
-        let final_probe2 = RefineTable::build_supermer_slices(&seqs_with_guide, FINAL_PROBE_HALF * 2)?;
+        let final_probe2 =
+            RefineTable::build_supermer_slices(&seqs_with_guide, FINAL_PROBE_HALF * 2)?;
         let mut masters: Vec<Master> = Vec::new();
         for &k in ks.iter().skip(1) {
             let table = RefineTable::build_supermer_slices(&seqs_with_guide, k)?;
@@ -273,19 +274,17 @@ pub(crate) fn assemble_all_masters(
         }
         // Finalize independent masters concurrently; outputs are appended
         // in ladder order to keep the byte stream deterministic.
-        masters
-            .par_iter_mut()
-            .try_for_each(|m| {
-                m.finalize(
-                    &probe2,
-                    probe_half,
-                    &final_probe2,
-                    FINAL_PROBE_HALF,
-                    &repeat2,
-                    REPEAT_K,
-                    opts,
-                )
-            })?;
+        masters.par_iter_mut().try_for_each(|m| {
+            m.finalize(
+                &probe2,
+                probe_half,
+                &final_probe2,
+                FINAL_PROBE_HALF,
+                &repeat2,
+                REPEAT_K,
+                opts,
+            )
+        })?;
         for m in &mut masters {
             out.append(&mut m.out);
         }

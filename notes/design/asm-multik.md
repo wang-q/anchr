@@ -988,7 +988,7 @@ unitig_240 已断开，仅剩 3 个 106–122 bp 重复片段 unitig（整条即
 两拷贝各一短匹配，属正常）。MG1655 全链指标见
 `results/model_org.md` 2026-08-19 节。
 
-### 2026-08-20：Q25L60X80P001 unitig_411 轮内 progressive_filter 融合（未解决，会话交接）
+### 2026-08-20：Q25L60X80P001 unitig_411 轮内 progressive_filter 融合（已解决，见下节）
 
 > 本节点记录 2026-08-20 凌晨的**未完成状态**，供新会话直接接续。当前
 > 工作树未提交的改动：`src/libs/asm/multik/{graph,master,schedule}.rs` +
@@ -1046,15 +1046,39 @@ unitig_240 已断开，仅剩 3 个 106–122 bp 重复片段 unitig（整条即
 * /tmp 现状：34G/45G（77%）；`du`：mg1655_full 16G、dh5alpha_full 15G、
   mg1655_fix_test 1.6G、g37_full 995M、q25p001 592M。重跑前需先清盘。
 
-**下一步建议顺序**：
+**最终采纳方案：end-multiplicity 图级门控（Fix B），非 Fix A**（2026-08-20）：
 
-1. 清理 /tmp（备份/删除分析残留）→ 释放空间；
-2. 实现/验证修复 A（轮内长探针验链），确认 Q25L60X80P001 不再出
-   unitig_411，且 40x 组不碎片化；
-3. MG1655 全链干净重跑（所有组含 X80）→ 7_merge → 9_quast 验证 0 mis；
-4. G37、DH5alpha 不回归验证（同样先看 /tmp 空间，dh5alpha_full 15G）；
-5. 更新 `results/model_org.md`（2026-08-19 两处修复 + 本次全链新指标）；
-6. git commit 未提交改动（graph/master/schedule.rs + 本文件）。
+* Fix A（轮内长探针验链）被实测否决：80x 组真 junction 的 138-mer reads
+  支持仅 0–3，会过切 ~28% 的 unique-chain 链（`measure_overcut.py`）。
+* 改走图级信号：unitig_411 的 80 bp 平坦覆盖重复桥对 reads 不可见，但
+  其共享 (k_build-1)-mer 被 **3 个 unitig 末端**携带（u3-R/u278-L/u29-L），
+  与 k0 骨架无法消解的保守/节段重复一致。据此新增多重度门控：
+  * `graph.rs` 新增 `end_multiplicity`（统计各 unitig begin/end 携带的
+    规范 (k_build-1)-mer 多重度）、`junction_kmer`（末端离开方向链要
+    压缩的共享 k-mer）、`is_multiplicity_repeat`（该 k-mer 多重度≥3 → 重复桥）。
+  * `recompact_graph` 与 `merge_chains` 在共享 (k-1)-mer ≥3 末端时**阻断
+    压缩/融合**（与覆盖型 `is_repeat_bridge` 并列为 orphan 阻断条件）。
+    `merge_chains` 恒启用；`recompact_graph` 由 `gate_multiplicity` 开关控制：
+    **`progressive_filter` 内启用、逐轮 recompact 关闭**——逐轮关闭以保住
+    N50（总开关在 `Master::round` 传 `false`，`progressive_filter` 传 `true`）。
+* 普世性：依赖图结构末端多重度、与覆盖/读长无关，可捕捉覆盖型
+  `is_repeat_bridge` 对平坦覆盖 relocation 桥的盲区。
+
+**单级门禁（Q25L60X80P001 同组口径，`-k 31,41,...,91 --all-masters`，
+QUAST `--complete-reads` 未开，`--min-contig 200`）**：
+
+| Dataset | pre #mis | post #mis | pre N50 | post N50 | N50Δ | contigs Δ |
+| ------- | ------: | -------: | ------: | -------: | ---: | -------: |
+| MG1655 80x P001 | 1 | 0 |  9285 |  8452 | −9.0% | +563 |
+| MG1655 40x P001 | 0 | 0 |  7761 |  7722 | −0.5% |  +15 |
+| G37 80x P001 | 4 | 4 |  7666 |  7451 | −2.8% |  +30 |
+| DH5alpha 80x P001 | 0 | 0 | 39225 | 39129 | −0.2% |  +11 |
+
+* **门控从不引入新错装**（mis 持平或下降）；N50 代价集中在确有嵌合的
+  MG1655 80x（正确切开 unitig_411 的副作用），已干净数据集（DH5alpha
+  −0.2%、MG1655 40x −0.5%）过切可忽略，G37 −2.8% 温和。
+* 为单级门禁（用户选定口径），非 AGENTS.md 的完整全链门禁；方案成立但
+  应在合入后补跑三数据集全链（0 mis / N50 不崩）作为权威基线。
 
 ---
 
