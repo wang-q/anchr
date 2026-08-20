@@ -42,3 +42,8 @@ mis 不在此层判定（单组 mis 属预期，由多组 anchor 投票消解）
 | G37     | 7 | 13 | 187498 | 581339 | 121382 | 0 | 98.674 | 1.001 |
 | MG1655  | 5 | 91 | 268281 | 4617679 | 112557 | 0 | 98.197 | 1.013 |
 | DH5alpha| 13 | 105 | 258601 | 4496026 | 99473 | 0 | 97.800 | 1.003 |
+
+> 用 `scripts/asm-gate.sh full <g37|mg1655|dh5alpha>` 复跑的实测值（quast
+> report.tsv，`--min-contig 10`）会自动打印 #contigs/Total/N50/mis/GF，
+> mis 为硬红线。工作目录默认 `/tmp/asm-gate-full/<ds>`（可 `FULL_WORK=`
+> 覆盖），已完成的各组 anchor 会被复用，避免每次重跑 multik。

@@ -110,11 +110,22 @@
 
 ### 质量红线（组装类改动）
 
-- 任何触碰 `src/libs/asm/` 的改动，合入前必须在基准数据集 `results/model_org.md`  上过质量门禁：
+- 任何触碰 `src/libs/asm/` 的改动，合入前必须在基准数据集 `results/model_org.md` 上过质量门禁：
   G37, MG1655 与 dh5alpha 全流程 quast 对比，**错装数（# misassemblies）必需为 0；GF/N50 变化也不应该过大。
+- **分层门禁与回归检查**（防止 N50/内存/unitig 数量这类"单测测不到、全链又太慢"
+  的数值退化漏检）：
+  * 改动 `src/libs/asm/` 后需跑 `scripts/asm-gate.sh`：
+    - `smoke`：秒级，G37 MRX40P000 multik，与 golden-md5 字节级 diff；
+    - `single`：~3 分钟，G37+MG1655 40x 组 multik 峰值 RSS + count/N50/Total 趋势；
+    - `full <g37|mg1655|dh5alpha>`：小时级全链 quast，合入前最终验收。
+  * baseline（golden-md5、L2/L3 参考值）唯一事实来源 = `results/asm_gate.md`；
+    算法改动若有意改变 multik 输出，用 `smoke --write` 复捕 golden，并在同一
+    commit 更新 `results/asm_gate.md`。
+  * 判据：mis=0 是硬红线（全链 quast 权威）；N50/内存/计数=软报告，可接受
+    为修嵌合付的小幅代价，不误拦。
 - 禁止未经 A/B 验证就替换启发式公式/默认参数（如 auto 阶梯、阈值）。
   历史经验证的配置优先于"看起来更合理"的公式。
-- `anchr asm` 系列命令占用内存相对多，需要注意内存限制。
+- `anchr asm` 系列命令占用内存相对多，需要注意内存限制（L2 已自动测 peak RSS）。
 
 ### 资源纪律（实验与长任务）
 
