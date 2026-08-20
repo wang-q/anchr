@@ -37,7 +37,7 @@
 #   bash scripts/asm-gate.sh all             # smoke + single + full all
 #
 # Requires in PATH: anchr release binary, faops, quast.py. Baselines live in
-#   results/asm_gate.md (single source of truth).
+#   scripts/asm_gate.md (single source of truth, sibling to this script).
 
 set -euo pipefail
 
@@ -45,6 +45,7 @@ cd "$(dirname "$0")/.."
 BIN="${ANCHR:-$PWD/target/release/anchr}"
 QUAST="${QUAST:-/home/wangq/.cbp/bin/quast.py}"
 REF="${REF:-$HOME/data/anchr/ref}"
+GATE_MD="${GATE_MD:-$PWD/scripts/asm_gate.md}"
 
 #--- datasets (override via env) ---
 G37_DATA="${G37:-$HOME/data/anchr/g37}"
@@ -119,12 +120,12 @@ run_smoke() {
     run_multik_here "$reads" "$WORK/g37" 8
 
     local golden
-    golden=$(grep -E 'golden-md5[[:space:]`]*[0-9a-f]{32}' results/asm_gate.md 2>/dev/null | grep -oE '[0-9a-f]{32}' | head -1 || true)
+    golden=$(grep -E 'golden-md5[[:space:]`]*[0-9a-f]{32}' "$GATE_MD" 2>/dev/null | grep -oE '[0-9a-f]{32}' | head -1 || true)
 
     local cur="$WORK/g37/unitigs_all.fasta"
     if [ "${1:-}" = "--write" ] || [ -z "$golden" ]; then
         local m; m=$(md5sum "$cur" | awk '{print $1}')
-        fail "  golden-md5 not recorded in results/asm_gate.md (current md5 = $m). Re-run with smoke --write after updating the doc."
+        fail "  golden-md5 not recorded in $GATE_MD (current md5 = $m). Re-run with smoke --write after updating the doc."
         return
     fi
 

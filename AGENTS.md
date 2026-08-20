@@ -118,9 +118,9 @@
     - `smoke`：秒级，G37 MRX40P000 multik，与 golden-md5 字节级 diff；
     - `single`：~3 分钟，G37+MG1655 40x 组 multik 峰值 RSS + count/N50/Total 趋势；
     - `full <g37|mg1655|dh5alpha>`：小时级全链 quast，合入前最终验收。
-  * baseline（golden-md5、L2/L3 参考值）唯一事实来源 = `results/asm_gate.md`；
+  * baseline（golden-md5、L2/L3 参考值）唯一事实来源 = `scripts/asm_gate.md`；
     算法改动若有意改变 multik 输出，用 `smoke --write` 复捕 golden，并在同一
-    commit 更新 `results/asm_gate.md`。
+    commit 更新 `scripts/asm_gate.md`。
   * 判据：mis=0 是硬红线（全链 quast 权威）；N50/内存/计数=软报告，可接受
     为修嵌合付的小幅代价，不误拦。
 - 禁止未经 A/B 验证就替换启发式公式/默认参数（如 auto 阶梯、阈值）。

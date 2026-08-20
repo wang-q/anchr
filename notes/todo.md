@@ -112,7 +112,7 @@
 
 - **分层门禁机制（2026-08-20 落地骨架，待持续维护）**：为堵住"单测测不到
   N50/内存/unitig 数量退化、全链 quast 又太慢只在合入前跑"的缺口，新增
-  `scripts/asm-gate.sh` 四层门禁（baseline 在 `results/asm_gate.md`）：
+  `scripts/asm-gate.sh` 四层门禁（baseline 在 `scripts/asm_gate.md`）：
   * L0 单测（正确性/零 panic，不动）；
   * L1 smoke（秒级）：G37 MRX40P000 整组 multik，与 golden-md5 字节级
     diff；
