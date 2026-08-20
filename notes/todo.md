@@ -110,6 +110,19 @@
 
 ## 挂账 / 待决
 
+- **分层门禁机制（2026-08-20 落地骨架，待持续维护）**：为堵住"单测测不到
+  N50/内存/unitig 数量退化、全链 quast 又太慢只在合入前跑"的缺口，新增
+  `scripts/asm-gate.sh` 四层门禁（baseline 在 `results/asm_gate.md`）：
+  * L0 单测（正确性/零 panic，不动）；
+  * L1 smoke（秒级）：G37 MRX40P000 整组 multik，与 golden-md5 字节级
+    diff；
+  * L2 single（~4 min）：G37 + MG1655 40x 组 multik→olc→extend，报
+    count/N50/Total 趋势；
+  * L3 full（小时级）：全链 quast，最终验收。
+  判据：mis=硬红线（L3 quast 权威）；N50/内存/计数=软报告（避免误拦为
+  修嵌合付小幅代价的合法改动）。**维护点**：每合入算法改动后，若 L1 golden
+  有意变化用 `smoke --write` 复捕；L3 端到端自动化未完成（依赖
+  `/tmp/run_full.sh`），待固化进脚本。
 - `fq merge` 嵌合 reads（暂不修；机制、失败方案与 merge/no-merge 取舍见
   `fq-merge-replace.md` §9）：短读 merge 无法区分重复序列重叠与真实 insert
   重叠，reads 层无信号，由 multik 图防御兜底；merge 保留（N50 +54%）；
