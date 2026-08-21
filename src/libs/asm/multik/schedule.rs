@@ -39,7 +39,7 @@ pub(crate) fn pass0_opts(k0: usize, opts: &MultikOptions) -> AssembleOptions {
         min_count_seed: opts.min_count_seed,
         parallel: opts.parallel,
         use_supermer: true,
-        supermer_m: Some((12).min((5).max(k0 / 4))),
+        supermer_m: Some(pgr::libs::kmer::supermer::minimizer_len(k0)),
         use_dfa: true,
         ..AssembleOptions::default()
     }

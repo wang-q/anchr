@@ -8,6 +8,7 @@
 //! command-line compatibility notes remain. The count table itself lives
 //! in [`super::table`].
 
+use super::is_junction;
 use super::table::{
     base_code, base_comp_code, base_defined, canonicalize_quality, prob_error, Kmer, RefineTable,
 };
@@ -363,19 +364,6 @@ fn has_errors_fast(kmers: &[Option<Kmer>], table: &RefineTable, opts: &RefineOpt
     false
 }
 
-/// `isJunction(max, second)` with branch-resolution thresholds.
-pub(crate) fn is_junction(max: u32, second: u32, opts: &RefineOptions) -> bool {
-    if second < 1
-        || (second as f32) * opts.branch_mult1 < max as f32
-        || (second <= opts.branch_lower_const as u32
-            && (max as f32)
-                >= (opts.min_count_extend as f32).max(second as f32 * opts.branch_mult2))
-    {
-        return false;
-    }
-    true
-}
-
 /// Extends a sequence to the right by at most `distance` bases, mirroring
 /// `Tadpole1.extendToRight2`. Returns the number of bases added.
 #[allow(clippy::too_many_arguments)]
@@ -433,8 +421,22 @@ fn extend_to_right2(
     if right_max < opts.min_count_extend as u32 {
         return 0;
     }
-    if is_junction(right_max, right_second, opts)
-        || (use_left && is_junction(left_max, left_second, opts))
+    if is_junction(
+        right_max,
+        right_second,
+        opts.branch_mult1,
+        opts.branch_mult2,
+        opts.branch_lower_const,
+        opts.min_count_extend,
+    ) || (use_left
+        && is_junction(
+            left_max,
+            left_second,
+            opts.branch_mult1,
+            opts.branch_mult2,
+            opts.branch_lower_const,
+            opts.min_count_extend,
+        ))
     {
         return 0;
     }
@@ -463,8 +465,23 @@ fn extend_to_right2(
         right_second_pos = second_highest_position(&rc);
         right_second = rc[right_second_pos];
 
-        let junc_r = is_junction(right_max, right_second, opts);
-        let junc_l = use_left && is_junction(left_max, left_second, opts);
+        let junc_r = is_junction(
+            right_max,
+            right_second,
+            opts.branch_mult1,
+            opts.branch_mult2,
+            opts.branch_lower_const,
+            opts.min_count_extend,
+        );
+        let junc_l = use_left
+            && is_junction(
+                left_max,
+                left_second,
+                opts.branch_mult1,
+                opts.branch_mult2,
+                opts.branch_lower_const,
+                opts.min_count_extend,
+            );
         // Tadpole2 (k>31) appends the junction base when the k-mer's
         // canonical orientation is the forward one (`key()==array1` in
         // BBTools; the reverse-complement key is the other branch).
@@ -947,7 +964,14 @@ fn reassemble_inner(
                     // base is treated as already-correct when they coincide.
                     if num == right_max as i64 {
                     } else if (is_error3(right_max as i64, right_second as i64, qb, opts)
-                        || !is_junction(right_max, right_second, opts))
+                        || !is_junction(
+                            right_max,
+                            right_second,
+                            opts.branch_mult1,
+                            opts.branch_mult2,
+                            opts.branch_lower_const,
+                            opts.min_count_extend,
+                        ))
                         && is_similar(a_count, right_max as i64, opts)
                     {
                         bases[b] = number_to_base(right_max_pos as u8);

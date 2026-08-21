@@ -314,6 +314,353 @@ asm 家族对照 BBTools tadpole（contig）、BCALM2/GATB `ograph.cpp graph3`
 第十二轮结论：`cargo fmt`/`clippy --all-targets` 干净，extend/anchor/multik 集成测试
 （5+4+12）与全部 asm 集成测试通过。
 
+## 第十三轮复核（multik 内部 + olc 驱动 + 文档一致性纵深）
+
+对 multik 调度/图/桥/精化内部与 olc 驱动做纵深复核，发现并修复 3 处文档-实现不一致与
+1 处默认值来源不统一：
+
+- **`--supermer-m` 默认 minimizer 长度与 pgr 不一致（两处内联）**：
+  `cmd/asm/unitig.rs` 的默认值计算 `(12).min((5).max(k / 4))` 与
+  `libs/asm/multik/schedule.rs::pass0_opts` 的内联式重复了 pgr
+  `supermer::minimizer_len`，但缺 `k-1` 上界、且用截断除法 `k / 4` 而非
+  `ceil(k/4)`（k%4≠0 时差 1），与 pgr 单点事实来源漂移。修复：两处统一调用
+  `pgr::libs::kmer::supermer::minimizer_len(k)`，同时修正 `--supermer-m` 帮助文本
+  为 `min(12, max(5, ceil(k/4)), k-1)`。
+- **`docs/asm.md` 的 `--supermer` 描述缺 `k-1` 上界**：帮助/文档与实现不一致，
+  补为 `min(12, max(5, ceil(k/4)), k-1)`。
+- **`progressive_filter` 注释把 cutoff 上限写成 "graph maximum"**：
+  `libs/asm/multik/graph.rs` 的实现实际是 **25% 的 unitig 覆盖度中位数**（metaMDBG
+  语义；重复区会把图最大丰度顶到几百 x，若按最大会误删主链）。修正注释与实现一致。
+- **`docs/asm.md` cns 输出头格式笔误**：`>contig_<id>,len=...` 逗号应为空格
+  `>contig_<id> len=...,cov=...`，与实现输出对齐。
+
+第十三轮结论：`cargo fmt`/`clippy` 干净；`--supermer` 各 k 输出逐字节不变（minimizer
+默认值对齐 pgr 后 G37 full 验证一致），全部 asm 测试通过。
+
+## 第十四轮复核（olc 内部纵深 + 输入校验闭环）
+
+对 OLC 的 consensus/coverage 数值内核与 unitig/contig 输入校验做纵深复核，发现并修复
+3 处问题：
+
+- **`identity`（banded Levenshtein）首碱基漏计 bug**：`i==0 && j==0` 的基例写死
+  `best = 0`，不比较首碱基，导致**首碱基不匹配**的近重复 contig 编辑距离少算 1、
+  identity 虚高（如 `AC` vs `GC` 被算成 1.0 而非 0.5），可能把边界差异的近重复
+  误判为 dedup。修复：`best = usize::from(ai != bj)`。新增回归测试
+  `identity_counts_first_base_mismatch`（首碱基失配计 1；单碱基对失配 identity=0）、
+  `identity_scores_substitutions`（纯替换打分 `1 - mm/len`）。
+- **`coverage` 的 `dominant_offset` 与 `overlap_geometry` 重复实现**：两处都是
+  "31-mer 索引 + offset 直方图"，但 `dominant_offset` 缺 `overlap_geometry` 的
+  `EXACT_WORK_CAP` 有界回退——homopolymer 富集 contig 上会二次方发散（20k×20k 对）。
+  修复：`coverage` 复用 `overlap_geometry`（含 heavy/light 分治 + 精确验证回退），
+  删除 `dominant_offset`；`bounded_geometry_matches_exact_histogram` 与
+  `identity_*` 等测试全绿。
+- **`--min-count-seed 0` 未校验（unitig/contig）**：`0` 会把所有 k-mer 视为 solid、
+  抹掉错误过滤，静默改变组装语义。修复：`assemble_unitigs_core` 与 `contig::assemble`
+  加 `anyhow::ensure!(min_count_seed >= 1)` 友好报错（multik/olc 已通过共享参数
+  `MultikOptions` 校验覆盖）。
+
+第十四轮结论：`cargo fmt`/`clippy` 干净；`cargo test --lib`（110）+ cli_asm_unitig
+（14）+ cli_asm_olc（18）+ cli_asm_multik（12）+ cli_asm_extend（5）+ cli_asm_anchor
+（4）全部通过。
+
+## 第十五轮复核（olc 驱动 + overlap/layout 库纵深 + 输入解析健壮性）
+
+对 olc 驱动（`cmd/asm/olc.rs`）与 overlap/layout/consensus 三个 OLC 库（
+`libs/olc/overlap.rs`、`libs/olc/layout.rs`、`libs/olc/consensus.rs`）及独立阶段
+命令（ovlp/layout/cns）的输入解析做了纵深复核，发现并修复 1 处校验缺口：
+
+- **`cns --dedup-ratio` 缺范围校验**：`consensus_with_ratio` 直接消费 `ratio`
+  未做边界校验。`ratio <= 0` 时 `dedup_contained_ratio` 的
+  `coverage(...) >= ratio` 恒真，任何与已保留 contig 共享一个 31-mer 的 contig
+  都会被丢弃（静默删掉几乎全部 contig）；`ratio > 1` 则静默退化为
+  `ratio >= 1.0` 的精确子串语义，与帮助文本"<1.0 合并边界差异近重复"不符。
+  修复：库层 `anyhow::ensure!(ratio > 0.0 && ratio <= 1.0)` 友好报错，与 multik
+  驱动对 `--merge-similar` 的既有范围校验保持一致。回归
+  `rejects_out_of_range_dedup_ratio`（0/-0.1/1.1 报错，1.0/0.5 正常）；`--dedup-ratio`
+  帮助文本补 `(0.0, 1.0]` 范围。
+
+复核确认无需修改（经逐例推导验证）的路径：
+
+- **`overlap.rs::verify_seed`/`extend` 反向链延伸边界**：对反向 dovetail
+  （a 后缀 = rc(b 前缀)）做了完整的手工推导，`minus` 分支
+  `q[qs-1] == complement(t[te])` / `q[qe] == complement(t[ts-1])` 的方向与四端
+  边界守卫（`qs>0 && te<m`、`qe<n && ts>0`）均正确，能精确还原 10 bp 反向重叠，
+  无越界。
+- **`layout.rs` 边界 contain 边**：contain 重叠位于长 contig **端部**时（q 是 t 的
+  前缀/后缀）生成的扩展边可正确重建长 contig（短前缀 + t 剩余 = t）；仅中间 contain
+  不生成边（`contain_overlaps_do_not_chain`）。`is_repeat`/`mutual-best`/`placed`
+  防环与多义停止逻辑经推演正确。
+- **`filter_contained` 等长与传递 contain**：等长重复取 id 小者、传递 contain
+  （a⊃b⊃c）全部收敛到最长者，无双向误删。
+- **`drop_cross_chimeras`**：头/尾 `flank` 覆盖、junction `span` 跨盖、`min_groups=2`
+  的判定逻辑正确；单文件（全部同 tag）时 `min_groups` 不满足，静默 no-op 属设计语义。
+- **`consensus`/`merge_overlapping_contigs`/`dedup_contained_ratio`**：首碱基 identity
+  修复（第十四轮）、`overlap_geometry` 有界回退、合并后 `extend_seed_set` 的
+  `kept_heads` 陈旧仅为少一次预筛（`kept_seeds` 已更新，无漏检）。
+- **输入解析健壮性**：`cns` 布局 TSV 的 `contig_0` 下溢、超大 `contig_N` 巨型分配、
+  非连续 id、缺名、非法 strand 均友好报错；`layout` PAF 缺名友好报错；`ovlp`/`olc`
+  的 `--overlap-k`/空 unitigs 均友好报错；`read_unitigs` 的 tag 净化与冲突 `.i` 后缀
+  确定。
+
+记录项（未改，低风险 / 设计语义）：
+
+- `--unitigs` 模式下 `--kmer` 仍被无条件解析，传无效值（如 `abc`）会报错——与帮助
+  "ignored in this mode"（指无输出效果）略有出入，但 fail-fast 对拼写错误更友好，保留。
+- `--kmer 21,21` 重复 k 值产生重名 unitig（`k21:unitig_<id>` ×2），下游
+  `filter_contained` 收敛、输出正确，仅浪费计算；`--keep-dir` 的 unitigs.fa 会有重名
+  头（仅调试用途）。
+
+第十五轮结论：`cargo fmt`/`clippy --all-targets` 干净（仅既有依赖告警），`cargo test`
+全量（lib 111 + 全部集成测试）通过。
+
+## 第十六轮复核（组装内核纵深：extend/refine/unitig/contig/bubble/dfa）
+
+对组装内核做了逐行纵深复核：`libs/asm/extend.rs`（交叉 contig 归属护栏）、
+`libs/asm/refine.rs`（tadpole correct/extend/discard 移植）、`libs/asm/assemble/`
+（unitig/contig/bubble/mod）与 `libs/asm/dfa.rs`（cuttlefish 风格 DFA 状态分类）。
+发现并修复 1 处注释-实现不一致：
+
+- **`unitig.rs` 覆盖度重建注释把"种子"误写成"最右 k-mer"**：
+  `build_unitigs` 把左右两次走步的每条 k-mer 覆盖度重排成输出序列顺序。经
+  逐例推导（含 R>0 具体数值例证），被丢弃的 `left_counts[0]` 是**种子 k-mer**
+  的计数（RC 走步首窗口 = rc(seed)，canonical 计数与种子相同），与
+  `right_counts[0]`（右走步首条目 = 种子）重复——是**首个**右条目，而非注释所写
+  "last right entry"。代码正确，注释误导（若后续维护者按注释去改会把正确代码改坏）。
+  修复：注释改为 "the seed k-mer / the first right entry"。
+
+复核确认无需修改（经逐例推导验证）的路径：
+
+- **extend.rs 的低覆盖 seam 回滚**：`low_run` 达 5 后 `truncate(MIN_LOW_RUN-1)`
+  恰好裁掉该段推入的全部低覆盖碱基（第 5 步在 push 前 break），回滚方向对；
+  `foreign_run` 达 5 后 `truncate(foreign_run)` 裁掉进入他 contig 领地的全部碱基；
+  `saturating_sub` 防下溢；`top_two` 平局按索引序确定。
+- **refine.rs 的 tadpole 移植**：`is_junction` 语义、`extend_to_right2` 的
+  junction 基碱序（先捕 `b=right_max_pos` 再推进窗口）、`reassemble_inner` 的
+  `ca=a+1-k` 由 `len>=k` 保证不下溢、`regenerate_counts` 重算窗口 `ca..=ca+k`
+  （含一个无害的左侧多余窗口）、`clear_window2` 滑窗与 `count_errors` 的
+  `i+k-1` 边界均安全。
+- **contig.rs 的多遍播种**：`(1..contig_passes).rev()` + 末遍 `min_count_seed`
+  共 16 遍，与注释一致；`pass_threshold`/`max_len=1e9` 上限不可由 CLI 触发
+  （`min_extension`/`contig_passes`/`contig_pass_mult` 未暴露，仅默认值 2/16/1.7）。
+- **bubble.rs 的 BubblePopper**：`merge`/`pop` 的 k-1 重叠裁剪、`is_loop`、
+  `find_mutual_dest` 汇合判定、`mid_nodes_concur` 一致性检查均忠实移植。
+- **dfa.rs**：`step`/`in_count_at` 的 RC 走向翻转（`3-in_base`、in/out 互换）、
+  `canon_idx_pair` 二分、`succ_in/succ_out` 的 `NO_SUCC` 哨兵降级（非 panic）均正确。
+
+第十六轮结论：`cargo fmt`/`clippy` 干净；asm 相关 `cargo test` 通过。
+
+## 第十七轮复核（multik 内部纵深：bridge/master/graph/schedule/mod）
+
+对 `libs/asm/multik/` 剩余的 bridge.rs / master.rs / graph.rs / schedule.rs / mod.rs
+及 CLI（`cmd/asm/multik.rs`）做了逐行纵深复核。发现并修复 3 处问题：
+
+- **`sequence_similarity` 零带宽退化**（真 bug，可复现）：`max_indel` 由
+  `max(n,m) * (1 - min_similarity)` 截断为 0 时（即 `--merge-similar 1.0`，或
+  短序列 + 近 1.0 相似度），原代码直接 `return 0.0`——**完全相同的两条序列也返回
+  0.0**，导致 `bubble_merge` 判定 `0.0 < merge_similar` 而永不合并泡泡，
+  `--merge-similar 1.0`（合法 CLI 范围 (0.0, 1.0]）静默失效。修复：`max_indel == 0`
+  时按离散结果返回 `a == b ? 1.0 : 0.0`（任何替换/插入缺失都会使相似度 <
+  `1 - 1/max(n,m)` < min_similarity，故 0.0 仍正确落在阈值之下）。新增回归测试
+  `sequence_similarity_zero_width_band`。
+- **`Master::round` 计时标签错误**（调试仅，`ANCHR_MULTIK_TIMING`）：`prog` 槽位误用
+  `t5.elapsed()`（recompact 之后到计时点的总时长，混入 progressive_filter + split +
+  trace），并非 progressive_filter 耗时。修复：`progressive_filter` 返回后记录
+  `t6`，`prog` 改为 `t6.duration_since(t5)`。
+- **`bubble_merge` 文档-实现不符**：doc 写替代路径长度上限 "`merge_len * k`"，
+  实现为 `(merge_len * k / merge_similar).round()`（`max_len`，`bubble_merge_rejects_long_middles`
+  测试亦依赖此式）。修复：doc 改为 "`merge_len * k / merge_similar`"。
+
+复核确认安全（经推导/边界核对）的关键路径：
+
+- **bridge.rs**：`bridge_kmer` 四个方向（u 左右端 × 伙伴正向/RC）的接点窗口
+  `upstream 尾 (k-1) + downstream 续基` 均与 `u_ext == v_begin / rc(v_end)` 的
+  实际端点匹配一致，续基下标（`v[k_build-1]`、`rc(v)[k_build-1]=comp(v[len-1-k_build])`）
+  逐例验证正确；`probe_kmer` 的 `probe_half*2` 窗口两侧各取 `probe_half` 碱基，
+  边界 `v_dir.len() >= km1+probe_half` 守卫完备；`split_by_bridge` 的 `RollCanon::new`
+  由 `n < probe_len` 早退保护，`cut=0` 只作 run 跟踪标记不产生零长切片。
+- **master.rs**：`SumView` 的 `is_solid` 短接（reads 单侧达标即 solid）与
+  `count` 的 `saturating_add` 正确；round 第一步 link 校验用 `view.count`（`get_count`
+  内部 canonical），`remove_unsupported` 用 `view.is_solid(km.canon())`
+  （`get_count_canonical` 假定已 canonical），二者与 table.rs 的
+  `get_count`/`get_count_canonical` 语义逐一对应；carried 重喂时
+  `links.resize_with` 保持与 unitigs 索引对齐。
+- **graph.rs**：`tip_remover` 的 `in_src`（去重计数）与 `in_cov`（最大源覆盖）O(n+E)
+  预计算与旧 `any(l.to == i)` 语义一致；`weak_link_remover` 的
+  `to = usize::MAX` 哨兵在两次 `from_rc` 扫描后才统一 retain，无相互干扰；
+  `probe_stats` 的 `hi` 分位在 `left`/`right` 各至少含 1 个窗口时安全
+  （`n >= window_len` 早退保证）；`recompact_graph`/`merge_chains` 的链头回退
+  （`seen` 防环）+ 右向走步（`visited` 防环）+ 严格度 1 不变量一致。
+- **schedule.rs**：`assemble_one`/`assemble_all_masters` 的表生命周期
+  （bound-lookahead 窗口、`OnceLock` 共享、cap-1 channel 反压）保证峰值内存
+  约两表 + probe；`auto_ks` 阶梯与 `docs/asm.md` 一致。
+
+**记录在案、未改行为的设计观察**（改动需质量门禁 A/B 验证）：
+
+- **`weak_link_remover` 只删物理边的单侧镜像，实际近乎 no-op**：
+  `compute_links` 把同一物理接点从两端各发一条记录（u 的出边 `from_rc=false` +
+  v 的入边 `from_rc=true`），段图按 `seen` 去重后只认物理边。`weak_link_remover`
+  仅标记 `links[i]` 侧 `to = usize::MAX`，镜像记录仍存活 → 物理弱边在
+  `merge_chains`/`recompact_graph` 的段图中依然存在。又因弱边总出现在分支端
+  （`depths.len() > 1` 才删除），而链压缩要求两端严格度 1（`out_deg == in_deg == 1`），
+  分支端本就永不压缩 → 该函数在最终链路中**不影响输出**（近似无效而非有害）。
+  完整修复（双侧镜像删除）会允许主路径穿透原分支节点、改变 N50/GF，属
+  启发式行为变更，须按 `results/model_org.md` 质量门禁先 A/B 验证再合入；
+  本轮仅记录，未改动。
+
+第十七轮结论：`cargo fmt`/`clippy` 干净；multik 20 个单元测试 + 全量
+`cargo test -- --test-threads=1` 通过（含新增回归）。
+
+## 第十八轮复核（libs/asm/table.rs 整文件纵深）
+
+对 `libs/asm/table.rs` 全文（build 四路径 / prefix_index / locate / get_count /
+sorted/solid 快照 / count_keys_seq / merge_tables / Kmer / base_code 族 /
+count_read_kmers_packed）逐行纵深复核，重点核对与调用方（contig/unitig/refine/
+fq merge/multik）的契约。发现并修复 3 处问题：
+
+- **空 reads 构建的 k=0 空表可被查询 panic（真 bug，可复现）**：
+  `build_threaded` 的 `reads.is_empty()` 分支返回 `KmerTable::default()`（`k=0`、
+  `keys/counts` 空）。此后任何查询都会 panic：`prefix_index` 的 `keys.len()/kb`
+  除零、`locate` 对空 `q` 取 `q[0]/q[1]` 越界、`sorted_entries`/`solid_entries` 的
+  `chunks_exact(0)`。实际触发路径：`anchr asm contig`/`unitig` 对**空输入文件**
+  （0 reads）在 parallel=0 路径建出 k=0 表，随后 `scan_table`→`sorted_entries`、
+  `assemble_unitigs_from_table`→`solid_entries` 直接 panic（violates Zero-Panic）；
+  `fq merge`/`refine` 目前因处理循环由同一份空 reads 驱动、不会查询空表而侥幸
+  安全，但属于脆弱隐式不变量。修复：空分支改为保留 `k` 的
+  `KmerTable { k, keys: vec![], counts: vec![] }`，使空表与其它 k 集空表一致
+  （n=0，所有查询安全返回空/0）。新增回归 `empty_reads_table_stays_queryable`
+  （get_count / find_row / sorted_entries / solid_entries / solid_row_ranks /
+  fill_left_counts / fill_right_counts 全部安全且为空）。
+- **`build_threaded` 的 `threads` 参数文档与实现不符**：doc 声称
+  "`threads == 0` uses the rayon global pool; otherwise a private pool of exactly
+  `threads` workers"，实现完全忽略 `_threads`，始终用环境 rayon 池（body 注释
+  已说明这是有意为之：调用方已用 `--parallel` 包一层池，再建私有池会超订）。
+  修复：doc 改为说明 `threads` 仅为调用侧对称保留的 advisory 参数，不建私有池。
+- **`base_code`/`base_comp_code` 文档与实现不符**：doc 写非 ACGTU 返回 -1，
+  实现返回 0（返回类型 `u8` 亦不可能为 -1）。调用方均先 `base_defined` 门控
+  （`count_read_kmers_packed`、refine 各窗口、contig/unitig/extend），`_ => 0`
+  分支实际不可达。修复：doc 改"其它碱基映射为 0，调用方必须先经 `base_defined`
+  门控"。
+
+**排除的疑点（经核验无需修复）**：
+
+- `count_read_kmers_packed` 的 `fw[..half] <= rc[..half]` 半字节规范判定对
+  `k % 4 != 0` 同样成立（边界字节零填充对称性 + revcomp 对合性），已由
+  `k81_table_counts_match_bruteforce`（k=81 非 4 的倍数）实测背书。
+- `to_bytes()` 只返回 `key_bytes` 字节，`extend_from_slice(fw)` 不会多 emit。
+- supermer / direct / streamed 三条路径空输入均保留 `k`（pgr `count_keys` 与
+  `build_impl` 的 n_records==0 分支），仅 `build_threaded` 空分支是 k=0 唯一来源。
+- `Kmer::default()`（derive 出 k=0）无生产调用点；生产只用校验过的 `Kmer::new(k)`。
+- `count_keys_seq`/`merge_tables` 的计数 `u32` 上限与 `(j-i).min(u32::MAX)` 截断：
+  需 >4G 次相同 k-mer 才可能溢出，现实不可达，未改。
+
+第十八轮结论：`cargo fmt`/`clippy` 干净；`cargo test --lib libs::asm::table`
+6 个测试通过（含新增回归 `empty_reads_table_stays_queryable`）。
+
+## 第十九轮复核（libs/asm/dfa.rs + assemble/bubble.rs 整文件纵深）
+
+对 `libs/asm/dfa.rs`（unitig 行走 DFA 状态机）和 `libs/asm/assemble/bubble.rs`
+（contig 泡泡消除）整文件逐行纵深复核，重点验证与 BBTools Tadpole
+`BubblePopper.java`（Debian 源 39.01+dfsg-2）参考实现的语义一致性。发现并修复
+1 处真 bug，其余疑点经核验排除：
+
+- **`bubble.rs` 间接泡泡路径恒失效（真 bug，可复现）**：`expand_right` 中
+  `self.dest = dest_id` 赋值被错误放在 `mid_nodes_concur` 调用**之后**（上一版
+  结构）。而 `mid_nodes_concur` 用 `self.dest`（此时仍为 L244 重置的
+  `usize::MAX`）与每个 mid 的 `right_dest` 比较（L448 `right_dest != dest_id`），
+  条件恒成立 → 恒返回 false → 间接泡泡（indirect bubble）合并路径完全失效，
+  仅简单（direct）泡泡合并有效，contig 图只简化掉最外层分支。参考实现
+  `BubblePopper.expandRight` 在 `midNodesConcur` 调用前已明确赋值 `dest`。修复：
+  将 `self.dest = dest_id` 移至 `mid_nodes_concur` 调用前（L294-299，含注释说明
+  与参考实现的对齐依据）。
+
+**排除的疑点（经核验无需修复）**：
+
+- `dfa.rs` 状态分类：`VertexStates` 的 in/out 度、唯一后继（`succ_out`/`succ_in`）
+  与 `step()` 的朝向翻转（`fw_is_canon` → `out_base`，否则 `3 - in_base`）与
+  unitig 行走的 canonical 约定一致；并行/串行两类 build 路径状态向量长度对齐
+  `sorted_entries`，无越界。
+- `bubble.rs` `expand` 的翻转（`center.flip(destMap.get(center.id))`）顺序与
+  参考一致；`find_representative_mid_edge`/`fetch_mid_nodes` 的 `min_len`
+  （`2*k-1`）门控与 `BubblePopper` 构造参数一致。
+- `bubble.rs` `pop` 的 right_mid_edge 兜底 `get_right_edge(dest_id, Some(1))`
+  在 `mid_nodes_concur` 已保证各 mid 右 dest 一致的前提下，退化为取首个边，
+  语义等价于参考的 `findRightmostEdge`，无风险。
+
+第十九轮结论：`cargo fmt`/`clippy` 干净；`cargo test --lib libs::asm::assemble`
+通过（含 `contig`/`bubble` 相关测试）；L1 smoke 字节级 diff 无回归。
+
+## 第二十轮复核（cmd/asm 命令层 + assemble 库入口 + 文档一致性）
+
+对 `cmd/asm` 命令层（mod.rs / common.rs / contig.rs / unitig.rs / layout.rs /
+olc.rs）与 `assemble` 库入口（contig.rs / unitig.rs）及 `docs/asm.md` 纵深
+复核。发现并修复 3 处问题：
+
+- **`is_junction` 跨模块重复实现（漂移风险）**：`refine.rs` 与
+  `assemble/mod.rs` 各有一份逐字相同的 `is_junction(max, second, opts)`，
+  仅 `opts` 类型不同（`RefineOptions`/`AssembleOptions`）。公式若在任一处
+  修改，`asm contig`/`asm unitig` 与 `fq` 校正/延伸行为将静默分叉。参照第
+  十四轮删除 `dominant_offset` 重复的先例，上提为 `libs/asm/mod.rs` 的标量
+  参数共享函数（单一事实来源），两处调用点（refine 5 处、contig 9 处）
+  改为透传 4 个标量，`assemble/mod.rs` 改为 `pub(crate) use super::is_junction`
+  保持 contig.rs 导入不变。
+- **`read_unitigs` 标签去重边界缺陷（真 bug，可复现）**：`.i` 后缀合成后
+  不复查唯一性。特定文件茎组合（如 `["foo.fa", "foo.2.fa", "foo.fa"]`，
+  `foo.2` 文件夹在两个 `foo` 之间）下，第三个文件被分配与第二个相同的
+  tag `foo.2`，`used` 集合不去重合成结果 → 输出重复 unitig 名。影响
+  ovlp/olc/cns/layout 四个共用 `read_unitigs` 的命令（重复名破坏 PAF/布局
+  的 name→id 引用）。修复：冲突时从文件下标起循环递增直至 tag 唯一。
+- **`assemble_unitigs_core` 空输入防护缺失（潜在 panic）**：`--supermer`
+  的 FASTA 探测 `SeqReader::new(&infiles[0])` 位于任何空输入检查之前，
+  `read_records` 的空 `ensure!` 在其后才触发。所有 CLI 调用方（unitig/olc/
+  multik）目前先校验非空而侥幸安全，但 `pub(crate)` 函数缺前置守卫属脆弱
+  隐式不变量（与第十八轮空表 panic 同类）。修复：入口首行加
+  `ensure!(!infiles.is_empty())`。
+
+**排除的疑点（经核验无需修复）**：
+
+- k 上界 256 在六处库入口（contig/unitig/refine/multik/extend/table）均以
+  `ensure!` 兜底，`-k` 传超界返回友好错误而非 panic（零 panic 满足）。
+- `--supermer-m` 由 pgr `build_table_slices_with_m` 校验 `m ∈ [2, k-1]`，
+  非法值友好报错。
+- `unitig` 的 FASTQ→直连计数回退（docs 声称"FASTQ 自动回退"）在
+  `assemble_unitigs_core` 真实实现（`fasta_input` 探测 + `use_supermer`
+  `&& fasta_input` 门控）。
+- `format_cov` 的负输入分支不可达（coverage 为 k-mer 计数均值，恒非负）。
+- `cmd/asm/mod.rs` 十个子命令注册/分发完整；`docs/asm.md` 与各命令 CLI
+  帮助文本一致（含 multik 固定阶梯、olc `--keep-dir`/`--cross-validate`）。
+
+第二十轮结论：`cargo fmt`/`clippy` 干净；`cargo test --lib libs::asm` 34 个
+通过；`cli_asm_contig`/`cli_asm_unitig`/`cli_asm_olc` 集成测试 10/14/18 通过；
+L1 smoke 字节级 diff 无回归。
+
+## 第二十一轮复核（剩余 cmd 命令层 + olc 库入口 + 参数解析）
+
+对前几轮未深覆盖的命令层与库入口做收尾纵深复核：`cmd/asm/multik.rs`、
+`cmd/asm/cns.rs`、`cmd/asm/ovlp.rs`、`cmd/asm/extend.rs`、`cmd/asm/anchor.rs`、
+`cmd/args.rs::parse_parallel`、`libs/olc/consensus.rs`、`libs/olc/overlap.rs`、
+`libs/olc/layout.rs`。**未发现新问题**，核验到的既有防护如下：
+
+- `multik`：`--merge-similar ∈ (0.0, 1.0]`、`--merge-len ∈ 1..=1024`、
+  `--parallel ∈ 0..=1024` 均 cmd 层校验；`--use-guide` 依赖 `--all-masters`
+  （clap requires）；`--print-ks` 经 `auto_ks_for_reads` 派生；guide 伪 reads
+  临时文件由 `_guide_keep` 保活至组装结束（生命周期正确）。
+- `cns`：`--dedup-ratio` 范围校验在库层 `consensus_with_ratio`
+  （`(0.0, 1.0]`）；`parse_layouts` 对 7 字段、`contig_0` 拒收、contig/step
+  连续性、布局 id 巨大值（防巨型分配）全部友好报错（零 panic）。
+- `ovlp`：`find_overlaps` 对 seed_k 同时校验空/过短 unitigs（`seed_k >= 1`）
+  与上界（`<= MAX_K`），并 clamp 到最短 unitig。
+- `extend`：库层 `extend_contigs` 校验 `k ∈ 2..=MAX_K`、
+  `min_support >= 1`（第 12 轮修复确认）。
+- `anchor`：`--lscale > 0`/`--uscale > 0` 除零防护、`--stats` 与 `-o` 及输入
+  的三方冲突前置校验（第 11 轮修复确认）；SAM 解析对未知参考/坏 CIGAR/
+  坏 POS 均 bail，`pos + mlen - 1` 因 SAM POS 1-based（pos≥1）无下溢。
+- `parse_parallel`：`auto`=全核、`half`=`div_ceil(2).clamp(1,8)`、整数
+  `1..=1024`，非法值友好报错。
+- `build_layouts`：overlap 超过前一步末端有 `ensure!` 防护（零 panic）。
+
+第二十一轮结论：纵深复核未发现新问题，收尾轮干净；`cargo fmt`/`clippy`
+干净，`cargo test --lib` 与相关集成测试通过，L1 smoke 字节级一致。
+
 ## 结论
 
 `asm` 命令族审核完成（累计修复 5 类问题 + 4 处 `-o` 防护统一 + 1 处 `--keep-dir`
@@ -324,6 +671,29 @@ asm 家族对照 BBTools tadpole（contig）、BCALM2/GATB `ograph.cpp graph3`
 `docs/asm.md` 补 anchor/extend 文档、`docs/asm.md` k 上限 128→256、`extend` 的 `-k`
 帮助范围、`docs/asm.md` multik 段补 `--merge-similar`/`--merge-len` + 第十二轮 3 处：
 `bridge_filter` 文档-行为一致性、`extend --min-support 0` 校验、multik trace 无效目录
-容错），经纵深复核收敛；与 BBTools/BCALM
+容错 + 第十三轮 4 处：`--supermer-m` minimizer 长度与 pgr 单点事实来源对齐
+（`minimizer_len(k)`，含 `k-1` 上界与 `ceil(k/4)`）、`docs/asm.md` `--supermer` 补
+`k-1` 上界、`progressive_filter` 注释 cutoff 上限改 25% 中位数、`docs/asm.md` cns
+输出头逗号改空格 + 第十四轮 3 处：banded Levenshtein 首碱基漏计修复、
+`dominant_offset` 重复实现删除（复用 `overlap_geometry`）、`--min-count-seed 0`
+校验（unitig/contig）+ 第十五轮 1 处：`cns --dedup-ratio` 范围校验 (0.0, 1.0] +
+第十六轮 1 处：`unitig.rs` 覆盖度重建注释"last right entry"→"the seed / first
+right entry"（代码正确，注释误导）+ 第十七轮 3 处：`sequence_similarity` 零带宽
+退化修复（`--merge-similar 1.0` 时完全相同的序列不再返回 0.0）、`Master::round`
+计时 `prog` 槽位改用 `t6.duration_since(t5)`、`bubble_merge` 长度上限文档改
+`merge_len * k / merge_similar`，+ 第十八轮 3 处：空 reads 构建的 k=0 空表
+查询 panic 修复（空输入文件不再 `sorted_entries`/`solid_entries`/`prefix_index`
+panic）、`build_threaded` 的 `threads` 参数文档修正（advisory、不建私有池）、
+`base_code`/`base_comp_code` 文档改"其它碱基映射 0、须 `base_defined` 门控"，
+第十九轮 1 处：`bubble.rs` `expand_right` 的 `self.dest = dest_id` 赋值移到
+`mid_nodes_concur` 之前（修复间接泡泡路径恒失效，对齐 BBTools
+`BubblePopper.expandRight`），
+第二十轮 3 处：`is_junction` 重复实现上提为共享标量函数（消除 refine 与
+assemble 的公式漂移风险）、`read_unitigs` 标签去重循环递增至唯一（消除
+重复 unitig 名数据完整性缺陷）、`assemble_unitigs_core` 入口补空输入
+`ensure!`（消除 `--supermer` FASTA 探测的 `infiles[0]` 潜在 panic），
+第二十一轮为干净收尾轮（未发现新问题，复核 multik/cns/ovlp/extend/anchor
+命令层、olc 库入口与 parse_parallel，确认既有防护完备），
+经纵深复核收敛；与 BBTools/BCALM
 语义对拍、边界输入验证零 panic，`cargo fmt`/`clippy` 干净（asm 相关无新增告警），
 相关集成测试与 `cargo test --lib` 全部通过。

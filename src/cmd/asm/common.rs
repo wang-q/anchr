@@ -79,9 +79,20 @@ pub fn read_unitigs(infiles: &[String]) -> anyhow::Result<Vec<Unitig>> {
     let mut tags = Vec::with_capacity(infiles.len());
     let mut used = HashSet::new();
     for (i, path) in infiles.iter().enumerate() {
-        let mut tag = tag_for(path);
+        let base = tag_for(path);
+        let mut tag = base.clone();
         if used.contains(&tag) {
-            tag = format!("{tag}.{i}");
+            // Disambiguate with the file index, then keep bumping until the
+            // synthesized tag itself is not already taken (a stem equal to
+            // another stem's `.{i}` suffix must not collide).
+            let mut n = i;
+            loop {
+                tag = format!("{base}.{n}");
+                if !used.contains(&tag) {
+                    break;
+                }
+                n += 1;
+            }
         }
         used.insert(tag.clone());
         tags.push(tag);

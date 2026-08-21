@@ -62,7 +62,7 @@ Examples:
                 .num_args(1)
                 .default_value("1.0")
                 .value_parser(value_parser!(f64))
-                .help("Drop a contig when a longer kept contig covers this fraction of it (1.0 = exact substring; <1.0 merges boundary-differing near-duplicates)"),
+                .help("Drop a contig when a longer kept contig covers this fraction of it (0.0, 1.0]; 1.0 = exact substring; <1.0 merges boundary-differing near-duplicates)"),
         )
 }
 

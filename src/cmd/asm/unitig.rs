@@ -128,7 +128,7 @@ Examples:
                 .long("supermer-m")
                 .num_args(1)
                 .value_parser(value_parser!(usize))
-                .help("Minimizer length for --supermer (default: auto min(12, max(5, k/4)))"),
+                .help("Minimizer length for --supermer (default: auto min(12, max(5, ceil(k/4)), k-1))"),
         )
         .arg(
             Arg::new("parallel")
@@ -176,7 +176,7 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         supermer_m: args
             .get_one::<usize>("supermer_m")
             .copied()
-            .or_else(|| use_supermer.then(|| (12).min((5).max(k / 4)))),
+            .or_else(|| use_supermer.then(|| pgr::libs::kmer::supermer::minimizer_len(k))),
         parallel,
         ..AssembleOptions::default()
     };

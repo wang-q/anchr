@@ -291,6 +291,11 @@ impl BubblePopper {
         let Some(mid_nodes) = self.fetch_mid_nodes(&outbound, true) else {
             return false;
         };
+        // `mid_nodes_concur` compares each mid's right-dest against
+        // `self.dest`; the reference assigns `dest` before the concurrency
+        // check, so set it here or the check sees the `usize::MAX` reset and
+        // always fails (silently disabling indirect bubble pops).
+        self.dest = dest_id;
         if !self.mid_nodes_concur(&mid_nodes) {
             return false;
         }
@@ -302,7 +307,6 @@ impl BubblePopper {
         let Some(right_mid_edge) = right_mid_edge else {
             return false;
         };
-        self.dest = dest_id;
         self.pop(
             center_id,
             dest_id,

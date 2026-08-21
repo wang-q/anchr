@@ -7,6 +7,7 @@ mod bubble;
 mod contig;
 mod unitig;
 
+pub(crate) use super::is_junction;
 pub use contig::assemble;
 pub use unitig::{assemble_unitigs, assemble_unitigs_buf};
 pub(crate) use unitig::{
@@ -102,19 +103,6 @@ impl AssembleOptions {
     fn resolved_min_contig_len(&self) -> usize {
         self.min_contig_len
     }
-}
-
-/// `Tadpole.isJunction(max, second)`: depth-ratio branch detection.
-fn is_junction(max: u32, second: u32, opts: &AssembleOptions) -> bool {
-    if second < 1
-        || (second as f32) * opts.branch_mult1 < max as f32
-        || (second <= opts.branch_lower_const as u32
-            && (max as f32)
-                >= (opts.min_count_extend as f32).max(second as f32 * opts.branch_mult2))
-    {
-        return false;
-    }
-    true
 }
 
 /// Assembly statistics.

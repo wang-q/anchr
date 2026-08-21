@@ -133,7 +133,8 @@ anchr asm unitig [OPTIONS] <infiles>...
     output); kept as an explicit flag for compatibility.
 *   `--no-dfa`: Disable the DFA-state walk and use the bucket-scan walk.
 *   `--supermer`: Experimental: FastK-style super-mer two-stage counting
-    (pgr `kmer::supermer`, adaptive minimizer `min(12, max(5, ceil(k/4)))`).
+    (pgr `kmer::supermer`, adaptive minimizer `min(12, max(5, ceil(k/4)),
+    k-1)`).
     **Default for FASTA input** (no quality scores → equivalent to direct
     counting); FASTQ automatically falls back to the direct quality-gated
     counter. `--no-supermer` forces the direct streamed counter.
@@ -393,7 +394,7 @@ must agree).
 The unitig FASTA files must be the same files passed to `anchr asm ovlp` and
 `anchr asm layout`. The layout TSV is the first positional argument.
 
-Output is FASTA (`>contig_<id>,len=...,cov=...`, 70-column wrap, longest
+Output is FASTA (`>contig_<id> len=...,cov=...`, 70-column wrap, longest
 first); `cov` is the approximate unitig depth (sum of unitig lengths over
 the contig length).
 

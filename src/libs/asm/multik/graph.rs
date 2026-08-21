@@ -118,8 +118,15 @@ pub(crate) fn sequence_similarity(a: &[u8], b: &[u8], min_similarity: f64) -> f6
     let n = a.len();
     let m = b.len();
     let max_indel = (n.max(m) as f64 * (1.0 - min_similarity)) as usize;
-    if n.abs_diff(m) > max_indel || max_indel < 1 {
+    if n.abs_diff(m) > max_indel {
         return 0.0;
+    }
+    // A zero-width band cannot span even one indel, so only an exact match
+    // reaches `min_similarity` (any substitution or indel drops below it);
+    // report the two discrete outcomes instead of always 0.0, which would
+    // silently disable bubble merging at `--merge-similar 1.0`.
+    if max_indel == 0 {
+        return if a == b { 1.0 } else { 0.0 };
     }
     // Row i-1 of the banded DP; dp[j] is the edit distance between a[..i]
     // and b[..j] for |i - j| <= max_indel (entries outside the band stay
@@ -155,7 +162,8 @@ pub(crate) fn sequence_similarity(a: &[u8], b: &[u8], min_similarity: f64) -> f6
 /// the same partner (each middle has exactly one in- and one out-link,
 /// megahit `SearchAndPopBubble`), keep the highest-coverage path and drop
 /// the alternatives — but only when every alternative is length-bounded
-/// (`merge_len * k`) and edit-distance-similar to the main path (megahit
+/// (`merge_len * k / merge_similar`) and edit-distance-similar to the main
+/// path (megahit
 /// complex bubble: `>= merge_similar`). Dropped alternatives are returned
 /// as independent unitigs so variant content is not lost; the surviving
 /// chain is fused by the following recompaction.
@@ -401,10 +409,11 @@ fn retain_graph(
 
 /// Progressive abundance filter (metaMDBG `removeAbundanceNoQueue`):
 /// repeatedly drop unitigs below a cutoff that grows ~10% per round from
-/// 1.1 up to the graph's maximum abundance, then recompact the surviving
-/// graph (merge chains so the main path inherits its flanks' higher
-/// abundance and is not dropped by later cutoffs). Dropped unitigs are
-/// returned as independent output (metaMDBG keeps them via cutoff
+/// 1.1 up to 25% of the median unitig coverage (not the graph maximum — a
+/// repeated region can inflate it to hundreds of x), then recompact the
+/// surviving graph (merge chains so the main path inherits its flanks'
+/// higher abundance and is not dropped by later cutoffs). Dropped unitigs
+/// are returned as independent output (metaMDBG keeps them via cutoff
 /// snapshots), so low-abundance species are not lost.
 pub(crate) fn progressive_filter(
     unitigs: &mut Vec<Unitig>,

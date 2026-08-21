@@ -313,6 +313,7 @@ impl Master {
         );
         self.carried = dropped;
         self.carried_branch = dropped_branch;
+        let t6 = std::time::Instant::now();
         trace_graph(
             &format!("r{k0}_k{k}_after_prog"),
             &self.unitigs,
@@ -347,7 +348,7 @@ impl Master {
                 t3.duration_since(t2).as_secs_f64(),
                 t4.duration_since(t3).as_secs_f64(),
                 t5.duration_since(t4).as_secs_f64(),
-                t5.elapsed().as_secs_f64(),
+                t6.duration_since(t5).as_secs_f64(),
                 t_round.elapsed().as_secs_f64()
             );
         }

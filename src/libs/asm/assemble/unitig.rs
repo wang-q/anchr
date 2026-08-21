@@ -123,6 +123,9 @@ pub(crate) fn assemble_unitigs_core(
     infiles: &[String],
     opts: &AssembleOptions,
 ) -> Result<(Vec<Unitig>, AssembleStats)> {
+    // Guard before the `--supermer` FASTA probe (`infiles[0]`) below; all
+    // CLI callers check this first, but the empty case must not panic here.
+    anyhow::ensure!(!infiles.is_empty(), "at least one input file is required");
     anyhow::ensure!(
         opts.k >= 1,
         "k-mer length must be at least 1, got {}",
@@ -133,6 +136,11 @@ pub(crate) fn assemble_unitigs_core(
         "k-mer length must be at most {} (the k-mer key limit), got {}",
         key::Kmer::MAX_K,
         opts.k
+    );
+    anyhow::ensure!(
+        opts.min_count_seed >= 1,
+        "min-count-seed must be at least 1, got {} (0 treats every k-mer as solid and erases error filtering)",
+        opts.min_count_seed
     );
     // `--supermer` is the default for FASTA input (no quality scores, so
     // counting without quality gating is equivalent); FASTQ falls back to
@@ -400,10 +408,10 @@ fn build_unitigs(table: &RefineTable, opts: &AssembleOptions) -> Vec<Unitig> {
             bb = rev_comp(&bb).collect();
         }
         // The RC walk covers the left prefix (positions 0..l-1 of the final
-        // sequence, reversed) plus a duplicate of the last right k-mer; the
-        // right walk covers positions l..l+r. Reassemble the output-order
-        // counts from the two lists (drop `left_counts[0]`, which is the
-        // same canonical k-mer as the last right entry).
+        // sequence, reversed) plus a duplicate of the seed k-mer; the right
+        // walk covers the seed onward (positions l..l+r). Reassemble the
+        // output-order counts from the two lists (drop `left_counts[0]`,
+        // which is the same canonical k-mer as the first right entry).
         let mut counts: Vec<u32> = left_counts[1..].iter().rev().copied().collect();
         counts.extend_from_slice(&right_counts);
         let counts = if keep {

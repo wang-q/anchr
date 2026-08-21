@@ -40,9 +40,11 @@ impl RefineTable {
         Self::build_threaded(reads, k, min_prob, 0)
     }
 
-    /// `build` with an explicit worker count: `threads == 0` uses the
-    /// rayon global pool (all cores); otherwise a private pool of exactly
-    /// `threads` workers runs the per-chunk emission + merge.
+    /// `build` with an explicit worker count (kept for call-site symmetry).
+    ///
+    /// `threads` is advisory: the parallel per-chunk emission runs on the
+    /// ambient rayon pool (the caller wraps the assemble call in a single
+    /// `--parallel` pool), so no private pool is ever spawned here.
     pub(crate) fn build_threaded(
         reads: &[(Vec<u8>, Vec<u8>)],
         k: usize,
@@ -51,8 +53,15 @@ impl RefineTable {
     ) -> Self {
         let (prob_correct, prob_correct_inv) = prob_tables();
         if reads.is_empty() {
+            // Keep `k` so the empty table stays queryable: a defaulted
+            // table (k=0) would panic on `get_count` (0/0 in prefix_index)
+            // and on the `chunks_exact(0)` of the sorted/solid snapshots.
             return Self {
-                table: pgr::libs::kmer::KmerTable::default(),
+                table: pgr::libs::kmer::KmerTable {
+                    k,
+                    keys: Vec::new(),
+                    counts: Vec::new(),
+                },
                 prefix_index: OnceLock::new(),
                 sorted: OnceLock::new(),
             };
@@ -694,7 +703,9 @@ impl Kmer {
 }
 
 /// 2-bit base code, mirroring `AminoAcid.baseToNumber`: A=0, C=1, G=2,
-/// T/U=3, and -1 for everything else (N and ambiguity reset the k-mer window).
+/// T/U=3. Everything else maps to 0, so callers must gate on
+/// [`base_defined`] first (the k-mer windows reset on N/ambiguity before
+/// ever calling this).
 pub(crate) fn base_code(b: u8) -> u8 {
     match b {
         b'A' | b'a' => 0,
@@ -706,7 +717,8 @@ pub(crate) fn base_code(b: u8) -> u8 {
 }
 
 /// Reverse-complement code, mirroring `AminoAcid.baseToComplementNumber`:
-/// A=3, C=2, G=1, T/U=0, and -1 for everything else (including N).
+/// A=3, C=2, G=1, T/U=0. Everything else maps to 0; callers must gate on
+/// [`base_defined`] first.
 pub(crate) fn base_comp_code(b: u8) -> u8 {
     match b {
         b'A' | b'a' => 3,
@@ -836,6 +848,25 @@ mod tests {
             x = (x << 2) | k.base_at(i) as u128;
         }
         x
+    }
+
+    #[test]
+    fn empty_reads_table_stays_queryable() {
+        // A build from zero reads must still carry `k`: querying the empty
+        // table (get_count / fill_* / sorted / solid snapshots) has to be
+        // safe and empty instead of panicking on a defaulted k=0 table.
+        let table = RefineTable::build(&[], 81, 0.5);
+        let mut probe = Kmer::new(81);
+        for &b in b"ACGTACGTACGTACGTACGTACGTACGTACGT" {
+            probe.push_right(base_code(b));
+        }
+        assert_eq!(table.get_count(&probe), 0);
+        assert_eq!(table.find_row(&probe), None);
+        assert!(table.sorted_entries().is_empty());
+        assert!(table.solid_entries(1).is_empty());
+        assert!(table.solid_row_ranks(1).is_empty());
+        assert!(table.fill_left_counts(&probe).iter().all(|&c| c == 0));
+        assert!(table.fill_right_counts(&probe).iter().all(|&c| c == 0));
     }
 
     #[test]

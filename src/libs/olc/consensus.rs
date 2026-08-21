@@ -31,6 +31,14 @@ pub fn consensus_with_ratio(
     min_contig_len: usize,
     ratio: f64,
 ) -> Result<Vec<Contig>> {
+    // `ratio` gates approximate dedup (`cns --dedup-ratio`): <= 0 would drop
+    // any contig sharing a single 31-mer with a kept contig (degenerate),
+    // and > 1 silently degrades to the exact-substring path. Mirror the
+    // `--merge-similar` range check in the multik driver.
+    anyhow::ensure!(
+        ratio > 0.0 && ratio <= 1.0,
+        "dedup ratio must be in (0.0, 1.0], got {ratio}"
+    );
     let mut contigs = Vec::new();
     for (ci, layout) in layouts.iter().enumerate() {
         let mut seq: Vec<u8> = Vec::new();
@@ -466,7 +474,7 @@ fn identity(a: &[u8], b: &[u8]) -> f64 {
                 let d = prev[c] + usize::from(ai != bj);
                 best = best.min(d);
             } else if i == 0 && j == 0 {
-                best = 0;
+                best = usize::from(ai != bj);
             }
             // deletion (consume a[i] only)
             if i > 0 && c + 1 < width {
@@ -585,30 +593,31 @@ pub(crate) fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
     // `haystack` even across large internal indels (a 120 bp insertion made
     // the fixed 100-mer anchors below miss the tail); the banded identity
     // then measures how much of `needle` is covered.
-    if let Some((off, hits, matched)) = dominant_offset(haystack, needle) {
-        let ratio = hits as f64 / matched.max(1) as f64;
-        // A large internal indel splits the offset histogram into two peaks
-        // (e.g. a 120 bp insertion leaves 76% at one offset); the banded
-        // identity below tolerates the indel, so the peak-ratio bar is only
-        // a candidate filter — the >=99% identity check does the judging.
+    let mut index: std::collections::HashMap<&[u8], Vec<usize>> = std::collections::HashMap::new();
+    for (p, w) in haystack.windows(SEED_LEN).enumerate() {
+        index.entry(w).or_default().push(p);
+    }
+    // Reuses the exact-offset histogram (and its bounded fallback for
+    // repetitive inputs) of `overlap_geometry` so homopolymer-rich contigs
+    // do not fan out quadratically.
+    let (off, hits, matched) = overlap_geometry(&index, needle);
+    if hits >= 100 && hits as f64 / matched.max(1) as f64 >= 0.6 {
         // A large internal indel can split the histogram into two near-equal
         // peaks (e.g. 66%/34% for a 120 bp insertion); the peak-ratio bar is
         // only a candidate filter, the >=99% identity check does the judging.
-        if hits >= 100 && ratio >= 0.6 {
-            let hay_len = haystack.len() as isize;
-            let nd_len = needle.len() as isize;
-            let start = off.max(0) as usize;
-            let end = (off + nd_len).clamp(0, hay_len) as usize;
-            if end > start {
-                let a = &haystack[start..end];
-                let nstart = if off < 0 { off.unsigned_abs() } else { 0 };
-                let nend = nstart + (end - start);
-                if nend <= needle.len() {
-                    let idy = identity(a, &needle[nstart..nend]);
-                    let covered = (end - start) as f64 * idy / nd_len as f64;
-                    if covered >= 0.99 {
-                        return covered.min(1.0);
-                    }
+        let hay_len = haystack.len() as isize;
+        let nd_len = needle.len() as isize;
+        let start = off.max(0) as usize;
+        let end = (off + nd_len).clamp(0, hay_len) as usize;
+        if end > start {
+            let a = &haystack[start..end];
+            let nstart = if off < 0 { off.unsigned_abs() } else { 0 };
+            let nend = nstart + (end - start);
+            if nend <= needle.len() {
+                let idy = identity(a, &needle[nstart..nend]);
+                let covered = (end - start) as f64 * idy / nd_len as f64;
+                if covered >= 0.99 {
+                    return covered.min(1.0);
                 }
             }
         }
@@ -672,34 +681,6 @@ pub(crate) fn coverage(haystack: &[u8], needle: &[u8]) -> f64 {
     }
     covered += cur_end - cur_start;
     covered.min(needle.len()) as f64 / needle.len() as f64
-}
-
-/// Dominant 31-mer offset of `needle` inside `haystack` (position in
-/// haystack minus position in needle), its hit count, and the number of
-/// needle windows present anywhere in `haystack`. Returns `None` for empty
-/// or too-short inputs.
-fn dominant_offset(haystack: &[u8], needle: &[u8]) -> Option<(isize, usize, usize)> {
-    let k = SEED_LEN;
-    if needle.len() < k || haystack.len() < k {
-        return None;
-    }
-    let mut index: std::collections::HashMap<&[u8], Vec<usize>> = std::collections::HashMap::new();
-    for (p, w) in haystack.windows(k).enumerate() {
-        index.entry(w).or_default().push(p);
-    }
-    let mut hist: std::collections::HashMap<isize, usize> = std::collections::HashMap::new();
-    let mut matched = 0usize;
-    for (i, w) in needle.windows(k).enumerate() {
-        if let Some(ps) = index.get(w) {
-            matched += 1;
-            for &p in ps {
-                *hist.entry(p as isize - i as isize).or_default() += 1;
-            }
-        }
-    }
-    hist.into_iter()
-        .max_by_key(|(_, n)| *n)
-        .map(|(o, n)| (o, n, matched))
 }
 
 #[cfg(test)]
@@ -1137,6 +1118,50 @@ mod tests {
                 query.len()
             );
         }
+    }
+
+    /// The first base pair must count toward the edit distance (a plain
+    /// base-case `best = 0` silently treated `a[0] != b[0]` as a match,
+    /// over-reporting identity for boundary-differing near-duplicates).
+    #[test]
+    fn identity_counts_first_base_mismatch() {
+        // Differing first base, matching second: edit distance 1, not 0.
+        assert!((identity(b"AC", b"GC") - 0.5).abs() < 1e-9);
+        // Single-base pair: a mismatch is identity 0, not 1.
+        assert!((identity(b"A", b"G") - 0.0).abs() < 1e-9);
+        assert!((identity(b"A", b"A") - 1.0).abs() < 1e-9);
+    }
+
+    /// Substitution-only sequences score `1 - mismatches / len`.
+    #[test]
+    fn identity_scores_substitutions() {
+        assert!((identity(b"ACGT", b"ACGT") - 1.0).abs() < 1e-9);
+        assert!((identity(b"ACGT", b"ACGA") - 0.75).abs() < 1e-9);
+        assert!((identity(b"ACGT", b"AGGT") - 0.75).abs() < 1e-9);
+        // A mid-sequence indel costs 2 (delete + insert), so `ATGT` vs
+        // `ACGT` is distance 1 (substitute) — the banded path finds it.
+        assert!((identity(b"ATGT", b"ACGT") - 0.75).abs() < 1e-9);
+    }
+
+    /// The dedup ratio must be in (0.0, 1.0]: 0/negative would drop any
+    /// contig sharing a 31-mer with a kept one, and > 1 silently degrades to
+    /// exact-substring semantics (friendly error, not silent misbehaviour).
+    #[test]
+    fn rejects_out_of_range_dedup_ratio() {
+        let us = unitigs(&["u0"], &["ACGTACGT"]);
+        let layouts = vec![layout(vec![LayoutStep {
+            unitig: 0,
+            strand: '+',
+            q_start: 0,
+            q_end: 8,
+            overlap_len: 0,
+        }])];
+        for bad in [0.0, -0.1, 1.1] {
+            let err = consensus_with_ratio(&us, &layouts, 1, bad).unwrap_err();
+            assert!(err.to_string().contains("dedup ratio"), "{err}");
+        }
+        assert!(consensus_with_ratio(&us, &layouts, 1, 1.0).is_ok());
+        assert!(consensus_with_ratio(&us, &layouts, 1, 0.5).is_ok());
     }
 
     fn concat(a: &[u8], b: &[u8]) -> Vec<u8> {

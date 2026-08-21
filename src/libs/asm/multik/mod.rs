@@ -378,6 +378,21 @@ mod tests {
         assert!(sequence_similarity(a, &c, 0.95) < 0.95);
     }
 
+    /// A zero-width band (`--merge-similar 1.0`, or near-1.0 on short
+    /// sequences) must still report identical sequences as 1.0 and any
+    /// differing pair as 0.0 — not collapse everything to 0.0, which would
+    /// silently disable bubble merging.
+    #[test]
+    fn sequence_similarity_zero_width_band() {
+        let a = b"ACGTACGTACGTACGTACGT";
+        assert!((sequence_similarity(a, a, 1.0) - 1.0).abs() < 1e-9);
+        assert!((sequence_similarity(a, a, 0.99) - 1.0).abs() < 1e-9);
+        let mut b = a.to_vec();
+        b[5] = b'G';
+        assert_eq!(sequence_similarity(a, &b, 1.0), 0.0);
+        assert_eq!(sequence_similarity(a, &b, 0.99), 0.0);
+    }
+
     #[test]
     fn bubble_merge_keeps_dominant_path() {
         // m1 (dominant) = C*40, m2 (variant) = C*38 + G A (2 substitutions

@@ -89,6 +89,11 @@ pub fn assemble<W: Write>(
         key::Kmer::MAX_K,
         opts.k
     );
+    anyhow::ensure!(
+        opts.min_count_seed >= 1,
+        "min-count-seed must be at least 1, got {} (0 treats every k-mer as solid and erases error filtering)",
+        opts.min_count_seed
+    );
 
     // Read + canonicalize + phred-convert in one pass (one record buffer).
     let reads = read_records(infiles)?;
@@ -346,15 +351,36 @@ fn extend_to_right(
     if right_max < opts.min_count_extend as u32 {
         return (DEAD_END, 0.0);
     }
-    if is_junction(right_max, right_second, opts) {
-        let d = is_junction(left_max, left_second, opts);
+    if is_junction(
+        right_max,
+        right_second,
+        opts.branch_mult1,
+        opts.branch_mult2,
+        opts.branch_lower_const,
+        opts.min_count_extend,
+    ) {
+        let d = is_junction(
+            left_max,
+            left_second,
+            opts.branch_mult1,
+            opts.branch_mult2,
+            opts.branch_lower_const,
+            opts.min_count_extend,
+        );
         return if d {
             (D_BRANCH, calc_ratio(&right))
         } else {
             (F_BRANCH, calc_ratio(&right))
         };
     }
-    if is_junction(left_max, left_second, opts) {
+    if is_junction(
+        left_max,
+        left_second,
+        opts.branch_mult1,
+        opts.branch_mult2,
+        opts.branch_lower_const,
+        opts.min_count_extend,
+    ) {
         return (B_BRANCH, calc_ratio(&left));
     }
 
@@ -377,8 +403,22 @@ fn extend_to_right(
         let right_second_pos = second_highest_position(&right);
         let right_second = right[right_second_pos];
 
-        let fbranch = is_junction(right_max, right_second, opts);
-        let bbranch = is_junction(left_max, left_second, opts);
+        let fbranch = is_junction(
+            right_max,
+            right_second,
+            opts.branch_mult1,
+            opts.branch_mult2,
+            opts.branch_lower_const,
+            opts.min_count_extend,
+        );
+        let bbranch = is_junction(
+            left_max,
+            left_second,
+            opts.branch_mult1,
+            opts.branch_mult2,
+            opts.branch_lower_const,
+            opts.min_count_extend,
+        );
         let hbranch = left_max_pos != evicted as usize && opts.branch_mult1 > 0.0;
         if bbranch || hbranch {
             let ratio = if fbranch {
@@ -820,7 +860,16 @@ fn process_contig_left(
     let mut edges_to_add: Vec<EdgeRef> = Vec::new();
     for x in 0..4u8 {
         let count = left[x as usize];
-        if count > 0 && is_junction(left_max, count, opts) {
+        if count > 0
+            && is_junction(
+                left_max,
+                count,
+                opts.branch_mult1,
+                opts.branch_mult2,
+                opts.branch_lower_const,
+                opts.min_count_extend,
+            )
+        {
             let mut kmer = kmer0;
             kmer.push_left(x);
             // Tadpole1 (k <= 31) walks the left edge in reverse-complement
@@ -867,7 +916,16 @@ fn process_contig_right(
     let mut edges_to_add: Vec<EdgeRef> = Vec::new();
     for x in 0..4u8 {
         let count = right[x as usize];
-        if count > 0 && is_junction(right_max, count, opts) {
+        if count > 0
+            && is_junction(
+                right_max,
+                count,
+                opts.branch_mult1,
+                opts.branch_mult2,
+                opts.branch_lower_const,
+                opts.min_count_extend,
+            )
+        {
             let mut kmer = kmer0;
             kmer.push_right(x);
             let mut bb = vec![number_to_base(x)];
@@ -916,7 +974,14 @@ fn explore_right(
         let left_max = left[left_max_pos];
         let left_second_pos = second_highest_position(&left);
         let left_second = left[left_second_pos];
-        if is_junction(left_max, left_second, opts) {
+        if is_junction(
+            left_max,
+            left_second,
+            opts.branch_mult1,
+            opts.branch_mult2,
+            opts.branch_lower_const,
+            opts.min_count_extend,
+        ) {
             return (None, length, 0);
         }
         let right = table.fill_right_counts(&kmer);
@@ -927,7 +992,14 @@ fn explore_right(
         if right_max < opts.min_count_extend as u32 {
             return (None, length, 0);
         }
-        if is_junction(right_max, right_second, opts) {
+        if is_junction(
+            right_max,
+            right_second,
+            opts.branch_mult1,
+            opts.branch_mult2,
+            opts.branch_lower_const,
+            opts.min_count_extend,
+        ) {
             return (None, length, 0);
         }
         bb.push(number_to_base(right_max_pos as u8));
