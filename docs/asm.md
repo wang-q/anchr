@@ -7,11 +7,14 @@ reads and mapping reads back to an assembly.
 
 *   `contig`: Assemble reads into contigs (tadpole-compatible).
 *   `unitig`: Assemble reads into maximal unitigs (BCALM-style compaction).
+*   `anchor`: Select reliable anchors (properly covered regions) from
+    unitigs by read coverage.
 *   `map`: Map reads to a reference requiring perfect matches (bbmap
     perfectmode replacement).
 *   `ovlp`: Find exact overlaps between unitigs (OLC stage 1).
 *   `layout`: Chain unitigs into layouts from an overlap PAF (OLC stage 2).
 *   `cns`: Stitch layouts into consensus contigs (OLC stage 3).
+*   `extend`: Extend contig ends along read-supported k-mer paths.
 *   `multik`: Assemble reads into long unitigs by iterating over increasing
     k (cross-round junction validation).
 *   `olc`: Assemble reads into contigs via multi-k unitig OLC (full
@@ -40,7 +43,7 @@ anchr asm contig [OPTIONS] <infiles>...
 
 ### Options
 
-*   `-k, --kmer <int>`: K-mer length (default 31; up to 128, the k-mer key
+*   `-k, --kmer <int>`: K-mer length (default 31; up to 256, the k-mer key
     table limit — k > 64 uses multi-word k-mers).
 *   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
 *   `--min-contig-len <int>`: Minimum contig length (default:
@@ -56,8 +59,7 @@ anchr asm contig [OPTIONS] <infiles>...
     and `#` comments are ignored).
 *   `-p, --parallel <int|auto>`: Worker threads for k-mer counting
     (default: half of logical cores, capped at 8; `auto` = all cores);
-    the walk stays deterministic
-    single-pass.
+    the walk stays deterministic single-pass.
 
 Input is one or more FASTA/FASTQ files, plain or gzipped. Pairing is
 irrelevant for assembly: every record from every file contributes its
@@ -110,7 +112,7 @@ anchr asm unitig [OPTIONS] <infiles>...
 
 ### Options
 
-*   `-k, --kmer <int>`: K-mer length (default 31; up to 128, the k-mer key
+*   `-k, --kmer <int>`: K-mer length (default 31; up to 256, the k-mer key
     table limit — k > 64 uses multi-word k-mers).
 *   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
 *   `--min-contig-len <int>`: Minimum unitig length (default: 0 — keep all
@@ -183,6 +185,63 @@ odd number of records work fine.
 
 ---
 
+## anchor
+
+Selects the reliable anchors of the unitigs by mapping the reads back with
+perfect matches (`anchr asm map` semantics), computing the per-base depth,
+and keeping positions inside `[lower, upper]`:
+`lower = max(mincov, (median - mscale*MAD)/lscale)`,
+`upper = (median + mscale*MAD)*uscale`.
+Low-coverage positions are likely errors, high-coverage positions likely
+repeats; both are excluded, and the remaining contiguous stretches are the
+anchors (legacy `anchr anchors` flow, modern `asm` implementation).
+
+Anchors are the reliable fragments to feed the OLC merge: assemble per
+coverage set with `anchr asm multik`, select anchors per set, then merge
+them all with `anchr asm olc --unitigs`.
+
+```bash
+anchr asm anchor [OPTIONS] <unitig.fa> <reads...>
+```
+
+### Options
+
+*   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
+*   `--mincov <int>`: Absolute floor for the lower coverage bound (default 5).
+*   `--mscale <float>`: Median absolute deviation multiplier (default 3).
+*   `--lscale <float>`: Lower-window divider (default 3).
+*   `--uscale <float>`: Upper-window multiplier (default 2).
+*   `--min-anchor-len <int>`: Minimum anchor length in bases (default 500).
+*   `-k, --kmer <int>`: Seed k-mer length for the perfect-match read mapping
+    (default 31).
+*   `-p, --parallel <int>`: Worker threads for the read mapping (1..=1024,
+    default 8).
+*   `--stats <file>`: Output TSV with
+    Mapped/median/MAD/lower/upper/SumOthers.
+*   `--list-files`: Treat `<infiles>` as list files, one sequence file path
+    per line (blank lines and `#` comments are ignored).
+
+The first input is the unitig/contig FASTA; the remaining inputs are the read
+files (FASTA/FASTQ, plain or gzipped) — use the SAME coverage subset that
+produced the unitigs (not the full read set), so the depth matches. Output
+FASTA names carry the source unitig and interval
+(`anchor_<n>_<unitig>_<start>-<end>`), 70-column wrapped.
+
+### Examples
+
+1.  **Anchors from one coverage set**:
+    ```bash
+    anchr asm anchor k40.fa reads40.fq.gz -o anchors40.fa
+    ```
+
+2.  **Tune the coverage window**:
+    ```bash
+    anchr asm anchor k40.fa reads40.fq.gz -o anchors40.fa \
+        --mincov 10 --mscale 3 --lscale 3 --uscale 2 --min-anchor-len 1000
+    ```
+
+---
+
 ## map
 
 Maps reads to a reference (typically an assembly) requiring every read to
@@ -213,7 +272,7 @@ anchr asm map [OPTIONS] <ref.fa> <reads.fq...>
 
 ### Options
 
-*   `-k, --kmer <int>`: Seed k-mer length (default 31, range 1..=128).
+*   `-k, --kmer <int>`: Seed k-mer length (default 31, range 1..=256).
 *   `--outm <file>`: SAM output of perfectly matched reads.
 *   `--outu <file>`: SAM output of unmapped reads.
 *   `--paired`: Map reads as R1/R2 pairs (exactly 2 read files; pairs with
@@ -271,7 +330,7 @@ anchr asm ovlp [OPTIONS] <infiles>...
 ### Options
 
 *   `-o, --outfile <file>`: Output PAF filename (default: stdout).
-*   `--overlap-k <int>`: Seed k-mer length (default 17; 1..=128, clamped to
+*   `--overlap-k <int>`: Seed k-mer length (default 17; 1..=256, clamped to
     the shortest unitig).
 *   `--min-overlap <int>`: Minimum accepted overlap length in bases
     (default 34).
@@ -361,6 +420,50 @@ anchr asm cns <layout.tsv> <infiles>... -o contigs.fa
 
 ---
 
+## extend
+
+Walks each contig end base-by-base through the reads' k-mer graph: a base is
+appended only when it has a strict majority of read support (>= `--min-support`
+reads and >= 2x the runner-up), so junctions and repetitive contexts stop the
+extension instead of joining distant loci. This closes small coverage gaps at
+contig ends (megahit local-assembly goal) without reassembling the reads; the
+output keeps the input contig order and leaves unsupported ends unchanged.
+
+```bash
+anchr asm extend [OPTIONS] <contigs.fa> <reads...>
+```
+
+### Options
+
+*   `-k, --kmer <int>`: Seed k-mer length (default 31; 2..=256, the k-mer key
+    limit).
+*   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
+*   `--max-extend <int>`: Maximum extension in bases per contig end (default
+    500).
+*   `--min-support <int>`: Minimum read support for each appended base
+    (default 2).
+*   `--min-extend <int>`: Minimum total extension to keep (default 0).
+*   `--min-len <int>`: Minimum input contig length to extend (shorter contigs
+    pass through unchanged; default 1000).
+
+The extension is capped at `--max-extend` bases per end and discarded when
+both ends together extend less than `--min-extend` bases. Output sequences
+are wrapped at 70 columns.
+
+### Examples
+
+1.  **Extend unitigs with the reads they were assembled from**:
+    ```bash
+    anchr asm extend unitigs.fasta pe.cor.fa.gz -o unitigs.ext.fasta
+    ```
+
+2.  **Raise the read-support bar**:
+    ```bash
+    anchr asm extend unitigs.fasta reads.fq.gz --min-support 3 -o out.fasta
+    ```
+
+---
+
 ## multik
 
 Iterates the unitig graph over increasing k-mer lengths (metaMDBG-style
@@ -416,6 +519,10 @@ anchr asm multik [OPTIONS] <infiles>...
     (default 3).
 *   `--min-count-extend <int>`: Solid k-mer count threshold for
     cross-round validation (default 2).
+*   `--merge-similar <float>`: Bubble merge: minimum sequence similarity of
+    the collapsed alternative paths (default 0.95; in `(0.0, 1.0]`).
+*   `--merge-len <int>`: Bubble merge: maximum alternative-path length as a
+    multiple of the master k (default 20; 1..=1024).
 *   `-p, --parallel <int>`: Worker threads for counting (default 0 = all
     cores).
 *   `--all-masters`: Every k in `--kmer` is a master validated by the
@@ -480,12 +587,12 @@ anchr asm olc [OPTIONS] <infiles>...
 ### Options
 
 *   `-k, --kmer <int,int,...>`: Comma-separated k-mer lengths for the unitig
-    sets (default `21,51,81`; each k in 1..=128).
+    sets (default `21,51,81`; each k in 1..=256).
 *   `-o, --outfile <file>`: Output FASTA filename (default: stdout).
 *   `--min-count-seed <int>`: Solid k-mer count threshold for unitig
     assembly (default 3).
 *   `--overlap-k <int>`: Seed k-mer length for overlap detection (default
-    17; 1..=128).
+    17; 1..=256).
 *   `--min-overlap <int>`: Minimum accepted overlap length in bases (default
     34).
 *   `--min-contig-len <int>`: Minimum output contig length (default 500).

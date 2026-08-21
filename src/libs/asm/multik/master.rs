@@ -74,11 +74,12 @@ fn trace_chains(tag: &str, chains: &[MultikUnitig]) {
         return;
     };
     let path = std::path::Path::new(&dir).join(format!("{tag}.fa"));
-    let mut f = std::fs::File::create(&path).unwrap();
-    for (i, u) in chains.iter().enumerate() {
-        writeln!(f, ">u{i} len={} cov={:.1}", u.bases.len(), u.coverage).unwrap();
-        for chunk in u.bases.chunks(100) {
-            writeln!(f, "{}", String::from_utf8_lossy(chunk)).unwrap();
+    if let Ok(mut f) = std::fs::File::create(&path) {
+        for (i, u) in chains.iter().enumerate() {
+            writeln!(f, ">u{i} len={} cov={:.1}", u.bases.len(), u.coverage).unwrap();
+            for chunk in u.bases.chunks(100) {
+                writeln!(f, "{}", String::from_utf8_lossy(chunk)).unwrap();
+            }
         }
     }
 }
@@ -92,17 +93,18 @@ fn trace_graph(tag: &str, unitigs: &[Unitig], links: &[Vec<Link>]) {
         return;
     };
     let path = std::path::Path::new(&dir).join(format!("{tag}.fa"));
-    let mut f = std::fs::File::create(&path).unwrap();
-    for (i, u) in unitigs.iter().enumerate() {
-        writeln!(f, ">u{i} len={} cov={:.1}", u.bases.len(), u.coverage).unwrap();
-        for chunk in u.bases.chunks(100) {
-            writeln!(f, "{}", String::from_utf8_lossy(chunk)).unwrap();
+    if let Ok(mut f) = std::fs::File::create(&path) {
+        for (i, u) in unitigs.iter().enumerate() {
+            writeln!(f, ">u{i} len={} cov={:.1}", u.bases.len(), u.coverage).unwrap();
+            for chunk in u.bases.chunks(100) {
+                writeln!(f, "{}", String::from_utf8_lossy(chunk)).unwrap();
+            }
+            let ls: Vec<String> = links[i]
+                .iter()
+                .map(|l| format!("{}{}", l.to, if l.from_rc { "-" } else { "+" }))
+                .collect();
+            writeln!(f, "#L {}", ls.join(" ")).unwrap();
         }
-        let ls: Vec<String> = links[i]
-            .iter()
-            .map(|l| format!("{}{}", l.to, if l.from_rc { "-" } else { "+" }))
-            .collect();
-        writeln!(f, "#L {}", ls.join(" ")).unwrap();
     }
 }
 
@@ -224,6 +226,12 @@ impl Master {
         let t_round = std::time::Instant::now();
         self.unitigs.append(&mut self.carried);
         self.branch.append(&mut self.carried_branch);
+        // Carried unitigs were pruned as isolated/branching nodes, so they
+        // carry no links. Keep `links` index-aligned with `unitigs` anyway:
+        // `retain_graph` (via remove_unsupported) zips the two, and a
+        // mismatch would silently drop the re-fed unitigs at the truncated
+        // tail, losing low-abundance content.
+        self.links.resize_with(self.unitigs.len(), Vec::new);
         let t0 = std::time::Instant::now();
         let seqs: Vec<&[u8]> = self.unitigs.iter().map(|u| u.bases.as_slice()).collect();
         // Direct counting (unique sequence; see `Master::cut`).

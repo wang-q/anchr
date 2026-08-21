@@ -290,6 +290,11 @@ pub fn extend_contigs(
         "k must be in 2..={} (the k-mer key limit)",
         pgr::libs::kmer::key::Kmer::MAX_K
     );
+    ensure!(
+        opts.min_support >= 1,
+        "min_support must be >= 1, got {} (0 would append bases with no read support)",
+        opts.min_support
+    );
     if contigs.is_empty() {
         return Ok(Vec::new());
     }

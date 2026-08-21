@@ -307,6 +307,77 @@ fn command_asm_multik_bubble_merge_options_accepted() {
     assert_eq!(longest, genome.len());
 }
 
+/// `--merge-len` multiplies the master k in the bubble-merge length bound,
+/// so an unbounded value would overflow: values above 1024 are rejected with
+/// a friendly error instead of a panic.
+#[test]
+fn command_asm_multik_rejects_huge_merge_len() {
+    let dir = tempfile::tempdir().unwrap();
+    let reads = dir.path().join("reads.fa");
+    fs::write(&reads, ">r1\nACGT\n").unwrap();
+    let out = dir.path().join("out.fa");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "multik",
+            reads.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "-k",
+            "21",
+            "--merge-len",
+            "18446744073709551615", // usize::MAX
+        ])
+        .run_fail();
+    assert!(
+        stderr.contains("--merge-len must be in 1..=1024"),
+        "huge --merge-len must be rejected (got: {stderr})"
+    );
+}
+
+/// `--print-ks` must resolve its inputs through `--list-files` (a one-path
+/// per line list), not treat the list file as a FASTA: the derived ladder is
+/// printed and the command exits.
+#[test]
+fn command_asm_multik_print_ks_list_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let reads = dir.path().join("reads.fa");
+    let list = dir.path().join("reads.list");
+    let mut rng = 42u64;
+    let mut genome = Vec::new();
+    for _ in 0..500 {
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        genome.push(b"ACGT"[(rng >> 33) as usize % 4]);
+    }
+    let mut fa = String::new();
+    for i in 0..30 {
+        fa.push_str(&format!(">r{i}\n"));
+        fa.push_str(&String::from_utf8(genome.clone()).unwrap());
+        fa.push('\n');
+    }
+    fs::write(&reads, fa).unwrap();
+    fs::write(&list, format!("{}\n", reads.display())).unwrap();
+    let (stdout, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "multik",
+            list.to_str().unwrap(),
+            "--list-files",
+            "--print-ks",
+        ])
+        .run();
+    assert_eq!(stderr, "");
+    // 500 bp reads: N50 = 500 -> k_max = clamp(250, 81, 192) = 192, the full
+    // fixed ladder (space-separated increasing integers).
+    let ks: Vec<usize> = stdout
+        .split_whitespace()
+        .map(|s| s.parse().unwrap())
+        .collect();
+    assert_eq!(ks, vec![31, 41, 51, 61, 71, 81, 101, 121, 128, 160, 192]);
+}
+
 /// `--guide-contigs` seeds the master-k count with a previous master's
 /// unitigs (megahit seq2sdbg guidance). It must be accepted and change the
 /// output: a higher-k master alone fragments on short reads, while the

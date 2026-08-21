@@ -39,7 +39,7 @@ mis 不在此层判定（单组 mis 属预期，由多组 anchor 投票消解）
 
 | dataset | 组数 | #contigs | Largest | Total | N50 | #mis | GF% | Dup |
 | ------- | --- | ------: | ------: | ----: | ---: | ---: | ---: | ---: |
-| G37     | 7 | 13 | 187498 | 581339 | 121382 | 0 | 98.674 | 1.001 |
+| G37     | 7 | 10 | 187498 | 579008 | 121382 | 0 | 98.548 | 1.000 |
 | MG1655  | 5 | 91 | 268281 | 4617679 | 112557 | 0 | 98.197 | 1.013 |
 | DH5alpha| 13 | 105 | 258601 | 4496026 | 99473 | 0 | 97.800 | 1.003 |
 
@@ -47,6 +47,13 @@ mis 不在此层判定（单组 mis 属预期，由多组 anchor 投票消解）
 > report.tsv，`--min-contig 10`）会自动打印 #contigs/Total/N50/mis/GF，
 > mis 为硬红线。工作目录默认 `/tmp/asm-gate-full/<ds>`（可 `FULL_WORK=`
 > 覆盖），已完成的各组 anchor 会被复用，避免每次重跑 multik。
+>
+> 2026-08-20 L3 全链重跑（三数据集）：三者 #mis 均 0，MG1655 与
+> DH5alpha 逐指标与上表一致；G37 现为 **10 contigs**（merge 用
+> `--min-contig-len 1000` 丢弃早前未过滤纪录中包含的 3 条 <1000bp 尾部
+> 子区 contig_11/12/13，共 2331 bp；N50 不变 121382）。该差异为测量口径
+> 差异（gate 统一 merge 过滤 <1000bp），非代码回归，且合并基准与模板
+> `9_quast.sh` 一致。
 
 ---
 
@@ -227,13 +234,18 @@ QUAST `--min-contig 10`（同模板 9_quast.sh 口径）。
 * 单级门禁（Q25L60X80P001 组）4 mis 与修复前持平——单级 unitig 层
   mis 由下游多组 anchor 投票消解，与全链 0 mis 不矛盾。
 
-### bcer: 现代流程门禁（待跑）
+### bcer: 现代流程门禁（2026-08-20 已跑）
 
-* 数据已就位（本地 R1/R2 + ref），按 template/run 节命令执行即可；
-* 关注点：低 GC（~38%）5.43 Mb 基因组（首个革兰氏阳性条目）下
-  `multik --all-masters` + 跨组 `olc --unitigs --cross-validate` 的表现；
-  老流程基线 fill N50 61,075 / 159 条（Sum 5,317,582 ≈ 参考 97.9%）；
-* 复现记录建议放 `/tmp/bcer_gate/`（参照 dh5alpha_gate 的门禁链格式）。
+* 数据已就位（本地 R1/R2 + ref），用 `/tmp/bcer_full` 完整模板链初跑
+  （`--unitigger "multik unitig"`，非弃用的 `bcalm` 写法）；
+* **首个革兰氏阳性 / 低 GC（~38%）/ 多复制子（染色体 + pBc10987 质粒）**
+  视角：multik 相关组装（merge_multik / merge_mr_multik / merge_unitig /
+  merge_mr_unitig / merge_anchors）**全部 0 mis**；`merge_anchors`
+  N50 62,043、GF 98.517、Dup 1.018；`merge_mr_multik` N50 44,305、
+  GF 98.488。对比组装器 megahit 7 mis / mr_megahit 1 mis；
+* 对照老流程基线（见 `results/model_org.md` §bcer statQuast）：多复制子上
+  Dup>1 由质粒/重复区正常放大；无 cv（单样本，非共组装场景）；
+* 工作目录 `/tmp/bcer_full`（quast `--min-contig 100`，同模板口径）。
 
 ### rsph: 现代流程门禁（待跑）
 

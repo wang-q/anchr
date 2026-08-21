@@ -143,7 +143,8 @@ pub(crate) fn probe_kmer(
 /// `computeBridgingReads` — a chimeric link joining two distant regions has
 /// no reads covering the junction and is pruned). `table` is the reads-only
 /// probe table shared across rounds. Links whose probe cannot be built
-/// (short unitigs) are kept conservatively.
+/// (short unitigs) are dropped as well: an unverifiable junction is not
+/// compacted, so such fragments stay independent output.
 pub(crate) fn bridge_filter(
     unitigs: &[Unitig],
     links: &mut [Vec<Link>],

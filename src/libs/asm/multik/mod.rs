@@ -95,6 +95,16 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
             Kmer::MAX_K
         );
     }
+    anyhow::ensure!(
+        opts.min_count_seed >= 1,
+        "min-count-seed must be >= 1, got {} (0 makes every k-mer solid in pass 0 and empties --guide-contigs pseudo-reads)",
+        opts.min_count_seed
+    );
+    anyhow::ensure!(
+        opts.min_count_extend >= 1,
+        "min-count-extend must be >= 1, got {} (0 silently disables all chimeric-junction validation)",
+        opts.min_count_extend
+    );
     ks.sort_unstable();
     ks.dedup();
 
@@ -112,9 +122,10 @@ pub fn assemble_multik(infiles: &[String], opts: &MultikOptions) -> Result<Vec<M
 
 /// Auto-derived master-k sequence from the input reads' read-length N50.
 /// Public for the CLI `--print-ks` helper: the template uses it to drive
-/// per-master parallel runs with a sequence that adapts to the reads
-/// (short 150 bp reads get 50/70/90/110; merged ~450 bp reads get
-/// 51/71/91/.../251), instead of hard-coding k values.
+/// per-master parallel runs with the fixed ladder
+/// `31,41,51,61,71,81,101,121,128,160,192` truncated at
+/// `clamp(N50/2, 81, 192)` (150 bp reads get 31..81, ~450 bp merged reads
+/// get the full ladder up to 192), instead of hard-coding k values.
 pub fn auto_ks_for_reads(infiles: &[String]) -> Result<Vec<usize>> {
     Ok(auto_ks(read_n50(&read_records(infiles)?)))
 }
@@ -130,6 +141,7 @@ mod tests {
     use super::*;
     use crate::libs::asm::assemble::{compute_links, Link, Unitig};
     use crate::libs::asm::table::{base_code, Kmer as TdKmer};
+    use pgr::libs::nt::rev_comp;
     use std::io::Write;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -255,6 +267,53 @@ mod tests {
         );
         // Zero/empty input yields no ks.
         assert!(auto_ks(0).is_empty());
+    }
+
+    /// Round 1 prunes a low-abundance isolated unitig into the carry; round
+    /// 2 must re-feed it so it survives as output (a silent drop here loses
+    /// the low-abundance species).
+    #[test]
+    fn carried_unitigs_are_refed_into_next_round() {
+        // Deterministic pseudo-random sequences (non-periodic, so they
+        // assemble into clean linear unitigs).
+        let mut x: u64 = 0x1234_5678_9abc_def0;
+        let mut rand = |n: usize| -> Vec<u8> {
+            (0..n)
+                .map(|_| {
+                    x ^= x << 13;
+                    x ^= x >> 7;
+                    x ^= x << 17;
+                    b"ACGT"[x as usize % 4]
+                })
+                .collect()
+        };
+        let a = rand(250);
+        let b = rand(250);
+        let mut reads: Vec<String> = Vec::new();
+        for _ in 0..30 {
+            reads.push(String::from_utf8(a.clone()).unwrap());
+        }
+        for _ in 0..3 {
+            reads.push(String::from_utf8(b.clone()).unwrap());
+        }
+        let out = run(
+            &reads.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+            &[21, 31, 41],
+        );
+        // Region B must survive as an independent unitig (re-fed carry),
+        // on either strand.
+        let b_head = String::from_utf8_lossy(&b[..100]).into_owned();
+        let b_head_rc =
+            String::from_utf8_lossy(&rev_comp(&b[..100]).collect::<Vec<_>>()).into_owned();
+        let survived = out.iter().any(|u| {
+            u.bases.len() >= 200
+                && (String::from_utf8_lossy(&u.bases).contains(&b_head)
+                    || String::from_utf8_lossy(&u.bases).contains(&b_head_rc))
+        });
+        assert!(
+            survived,
+            "low-abundance isolated unitig was lost from output"
+        );
     }
 
     #[test]

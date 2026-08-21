@@ -31,7 +31,7 @@ Notes:
   read files (FASTA/FASTQ, plain or gzipped) — use the SAME coverage subset
   that produced the unitigs (not the full read set), so the depth matches
 * Output FASTA names carry the source unitig and interval
-  (`<unitig>_<start>-<end>`), 70-column wrapped
+  (`anchor_<n>_<unitig>_<start>-<end>`), 70-column wrapped
 
 Examples:
 1. Anchors from one coverage set:
@@ -101,8 +101,8 @@ Examples:
                 .short('p')
                 .num_args(1)
                 .default_value("8")
-                .value_parser(value_parser!(usize))
-                .help("Worker threads for the read mapping"),
+                .value_parser(clap::builder::RangedU64ValueParser::<usize>::new().range(1..=1024))
+                .help("Worker threads for the read mapping (1..=1024)"),
         )
         .arg(
             Arg::new("stats")
@@ -133,6 +133,13 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     let read_files = infiles[1..].to_vec();
     let outfile = crate::cmd::args::get_outfile(args);
     crate::cmd::args::ensure_outfile_distinct(outfile, infiles.iter().map(|s| s.as_str()))?;
+    // `--stats` is a second output: it must not collide with `-o` or any
+    // input (the writer truncates whatever it opens). Checked up front so
+    // an invalid path fails before the mapping work.
+    if let Some(stats_file) = args.get_one::<String>("stats") {
+        crate::cmd::args::ensure_outfiles_distinct([outfile, stats_file.as_str()])?;
+        crate::cmd::args::ensure_outfile_distinct(stats_file, infiles.iter().map(|s| s.as_str()))?;
+    }
 
     let opts = AnchorOptions {
         mincov: *args.get_one::<u32>("mincov").unwrap(),
@@ -141,6 +148,16 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         uscale: *args.get_one::<f64>("uscale").unwrap(),
         min_len: *args.get_one::<usize>("min_anchor_len").unwrap(),
     };
+    anyhow::ensure!(
+        opts.lscale > 0.0,
+        "--lscale must be > 0, got {}",
+        opts.lscale
+    );
+    anyhow::ensure!(
+        opts.uscale > 0.0,
+        "--uscale must be > 0, got {}",
+        opts.uscale
+    );
     let k = *args.get_one::<usize>("kmer").unwrap();
     let parallel = *args.get_one::<usize>("parallel").unwrap();
 

@@ -64,3 +64,64 @@ fn command_asm_anchor_in_help() {
     let (stdout, _) = AnchrCmd::new().args(&["asm", "--help"]).run();
     assert!(stdout.contains("anchor"), "asm help must list anchor");
 }
+
+/// `--stats` is a second output: pointing it at the same path as `-o` would
+/// truncate the first writer's output, so it must be rejected up front.
+#[test]
+fn command_asm_anchor_stats_not_outfile() {
+    let dir = tempfile::tempdir().unwrap();
+    let ut = dir.path().join("ut.fa");
+    let reads = dir.path().join("reads.fa");
+    let a100 = "A".repeat(100);
+    fs::write(&ut, format!(">unitig_1,len=100,cov=5\n{a100}\n")).unwrap();
+    fs::write(&reads, format!(">r1\n{a100}\n>r2\n{a100}\n>r3\n{a100}\n")).unwrap();
+    let same = dir.path().join("same.tsv");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "anchor",
+            ut.to_str().unwrap(),
+            reads.to_str().unwrap(),
+            "--mincov",
+            "1",
+            "--min-anchor-len",
+            "1",
+            "-o",
+            same.to_str().unwrap(),
+            "--stats",
+            same.to_str().unwrap(),
+        ])
+        .run_fail();
+    assert!(
+        stderr.contains("output files must be distinct"),
+        "expected a distinct-output error, got: {stderr}"
+    );
+}
+
+/// `--lscale`/`--uscale` are the coverage-window denominator/multiplier: 0
+/// yields NaN/inf bounds and a silently empty anchor set, so reject it.
+#[test]
+fn command_asm_anchor_rejects_zero_lscale() {
+    let dir = tempfile::tempdir().unwrap();
+    let ut = dir.path().join("ut.fa");
+    let reads = dir.path().join("reads.fa");
+    fs::write(&ut, ">u1\nACGTACGTACGTACGTACGT\n").unwrap();
+    fs::write(&reads, ">r1\nACGTACGTACGTACGTACGT\n").unwrap();
+    let out = dir.path().join("out.fa");
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "anchor",
+            ut.to_str().unwrap(),
+            reads.to_str().unwrap(),
+            "--lscale",
+            "0",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .run_fail();
+    assert!(
+        stderr.contains("--lscale must be > 0"),
+        "expected an lscale error, got: {stderr}"
+    );
+}

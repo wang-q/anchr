@@ -121,3 +121,79 @@ fn command_asm_extend_in_help() {
     let (stdout, _) = AnchrCmd::new().args(&["asm", "--help"]).run();
     assert!(stdout.contains("extend"), "asm help must list extend");
 }
+
+/// `-o` must not overwrite any input: pointing it at a read file would
+/// truncate the reads on disk, so it is rejected up front (along with the
+/// contigs collision) before any file is written.
+#[test]
+fn command_asm_extend_outfile_not_reads() {
+    let dir = tempfile::tempdir().unwrap();
+    let reads = dir.path().join("reads.fa");
+    let contigs = dir.path().join("contigs.fa");
+
+    let mut rng = 2026u64;
+    let mut genome = Vec::new();
+    for _ in 0..300 {
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        genome.push(b"ACGT"[(rng >> 33) as usize % 4]);
+    }
+    let mut fa = String::new();
+    for i in 0..10 {
+        fa.push_str(&format!(">r{i}\n"));
+        fa.push_str(&String::from_utf8(genome.clone()).unwrap());
+        fa.push('\n');
+    }
+    fs::write(&reads, fa.clone()).unwrap();
+    let cf = format!(">c1\n{}\n", std::str::from_utf8(&genome[..170]).unwrap());
+    fs::write(&contigs, cf).unwrap();
+
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "extend",
+            contigs.to_str().unwrap(),
+            reads.to_str().unwrap(),
+            "-o",
+            reads.to_str().unwrap(),
+        ])
+        .run_fail();
+    assert!(
+        stderr.contains("output file"),
+        "expected an output-collision error, got: {stderr}"
+    );
+    // The read file must be untouched (the check runs before the writer).
+    assert_eq!(fs::read_to_string(&reads).unwrap(), fa);
+}
+
+/// `--min-support 0` would append bases with zero read support (the all-zero
+/// extension counts pass the `>= 2x runner-up` majority check), silently
+/// extending contigs through unsupported sequence, so it is rejected.
+#[test]
+fn command_asm_extend_rejects_zero_min_support() {
+    let dir = tempfile::tempdir().unwrap();
+    let reads = dir.path().join("reads.fa");
+    let contigs = dir.path().join("contigs.fa");
+    let out = dir.path().join("out.fa");
+
+    fs::write(&reads, ">r1\nACGTACGTACGTACGTACGTACGTACGTACGT\n").unwrap();
+    fs::write(&contigs, ">c1\nACGTACGTACGTACGTACGTACGTACGTACGT\n").unwrap();
+
+    let (_, stderr) = AnchrCmd::new()
+        .args(&[
+            "asm",
+            "extend",
+            contigs.to_str().unwrap(),
+            reads.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--min-support",
+            "0",
+        ])
+        .run_fail();
+    assert!(
+        stderr.contains("min_support must be >= 1"),
+        "expected a min_support error, got: {stderr}"
+    );
+}

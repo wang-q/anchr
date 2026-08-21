@@ -54,7 +54,7 @@ Examples:
                 .num_args(1)
                 .default_value("31")
                 .value_parser(value_parser!(usize))
-                .help("Seed k-mer length (default 31)"),
+                .help("Seed k-mer length (default 31; 2..=256, the k-mer key limit)"),
         )
         .arg(
             Arg::new("max_extend")
@@ -98,6 +98,13 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         .unwrap()
         .cloned()
         .collect();
+    let outfile = crate::cmd::args::get_outfile(args);
+    // Reject `-o` that would overwrite any input (contigs or reads): the
+    // writer opens and truncates whatever it is pointed at.
+    crate::cmd::args::ensure_outfile_distinct(
+        outfile,
+        std::iter::once(contigs_file.as_str()).chain(infiles.iter().map(|s| s.as_str())),
+    )?;
     let contigs: Vec<(String, Vec<u8>)> = read_fasta(std::slice::from_ref(contigs_file))?
         .into_iter()
         .map(|r| (r.name, r.seq))
@@ -113,8 +120,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
     };
     let extended = extend_contigs(&contigs, reads, &opts)
         .with_context(|| format!("failed to extend contigs in {contigs_file}"))?;
-    let outfile = crate::cmd::args::get_outfile(args);
-    crate::cmd::args::ensure_outfile_distinct(outfile, std::iter::once(contigs_file.as_str()))?;
     let mut out = pgr::libs::io::writer(outfile)
         .with_context(|| format!("failed to open output {outfile}"))?;
     for (i, (name, seq)) in extended.iter().enumerate() {

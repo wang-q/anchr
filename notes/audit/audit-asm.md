@@ -3,12 +3,13 @@
 > 维护约定：本文是迁移时的审计快照；后续 anchr 侧对 asm 的修改应更新本
 > 审计记录（而非 pgr 侧）。
 
-对 `anchr asm` 全部 7 个子命令（contig/unitig/ovlp/layout/cns/olc/map）及相关库
-文件（`libs/asm/assemble/`、`libs/asm/table.rs`、`libs/asm/refine.rs`、`libs/olc/overlap.rs`、
-`libs/olc/layout.rs`、`libs/olc/consensus.rs`、`libs/map.rs`，以及
-`cmd/asm/common.rs`）和全部测试/文档进行审核。以下仅保留有借鉴意义的结论；
-逐轮验证过程已精简（第一轮发现并修复 5 类问题，第二、三轮复核未再发现新问题，
-第四轮为迁移后代码路径复核 + 文档准确性修正）。
+对 `anchr asm` 全部 10 个子命令（anchor/contig/unitig/extend/ovlp/layout/cns/multik/olc/map）及相关库
+文件（`libs/asm/assemble/`、`libs/asm/table.rs`、`libs/asm/refine.rs`、`libs/asm/extend.rs`、
+`libs/asm/multik/`、`libs/olc/overlap.rs`、`libs/olc/layout.rs`、`libs/olc/consensus.rs`、
+`libs/olc/anchor.rs`、`libs/map.rs`，以及 `cmd/asm/common.rs`）和全部测试/文档进行审核。
+以下仅保留有借鉴意义的结论；逐轮验证过程已精简（第一轮发现并修复 5 类问题，第二、三轮复核未再发现新问题，
+第四轮为迁移后代码路径复核 + 文档准确性修正；第十一、十二轮为新增子命令 anchor/extend/multik
+的纵深审核与文档同步）。
 
 > 注：本报告初版（2026-08-12）审核的是迁移前的 `src/cmd_pgr/asm/`；`asm` 已迁移至
 > `src/cmd/asm/`，本版路径已全部更新为迁移后的位置。
@@ -22,6 +23,9 @@
 | cns    | `src/cmd/asm/cns.rs`    | `libs/olc/consensus.rs` |
 | olc    | `src/cmd/asm/olc.rs`    | 上述全部 |
 | map    | `src/cmd/asm/map.rs`    | `libs/map.rs` |
+| anchor | `src/cmd/asm/anchor.rs` | `libs/olc/anchor.rs`, `libs/map.rs` |
+| extend | `src/cmd/asm/extend.rs` | `libs/asm/extend.rs` |
+| multik | `src/cmd/asm/multik.rs` | `libs/asm/multik/` |
 
 共享：`src/cmd/asm/common.rs`。
 
@@ -238,12 +242,88 @@ asm 家族对照 BBTools tadpole（contig）、BCALM2/GATB `ograph.cpp graph3`
 编译与 54 个 asm 用例通过），未发现新的代码/文档缺陷，零悬空策略闭环、边界与
 溢出不变量健全，审核收敛。
 
+## 第十一轮复核（新增子命令 anchor/extend/multik 纵深审核）
+
+对 `asm` 迁移后新增的三个子命令（anchor/extend/multik）及其库做了逐行纵深审核，发现并修复以下缺陷：
+
+- **`extend` 的 `-o` 数据安全缺陷**：`cmd/asm/extend.rs` 只对 `-o` 校验了 contigs 文件
+  （`ensure_outfile_distinct(outfile, [contigs])`），未校验 reads 输入文件。由于 writer
+  在 walk 前打开并截断目标，`-o` 指向任一 reads 文件会直接销毁用户输入。修复：校验
+  扩展到 `contigs + 全部 infiles`，并前移到读取输入之前（fail-fast）。回归
+  `command_asm_extend_outfile_not_reads`（校验失败后 reads 文件内容保持不变）。
+- **`anchor --stats` 冲突校验延迟**：`cmd/asm/anchor.rs` 的 `--stats` 与 `-o`/输入的
+  冲突校验原先在 `map_files` + SAM 解析之后才执行，无效路径会白跑一轮映射。修复：移到
+  映射前，与 `-o` 的 `ensure_outfile_distinct` 并列执行。
+- **`docs/asm.md` 缺失 anchor/extend 子命令**：`cmd/asm/mod.rs` 注册 10 个子命令，而
+  `docs/asm.md` 只列了 8 个（缺 anchor/extend）。修复：子命令列表补两行，并新增完整的
+  `## anchor`、`## extend` 文档段（参数、语义、示例，与帮助文本一致）。
+- **`docs/asm.md` k-mer 上限过时（128→256）**：pgr `key::Kmer::MAX_K` 已升至 256
+  （对标 megahit，2026-08-16），全部 asm CLI help 也已同步为 `1..=256`（contig/unitig/
+  map/ovlp/olc/multik），但 `docs/asm.md` 仍写 `up to 128`/`1..=128`。修复：统一为
+  256。注：multik 的 `auto_ks` 阶梯独立封顶 192（读长驱动、残留错误经验值），不受此影响，
+  文档本已与 `auto_ks` 代码一致。
+- **`extend` 的 `-k` 帮助未标范围**：家族内其他命令的 `-k`/`--overlap-k` 帮助都注明
+  `1..=256`，`extend` 只写 "(default 31)"，而库层 `extend_contigs` 要求 `k in 2..=MAX_K`。
+  补为 "(default 31; 2..=256, the k-mer key limit)"。
+- **`docs/asm.md` multik 段缺 `--merge-similar`/`--merge-len`**：命令定义了这两个泡泡
+  合并选项且做范围校验，但 multik 文档的 Options 列表漏列。修复：补两行（参数与默认值，
+  与帮助文本一致）。
+- **`multik --print-ks` 忽略 `--list-files`**：`--print-ks` 分支原先在解析 infiles
+  之前判断 `is_list`（默认 false），传 `--list-files` 时把列表文件当普通 FASTA 读，
+  导致报错。修复：`execute` 开头即读 `list_files` flag，`--print-ks` 与主路径共用
+  `resolve_paths(f, is_list)`。回归 `command_asm_multik_print_ks_list_files`。
+- **`multik`/`anchor` 的 `--parallel` 无范围校验**：`multik` 用
+  `RangedU64ValueParser 0..=1024`（0 = 全部核心），`anchor` 用 `1..=1024`，防越界值
+  破坏 rayon 线程池构建。
+
+复核确认无需修改的路径：
+
+- `multik`：`--kmer` 解析在库层 `assemble_multik` 校验 `1..=256` 并对 `--list-files`
+  空解析报友好错误；`--print-ks` 已尊重 `--list-files`；`--merge-similar`/`--merge-len`/
+  `--parallel` 均已在前置校验。k 序列内部 `sort + dedup`，`auto_ks` 空 reads 返回空序列
+  报友好错误，均无 panic。
+- `anchor`：空映射（read_len=0 / 全 0 覆盖）时 `anchor_stats` 返回全 0 边界，
+  `anchor_regions` 的 `half=0` 走非边缘分支、无除零（`read_len` 作除数仅在 `half > 0`
+  时进入），`extract_anchors` 切片边界由 regions 生成规则保证，无越界。
+- `extend`：`extend_contigs` 校验 `k in 2..=MAX_K`；`min_len`/`min_extend` 语义与文档
+  一致（短 contig 原样通过）；`cross_contig_kmers`/`is_foreign` 的跨 contig 护栏
+  （`MIN_FOREIGN_RUN=5` 回滚）与低覆盖 seam 护栏（`MIN_LOW_RUN=5` 回滚）均有单元测试
+  覆盖，无 panic 路径。
+
+第十一轮结论：`cargo fmt`/`clippy --all-targets` 干净，extend/anchor/multik 集成测试
+（4+4+10）与全部 asm 集成测试、107 个 lib 测试通过。
+
+## 第十二轮复核（第十一轮修复的复核 + 未覆盖路径）
+
+对第十一轮的修复逐项复核，并补扫此前未覆盖的路径，发现并修复 3 处新缺陷：
+
+- **`bridge_filter` 文档与行为不一致**：`libs/asm/multik/bridge.rs` 的 `bridge_filter`
+  注释称"短 unitig 的 link 保守保留"，而实现实际是**丢弃**无法构建 junction 探针的
+  link（短 unitig 探针构建失败即删除）。注释与代码矛盾会误导后续维护者。修复：注释改
+  为与实现一致的行为描述（未经验证的 junction 不压缩，碎片保持独立输出）。
+- **`extend --min-support 0` 静默错误扩展**：`extend_contigs` 未校验 `--min-support`
+  下界，`0` 时扩展计数全 0 仍能通过 `>= 2x runner-up` 多数判定，导致无 read 支持地
+  追加碱基（静默扩展出无支撑序列）。修复：库层 `ensure!(opts.min_support >= 1)` 友好
+  报错。回归 `command_asm_extend_rejects_zero_min_support`。
+- **调试 trace 函数无效目录 panic**：`master.rs` 的 `trace_chains`/`trace_graph` 在
+  `ANCHR_MULTIK_TRACE_DIR` 指向无效/不可写路径时 `File::create(...).unwrap()` panic。
+  trace 是调试辅助，不应因环境变量错误而中断主流程。修复：改用 `if let Ok(f) = ...`
+  静默跳过。复核时确认：`trace_graph` 的 `links[i]` 索引与 `unitigs` 一一对应，循环内
+  `i` 均 < `unitigs.len()`，无越界。
+
+第十二轮结论：`cargo fmt`/`clippy --all-targets` 干净，extend/anchor/multik 集成测试
+（5+4+12）与全部 asm 集成测试通过。
+
 ## 结论
 
 `asm` 命令族审核完成（累计修复 5 类问题 + 4 处 `-o` 防护统一 + 1 处 `--keep-dir`
 文档修正 + 1 处 `--outm`/`--outu` 冲突防护 + 1 处 `--overlap-k` 上限校验 + 第七轮
 3 处：`map` 帮助单复数、`contig`/`unitig` 的 `-k` 上限帮助、`cns` 布局 id 连续性与
 巨型分配防护 + 第九轮 2 处：`unitig --links` 悬空引用、`asm_map_benchmark.rs` 编译
-错误），经纵深复核收敛；与 BBTools/BCALM
+错误 + 第十一轮 6 处：`extend` 的 `-o` 数据安全、`anchor --stats` 校验 fail-fast、
+`docs/asm.md` 补 anchor/extend 文档、`docs/asm.md` k 上限 128→256、`extend` 的 `-k`
+帮助范围、`docs/asm.md` multik 段补 `--merge-similar`/`--merge-len` + 第十二轮 3 处：
+`bridge_filter` 文档-行为一致性、`extend --min-support 0` 校验、multik trace 无效目录
+容错），经纵深复核收敛；与 BBTools/BCALM
 语义对拍、边界输入验证零 panic，`cargo fmt`/`clippy` 干净（asm 相关无新增告警），
 相关集成测试与 `cargo test --lib` 全部通过。

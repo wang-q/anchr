@@ -1009,8 +1009,8 @@ Table: statQuast
 ## *Bacillus cereus* ATCC 10987
 
 > GAGE-B MiSeq 数据集（100× 子集），reads 与参考**同株**（见 reference
-> 节实测）。老流程基线（2025-06）来自 `results/gage_b.md`；现代流程门禁
-> 待跑（见 `scripts/asm_gate.md` §gate history）。
+> 节实测）。现代流程初跑质量基线见下 §statQuast；老流程基线（2025-06）来自
+> `results/gage_b.md`（门禁笔记见 `scripts/asm_gate.md` §gate history）。
 
 ### bcer: reference
 
@@ -1092,7 +1092,7 @@ anchr template \
     --merge \
     \
     --cov "40 80" \
-    --unitigger "multik unitig bcalm" \
+    --unitigger "multik unitig" \
     --statp 2 \
     --uscale 2 \
     --lscale 3
@@ -1122,9 +1122,44 @@ bash 0_script/0_master.sh
 
 ```
 
-现代流程门禁**待跑**（本地数据已齐，可直接执行；见
-`scripts/asm_gate.md` §gate history）；老流程 2025-06 运行见
-`results/gage_b.md`。
+现代流程门禁**已跑**（2026-08-20，`/tmp/bcer_full`，完整模板链）；质量基线见
+下节 statQuast。老流程 2025-06 运行见 `results/gage_b.md`。
+
+**现代流程初跑**：首个革兰氏阳性 / 低 GC（~38%）/ 多复制子（染色体 +
+pBc10987 质粒）数据集。multik 相关组装**全部 0 mis**（megahit 7 mis、
+mr_megahit 1 mis 为对比组装器）。`merge_anchors` N50 62,043 / GF 98.517、
+`merge_mr_multik` N50 44,305 / GF 98.488。
+
+Table: statFinal（现代流程）
+
+| Name                    |     N50 |     Sum |    # |
+| ----------------------- | ------: | ------: | ---: |
+| Genome                  | 5224283 |   5.43M |    2 |
+| Paralogs                |    2062 | 229.99K |  111 |
+| repetitive              |    3070 | 139.22K |  228 |
+| 7_merge_anchors.anchors |   62043 |   5.45M |  160 |
+| spades.contig           |  180120 |   5.37M |  154 |
+| spades.scaffold         |  485264 |   5.37M |  130 |
+| mr_spades.contig        |   99602 |   5.37M |  127 |
+| mr_spades.scaffold      |  284749 |   5.37M |   64 |
+| megahit.contig          |   41592 |   5.36M |  270 |
+| mr_megahit.contig       |   81902 |   5.38M |  163 |
+
+Table: statQuast（现代流程）
+
+* Assembly quality by QUAST（quast `--min-contig 100`，同 g37/mg1655/dh5alpha 口径）
+
+| Assembly         | # contigs | Largest |  Total |    N50 | # mis |   GF% |  Dup | N/100k | mm/100k | indel/100k |
+| ---------------- | --------: | ------: | -----: | -----: | ----: | ----: | ---: | -----: | ------: | ---------: |
+| merge_multik     |       434 |  105500 | 5393602 |  18970 |     0 | 97.789 | 1.015 |   0.00 |    1.76 |       2.06 |
+| merge_mr_multik  |       216 |  156918 | 5456985 |  44305 |     0 | 98.488 | 1.019 |   0.00 |    0.97 |       2.15 |
+| merge_unitig     |       283 |  134604 | 5350197 |  32701 |     0 | 97.812 | 1.006 |   0.00 |    1.44 |       2.06 |
+| merge_mr_unitig  |       166 |  424366 | 5441733 |  60388 |     0 | 98.455 | 1.017 |   0.00 |    0.53 |       1.95 |
+| merge_anchors    |       160 |  424369 | 5449087 |  62043 |     0 | 98.517 | 1.018 |   0.00 |    1.12 |       2.11 |
+| spades           |       131 |  611981 | 5363784 | 180120 |     0 | 98.616 | 1.001 |   0.00 |    4.78 |       2.78 |
+| mr_spades        |       127 |  483871 | 5367611 |  99602 |     0 | 98.678 | 1.001 |   0.00 |    1.01 |       2.22 |
+| megahit          |       270 |  210929 | 5361779 |  41592 |     7 | 98.521 | 1.001 |   0.00 |    2.17 |       2.69 |
+| mr_megahit       |       163 |  483817 | 5383481 |  81902 |     1 | 98.854 | 1.002 |   0.00 |    2.47 |       2.64 |
 
 ### bcer: 老流程基线（2025-06 GAGE-B）
 

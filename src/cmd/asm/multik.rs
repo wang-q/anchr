@@ -16,7 +16,9 @@ each unitig junction must be solid (count >= --min-count-extend) in the
 reads plus the previous unitigs, and every internal k-mer of a long-enough
 unitig must stay solid (chimeric-unitig cleanup). A progressive abundance
 filter then drops the lowest-abundance unitigs (cutoff grows ~10% per round
-from 1.1 up to the graph maximum) and recompacts surviving chains — only
+from 1.1 up to 25% of the median unitig coverage, not the graph maximum — a
+repeated region can inflate it to hundreds of x) and recompacts surviving
+chains — only
 branching junctions and isolated nodes are pruned by abundance, unique-chain
 unitigs (the main path) are always kept, so coverage fluctuations within one
 genome do not break the assembly. High-coverage strain divergence dissolves,
@@ -43,9 +45,10 @@ Notes:
   unitigs guide the later masters (each contig feeds their counts as
   pseudo-reads repeated to the solid threshold), the built-in counterpart
   of `--guide-contigs`
-* `--kmer auto` (default) derives the sequence from the read-length N50
-  (~1/3 of the read length up to 51, e.g. 50/70/90/110 for 150 bp reads,
-  51/81/111 for long reads)
+* `--kmer auto` (default) derives the sequence from the read-length N50:
+  the fixed ladder 31,41,51,61,71,81,101,121,128,160,192 truncated at
+  `clamp(N50/2, 81, 192)` (e.g. 150 bp reads get 31..81, ~450 bp merged
+  reads get the full ladder up to 192)
 * Output unitigs are written longest-first with `unitig_<id>` FASTA headers
   carrying length and coverage
 
@@ -97,7 +100,7 @@ Examples:
                 .long("merge-len")
                 .num_args(1)
                 .value_parser(value_parser!(usize))
-                .help("Bubble merge: maximum alternative-path length as k multiples (default 20)"),
+                .help("Bubble merge: maximum alternative-path length as k multiples (default 20; 1..=1024)"),
         )
         .arg(
             Arg::new("parallel")
@@ -105,8 +108,8 @@ Examples:
                 .short('p')
                 .num_args(1)
                 .default_value("0")
-                .value_parser(value_parser!(usize))
-                .help("Worker threads for counting; 0 = all cores"),
+                .value_parser(clap::builder::RangedU64ValueParser::<usize>::new().range(0..=1024))
+                .help("Worker threads for counting; 0 = all cores (0..=1024)"),
         )
         .arg(
             Arg::new("guide_contigs")
@@ -159,12 +162,12 @@ Examples:
 
 /// Execute the multik command.
 pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
+    let is_list = args.get_flag("list_files");
     if args.get_flag("print_ks") {
-        let infiles: Vec<String> = args
-            .get_many::<String>("infiles")
-            .unwrap()
-            .flat_map(|f| pgr::libs::par::resolve_paths(f, false).unwrap_or_default())
-            .collect();
+        let mut infiles: Vec<String> = Vec::new();
+        for f in args.get_many::<String>("infiles").unwrap() {
+            infiles.extend(pgr::libs::par::resolve_paths(f, is_list)?);
+        }
         let ks = crate::libs::asm::multik::auto_ks_for_reads(&infiles)
             .with_context(|| "failed to derive the k sequence from the reads")?;
         println!(
@@ -176,7 +179,6 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
         );
         return Ok(());
     }
-    let is_list = args.get_flag("list_files");
     let mut infiles: Vec<String> = Vec::new();
     for f in args.get_many::<String>("infiles").unwrap() {
         infiles.extend(pgr::libs::par::resolve_paths(f, is_list)?);
@@ -216,6 +218,19 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             })
             .collect::<anyhow::Result<_>>()?
     };
+    let merge_similar = args
+        .get_one::<f64>("merge_similar")
+        .copied()
+        .unwrap_or(0.95);
+    let merge_len = args.get_one::<usize>("merge_len").copied().unwrap_or(20);
+    anyhow::ensure!(
+        merge_similar > 0.0 && merge_similar <= 1.0,
+        "--merge-similar must be in (0.0, 1.0], got {merge_similar}"
+    );
+    anyhow::ensure!(
+        (1..=1024).contains(&merge_len),
+        "--merge-len must be in 1..=1024 (it multiplies the master k; >1024 overflows), got {merge_len}"
+    );
     let opts = MultikOptions {
         ks,
         min_count_seed,
@@ -223,11 +238,8 @@ pub fn execute(args: &ArgMatches) -> anyhow::Result<()> {
             .get_one::<usize>("min_count_extend")
             .copied()
             .unwrap_or(2),
-        merge_similar: args
-            .get_one::<f64>("merge_similar")
-            .copied()
-            .unwrap_or(0.95),
-        merge_len: args.get_one::<usize>("merge_len").copied().unwrap_or(20),
+        merge_similar,
+        merge_len,
         parallel: *args.get_one::<usize>("parallel").unwrap(),
         all_masters: args.get_flag("all_masters"),
         use_guide: args.get_flag("use_guide"),
